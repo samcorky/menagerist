@@ -16,7 +16,7 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ class CreateNodeTypeCommand:
 class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, NodeType]):
     """Create and persist a new node type."""
 
-    access: ClassVar[Access] = Requires(GraphPermission.TYPE_WRITE)
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_WRITE)
 
     def __init__(
         self,
@@ -67,11 +67,17 @@ class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, Node
         else:
             attributes_schema = None
         async with self._uow as repos:
-            if await repos.node_types.get_by_slug(command.slug) is not None:
+            if (
+                await repos.node_types.get_by_slug(
+                    command.slug, scope=self.scope(actor)
+                )
+                is not None
+            ):
                 raise NodeTypeSlugConflictError(
                     f"NodeType with slug '{command.slug}' already exists"
                 )
             node_type = NodeType.create(
+                owner_id=actor.id,
                 slug=command.slug,
                 label=command.label,
                 description=command.description,

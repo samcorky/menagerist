@@ -11,7 +11,7 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ class ListNodeTypesQuery:
 class ListNodeTypes(QueryHandler[GraphRepos, ListNodeTypesQuery, list[NodeType]]):
     """List node types with keyset pagination."""
 
-    access: ClassVar[Access] = Requires(GraphPermission.TYPE_READ)
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_READ)
 
     def __init__(
         self,
@@ -45,7 +45,9 @@ class ListNodeTypes(QueryHandler[GraphRepos, ListNodeTypesQuery, list[NodeType]]
 
     async def _handle(self, query: ListNodeTypesQuery, actor: Actor) -> list[NodeType]:
         """Return a page of node types after `query.after`, up to `query.limit`."""
-        result = await self._repos.node_types.list(after=query.after, limit=query.limit)
+        result = await self._repos.node_types.list(
+            scope=self.scope(actor), after=query.after, limit=query.limit
+        )
         logger.debug("node types listed", count=len(result))
         return [await self._resolved(node_type) for node_type in result]
 

@@ -7,6 +7,7 @@ import structlog
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.errors import EdgeNotFoundError
 
@@ -61,7 +62,9 @@ class UpdateEdge(CommandHandler[GraphUnitOfWork, UpdateEdgeCommand, Edge]):
             self._guard.assert_can_modify(actor, edge.owner_id)
 
             if command.attributes is not None:
-                edge_type = await repos.edge_types.get_by_slug(slugify(edge.type))
+                edge_type = await repos.edge_types.get_by_slug(
+                    slugify(edge.type), scope=owner_scope(edge.owner_id)
+                )
                 if edge_type is not None and edge_type.attributes_schema is not None:
                     schema = await resolve_choice_lists(
                         edge_type.attributes_schema, self._choice_lists

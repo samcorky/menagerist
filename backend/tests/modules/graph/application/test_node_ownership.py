@@ -35,7 +35,7 @@ from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaFieldCommand,
 )
 from app.modules.graph.application.update_node import UpdateNode, UpdateNodeCommand
-from app.modules.graph.domain.errors import NodeNotFoundError
+from app.modules.graph.domain.errors import NodeNotFoundError, NodeTypeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
@@ -173,7 +173,7 @@ async def test_promote_is_not_found_for_someone_else() -> None:
     node = await _alices_item(
         repos, extra_schema={"properties": {"x": {"type": "string"}}}
     )
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=BOB.id, slug="film", label="Film")
     await repos.node_types.add(node_type)
     uow = InMemoryUnitOfWork(repos)
 
@@ -189,10 +189,12 @@ async def test_promote_is_not_found_for_someone_else() -> None:
 
 
 async def test_usage_counts_and_value_suggestions_use_the_viewers_scope() -> None:
-    """Counts and suggestions never include other people's items."""
+    """Each person counts their own items under their own copy of the type."""
     repos = _repos()
-    node_type = NodeType.create(slug="film", label="Film")
-    await repos.node_types.add(node_type)
+    alices_type = NodeType.create(owner_id=ALICE.id, slug="film", label="Film")
+    bobs_type = NodeType.create(owner_id=BOB.id, slug="film", label="Film")
+    await repos.node_types.add(alices_type)
+    await repos.node_types.add(bobs_type)
     await _alices_item(repos, type="film", attributes={"rating": "PG"})
     await repos.nodes.add(
         Node.create(
@@ -202,19 +204,23 @@ async def test_usage_counts_and_value_suggestions_use_the_viewers_scope() -> Non
 
     usage = CountNodeTypeAttributeUsage(repos, POLICY)
     values = ListAttributeValues(repos, POLICY)
-    usage_query = CountNodeTypeAttributeUsageQuery(
-        node_type_id=node_type.id, key="rating"
-    )
-    values_query = ListAttributeValuesQuery(node_type_id=node_type.id, key="rating")
 
-    assert await usage.handle(usage_query, ALICE) == 1
-    assert await usage.handle(usage_query, BOB) == 1
-    assert await values.handle(values_query, ALICE) == [
+    def usage_query(type_id: uuid.UUID) -> CountNodeTypeAttributeUsageQuery:
+        return CountNodeTypeAttributeUsageQuery(node_type_id=type_id, key="rating")
+
+    def values_query(type_id: uuid.UUID) -> ListAttributeValuesQuery:
+        return ListAttributeValuesQuery(node_type_id=type_id, key="rating")
+
+    assert await usage.handle(usage_query(alices_type.id), ALICE) == 1
+    assert await usage.handle(usage_query(bobs_type.id), BOB) == 1
+    assert await values.handle(values_query(alices_type.id), ALICE) == [
         AttributeValueCountResult(value="PG", count=1)
     ]
-    assert await values.handle(values_query, BOB) == [
+    assert await values.handle(values_query(bobs_type.id), BOB) == [
         AttributeValueCountResult(value="R", count=1)
     ]
+    with pytest.raises(NodeTypeNotFoundError):
+        await usage.handle(usage_query(bobs_type.id), ALICE)
 
 
 async def test_each_use_case_asks_the_guard_for_the_right_check() -> None:

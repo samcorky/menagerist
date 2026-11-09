@@ -56,7 +56,12 @@ async def test_create_node_validates_attributes_against_schema() -> None:
         "required": ["year"],
     }
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+        NodeType.create(
+            owner_id=SYSTEM_ACTOR.id,
+            slug="film",
+            label="Film",
+            attributes_schema=schema,
+        )
     )
     use_case = CreateNode(uow, InMemoryAccessGuard())
 
@@ -79,7 +84,12 @@ async def test_create_node_passes_valid_attributes() -> None:
         "required": ["year"],
     }
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+        NodeType.create(
+            owner_id=SYSTEM_ACTOR.id,
+            slug="film",
+            label="Film",
+            attributes_schema=schema,
+        )
     )
     use_case = CreateNode(uow, InMemoryAccessGuard())
 
@@ -102,7 +112,12 @@ async def test_create_node_ignores_required_in_schema() -> None:
         "x-menagerist": {"required": ["year"]},
     }
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+        NodeType.create(
+            owner_id=SYSTEM_ACTOR.id,
+            slug="film",
+            label="Film",
+            attributes_schema=schema,
+        )
     )
     use_case = CreateNode(uow, InMemoryAccessGuard())
 
@@ -138,6 +153,7 @@ async def test_create_node_merges_type_schema_and_extra_schema() -> None:
     uow, repos = _make_uow()
     await repos.node_types.add(
         NodeType.create(
+            owner_id=SYSTEM_ACTOR.id,
             slug="film",
             label="Film",
             attributes_schema={
@@ -173,6 +189,7 @@ async def test_create_node_rejects_extra_schema_redefining_a_type_field() -> Non
     uow, repos = _make_uow()
     await repos.node_types.add(
         NodeType.create(
+            owner_id=SYSTEM_ACTOR.id,
             slug="film",
             label="Film",
             attributes_schema={

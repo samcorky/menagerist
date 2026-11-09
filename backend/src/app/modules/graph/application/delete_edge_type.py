@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.errors import EdgeTypeInUseError, EdgeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -25,24 +25,25 @@ class DeleteEdgeTypeCommand:
 
 
 class DeleteEdgeType(CommandHandler[GraphUnitOfWork, DeleteEdgeTypeCommand, None]):
-    """Soft-delete an edge type (administrators only).
+    """Soft-delete an edge type (its owner only).
 
-    The in-use check spans every person's connections.
+    The in-use check covers only the owner's connections.
     """
 
-    access: ClassVar[Access] = Requires(GraphPermission.DELETE_EDGE_TYPE)
+    access: ClassVar[Access] = Content(GraphPermission.DELETE_EDGE_TYPE)
 
     async def _handle(self, command: DeleteEdgeTypeCommand, actor: Actor) -> None:
         """Soft-delete the edge type or raise EdgeTypeNotFoundError."""
         async with self._uow as repos:
-            edge_type = await repos.edge_types.get(command.edge_type_id)
+            edge_type = await repos.edge_types.get(
+                command.edge_type_id, scope=self.scope(actor)
+            )
             if edge_type is None:
                 raise EdgeTypeNotFoundError(
                     f"Edge type {command.edge_type_id} not found"
                 )
-            # admin-wide: affects every user's content
             if await repos.edges.has_edges_of_type(
-                str(edge_type.slug), scope=ContentFilter.everyone()
+                str(edge_type.slug), scope=owner_scope(edge_type.owner_id)
             ):
                 raise EdgeTypeInUseError(
                     f"Edge type '{edge_type.slug}' "

@@ -190,18 +190,19 @@ async def test_expired_types_and_presets_are_purged_unless_still_used(
     linked = Preset.create(kind="choice_list", label="Linked", definition={})
     spare = Preset.create(kind="choice_list", label="Spare", definition={})
     linked.deleted_at = spare.deleted_at = LONG_AGO
-    gone = NodeType.create(slug="gone", label="Gone")
-    carried = NodeType.create(slug="carried", label="Carried")
+    gone = NodeType.create(owner_id=ALICE, slug="gone", label="Gone")
+    carried = NodeType.create(owner_id=ALICE, slug="carried", label="Carried")
     gone.deleted_at = carried.deleted_at = LONG_AGO
     live_type = NodeType.create(
+        owner_id=ALICE,
         slug="live",
         label="Live",
         attributes_schema={
             "properties": {"genre": {"x-menagerist": {"list": str(linked.id)}}}
         },
     )
-    unused_link = EdgeType.create(slug="unused", label="Unused")
-    carried_link = EdgeType.create(slug="used", label="Used")
+    unused_link = EdgeType.create(owner_id=ALICE, slug="unused", label="Unused")
+    carried_link = EdgeType.create(owner_id=ALICE, slug="used", label="Used")
     unused_link.deleted_at = carried_link.deleted_at = LONG_AGO
     async with factory() as session:
         for preset in (linked, spare):
@@ -212,13 +213,13 @@ async def test_expired_types_and_presets_are_purged_unless_still_used(
         link_types = SqlAlchemyEdgeTypeRepository(session)
         for edge_type in (unused_link, carried_link):
             await link_types.add(edge_type)
-        item = Node.create(owner_id=BOB, name="Kept", type="carried")
-        other = Node.create(owner_id=BOB, name="Other", type=None)
+        item = Node.create(owner_id=ALICE, name="Kept", type="carried")
+        other = Node.create(owner_id=ALICE, name="Other", type=None)
         for node in (item, other):
             await SqlAlchemyNodeRepository(session).add(node)
         await SqlAlchemyEdgeRepository(session).add(
             Edge.create(
-                owner_id=BOB, source_id=item.id, target_id=other.id, type="used"
+                owner_id=ALICE, source_id=item.id, target_id=other.id, type="used"
             )
         )
         await session.commit()

@@ -111,7 +111,12 @@ async def test_update_edge_validates_attributes_against_schema() -> None:
     }
     edge_types = InMemoryEdgeTypeRepository()
     await edge_types.add(
-        EdgeType.create(slug="owns", label="Owns", attributes_schema=schema)
+        EdgeType.create(
+            owner_id=uuid.UUID(int=1),
+            slug="owns",
+            label="Owns",
+            attributes_schema=schema,
+        )
     )
     repository = InMemoryEdgeRepository()
     edge = Edge.create(
@@ -149,7 +154,12 @@ async def test_update_edge_ignores_stale_invalid_value_that_was_not_edited() -> 
     }
     edge_types = InMemoryEdgeTypeRepository()
     await edge_types.add(
-        EdgeType.create(slug="owns", label="Owns", attributes_schema=schema)
+        EdgeType.create(
+            owner_id=uuid.UUID(int=1),
+            slug="owns",
+            label="Owns",
+            attributes_schema=schema,
+        )
     )
     repository = InMemoryEdgeRepository()
     edge = Edge.create(

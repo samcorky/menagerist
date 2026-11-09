@@ -333,14 +333,22 @@ CASES: list[tuple[str, dict[str, Any], set[str], uuid.UUID]] = [
 
 async def _seed(repos: GraphRepos) -> None:
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=_YEAR_SCHEMA)
+        NodeType.create(
+            owner_id=ALICE, slug="film", label="Film", attributes_schema=_YEAR_SCHEMA
+        )
     )
-    await repos.node_types.add(NodeType.create(slug="person", label="Person"))
-    await repos.edge_types.add(EdgeType.create(slug="directed-by", label="Directed by"))
+    await repos.node_types.add(
+        NodeType.create(owner_id=ALICE, slug="person", label="Person")
+    )
     await repos.edge_types.add(
-        EdgeType.create(slug="related", label="Related", directional=False)
+        EdgeType.create(owner_id=ALICE, slug="directed-by", label="Directed by")
     )
-    retired = EdgeType.create(slug="retired", label="Retired")
+    await repos.edge_types.add(
+        EdgeType.create(
+            owner_id=ALICE, slug="related", label="Related", directional=False
+        )
+    )
+    retired = EdgeType.create(owner_id=ALICE, slug="retired", label="Retired")
     retired.soft_delete()
     await repos.edge_types.add(retired)
     for name, (owner, type_slug, year, tags, deleted) in ITEMS.items():

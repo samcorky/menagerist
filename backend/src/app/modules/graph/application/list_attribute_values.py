@@ -45,7 +45,9 @@ class ListAttributeValues(
         self, query: ListAttributeValuesQuery, actor: Actor
     ) -> list[AttributeValueCountResult]:
         """Return the values, or raise `NodeTypeNotFoundError` if missing."""
-        node_type = await self._repos.node_types.get(query.node_type_id)
+        node_type = await self._repos.node_types.get(
+            query.node_type_id, scope=self.scope(actor)
+        )
         if node_type is None:
             raise NodeTypeNotFoundError(f"NodeType {query.node_type_id} not found")
         values = await self._repos.nodes.list_attribute_values(

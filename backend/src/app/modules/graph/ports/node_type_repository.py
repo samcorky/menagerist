@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from app.modules.graph.domain.node_type import NodeType
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class NodeTypeRepository(Protocol):
@@ -19,14 +20,18 @@ class NodeTypeRepository(Protocol):
         """Persist changes to an existing node type."""
         ...
 
-    async def get(self, node_type_id: uuid.UUID) -> NodeType | None:
-        """Return the node type with `node_type_id`, or `None` if missing or deleted."""
+    async def get(
+        self, node_type_id: uuid.UUID, *, scope: ContentFilter
+    ) -> NodeType | None:
+        """Return the node type, or `None` if missing, deleted or outside `scope`."""
         ...
 
     async def get_by_slug(
-        self, slug: str, *, guard_item_write: bool = False
+        self, slug: str, *, scope: ContentFilter, guard_item_write: bool = False
     ) -> NodeType | None:
-        """Return the node type with `slug`, or `None` if missing or deleted.
+        """Return the node type with `slug` in `scope`, or `None` if missing/deleted.
+
+        A slug is unique per owner, so `scope` decides which person's type it is.
 
         With `guard_item_write` the caller is about to store an item of this
         type: the type is held against `get_for_removal` until the transaction
@@ -34,12 +39,16 @@ class NodeTypeRepository(Protocol):
         """
         ...
 
-    async def get_for_removal(self, node_type_id: uuid.UUID) -> NodeType | None:
+    async def get_for_removal(
+        self, node_type_id: uuid.UUID, *, scope: ContentFilter
+    ) -> NodeType | None:
         """Like `get`, but lock the type against concurrent item writes."""
         ...
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[NodeType]:
-        """List non-deleted node types ordered by id, starting after `after`."""
+    async def list(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> list[NodeType]:
+        """List non-deleted node types in `scope` ordered by id, after `after`."""
         ...
 
     async def list_deleted_before(
@@ -53,4 +62,13 @@ class NodeTypeRepository(Protocol):
 
     async def purge(self, node_type_id: uuid.UUID) -> None:
         """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        ...
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every item type with no owner or a legacy owner.
+
+        System-level, for the first-admin claim; returns the number changed.
+        """
         ...

@@ -121,21 +121,14 @@ class SqlAlchemyUserDatabaseRestorer(SqlAlchemyDatabaseRestorer):
             .mappings()
             .first()
         )
-        if name == "presets":
-            query = select(table).where(
-                table.c.kind == row["kind"],
-                table.c.label == row["label"],
-                table.c.deleted_at.is_(None),
-            )
-        else:
-            query = select(table).where(
-                table.c.slug == row["slug"], table.c.deleted_at.is_(None)
-            )
+        query = select(table).where(
+            table.c.kind == row["kind"],
+            table.c.label == row["label"],
+            table.c.deleted_at.is_(None),
+        )
         candidates = (await connection.execute(query)).mappings().all()
         if by_id is not None:
-            if not compatible(name, row, dict(by_id)) or (
-                name != "presets" and row["slug"] != by_id["slug"]
-            ):
+            if not compatible(name, row, dict(by_id)):
                 raise ImportCollisionError(
                     "A vocabulary identifier conflicts with existing content."
                 )
@@ -145,10 +138,6 @@ class SqlAlchemyUserDatabaseRestorer(SqlAlchemyDatabaseRestorer):
         for candidate in candidates:
             if compatible(name, row, dict(candidate)):
                 return dict(candidate)
-        if candidates and name != "presets":
-            raise ImportCollisionError(
-                "An existing type slug has an incompatible schema."
-            )
         return None
 
 

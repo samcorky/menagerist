@@ -2,13 +2,14 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, MetaData, and_, false, or_, select
+from sqlalchemy import JSON, MetaData, and_, false, select
 
 from app.modules.backup.adapters.persistence.database_snapshot import (
     SqlAlchemyDatabaseSnapshot,
 )
 from app.modules.backup.adapters.persistence.user_transfer_rows import (
     USER_TABLES,
+    VOCABULARY,
     installation_vocabulary,
     preset_ids,
 )
@@ -30,7 +31,7 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
     """Stream one person's content without any account or authentication rows."""
 
     async def export(self, *, scope: ContentFilter) -> AsyncGenerator[ArchiveMember]:  # type: ignore[override]
-        """Take a repeatable snapshot, including only referenced shared vocabulary."""
+        """Take a repeatable snapshot of one person's content and its choice lists."""
         if scope.user_id is None:
             raise CorruptBackupError("User export requires one owner.")
         async with self._session_factory() as session:
@@ -45,7 +46,7 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
             tables = metadata.tables
             predicates = self._predicates(tables, scope.user_id)
             installation_refs: dict[str, set[str]] = {
-                name: set() for name in ("presets", "node_types", "edge_types")
+                name: set() for name in VOCABULARY
             }
             async with connection.stream(
                 select(tables["example_installations"].c.entities).where(
@@ -55,10 +56,6 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
                 async for records in result.scalars():
                     for name, ids in installation_vocabulary(records).items():
                         installation_refs[name].update(ids)
-            for name in ("node_types", "edge_types"):
-                predicates[name] = or_(
-                    predicates[name], tables[name].c.id.in_(installation_refs[name])
-                )
             refs = installation_refs["presets"]
             for name, column in (
                 ("node_types", "attributes_schema"),
@@ -87,6 +84,8 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
             name: false() for name in USER_TABLES
         }
         for name in (
+            "node_types",
+            "edge_types",
             "nodes",
             "edges",
             "collections",
@@ -95,7 +94,7 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
         ):
             predicates[name] = tables[name].c.owner_id == owner_id
         # Soft-deleted content is left out, as vocabulary already is.
-        for name in ("nodes", "edges", "collections"):
+        for name in ("node_types", "edge_types", "nodes", "edges", "collections"):
             predicates[name] = and_(
                 predicates[name], tables[name].c.deleted_at.is_(None)
             )
@@ -123,13 +122,6 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
             tables["node_favourites"].c.user_id == owner_id,
             tables["node_favourites"].c.node_id.in_(nodes),
         )
-        for vocabulary, content in (("node_types", "nodes"), ("edge_types", "edges")):
-            predicates[vocabulary] = and_(
-                tables[vocabulary].c.deleted_at.is_(None),
-                tables[vocabulary].c.slug.in_(
-                    select(tables[content].c.type).where(predicates[content])
-                ),
-            )
         return predicates
 
     @staticmethod

@@ -28,6 +28,7 @@ from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -47,6 +48,7 @@ def _repos(
 async def test_moves_the_property_and_keeps_the_value() -> None:
     """Promoting a field adds it to the type schema and keeps its attribute value."""
     node_type = NodeType.create(
+        owner_id=uuid.UUID(int=1),
         slug="film",
         label="Film",
         attributes_schema={
@@ -86,7 +88,7 @@ async def test_moves_the_property_and_keeps_the_value() -> None:
     # properties is represented as an empty properties dict, not None.
     assert updated.extra_schema is not None
     assert updated.extra_schema["properties"] == {}
-    saved_type = await node_types.get(node_type.id)
+    saved_type = await node_types.get(node_type.id, scope=ContentFilter.everyone())
     assert saved_type is not None
     assert saved_type.attributes_schema is not None
     assert "condition" in saved_type.attributes_schema["properties"]
@@ -95,7 +97,7 @@ async def test_moves_the_property_and_keeps_the_value() -> None:
 
 async def test_moves_one_property_and_keeps_the_others_in_the_overlay() -> None:
     """Promoting one field leaves the rest of the overlay untouched."""
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(node_type)
 
@@ -128,7 +130,7 @@ async def test_moves_one_property_and_keeps_the_others_in_the_overlay() -> None:
     assert updated.extra_schema is not None
     assert "condition" not in updated.extra_schema["properties"]
     assert "signed" in updated.extra_schema["properties"]
-    saved_type = await node_types.get(node_type.id)
+    saved_type = await node_types.get(node_type.id, scope=ContentFilter.everyone())
     assert saved_type is not None
     assert saved_type.attributes_schema is not None
     assert "condition" in saved_type.attributes_schema["properties"]
@@ -136,7 +138,7 @@ async def test_moves_one_property_and_keeps_the_others_in_the_overlay() -> None:
 
 async def test_key_not_in_the_overlay_raises() -> None:
     """Promoting a key absent from the node's overlay raises."""
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(node_type)
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
@@ -156,6 +158,7 @@ async def test_key_not_in_the_overlay_raises() -> None:
 async def test_key_already_on_the_type_raises() -> None:
     """Promoting a key that already exists on the item type raises."""
     node_type = NodeType.create(
+        owner_id=uuid.UUID(int=1),
         slug="film",
         label="Film",
         attributes_schema={
@@ -190,7 +193,7 @@ async def test_key_already_on_the_type_raises() -> None:
 
 async def test_node_not_found_raises() -> None:
     """Promoting a field on a missing node raises."""
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(node_type)
     uow = InMemoryUnitOfWork(_repos(node_types=node_types))

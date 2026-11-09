@@ -32,8 +32,8 @@ def _make_repos(node_types: InMemoryNodeTypeRepository) -> GraphRepos:
 async def test_list_node_types_returns_all() -> None:
     """ListNodeTypes returns all non-deleted node types."""
     node_types = InMemoryNodeTypeRepository()
-    film = NodeType.create(slug="film", label="Film")
-    book = NodeType.create(slug="book", label="Book")
+    film = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
+    book = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="book", label="Book")
     await node_types.add(film)
     await node_types.add(book)
     use_case = ListNodeTypes(_make_repos(node_types), InMemoryAccessGuard())
@@ -48,7 +48,11 @@ async def test_list_node_types_respects_limit() -> None:
     """ListNodeTypes returns at most `limit` items."""
     node_types = InMemoryNodeTypeRepository()
     for i in range(5):
-        await node_types.add(NodeType.create(slug=f"type-{i}", label=f"Type {i}"))
+        await node_types.add(
+            NodeType.create(
+                owner_id=SYSTEM_ACTOR.id, slug=f"type-{i}", label=f"Type {i}"
+            )
+        )
     use_case = ListNodeTypes(_make_repos(node_types), InMemoryAccessGuard())
 
     results = await use_case.handle(ListNodeTypesQuery(limit=3), SYSTEM_ACTOR)
@@ -59,7 +63,7 @@ async def test_list_node_types_respects_limit() -> None:
 async def test_list_node_types_excludes_deleted() -> None:
     """ListNodeTypes omits soft-deleted node types."""
     node_types = InMemoryNodeTypeRepository()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
     nt.soft_delete()
     await node_types.add(nt)
     use_case = ListNodeTypes(_make_repos(node_types), InMemoryAccessGuard())
@@ -84,7 +88,9 @@ async def test_list_node_types_fills_in_linked_choice_options() -> None:
         },
     }
     node_types = InMemoryNodeTypeRepository()
-    film = NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    film = NodeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="film", label="Film", attributes_schema=schema
+    )
     await node_types.add(film)
 
     class _Options:

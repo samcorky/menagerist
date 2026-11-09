@@ -14,7 +14,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError, InvalidSchema
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ class UpdateEdgeTypeCommand:
 class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, EdgeType]):
     """Apply partial updates to an existing edge type."""
 
-    access: ClassVar[Access] = Requires(GraphPermission.TYPE_WRITE)
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_WRITE)
 
     def __init__(
         self,
@@ -65,7 +65,9 @@ class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, Edge
         else:
             attributes_schema = None
         async with self._uow as repos:
-            edge_type = await repos.edge_types.get(command.edge_type_id)
+            edge_type = await repos.edge_types.get(
+                command.edge_type_id, scope=self.scope(actor)
+            )
             if edge_type is None:
                 raise EdgeTypeNotFoundError(
                     f"Edge type {command.edge_type_id} not found"

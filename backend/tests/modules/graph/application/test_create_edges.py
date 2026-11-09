@@ -171,6 +171,7 @@ async def test_create_edges_validates_attributes_against_the_type_schema() -> No
     repos, source, targets = await _repos_with_source_and_targets(2)
     await repos.edge_types.add(
         EdgeType.create(
+            owner_id=uuid.UUID(int=1),
             slug="pictured-with",
             label="Pictured with",
             attributes_schema={
@@ -203,4 +204,9 @@ async def test_create_edges_auto_creates_an_unknown_edge_type() -> None:
         SYSTEM_ACTOR,
     )
 
-    assert await repos.edge_types.get_by_slug("pictured-with") is not None
+    assert (
+        await repos.edge_types.get_by_slug(
+            "pictured-with", scope=ContentFilter.everyone()
+        )
+        is not None
+    )

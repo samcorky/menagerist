@@ -37,9 +37,12 @@ async def _seed(
     session: AsyncSession,
 ) -> tuple[GraphItemLookup, GraphDefinitionChecker]:
     repos = build_graph_repos(session)
-    await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=SCHEMA)
-    )
+    for owner in (ME, THEM):
+        await repos.node_types.add(
+            NodeType.create(
+                owner_id=owner, slug="film", label="Film", attributes_schema=SCHEMA
+            )
+        )
     for owner, rating in ((ME, 1), (ME, 3), (THEM, 5)):
         await repos.nodes.add(
             Node.create(

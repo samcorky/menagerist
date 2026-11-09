@@ -73,9 +73,13 @@ class World:
     async def setup(self) -> None:
         """Add the film and book item types."""
         await self.repos.node_types.add(
-            NodeType.create(slug="film", label="Film", attributes_schema=SCHEMA)
+            NodeType.create(
+                owner_id=ALICE, slug="film", label="Film", attributes_schema=SCHEMA
+            )
         )
-        await self.repos.node_types.add(NodeType.create(slug="book", label="Book"))
+        await self.repos.node_types.add(
+            NodeType.create(owner_id=ALICE, slug="book", label="Book")
+        )
 
     async def item(
         self,

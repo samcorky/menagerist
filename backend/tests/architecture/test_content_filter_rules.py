@@ -44,18 +44,32 @@ from app.modules.examples.ports.installation_repository import InstallationRepos
 from app.modules.graph.adapters.persistence.edge_repository import (
     SqlAlchemyEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.edge_type_repository import (
+    SqlAlchemyEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
 )
 from app.modules.graph.adapters.persistence.models import EdgeModel, NodeModel
 from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
+from app.modules.graph.adapters.persistence.node_type_repository import (
+    SqlAlchemyNodeTypeRepository,
+)
 from app.modules.graph.ports.edge_repository import EdgeRepository
+from app.modules.graph.ports.edge_type_repository import EdgeTypeRepository
 from app.modules.graph.ports.node_repository import NodeRepository
+from app.modules.graph.ports.node_type_repository import NodeTypeRepository
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
 )
@@ -86,10 +100,8 @@ _ADD = "persists a new entity; the use case stamps the owner"
 _SAVE = "persists an entity already fetched through a scoped read"
 _RETENTION = "system-only retention purge reads every owner's rows by age"
 _PURGE = "system-only hard delete by id; the System use case reads no content"
-_TYPE_IN_USE = "system-only check that any row, whoever owns it, still has the type"
 NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
     NodeRepository: {
-        "has_any_of_type": _TYPE_IN_USE,
         "add": _ADD,
         "save": _SAVE,
         "claim_orphaned": _CLAIM,
@@ -97,8 +109,21 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
         "list_deleted_before": _RETENTION,
         "count_deleted_before": _RETENTION,
     },
+    NodeTypeRepository: {
+        "add": _ADD,
+        "save": _SAVE,
+        "claim_orphaned": _CLAIM,
+        "purge": _PURGE,
+        "list_deleted_before": _RETENTION,
+    },
+    EdgeTypeRepository: {
+        "add": _ADD,
+        "save": _SAVE,
+        "claim_orphaned": _CLAIM,
+        "purge": _PURGE,
+        "list_deleted_before": _RETENTION,
+    },
     EdgeRepository: {
-        "has_any_of_type": _TYPE_IN_USE,
         "add": _ADD,
         "save": _SAVE,
         "claim_orphaned": _CLAIM,
@@ -142,6 +167,8 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
 PORTS: list[tuple[type, tuple[type, ...]]] = [
     (NodeRepository, (InMemoryNodeRepository, SqlAlchemyNodeRepository)),
     (EdgeRepository, (InMemoryEdgeRepository, SqlAlchemyEdgeRepository)),
+    (NodeTypeRepository, (InMemoryNodeTypeRepository, SqlAlchemyNodeTypeRepository)),
+    (EdgeTypeRepository, (InMemoryEdgeTypeRepository, SqlAlchemyEdgeTypeRepository)),
     (
         CollectionRepository,
         (InMemoryCollectionRepository, SqlAlchemyCollectionRepository),
@@ -238,6 +265,7 @@ def test_implementations_mirror_the_port_scope(
 UNSCOPED_USE_CASES = {
     # System-actor jobs run once by the first-admin claim: assign owners only.
     "ClaimOrphanedItems": "first-admin claim",
+    "ClaimOrphanedTypes": "first-admin claim",
     "ClaimLegacyCollections": "first-admin claim",
     "ClaimOrphanedMedia": "first-admin claim",
     "ClaimOrphanedInstallations": "first-admin claim",
@@ -252,7 +280,7 @@ UNSCOPED_USE_CASES = {
     # System-actor retention purge, run from the data CLI: sweeps all owners by age.
     "PurgeExpiredNodes": "system retention purge",
     "PurgeExpiredCollections": "system retention purge",
-    "PurgeExpiredTypes": "system retention purge of types, which hold no content",
+    "PurgeExpiredTypes": "system retention purge of types, which hold no item content",
     "PurgeItemMemberships": "system purge",
     "PurgeAttachment": "system purge",
 }

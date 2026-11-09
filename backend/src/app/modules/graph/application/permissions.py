@@ -6,9 +6,10 @@ from app.shared_kernel.permission import PermissionEnum
 class GraphPermission(PermissionEnum):
     """Permissions for graph operations.
 
-    Item and type permissions are held by members; the rest affect every user's
-    content and are admin-only. `ITEM_PURGE` is held by members but never
-    grantable to a token. Values read `<module>:<resource>:<action>`.
+    Members hold every permission here: types belong to a person, so deleting one
+    or purging an attribute reaches only the owner's content. `ITEM_PURGE`, the
+    type deletions and the attribute purges are never grantable to a token.
+    Values read `<module>:<resource>:<action>`.
     """
 
     ITEM_READ = "graph:item:read"

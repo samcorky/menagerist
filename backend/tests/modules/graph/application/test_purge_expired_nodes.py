@@ -184,10 +184,10 @@ async def test_a_connection_deleted_on_its_own_goes_only_when_old_enough() -> No
 async def test_soft_deleted_types_are_never_touched() -> None:
     """Item and relationship types deleted long ago are not part of the purge."""
     repos = _repos()
-    node_type = NodeType.create(slug="movie", label="Movie")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="movie", label="Movie")
     node_type.deleted_at = LONG_AGO
     await repos.node_types.add(node_type)
-    edge_type = EdgeType.create(slug="knows", label="Knows")
+    edge_type = EdgeType.create(owner_id=uuid.UUID(int=1), slug="knows", label="Knows")
     edge_type.deleted_at = LONG_AGO
     await repos.edge_types.add(edge_type)
 

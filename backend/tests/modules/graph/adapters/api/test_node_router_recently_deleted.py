@@ -21,6 +21,7 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
     create_in_memory_graph_uow,
 )
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -43,7 +44,7 @@ class _Dependents:
 
 
 async def _delete_type(repos: GraphRepos, slug: str) -> None:
-    node_type = await repos.node_types.get_by_slug(slug)
+    node_type = await repos.node_types.get_by_slug(slug, scope=ContentFilter.everyone())
     assert node_type is not None
     node_type.soft_delete()
     await repos.node_types.save(node_type)

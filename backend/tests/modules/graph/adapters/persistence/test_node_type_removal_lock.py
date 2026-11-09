@@ -55,7 +55,7 @@ async def factory(
 
 
 async def _add_type(factory: async_sessionmaker[AsyncSession], slug: str) -> NodeType:
-    node_type = NodeType.create(slug=slug, label=slug)
+    node_type = NodeType.create(owner_id=OWNER, slug=slug, label=slug)
     async with factory.begin() as session:
         await SqlAlchemyNodeTypeRepository(session).add(node_type)
     return node_type
@@ -81,7 +81,12 @@ async def test_an_unused_type_is_removed(
     await _remove(factory, node_type)
 
     async with factory() as session:
-        assert await SqlAlchemyNodeTypeRepository(session).get(node_type.id) is None
+        assert (
+            await SqlAlchemyNodeTypeRepository(session).get(
+                node_type.id, scope=ContentFilter.everyone()
+            )
+            is None
+        )
 
 
 async def test_an_item_being_added_keeps_the_type(
@@ -91,7 +96,12 @@ async def test_an_item_being_added_keeps_the_type(
     node_type = await _add_type(factory, "film")
     async with factory() as writer:
         types = SqlAlchemyNodeTypeRepository(writer)
-        assert await types.get_by_slug("film", guard_item_write=True) is not None
+        assert (
+            await types.get_by_slug(
+                "film", guard_item_write=True, scope=ContentFilter.everyone()
+            )
+            is not None
+        )
         await SqlAlchemyNodeRepository(writer).add(
             Node.create(owner_id=OWNER, name="Heat", type="film")
         )
@@ -105,7 +115,9 @@ async def test_an_item_being_added_keeps_the_type(
     with pytest.raises(NodeTypeInUseError):
         await removal
     async with factory() as session:
-        assert await SqlAlchemyNodeTypeRepository(session).get(node_type.id)
+        assert await SqlAlchemyNodeTypeRepository(session).get(
+            node_type.id, scope=ContentFilter.everyone()
+        )
         items = await SqlAlchemyNodeRepository(session).list(
             scope=ContentFilter.everyone(), after=None, limit=10, type="film"
         )
@@ -119,13 +131,15 @@ async def test_a_writer_waits_for_a_removal_in_progress(
     node_type = await _add_type(factory, "game")
     async with factory() as remover:
         types = SqlAlchemyNodeTypeRepository(remover)
-        locked = await types.get_for_removal(node_type.id)
+        locked = await types.get_for_removal(
+            node_type.id, scope=ContentFilter.everyone()
+        )
         assert locked is not None
 
         async def write() -> NodeType | None:
             async with factory() as writer:
                 return await SqlAlchemyNodeTypeRepository(writer).get_by_slug(
-                    "game", guard_item_write=True
+                    "game", guard_item_write=True, scope=ContentFilter.everyone()
                 )
 
         writing = asyncio.create_task(write())

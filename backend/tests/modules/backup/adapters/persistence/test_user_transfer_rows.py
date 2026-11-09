@@ -53,7 +53,14 @@ async def test_preset_reuse_remaps_only_structural_references() -> None:
                 "builtin": True,
             }
         ],
-        "node_types": [{"id": uuid7(), "slug": "book", "attributes_schema": schema}],
+        "node_types": [
+            {
+                "id": uuid7(),
+                "owner_id": source,
+                "slug": "book",
+                "attributes_schema": schema,
+            }
+        ],
         "nodes": [
             {
                 "id": item,

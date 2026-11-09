@@ -101,12 +101,20 @@ async def _uninstall(world: World, pack_id: str) -> Any:  # noqa: ANN401
 
 
 async def _live_counts(world: World) -> list[int]:
-    repos = (
-        world.graph_repos.node_types,
-        world.graph_repos.edge_types,
-        world.preset_repos.presets,
-    )
-    counts = [len(await repo.list(after=None, limit=_LIMIT)) for repo in repos]
+    everyone = ContentFilter.everyone()
+    counts = [
+        len(
+            await world.graph_repos.node_types.list(
+                after=None, limit=_LIMIT, scope=everyone
+            )
+        ),
+        len(
+            await world.graph_repos.edge_types.list(
+                after=None, limit=_LIMIT, scope=everyone
+            )
+        ),
+        len(await world.preset_repos.presets.list(after=None, limit=_LIMIT)),
+    ]
     counts.append(
         len(
             await world.graph_repos.edges.list(

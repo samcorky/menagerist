@@ -12,7 +12,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ class GetEdgeTypeQuery:
 class GetEdgeType(QueryHandler[GraphRepos, GetEdgeTypeQuery, EdgeType]):
     """Retrieve a single edge type by id."""
 
-    access: ClassVar[Access] = Requires(GraphPermission.TYPE_READ)
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_READ)
 
     def __init__(
         self,
@@ -45,7 +45,9 @@ class GetEdgeType(QueryHandler[GraphRepos, GetEdgeTypeQuery, EdgeType]):
 
     async def _handle(self, query: GetEdgeTypeQuery, actor: Actor) -> EdgeType:
         """Return the edge type or raise EdgeTypeNotFoundError."""
-        edge_type = await self._repos.edge_types.get(query.edge_type_id)
+        edge_type = await self._repos.edge_types.get(
+            query.edge_type_id, scope=self.scope(actor)
+        )
         if edge_type is None:
             raise EdgeTypeNotFoundError(f"Edge type {query.edge_type_id} not found")
         logger.debug("edge type fetched", edge_type_id=query.edge_type_id)

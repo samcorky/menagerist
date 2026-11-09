@@ -191,7 +191,9 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             if combined is None:
                 return 0
             return await self._repos.nodes.search_count(scope=scope, resolved=combined)
-        exclusions = await self._search_exclusions() if query.q is not None else None
+        exclusions = (
+            await self._search_exclusions(scope) if query.q is not None else None
+        )
         return await self._repos.nodes.count(
             scope=scope,
             type=query.type,
@@ -222,10 +224,10 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             ids=None if source is None else source.ids,
         )
 
-    async def _search_exclusions(self) -> dict[str, list[str]]:
+    async def _search_exclusions(self, scope: ContentFilter) -> dict[str, list[str]]:
         """Map each node type slug to the attribute keys a search must skip."""
         exclusions: dict[str, list[str]] = {}
-        for node_type in await load_node_types(self._repos):
+        for node_type in await load_node_types(self._repos, scope):
             keys = search_excluded_keys(node_type.attributes_schema or {})
             if keys:
                 exclusions[str(node_type.slug)] = keys
@@ -239,7 +241,9 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             smart = await self._list_smart(query, source.definition, scope)
             logger.debug("nodes listed", count=len(smart.items), total=smart.total)
             return smart
-        exclusions = await self._search_exclusions() if query.q is not None else None
+        exclusions = (
+            await self._search_exclusions(scope) if query.q is not None else None
+        )
         ids = None if source is None else source.ids
         items = await self._repos.nodes.list(
             scope=scope,

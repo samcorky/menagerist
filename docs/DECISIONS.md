@@ -1407,3 +1407,19 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 - Values are not re-validated against the type: they were valid on the original. A field that must be unique (a serial number, say) is copied as it is.
 
 **Rationale:** the issue asked for a copy of the fields and tags with a choice about relationships and media, defaulting to neither. Collections default to on, and the cover is its own choice, at the owner's request: a copy is usually another entry in the same series, and a variant may want the same look without the whole gallery. Real copies cost disk space, but they keep deleting a photo on one item from affecting the other, which sharing could not do without changing how media deletion works.
+
+## Types belong to a person (2026-11-09)
+
+**Decision:** item types and relationship types are owned, like items. Each has an `owner_id`; a slug is unique per owner among live rows, not across the instance; and a person sees and edits only their own types. There are no system-seeded types: a fresh install has none, and an item with no type is fine. Types arrive by creating one or by installing an example pack, and belong to whoever did so. An item's type is still a slug, resolved inside the item's owner's types.
+
+**Choices that are not obvious:**
+
+- Not per collection. Scoping types to a collection would break reuse across collections (one Person type across Comics and Vinyl) and undercut relationships between items.
+- Two people who install the same pack each get their own copy, so duplicate types across owners are expected. The old behaviour, where a second install reused the first person's shared types, is gone. Sharing a type is a later feature, handled by the same access policy as sharing items, not a visibility value on the type.
+- Visibility is owner-only. Administrators get no special view of other people's types until sharing exists.
+- Deleting a type and purging an attribute used to be administrator-only because they rewrite everyone's content. A type now only reaches its owner's content, so the owner may do both; the permission names are unchanged.
+- Migrating shared types: a type used by items or example installations of several people becomes one copy per owner, so no one is left with a slug they cannot see. Unused types go to the earliest administrator, or stay ownerless until the first administrator claims existing data. The owner column becomes NOT NULL with the existing owner-columns follow-up.
+- Media needs no ownership model. Files are named by asset id, not by content hash, and every asset row has its own owner, so there is no cross-owner sharing or reference counting to scope.
+- Parent types and subtypes are out of scope (#320).
+
+**Rationale:** sharing (Stage 2) depends on every piece of data having an owner, so types are settled first. Owner scoping matches items and keeps one access policy.

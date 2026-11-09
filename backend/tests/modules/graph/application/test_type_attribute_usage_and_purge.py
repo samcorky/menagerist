@@ -56,7 +56,7 @@ def _repos() -> GraphRepos:
 
 async def _node_setup() -> tuple[GraphRepos, NodeType, list[Node]]:
     repos = _repos()
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     await repos.node_types.add(node_type)
     nodes = [
         Node.create(
@@ -86,7 +86,7 @@ async def _node_setup() -> tuple[GraphRepos, NodeType, list[Node]]:
 
 async def _edge_setup() -> tuple[GraphRepos, EdgeType, list[Edge]]:
     repos = _repos()
-    edge_type = EdgeType.create(slug="owns", label="Owns")
+    edge_type = EdgeType.create(owner_id=uuid.UUID(int=1), slug="owns", label="Owns")
     await repos.edge_types.add(edge_type)
     source, target = uuid.uuid4(), uuid.uuid4()
     edges = [
@@ -274,7 +274,9 @@ async def test_purge_edge_type_attribute_raises_for_missing_type() -> None:
 async def test_count_node_type_attribute_usage_can_match_a_group_sub_key() -> None:
     """With `sub_key`, `key` names a group array and rows are matched instead."""
     repos = _repos()
-    node_type = NodeType.create(slug="recipe", label="Recipe")
+    node_type = NodeType.create(
+        owner_id=uuid.UUID(int=1), slug="recipe", label="Recipe"
+    )
     await repos.node_types.add(node_type)
     await repos.nodes.add(
         Node.create(
@@ -308,7 +310,9 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
 ):
     """With `sub_key`, only that key is removed from each row; the array is kept."""
     repos = _repos()
-    node_type = NodeType.create(slug="recipe", label="Recipe")
+    node_type = NodeType.create(
+        owner_id=uuid.UUID(int=1), slug="recipe", label="Recipe"
+    )
     await repos.node_types.add(node_type)
     node = Node.create(
         owner_id=uuid.UUID(int=1),
@@ -340,7 +344,9 @@ async def test_purge_node_type_attribute_strips_a_group_sub_key_from_every_row()
 async def test_count_edge_type_attribute_usage_can_match_a_group_sub_key() -> None:
     """With `sub_key`, `key` names a group array and rows are matched instead."""
     repos = _repos()
-    edge_type = EdgeType.create(slug="loaned-to", label="Loaned to")
+    edge_type = EdgeType.create(
+        owner_id=uuid.UUID(int=1), slug="loaned-to", label="Loaned to"
+    )
     await repos.edge_types.add(edge_type)
     source, target = uuid.uuid4(), uuid.uuid4()
     await repos.edges.add(
@@ -377,7 +383,9 @@ async def test_purge_edge_type_attribute_strips_a_group_sub_key_from_every_row()
 ):
     """With `sub_key`, only that key is removed from each row; the array is kept."""
     repos = _repos()
-    edge_type = EdgeType.create(slug="loaned-to", label="Loaned to")
+    edge_type = EdgeType.create(
+        owner_id=uuid.UUID(int=1), slug="loaned-to", label="Loaned to"
+    )
     await repos.edge_types.add(edge_type)
     source, target = uuid.uuid4(), uuid.uuid4()
     edge = Edge.create(

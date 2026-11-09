@@ -77,15 +77,15 @@ ITEM_STANCES: dict[type[UseCase[Any, Any]], Access] = {
 
 
 VOCABULARY_STANCES: dict[type[UseCase[Any, Any]], Access] = {
-    GetNodeType: Requires(GraphPermission.TYPE_READ),
-    ListNodeTypes: Requires(GraphPermission.TYPE_READ),
-    GetEdgeType: Requires(GraphPermission.TYPE_READ),
-    ListEdgeTypes: Requires(GraphPermission.TYPE_READ),
+    GetNodeType: Content(GraphPermission.TYPE_READ),
+    ListNodeTypes: Content(GraphPermission.TYPE_READ),
+    GetEdgeType: Content(GraphPermission.TYPE_READ),
+    ListEdgeTypes: Content(GraphPermission.TYPE_READ),
     ValidateQuery: Requires(GraphPermission.TYPE_READ),
-    CreateNodeType: Requires(GraphPermission.TYPE_WRITE),
-    UpdateNodeType: Requires(GraphPermission.TYPE_WRITE),
-    CreateEdgeType: Requires(GraphPermission.TYPE_WRITE),
-    UpdateEdgeType: Requires(GraphPermission.TYPE_WRITE),
+    CreateNodeType: Content(GraphPermission.TYPE_WRITE),
+    UpdateNodeType: Content(GraphPermission.TYPE_WRITE),
+    CreateEdgeType: Content(GraphPermission.TYPE_WRITE),
+    UpdateEdgeType: Content(GraphPermission.TYPE_WRITE),
 }
 
 
@@ -100,20 +100,20 @@ def test_claim_jobs_are_system_only() -> None:
         assert use_case.access == System()
 
 
-def test_shared_vocabulary_needs_the_type_permissions() -> None:
-    """Item and relationship types are shared, read or written by permission."""
+def test_types_need_the_type_permissions_within_the_owners_scope() -> None:
+    """Types are the owner's own, read or written by permission."""
     assert {u: u.access for u in VOCABULARY_STANCES} == VOCABULARY_STANCES
 
 
 def test_promote_extra_schema_field_needs_what_its_inner_use_cases_need() -> None:
     """The composite runs UpdateNodeType then UpdateNode under the same actor."""
     assert PromoteExtraSchemaField.access == Content(GraphPermission.TYPE_WRITE)
-    assert UpdateNodeType.access == Requires(GraphPermission.TYPE_WRITE)
+    assert UpdateNodeType.access == Content(GraphPermission.TYPE_WRITE)
     assert UpdateNode.access == Content(GraphPermission.ITEM_WRITE)
 
 
 def test_structural_changes_keep_their_permissions() -> None:
-    """Deleting or purging type structure stays admin-only."""
+    """Deleting a type or purging an attribute reaches only the owner's content."""
     assert {
         DeleteEdgeType: DeleteEdgeType.access,
         DeleteNodeType: DeleteNodeType.access,
@@ -121,9 +121,9 @@ def test_structural_changes_keep_their_permissions() -> None:
         PurgeEdgeTypeAttribute: PurgeEdgeTypeAttribute.access,
         PurgeNodeTypeAttribute: PurgeNodeTypeAttribute.access,
     } == {
-        DeleteEdgeType: Requires(GraphPermission.DELETE_EDGE_TYPE),
-        DeleteNodeType: Requires(GraphPermission.DELETE_NODE_TYPE),
-        DeleteUnusedNodeType: Requires(GraphPermission.DELETE_NODE_TYPE),
-        PurgeEdgeTypeAttribute: Requires(GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE),
-        PurgeNodeTypeAttribute: Requires(GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE),
+        DeleteEdgeType: Content(GraphPermission.DELETE_EDGE_TYPE),
+        DeleteNodeType: Content(GraphPermission.DELETE_NODE_TYPE),
+        DeleteUnusedNodeType: Content(GraphPermission.DELETE_NODE_TYPE),
+        PurgeEdgeTypeAttribute: Content(GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE),
+        PurgeNodeTypeAttribute: Content(GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE),
     }

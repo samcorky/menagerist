@@ -11,7 +11,7 @@ from app.modules.graph.domain.edge_type import EdgeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ class ListEdgeTypesQuery:
 class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, list[EdgeType]]):
     """List edge types with keyset pagination."""
 
-    access: ClassVar[Access] = Requires(GraphPermission.TYPE_READ)
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_READ)
 
     def __init__(
         self,
@@ -45,7 +45,9 @@ class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, list[EdgeType]]
 
     async def _handle(self, query: ListEdgeTypesQuery, actor: Actor) -> list[EdgeType]:
         """Return a page of non-deleted edge types ordered by id."""
-        result = await self._repos.edge_types.list(after=query.after, limit=query.limit)
+        result = await self._repos.edge_types.list(
+            scope=self.scope(actor), after=query.after, limit=query.limit
+        )
         logger.debug("edge types listed", count=len(result))
         return [await self._resolved(edge_type) for edge_type in result]
 

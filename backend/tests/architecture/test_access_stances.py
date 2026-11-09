@@ -47,6 +47,7 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "collections.PurgeItemMemberships",
         "examples.ClaimOrphanedInstallations",
         "graph.ClaimOrphanedItems",
+        "graph.ClaimOrphanedTypes",
         "graph.PurgeEdge",
         "graph.PurgeExpiredNodes",
         "graph.PurgeExpiredTypes",
@@ -86,6 +87,19 @@ EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
 )
 EXPECTED_CONTENT: frozenset[str] = frozenset(
     {
+        "graph.CreateEdgeType",
+        "graph.CreateNodeType",
+        "graph.DeleteEdgeType",
+        "graph.DeleteNodeType",
+        "graph.DeleteUnusedNodeType",
+        "graph.GetEdgeType",
+        "graph.GetNodeType",
+        "graph.ListEdgeTypes",
+        "graph.ListNodeTypes",
+        "graph.PurgeEdgeTypeAttribute",
+        "graph.PurgeNodeTypeAttribute",
+        "graph.UpdateEdgeType",
+        "graph.UpdateNodeType",
         "backup.DeleteUserExport",
         "backup.ExportUserData",
         "backup.ImportUserArchive",

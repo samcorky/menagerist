@@ -37,7 +37,9 @@ class CountEdgeTypeAttributeUsage(
         self, query: CountEdgeTypeAttributeUsageQuery, actor: Actor
     ) -> int:
         """Return the count, or raise `EdgeTypeNotFoundError` if the type is missing."""
-        edge_type = await self._repos.edge_types.get(query.edge_type_id)
+        edge_type = await self._repos.edge_types.get(
+            query.edge_type_id, scope=self.scope(actor)
+        )
         if edge_type is None:
             raise EdgeTypeNotFoundError(f"EdgeType {query.edge_type_id} not found")
         count = await self._repos.edges.count_with_attribute(

@@ -242,7 +242,12 @@ async def test_unknown_marker_fails_before_anything_is_created(
     with pytest.raises(InvalidPackError, match="unknown preset"):
         await world.graph.create_item_type(pack.item_types[0], {})
 
-    assert await world.graph_repos.node_types.get_by_slug("demo-record") is None
+    assert (
+        await world.graph_repos.node_types.get_by_slug(
+            "demo-record", scope=ContentFilter.everyone()
+        )
+        is None
+    )
 
 
 async def test_slug_taken_covers_both_type_kinds_and_unknown_slugs(
@@ -373,7 +378,12 @@ async def test_an_item_type_still_used_by_an_item_is_kept(
     )
     assert item is not None
     assert item.type == "demo-person"
-    assert await world.graph_repos.node_types.get(types[1].entity_id) is not None
+    assert (
+        await world.graph_repos.node_types.get(
+            types[1].entity_id, scope=ContentFilter.everyone()
+        )
+        is not None
+    )
 
 
 async def test_a_builtin_preset_cannot_be_removed(make_world: MakeWorld) -> None:

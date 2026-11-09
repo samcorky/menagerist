@@ -47,7 +47,9 @@ async def _repos(count: int = 3) -> GraphRepos:
         edge_types=InMemoryEdgeTypeRepository(),
     )
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=SCHEMA)
+        NodeType.create(
+            owner_id=OWNER, slug="film", label="Film", attributes_schema=SCHEMA
+        )
     )
     for index in range(count):
         await repos.nodes.add(

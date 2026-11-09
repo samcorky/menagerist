@@ -255,7 +255,13 @@ def test_each_person_only_finds_their_own_items_even_through_or(
 ) -> None:
     """An `or` group that matches both people's items still stays in scope."""
     _film(world.act_as(ALICE), "Alice film", 4)
-    _film(world.act_as(BOB), "Bob film", 4)
+    # Types are each person's own, so Bob defines the film type his search uses.
+    bob = world.act_as(BOB)
+    bob.post(
+        "/api/v1/node-types",
+        json={"slug": "film", "label": "Film", "attributes_schema": FILM_SCHEMA},
+    )
+    _film(bob, "Bob film", 4)
     either = _query(_rating("=", 4), {"kind": "favourite", "value": False}, op="or")
 
     for person, name in ((ALICE, "Alice film"), (BOB, "Bob film")):

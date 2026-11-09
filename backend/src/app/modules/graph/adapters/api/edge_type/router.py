@@ -179,7 +179,9 @@ async def update_edge_type(
             EdgeTypeInUseError,
             detail="Edge type 'directed-by' is still used by one or more connections",
         ),
-        **error_response(ForbiddenError, detail="Administrator access is required."),
+        **error_response(
+            ForbiddenError, detail="You do not have permission to do this."
+        ),
     },
 )
 async def delete_edge_type(
@@ -234,7 +236,9 @@ async def count_edge_type_attribute_usage(
             EdgeTypeNotFoundError,
             detail="EdgeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
         ),
-        **error_response(ForbiddenError, detail="Administrator access is required."),
+        **error_response(
+            ForbiddenError, detail="You do not have permission to do this."
+        ),
     },
 )
 async def purge_edge_type_attribute(

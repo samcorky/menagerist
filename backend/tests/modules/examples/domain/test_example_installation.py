@@ -13,7 +13,6 @@ from app.modules.examples.domain.installation import (
     Outcome,
     adoptable_records,
 )
-from app.modules.examples.domain.removal import holds_shared_type
 
 OWNER = uuid.UUID(int=0xA1)
 
@@ -245,9 +244,17 @@ def test_settling_a_kept_entity_that_is_not_kept_is_refused() -> None:
         installation.settle_kept_as_removed(uuid.uuid7())
 
 
-def test_only_types_can_be_held_as_shared() -> None:
-    """An item record is never shared structure."""
+def test_settling_a_kept_entity_skips_records_that_do_not_match() -> None:
+    """Only the kept record with the given id is closed; others are left alone."""
     installation = Installation.start("demo", uuid.UUID(int=1))
-    installation.record(EntityKind.ITEM, "a", "A", uuid.uuid7(), "h" * 64)
+    other, wanted = uuid.uuid7(), uuid.uuid7()
+    installation.record(EntityKind.PRESET, "a", "A", other, "h" * 64)
+    installation.record(EntityKind.PRESET, "b", "B", wanted, "h" * 64)
+    installation.settle(wanted, Outcome.KEPT, "still in use")
 
-    assert holds_shared_type(installation, installation.entities[0]) is False
+    installation.settle_kept_as_removed(wanted)
+
+    assert [r.outcome for r in installation.entities] == [
+        Outcome.OWNED,
+        Outcome.REMOVED,
+    ]

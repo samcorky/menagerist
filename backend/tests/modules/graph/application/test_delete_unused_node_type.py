@@ -25,7 +25,6 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
-from app.shared_kernel.errors import ForbiddenError
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 MEMBER = Actor(id=uuid.UUID(int=5), roles=frozenset({"member"}))
@@ -50,7 +49,7 @@ def _use_case(
 async def test_an_unused_type_is_soft_deleted() -> None:
     """With no items the type is deleted and committed."""
     repos = _repos()
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     await repos.node_types.add(node_type)
     use_case, uow = _use_case(repos)
 
@@ -62,12 +61,12 @@ async def test_an_unused_type_is_soft_deleted() -> None:
     assert uow.committed is True
 
 
-async def test_a_type_with_someone_elses_item_is_kept_and_nothing_is_written() -> None:
-    """Any person's item blocks the delete; no write happens (no rollback here)."""
+async def test_a_type_with_its_owners_item_is_kept_and_nothing_is_written() -> None:
+    """An item of the owner blocks the delete; no write happens (no rollback here)."""
     repos = _repos()
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     await repos.node_types.add(node_type)
-    item = Node.create(owner_id=uuid.UUID(int=9), name="Heat", type="film")
+    item = Node.create(owner_id=uuid.UUID(int=1), name="Heat", type="film")
     await repos.nodes.add(item)
     repos.node_types.save = AsyncMock()  # type: ignore[method-assign]
     repos.nodes.clear_type = AsyncMock()  # type: ignore[method-assign]
@@ -95,11 +94,30 @@ async def test_a_missing_type_is_not_found() -> None:
         )
 
 
-async def test_a_member_cannot_delete_a_type() -> None:
-    """The delete needs the node type delete permission."""
-    use_case, _ = _use_case(_repos())
+async def test_a_member_deletes_their_own_unused_type() -> None:
+    """Types are the owner's, so the owner needs no administrator to remove one."""
+    repos = _repos()
+    node_type = NodeType.create(owner_id=MEMBER.id, slug="film", label="Film")
+    await repos.node_types.add(node_type)
+    use_case, _ = _use_case(repos)
 
-    with pytest.raises(ForbiddenError):
+    await use_case.handle(
+        DeleteUnusedNodeTypeCommand(node_type_id=node_type.id), MEMBER
+    )
+
+    assert node_type.is_deleted
+
+
+async def test_a_member_cannot_see_or_delete_someone_elses_type() -> None:
+    """Another person's type reads as missing and stays as it was."""
+    repos = _repos()
+    theirs = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
+    await repos.node_types.add(theirs)
+    use_case, _ = _use_case(repos)
+
+    with pytest.raises(NodeTypeNotFoundError):
         await use_case.handle(
-            DeleteUnusedNodeTypeCommand(node_type_id=uuid.uuid4()), MEMBER
+            DeleteUnusedNodeTypeCommand(node_type_id=theirs.id), MEMBER
         )
+
+    assert not theirs.is_deleted

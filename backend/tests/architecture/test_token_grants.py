@@ -74,6 +74,10 @@ def test_grantable_set_is_member_content_minus_backups() -> None:
             BackupPermission.EXPORT_OWN_DATA,
             BackupPermission.IMPORT_OWN_DATA,
             GraphPermission.ITEM_PURGE,
+            GraphPermission.DELETE_NODE_TYPE,
+            GraphPermission.DELETE_EDGE_TYPE,
+            GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE,
+            GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE,
             CollectionPermission.COLLECTION_PURGE,
         }
         == TOKEN_GRANTABLE_PERMISSIONS
@@ -82,7 +86,14 @@ def test_grantable_set_is_member_content_minus_backups() -> None:
 
 def test_purges_are_held_by_members_but_never_grantable() -> None:
     """Permanent deletion needs a signed-in session, not a token."""
-    purges = {GraphPermission.ITEM_PURGE, CollectionPermission.COLLECTION_PURGE}
+    purges = {
+        GraphPermission.ITEM_PURGE,
+        CollectionPermission.COLLECTION_PURGE,
+        GraphPermission.DELETE_NODE_TYPE,
+        GraphPermission.DELETE_EDGE_TYPE,
+        GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE,
+        GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE,
+    }
     assert purges <= MEMBER_PERMISSIONS
     assert not purges & TOKEN_GRANTABLE_PERMISSIONS
     for purge in purges:

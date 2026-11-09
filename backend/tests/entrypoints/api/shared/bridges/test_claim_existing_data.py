@@ -36,7 +36,9 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.domain.edge import Edge
+from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (
     InMemoryMediaAssetRepository,
@@ -59,6 +61,8 @@ class Stores:
 
     nodes: InMemoryNodeRepository
     edges: InMemoryEdgeRepository
+    node_types: InMemoryNodeTypeRepository
+    edge_types: InMemoryEdgeTypeRepository
     collections: InMemoryCollectionRepository
     assets: InMemoryMediaAssetRepository
     installations: InMemoryInstallationRepository
@@ -70,6 +74,8 @@ def stores() -> Stores:
     """A claim wired over empty in-memory repositories."""
     nodes = InMemoryNodeRepository()
     edges = InMemoryEdgeRepository()
+    node_types = InMemoryNodeTypeRepository()
+    edge_types = InMemoryEdgeTypeRepository()
     collections = InMemoryCollectionRepository()
     assets = InMemoryMediaAssetRepository()
     installations = InMemoryInstallationRepository()
@@ -77,8 +83,8 @@ def stores() -> Stores:
         graph=GraphRepos(
             nodes=nodes,
             edges=edges,
-            node_types=InMemoryNodeTypeRepository(),
-            edge_types=InMemoryEdgeTypeRepository(),
+            node_types=node_types,
+            edge_types=edge_types,
         ),
         collections=CollectionsRepos(
             collections=collections,
@@ -90,6 +96,8 @@ def stores() -> Stores:
     return Stores(
         nodes=nodes,
         edges=edges,
+        node_types=node_types,
+        edge_types=edge_types,
         collections=collections,
         assets=assets,
         installations=installations,
@@ -101,6 +109,18 @@ def _node(owner: uuid.UUID | None) -> Node:
     node = Node.create(owner_id=SYSTEM, name="n")
     node.owner_id = owner
     return node
+
+
+def _item_type(owner: uuid.UUID | None, slug: str) -> NodeType:
+    item_type = NodeType.create(owner_id=SYSTEM, slug=slug, label=slug)
+    item_type.owner_id = owner
+    return item_type
+
+
+def _relationship_type(owner: uuid.UUID | None, slug: str) -> EdgeType:
+    relationship_type = EdgeType.create(owner_id=SYSTEM, slug=slug, label=slug)
+    relationship_type.owner_id = owner
+    return relationship_type
 
 
 def _edge(owner: uuid.UUID | None) -> Edge:
@@ -139,6 +159,12 @@ async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) 
     ]
     assets = [_asset(None), _asset(SYSTEM)]
     installations = [_installation(None, "p1"), _installation(SYSTEM, "p2")]
+    item_types = [_item_type(None, "a"), _item_type(SYSTEM, "b")]
+    relationship_types = [_relationship_type(SYSTEM, "c")]
+    for item_type in item_types:
+        await stores.node_types.add(item_type)
+    for relationship_type in relationship_types:
+        await stores.edge_types.add(relationship_type)
     for node in nodes:
         await stores.nodes.add(node)
     for edge in edges:
@@ -153,6 +179,7 @@ async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) 
     report = await stores.claim.claim(ADMIN)
 
     assert report.counts == {
+        "types": 3,
         "items": 2,
         "connections": 2,
         "collections": 2,
@@ -160,6 +187,8 @@ async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) 
         "examples": 2,
     }
     owners = [
+        *(t.owner_id for t in item_types),
+        *(t.owner_id for t in relationship_types),
         *(n.owner_id for n in nodes),
         *(e.owner_id for e in edges),
         *(c.owner_id for c in collections),

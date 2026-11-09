@@ -10,10 +10,20 @@ if TYPE_CHECKING:
     from uuid import UUID
 
 OWNED_TABLES = frozenset(
-    {"nodes", "edges", "collections", "media_assets", "example_installations"}
+    {
+        "node_types",
+        "edge_types",
+        "nodes",
+        "edges",
+        "collections",
+        "media_assets",
+        "example_installations",
+    }
 )
 # Content tables whose soft-deleted rows an export leaves out and an import skips.
-SOFT_DELETABLE = frozenset({"nodes", "edges", "collections"})
+SOFT_DELETABLE = frozenset(
+    {"node_types", "edge_types", "nodes", "edges", "collections"}
+)
 USER_TABLES = (
     "presets",
     "node_types",
@@ -27,12 +37,9 @@ USER_TABLES = (
     "media_attachments",
     "node_favourites",
 )
-VOCABULARY = frozenset({"presets", "node_types", "edge_types"})
-ENTITY_TABLES = {
-    "preset": "presets",
-    "item_type": "node_types",
-    "relationship_type": "edge_types",
-}
+# Choice lists are the one shared vocabulary left: types belong to a person.
+VOCABULARY = frozenset({"presets"})
+ENTITY_TABLES = {"preset": "presets"}
 MAX_ROW_BYTES = 16 * 1024 * 1024
 
 
@@ -173,12 +180,8 @@ def prepare_row(
 def compatible(
     name: str, incoming: dict[str, object], existing: dict[str, object]
 ) -> bool:
-    """Only reuse shared vocabulary with the same behaviour and schema."""
-    keys = (
-        ("kind", "definition")
-        if name == "presets"
-        else ("attributes_schema", "directional")
-    )
+    """Only reuse a shared choice list with the same kind and definition."""
+    keys = ("kind", "definition")
     return all(incoming.get(key) == existing.get(key) for key in keys) and (
         incoming.get("deleted_at") is None
     ) == (existing.get("deleted_at") is None)

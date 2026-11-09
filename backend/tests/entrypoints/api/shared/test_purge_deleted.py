@@ -241,13 +241,13 @@ async def test_a_second_run_is_a_no_op() -> None:
 async def test_types_and_presets_follow_the_items_that_carried_them() -> None:
     """An uninstalled pack's types and presets go once their items have."""
     w = _World()
-    book_type = NodeType.create(slug="book", label="Book")
+    book_type = NodeType.create(owner_id=ALICE, slug="book", label="Book")
     book_type.deleted_at = LONG_AGO
     await w.graph.node_types.add(book_type)
-    link_type = EdgeType.create(slug="cites", label="Cites")
+    link_type = EdgeType.create(owner_id=ALICE, slug="cites", label="Cites")
     link_type.deleted_at = LONG_AGO
     await w.graph.edge_types.add(link_type)
-    kept_type = NodeType.create(slug="film", label="Film")
+    kept_type = NodeType.create(owner_id=ALICE, slug="film", label="Film")
     kept_type.deleted_at = LONG_AGO
     await w.graph.node_types.add(kept_type)
     preset = Preset.create(kind="choice_list", label="Genres", definition={})

@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from app.modules.graph.domain.edge_type import EdgeType
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class EdgeTypeRepository(Protocol):
@@ -19,16 +20,23 @@ class EdgeTypeRepository(Protocol):
         """Persist changes to an existing edge type."""
         ...
 
-    async def get(self, edge_type_id: uuid.UUID) -> EdgeType | None:
-        """Return the edge type with `edge_type_id`, or None."""
+    async def get(
+        self, edge_type_id: uuid.UUID, *, scope: ContentFilter
+    ) -> EdgeType | None:
+        """Return the edge type, or None if missing, deleted or outside `scope`."""
         ...
 
-    async def get_by_slug(self, slug: str) -> EdgeType | None:
-        """Return the edge type with `slug`, or None."""
+    async def get_by_slug(self, slug: str, *, scope: ContentFilter) -> EdgeType | None:
+        """Return the edge type with `slug` in `scope`, or None.
+
+        A slug is unique per owner, so `scope` decides which person's type it is.
+        """
         ...
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[EdgeType]:
-        """List non-deleted edge types ordered by id."""
+    async def list(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> list[EdgeType]:
+        """List non-deleted edge types in `scope` ordered by id."""
         ...
 
     async def list_deleted_before(
@@ -42,4 +50,13 @@ class EdgeTypeRepository(Protocol):
 
     async def purge(self, edge_type_id: uuid.UUID) -> None:
         """Hard-delete the row, live or soft-deleted; an unknown id is a no-op."""
+        ...
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every edge type with no owner or a legacy owner.
+
+        System-level, for the first-admin claim; returns the number changed.
+        """
         ...

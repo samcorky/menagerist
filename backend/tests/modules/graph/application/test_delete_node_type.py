@@ -40,7 +40,7 @@ def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
 async def test_delete_node_type_soft_deletes_and_commits() -> None:
     """DeleteNodeType marks the node type as deleted and commits."""
     uow, repos = _make_uow()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     await repos.node_types.add(nt)
     use_case = DeleteNodeType(uow, get_access_guard())
 
@@ -64,7 +64,7 @@ async def test_delete_node_type_raises_when_missing() -> None:
 async def test_delete_node_type_clears_type_on_referencing_nodes() -> None:
     """Deleting a node type nulls out that type on all nodes that referenced it."""
     uow, repos = _make_uow()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     await repos.node_types.add(nt)
     node_a = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
     node_b = Node.create(owner_id=uuid.UUID(int=1), name="Aliens", type="film")

@@ -75,7 +75,9 @@ class World:
     async def setup(self) -> None:
         """Add the type and one item that is at its reorder level."""
         await self.repos.node_types.add(
-            NodeType.create(slug="part", label="Part", attributes_schema=self.schema)
+            NodeType.create(
+                owner_id=ALICE, slug="part", label="Part", attributes_schema=self.schema
+            )
         )
         await self.repos.nodes.add(
             Node.create(

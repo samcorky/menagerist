@@ -81,11 +81,13 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
             if command.type is not None:
                 slug = slugify(command.type)
                 node_type = await repos.node_types.get_by_slug(
-                    slug, guard_item_write=True
+                    slug, scope=self.scope(actor), guard_item_write=True
                 )
                 if node_type is None:
                     await repos.node_types.add(
-                        NodeType.create(slug=slug, label=command.type)
+                        NodeType.create(
+                            owner_id=actor.id, slug=slug, label=command.type
+                        )
                     )
                 else:
                     type_schema = node_type.attributes_schema

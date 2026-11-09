@@ -188,21 +188,25 @@ def test_patch_with_if_match_of_someone_elses_connection_is_404(
 
 
 def test_edge_type_usage_counts_are_per_person(world: _World) -> None:
-    """Attribute usage only reflects the caller's own connections."""
+    """Each person counts their own connections under their own relationship type."""
     alice = world.act_as(ALICE)
     _connect(alice, attributes={"note": "x"})
-    edge_type = alice.get("/api/v1/edge-types").json()[0]
+    alices_type = alice.get("/api/v1/edge-types").json()[0]
     bob = world.act_as(BOB)
     _connect(bob, attributes={"note": "x"})
     _connect(bob, attributes={"note": "y"})
-    url = f"/api/v1/edge-types/{edge_type['id']}/attributes/note/usage"
+    bobs_type = bob.get("/api/v1/edge-types").json()[0]
 
-    assert world.act_as(ALICE).get(url).json() == {"count": 1}
-    assert world.act_as(BOB).get(url).json() == {"count": 2}
+    def usage(type_id: str) -> str:
+        return f"/api/v1/edge-types/{type_id}/attributes/note/usage"
+
+    assert world.act_as(ALICE).get(usage(alices_type["id"])).json() == {"count": 1}
+    assert world.act_as(BOB).get(usage(bobs_type["id"])).json() == {"count": 2}
+    assert world.act_as(ALICE).get(usage(bobs_type["id"])).status_code == 404
 
 
-def test_members_get_403_on_admin_only_structure_routes(world: _World) -> None:
-    """Deleting a type and purging an attribute are refused for members."""
+def test_other_peoples_structure_routes_read_as_missing(world: _World) -> None:
+    """Bob, and an administrator, cannot reach Alice's types by id."""
     alice = world.act_as(ALICE)
     node_type = alice.post(
         "/api/v1/node-types", json={"slug": "film", "label": "Film"}
@@ -216,38 +220,50 @@ def test_members_get_403_on_admin_only_structure_routes(world: _World) -> None:
         ("delete", f"/api/v1/edge-types/{edge_type['id']}"),
         ("delete", f"/api/v1/edge-types/{edge_type['id']}/attributes/note"),
     ]
-    for method, url in requests:
-        assert getattr(alice, method)(url).status_code == 403
+    for stranger in (world.act_as(BOB), world.act_as(ADMIN, "admin")):
+        for method, url in requests:
+            assert getattr(stranger, method)(url).status_code == 404
 
+    alice = world.act_as(ALICE)
     assert alice.get(f"/api/v1/edge-types/{edge_type['id']}").status_code == 200
     assert alice.get(f"/api/v1/node-types/{node_type['id']}").status_code == 200
 
 
-def test_admin_purge_and_delete_span_all_users_content(world: _World) -> None:
-    """An admin's purge touches everyone's connections and items."""
+def test_an_owners_purge_and_delete_reach_only_their_own_content(
+    world: _World,
+) -> None:
+    """Alice's purge and delete leave Bob's same-slug type and content alone."""
     alice = world.act_as(ALICE)
     _connect(alice, attributes={"note": "x"})
-    edge_type = alice.get("/api/v1/edge-types").json()[0]
-    bob = world.act_as(BOB)
-    _connect(bob, attributes={"note": "x"})
-    node_type = bob.post(
+    alices_edge_type = alice.get("/api/v1/edge-types").json()[0]
+    alices_node_type = alice.post(
         "/api/v1/node-types", json={"slug": "film", "label": "Film"}
     ).json()
-    bob.post("/api/v1/nodes", json={"name": "Alien", "type": "film"})
-    alice = world.act_as(ALICE)
     alice.post("/api/v1/nodes", json={"name": "Aliens", "type": "film"})
+    bob = world.act_as(BOB)
+    _connect(bob, attributes={"note": "x"})
+    bob.post("/api/v1/node-types", json={"slug": "film", "label": "Film"})
+    bob.post("/api/v1/nodes", json={"name": "Alien", "type": "film"})
 
-    admin = world.act_as(ADMIN, "admin")
-    purge = admin.delete(f"/api/v1/edge-types/{edge_type['id']}/attributes/note")
+    alice = world.act_as(ALICE)
+    purge = alice.delete(f"/api/v1/edge-types/{alices_edge_type['id']}/attributes/note")
     assert purge.status_code == 204
     assert purge.content == b""
-    blocked = admin.delete(f"/api/v1/edge-types/{edge_type['id']}")
+    blocked = alice.delete(f"/api/v1/edge-types/{alices_edge_type['id']}")
     assert blocked.status_code == 409
-    assert admin.delete(f"/api/v1/node-types/{node_type['id']}").status_code == 204
+    assert (
+        alice.delete(f"/api/v1/node-types/{alices_node_type['id']}").status_code == 204
+    )
 
-    for person in (ALICE, BOB):
-        client = world.act_as(person)
-        assert all(e["attributes"] == {} for e in client.get("/api/v1/edges").json())
-        assert {n["type"] for n in client.get("/api/v1/nodes").json() if n["name"]} == {
-            None
-        }
+    alice = world.act_as(ALICE)
+    assert all(e["attributes"] == {} for e in alice.get("/api/v1/edges").json())
+    assert {
+        n["type"] for n in alice.get("/api/v1/nodes").json() if n["name"] == "Aliens"
+    } == {None}
+    bob = world.act_as(BOB)
+    assert all(
+        e["attributes"] == {"note": "x"} for e in bob.get("/api/v1/edges").json()
+    )
+    assert {
+        n["type"] for n in bob.get("/api/v1/nodes").json() if n["name"] == "Alien"
+    } == {"film"}

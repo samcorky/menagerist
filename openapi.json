@@ -7621,7 +7621,7 @@
                   "type": "about:blank",
                   "title": "ForbiddenError",
                   "status": 403,
-                  "detail": "Administrator access is required.",
+                  "detail": "You do not have permission to do this.",
                   "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
                 }
               }
@@ -8240,7 +8240,7 @@
                   "type": "about:blank",
                   "title": "ForbiddenError",
                   "status": 403,
-                  "detail": "Administrator access is required.",
+                  "detail": "You do not have permission to do this.",
                   "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/attributes/key"
                 }
               }
@@ -9265,7 +9265,7 @@
                   "type": "about:blank",
                   "title": "ForbiddenError",
                   "status": 403,
-                  "detail": "Administrator access is required.",
+                  "detail": "You do not have permission to do this.",
                   "instance": "https://menagerist.example/api/v1/edge-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
                 }
               }
@@ -9679,7 +9679,7 @@
                   "type": "about:blank",
                   "title": "ForbiddenError",
                   "status": 403,
-                  "detail": "Administrator access is required.",
+                  "detail": "You do not have permission to do this.",
                   "instance": "https://menagerist.example/api/v1/edge-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/attributes/key"
                 }
               }
@@ -25036,7 +25036,7 @@
           "graph:edge_type:purge_attribute"
         ],
         "title": "GraphPermission",
-        "description": "Permissions for graph operations.\n\nItem and type permissions are held by members; the rest affect every user's\ncontent and are admin-only. `ITEM_PURGE` is held by members but never\ngrantable to a token. Values read `<module>:<resource>:<action>`."
+        "description": "Permissions for graph operations.\n\nMembers hold every permission here: types belong to a person, so deleting one\nor purging an attribute reaches only the owner's content. `ITEM_PURGE`, the\ntype deletions and the attribute purges are never grantable to a token.\nValues read `<module>:<resource>:<action>`."
       },
       "HTTPValidationError": {
         "properties": {

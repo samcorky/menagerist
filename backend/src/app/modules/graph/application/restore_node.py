@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.errors import NodeNotFoundError, NodeTypeDeletedError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -49,7 +50,10 @@ class RestoreNode(CommandHandler[GraphUnitOfWork, RestoreNodeCommand, Node]):
             self._guard.assert_can_delete(actor, node.owner_id)
             if (
                 node.type is not None
-                and await repos.node_types.get_by_slug(node.type) is None
+                and await repos.node_types.get_by_slug(
+                    node.type, scope=owner_scope(node.owner_id)
+                )
+                is None
             ):
                 raise NodeTypeDeletedError(
                     f"The item type '{node.type}' has been deleted. "

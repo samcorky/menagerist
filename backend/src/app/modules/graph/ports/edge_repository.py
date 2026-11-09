@@ -101,10 +101,10 @@ class EdgeRepository(Protocol):
         """Return how many connections were soft-deleted before `cutoff`, any owner."""
         ...
 
-    async def has_any_of_type(self, type_slug: str) -> bool:
-        """Return whether any connection, live or soft-deleted, has `type_slug`.
+    async def has_any_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
+        """Return whether any connection in `scope`, live or deleted, has `type_slug`.
 
-        System-level and unscoped, for the retention purge of relationship types.
+        For the retention purge of relationship types, scoped to the type's owner.
         """
         ...
 

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
 from app.shared_kernel.access import Access, System
 from app.shared_kernel.cqrs import CommandHandler
@@ -85,9 +86,11 @@ class PurgeExpiredTypes(
             for node_type in batch:
                 async with self._uow as repos:
                     slug = str(node_type.slug)
+                    owner = owner_scope(node_type.owner_id)
                     if (
-                        await repos.nodes.has_any_of_type(slug)
-                        and await repos.node_types.get_by_slug(slug) is None
+                        await repos.nodes.has_any_of_type(slug, scope=owner)
+                        and await repos.node_types.get_by_slug(slug, scope=owner)
+                        is None
                     ):
                         continue
                     if not command.dry_run:
@@ -110,9 +113,11 @@ class PurgeExpiredTypes(
             for edge_type in batch:
                 async with self._uow as repos:
                     slug = str(edge_type.slug)
+                    owner = owner_scope(edge_type.owner_id)
                     if (
-                        await repos.edges.has_any_of_type(slug)
-                        and await repos.edge_types.get_by_slug(slug) is None
+                        await repos.edges.has_any_of_type(slug, scope=owner)
+                        and await repos.edge_types.get_by_slug(slug, scope=owner)
+                        is None
                     ):
                         continue
                     if not command.dry_run:

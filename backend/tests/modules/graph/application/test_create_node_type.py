@@ -28,6 +28,7 @@ from app.modules.graph.domain.errors import (
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -51,7 +52,7 @@ async def test_create_node_type_persists_and_commits() -> None:
         SYSTEM_ACTOR,
     )
 
-    assert await repos.node_types.get(nt.id) is nt
+    assert await repos.node_types.get(nt.id, scope=ContentFilter.everyone()) is nt
     assert uow.committed is True
 
 
@@ -72,7 +73,7 @@ async def test_create_node_type_persists_attributes_schema() -> None:
         SYSTEM_ACTOR,
     )
 
-    stored = await repos.node_types.get(nt.id)
+    stored = await repos.node_types.get(nt.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.attributes_schema == schema
 
@@ -123,7 +124,10 @@ async def test_create_node_type_succeeds_after_delete_of_same_slug() -> None:
     )
 
     assert second.id != first.id
-    assert await repos.node_types.get_by_slug("film") is second
+    assert (
+        await repos.node_types.get_by_slug("film", scope=ContentFilter.everyone())
+        is second
+    )
 
     with pytest.raises(NodeTypeSlugConflictError):
         await CreateNodeType(uow, InMemoryAccessGuard()).handle(
@@ -178,6 +182,6 @@ async def test_create_node_type_keeps_an_icon_and_colour() -> None:
         SYSTEM_ACTOR,
     )
 
-    stored = await repos.node_types.get(nt.id)
+    stored = await repos.node_types.get(nt.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert (stored.icon, stored.colour) == ("clapperboard", "red")

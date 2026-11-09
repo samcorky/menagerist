@@ -40,7 +40,9 @@ def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
 async def test_delete_edge_type_soft_deletes_and_commits() -> None:
     """DeleteEdgeType marks the edge type as deleted and commits."""
     uow, repos = _make_uow()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=uuid.UUID(int=1), slug="directed-by", label="Directed By"
+    )
     await repos.edge_types.add(et)
     use_case = DeleteEdgeType(uow, get_access_guard())
 
@@ -64,7 +66,9 @@ async def test_delete_edge_type_raises_when_missing() -> None:
 async def test_delete_edge_type_raises_when_edges_still_reference_it() -> None:
     """DeleteEdgeType raises EdgeTypeInUseError when edges use the type."""
     uow, repos = _make_uow()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=uuid.UUID(int=1), slug="directed-by", label="Directed By"
+    )
     await repos.edge_types.add(et)
     edge = Edge.create(
         owner_id=uuid.UUID(int=1),
@@ -84,7 +88,9 @@ async def test_delete_edge_type_raises_when_edges_still_reference_it() -> None:
 async def test_delete_edge_type_succeeds_when_no_edges_reference_it() -> None:
     """DeleteEdgeType soft-deletes when no active edges use the type."""
     uow, repos = _make_uow()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=uuid.UUID(int=1), slug="directed-by", label="Directed By"
+    )
     await repos.edge_types.add(et)
     # Edge with a different type - should not block deletion
     other_edge = Edge.create(

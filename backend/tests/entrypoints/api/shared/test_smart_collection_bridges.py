@@ -271,7 +271,15 @@ def _films(env: Env) -> dict[str, str]:
         "Alien Book": env.item("Alien Book", type="book"),
         "film-type-id": film.json()["id"],
     }
-    env.as_(BOB)
+    # Types are each person's own, so Bob defines the film type his item uses.
+    bob = env.as_(BOB)
+    assert (
+        bob.post(
+            "/api/v1/node-types",
+            json={"slug": "film", "label": "Film", "attributes_schema": RATED},
+        ).status_code
+        == 201
+    )
     ids["Bob's Alien"] = env.item("Bob's Alien", type="film", attributes={"rating": 5})
     env.as_(ALICE)
     return ids

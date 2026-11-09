@@ -15,17 +15,19 @@ def _epoch(column: str) -> str:
     return f"(EXTRACT(epoch FROM timezone('UTC'::text, {column}))::double precision)"
 
 
-class NodeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+class NodeTypeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     """ORM row for a node type.
 
     Storage shape kept separate from `domain.NodeType`.
     """
 
     __tablename__ = "node_types"
-    # Only live rows reserve a slug; the use cases check this too, the index backs them.
+    # Only live rows reserve a slug, and only within their owner; the use cases check
+    # this too, the index backs them.
     __table_args__ = (
         Index(
-            "uq_node_types_slug_live",
+            "uq_node_types_owner_slug_live",
+            "owner_id",
             "slug",
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
@@ -154,13 +156,14 @@ class EdgeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
 
-class EdgeTypeModel(IdentifiableMixin, SoftDeletableMixin, Base):
+class EdgeTypeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     """ORM row for an edge type."""
 
     __tablename__ = "edge_types"
     __table_args__ = (
         Index(
-            "uq_edge_types_slug_live",
+            "uq_edge_types_owner_slug_live",
+            "owner_id",
             "slug",
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),

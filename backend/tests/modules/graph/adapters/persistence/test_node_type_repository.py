@@ -7,6 +7,8 @@ from app.modules.graph.adapters.persistence.node_type_repository import (
     SqlAlchemyNodeTypeRepository,
 )
 from app.modules.graph.domain.node_type import NodeType
+from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,13 +35,13 @@ async def test_constraint_patterns_round_trip_through_jsonb(
 ) -> None:
     """Backslashes, unicode and `allOf` order survive the JSONB column unchanged."""
     repository = SqlAlchemyNodeTypeRepository(db_session)
-    node_type = NodeType.create(slug="record", label="Record")
+    node_type = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="record", label="Record")
     node_type.attributes_schema = _SCHEMA
     await repository.add(node_type)
     await db_session.flush()
     db_session.expire_all()
 
-    stored = await repository.get(node_type.id)
+    stored = await repository.get(node_type.id, scope=ContentFilter.everyone())
 
     assert stored is not None
     assert stored.attributes_schema == _SCHEMA
@@ -50,15 +52,17 @@ async def test_constraint_patterns_round_trip_through_jsonb(
 async def test_slug_can_be_reused_after_soft_delete(db_session: AsyncSession) -> None:
     """A soft-deleted node type stops reserving its slug."""
     repository = SqlAlchemyNodeTypeRepository(db_session)
-    first = NodeType.create(slug="record", label="Record")
+    first = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="record", label="Record")
     await repository.add(first)
     first.soft_delete()
     await repository.save(first)
 
-    second = NodeType.create(slug="record", label="Record again")
+    second = NodeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="record", label="Record again"
+    )
     await repository.add(second)
 
-    live = await repository.get_by_slug("record")
+    live = await repository.get_by_slug("record", scope=ContentFilter.everyone())
     assert live is not None
     assert live.id == second.id
 
@@ -66,10 +70,14 @@ async def test_slug_can_be_reused_after_soft_delete(db_session: AsyncSession) ->
 async def test_live_node_types_cannot_share_a_slug(db_session: AsyncSession) -> None:
     """The index backs the use case's check: two live types cannot share a slug."""
     repository = SqlAlchemyNodeTypeRepository(db_session)
-    await repository.add(NodeType.create(slug="record", label="Record"))
+    await repository.add(
+        NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="record", label="Record")
+    )
 
     with pytest.raises(IntegrityError):
-        await repository.add(NodeType.create(slug="record", label="Duplicate"))
+        await repository.add(
+            NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="record", label="Duplicate")
+        )
 
 
 async def test_icon_and_colour_round_trip_and_can_be_cleared(
@@ -78,13 +86,17 @@ async def test_icon_and_colour_round_trip_and_can_be_cleared(
     """A type's icon and colour are stored, changed and cleared."""
     repository = SqlAlchemyNodeTypeRepository(db_session)
     node_type = NodeType.create(
-        slug="record", label="Record", icon="disc-3", colour="violet"
+        owner_id=SYSTEM_ACTOR.id,
+        slug="record",
+        label="Record",
+        icon="disc-3",
+        colour="violet",
     )
     await repository.add(node_type)
     await db_session.flush()
     db_session.expire_all()
 
-    stored = await repository.get(node_type.id)
+    stored = await repository.get(node_type.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert (stored.icon, stored.colour) == ("disc-3", "violet")
 
@@ -94,6 +106,6 @@ async def test_icon_and_colour_round_trip_and_can_be_cleared(
     await db_session.flush()
     db_session.expire_all()
 
-    changed = await repository.get(node_type.id)
+    changed = await repository.get(node_type.id, scope=ContentFilter.everyone())
     assert changed is not None
     assert (changed.icon, changed.colour) == ("music", None)

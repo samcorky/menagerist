@@ -179,7 +179,9 @@ async def update_node_type(
             NodeTypeNotFoundError,
             detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
         ),
-        **error_response(ForbiddenError, detail="Administrator access is required."),
+        **error_response(
+            ForbiddenError, detail="You do not have permission to do this."
+        ),
     },
 )
 async def delete_node_type(
@@ -265,7 +267,9 @@ async def list_attribute_values(
             NodeTypeNotFoundError,
             detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
         ),
-        **error_response(ForbiddenError, detail="Administrator access is required."),
+        **error_response(
+            ForbiddenError, detail="You do not have permission to do this."
+        ),
     },
 )
 async def purge_node_type_attribute(

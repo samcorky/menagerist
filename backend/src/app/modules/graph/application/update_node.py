@@ -12,6 +12,7 @@ from app.modules.graph.application.schema_meta import (
     check_schema_definition,
     merge_attribute_schemas,
 )
+from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.errors import NodeNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
@@ -91,7 +92,7 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
             # A favourite is the caller's own, so changing only that leaves the item,
             # its timestamp and everyone else's view of it alone.
             if self._edits_item(command):
-                await self._apply_edits(repos, node, command, new_type)
+                await self._apply_edits(repos, node, command, new_type, actor.id)
             if command.favourite is not None:
                 await repos.nodes.set_favourite(
                     node.id, command.favourite, scope=self.scope(actor)
@@ -103,7 +104,11 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
 
     @staticmethod
     async def _apply_edits(
-        repos: GraphRepos, node: Node, command: UpdateNodeCommand, new_type: str | None
+        repos: GraphRepos,
+        node: Node,
+        command: UpdateNodeCommand,
+        new_type: str | None,
+        creator_id: uuid.UUID,
     ) -> None:
         """Apply the item's own changes, creating a newly named type, and save."""
         if command.clear_type:
@@ -118,8 +123,15 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
         )
         if node.type is not None and new_type is not None:
             slug = node.type
-            if await repos.node_types.get_by_slug(slug, guard_item_write=True) is None:
-                await repos.node_types.add(NodeType.create(slug=slug, label=new_type))
+            existing = await repos.node_types.get_by_slug(
+                slug, scope=owner_scope(node.owner_id), guard_item_write=True
+            )
+            if existing is None:
+                await repos.node_types.add(
+                    NodeType.create(
+                        owner_id=node.owner_id or creator_id, slug=slug, label=new_type
+                    )
+                )
         await repos.nodes.save(node)
 
     @staticmethod
@@ -165,7 +177,9 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
         """
         type_schema: dict[str, Any] | None = None
         if type_slug is not None:
-            node_type = await repos.node_types.get_by_slug(type_slug)
+            node_type = await repos.node_types.get_by_slug(
+                type_slug, scope=owner_scope(node.owner_id)
+            )
             type_schema = node_type.attributes_schema if node_type else None
         extra_schema = (
             command.extra_schema

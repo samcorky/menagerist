@@ -23,6 +23,7 @@ from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -39,7 +40,7 @@ def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
 async def test_update_node_type_persists_and_commits() -> None:
     """UpdateNodeType saves the changed node type and commits."""
     uow, repos = _make_uow()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
     await repos.node_types.add(nt)
     use_case = UpdateNodeType(uow, InMemoryAccessGuard())
 
@@ -49,7 +50,7 @@ async def test_update_node_type_persists_and_commits() -> None:
     )
 
     assert result.label == "Movie"
-    stored = await repos.node_types.get(nt.id)
+    stored = await repos.node_types.get(nt.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.label == "Movie"
     assert uow.committed is True
@@ -58,7 +59,7 @@ async def test_update_node_type_persists_and_commits() -> None:
 async def test_update_node_type_persists_attributes_schema() -> None:
     """UpdateNodeType stores a valid JSON Schema when provided."""
     uow, repos = _make_uow()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
     await repos.node_types.add(nt)
     schema = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -75,7 +76,7 @@ async def test_update_node_type_persists_attributes_schema() -> None:
     )
 
     assert result.attributes_schema == schema
-    stored = await repos.node_types.get(nt.id)
+    stored = await repos.node_types.get(nt.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.attributes_schema == schema
 
@@ -83,7 +84,7 @@ async def test_update_node_type_persists_attributes_schema() -> None:
 async def test_update_node_type_raises_on_invalid_schema() -> None:
     """UpdateNodeType rejects a schema that is not valid JSON Schema."""
     uow, repos = _make_uow()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
     await repos.node_types.add(nt)
     use_case = UpdateNodeType(uow, InMemoryAccessGuard())
 
@@ -112,7 +113,7 @@ async def test_update_node_type_raises_when_missing() -> None:
 async def test_update_node_type_sets_and_clears_icon_and_colour() -> None:
     """UpdateNodeType sets an icon and colour, and the clear flags remove them."""
     uow, repos = _make_uow()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
     await repos.node_types.add(nt)
     use_case = UpdateNodeType(uow, InMemoryAccessGuard())
 
