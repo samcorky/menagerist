@@ -120,7 +120,7 @@ export interface ReleaseView {
 	tone: ReleaseTone;
 	badge: string;
 	summary: string;
-	rows: Array<{ label: string; value: string; time?: boolean }>;
+	rows: Array<{ label: string; value: string; time?: boolean; plain?: boolean }>;
 	/** The release notes, only when the link is a GitHub page. */
 	notesUrl: string | null;
 	/** Why the last attempt failed, in words, or null. */
@@ -142,12 +142,22 @@ export function safeNotesUrl(url: string | null | undefined): string | null {
 	return typeof url === 'string' && url.startsWith('https://github.com/') ? url : null;
 }
 
+/** Tags are often `v1.2.3` while the installed version is `1.2.3`; show both the same way. */
+const bareVersion = (version: string) => version.replace(/^v(?=\d)/i, '');
+
+/** The release's own name, without the version it repeats (`v1.2.3 - Name` becomes `Name`). */
+function titleWithoutVersion(title: string, latest: string): string {
+	const bare = bareVersion(latest);
+	const escaped = bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return title.trim().replace(new RegExp(`^v?${escaped}\\s*[-–—:]?\\s*`, 'i'), '');
+}
+
 /**
  * How the Status page describes the last release check. An uncheckable build is never
  * reported as up to date, and a failed attempt keeps showing the last good answer.
  */
 export function releaseViewOf(release: ReleaseResponse, installed?: string | null): ReleaseView {
-	const latest = release.latest_version ?? null;
+	const latest = release.latest_version ? bareVersion(release.latest_version) : null;
 	const channel = CHANNEL_LABELS[release.channel];
 	const failureNote = release.failure ? FAILURE_NOTES[release.failure] : null;
 
@@ -192,9 +202,8 @@ export function releaseViewOf(release: ReleaseResponse, installed?: string | nul
 			value: release.prerelease ? `${latest} (prerelease)` : latest
 		});
 		// A release with no name of its own is titled with its tag, which adds nothing.
-		if (release.title && release.title !== latest) {
-			rows.push({ label: 'Title', value: release.title });
-		}
+		const title = release.title ? titleWithoutVersion(release.title, latest) : '';
+		if (title) rows.push({ label: 'Title', value: title, plain: true });
 	}
 	if (release.published_at) {
 		rows.push({ label: 'Published', value: release.published_at, time: true });

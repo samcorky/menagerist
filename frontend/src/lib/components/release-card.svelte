@@ -63,7 +63,9 @@
 						{@const when = formatDateTime(row.value)}
 						<span class="text-right text-sm" title={when.utc}>{when.local}</span>
 					{:else}
-						<span class="max-w-[60%] text-right font-mono text-sm break-words">{row.value}</span>
+						<span class={['max-w-[60%] text-right text-sm break-words', !row.plain && 'font-mono']}>
+							{row.value}
+						</span>
 					{/if}
 				</div>
 			{/each}

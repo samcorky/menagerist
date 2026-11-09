@@ -242,6 +242,20 @@ describe('releaseViewOf', () => {
 		expect(view.rows.map((row) => row.label)).not.toContain('Title');
 	});
 
+	it('shows a v-prefixed tag like the installed version and keeps only the release name as title', () => {
+		const view = releaseViewOf(
+			{ ...newer, latest_version: 'v0.2026.11.0', title: 'v0.2026.11.0 - Pocket Rocket' },
+			'0.2026.11.0'
+		);
+		expect(view.rows.find((row) => row.label === 'Latest release')?.value).toBe('0.2026.11.0');
+		expect(view.rows.find((row) => row.label === 'Title')).toMatchObject({
+			value: 'Pocket Rocket',
+			plain: true
+		});
+		const bare = releaseViewOf({ ...newer, latest_version: 'v0.2026.11.0', title: 'v0.2026.11.0' });
+		expect(bare.rows.map((row) => row.label)).not.toContain('Title');
+	});
+
 	it('says up to date only when a check confirmed it', () => {
 		expect(releaseViewOf({ ...newer, status: 'up_to_date' }).tone).toBe('ok');
 		const never = releaseViewOf(base);
