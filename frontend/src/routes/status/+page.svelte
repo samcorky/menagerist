@@ -568,14 +568,16 @@
 
 		{@const hasSide = (showDetail && browserCheck) || buildInfo?.release || buildInfo}
 		<div class={['grid items-start gap-4', hasSide && '2xl:grid-cols-[minmax(0,1fr)_22rem]']}>
-			<div class="grid items-start gap-4 xl:grid-cols-2">
+			<div class="gap-4 xl:columns-2">
 				{#each groups as [groupKey, checks] (groupKey)}
 					{@const anchorIds = checkAnchorIds(groupKey, checks)}
 					{@const GroupIcon = groupIcon(groupKey)}
 					{@const groupHealth = groupStatus(checks)}
 					{@const GroupStatusIcon = statusIcon(groupHealth)}
 					{@const isOpen = openGroups.get(groupKey) ?? false}
-					<Card.Root class="overflow-hidden border-border/70 bg-card shadow-sm">
+					<Card.Root
+						class="mb-4 break-inside-avoid overflow-hidden border-border/70 bg-card shadow-sm"
+					>
 						<Collapsible.Root
 							open={isOpen}
 							onOpenChange={(value) => openGroups.set(groupKey, value)}
