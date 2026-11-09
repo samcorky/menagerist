@@ -201,10 +201,15 @@ test('the checks lay out in columns on a wide screen', async ({ page }) => {
 	await page.setViewportSize({ width: 2048, height: 1152 });
 	await page.goto('/status');
 	await expect(groupBars(page).nth(1)).toBeVisible();
-	const first = await groupBars(page).nth(0).boundingBox();
-	const second = await groupBars(page).nth(1).boundingBox();
-	expect(second!.x).toBeGreaterThan(first!.x + first!.width / 2);
-	expect(Math.abs(second!.y - first!.y)).toBeLessThan(8);
+	// The cards flow down one column and then the next, so look for a card to the right of the first.
+	const boxes = await groupBars(page).evaluateAll((bars) =>
+		bars.map((bar) => {
+			const { x, width } = bar.getBoundingClientRect();
+			return { x, width };
+		})
+	);
+	const [first] = boxes;
+	expect(boxes.some((box) => box.x > first.x + first.width / 2)).toBe(true);
 });
 
 test('the checks stack in one column on a narrow screen', async ({ page }) => {
