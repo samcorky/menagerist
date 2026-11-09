@@ -76,7 +76,9 @@ class PromoteExtraSchemaField(
                     f"{command.key!r} is not defined on this item's extra fields"
                 )
 
-            node_type = await repos.node_types.get(command.node_type_id)
+            node_type = await repos.node_types.get(
+                command.node_type_id, scope=self.scope(actor)
+            )
             if node_type is None:
                 raise NodeTypeNotFoundError(
                     f"NodeType {command.node_type_id} not found"

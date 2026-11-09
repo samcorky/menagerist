@@ -32,8 +32,12 @@ def _make_repos(edge_types: InMemoryEdgeTypeRepository) -> GraphRepos:
 async def test_list_edge_types_returns_all() -> None:
     """ListEdgeTypes returns all non-deleted edge types."""
     edge_types = InMemoryEdgeTypeRepository()
-    et1 = EdgeType.create(slug="directed-by", label="Directed By")
-    et2 = EdgeType.create(slug="written-by", label="Written By")
+    et1 = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="directed-by", label="Directed By"
+    )
+    et2 = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="written-by", label="Written By"
+    )
     await edge_types.add(et1)
     await edge_types.add(et2)
     use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
@@ -48,7 +52,11 @@ async def test_list_edge_types_respects_limit() -> None:
     """ListEdgeTypes returns at most `limit` items."""
     edge_types = InMemoryEdgeTypeRepository()
     for i in range(5):
-        await edge_types.add(EdgeType.create(slug=f"type-{i}", label=f"Type {i}"))
+        await edge_types.add(
+            EdgeType.create(
+                owner_id=SYSTEM_ACTOR.id, slug=f"type-{i}", label=f"Type {i}"
+            )
+        )
     use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
 
     results = await use_case.handle(ListEdgeTypesQuery(limit=2), SYSTEM_ACTOR)
@@ -59,7 +67,9 @@ async def test_list_edge_types_respects_limit() -> None:
 async def test_list_edge_types_excludes_deleted() -> None:
     """ListEdgeTypes omits soft-deleted edge types."""
     edge_types = InMemoryEdgeTypeRepository()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="directed-by", label="Directed By"
+    )
     et.soft_delete()
     await edge_types.add(et)
     use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())

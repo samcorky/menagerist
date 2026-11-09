@@ -117,7 +117,12 @@ async def test_a_failing_smart_collection_rolls_the_whole_install_back(
 
     assert world.collections.collections == {}
     assert await _item_count(world) == 0
-    assert await world.graph_repos.node_types.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.node_types.list(
+            after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
     assert (
         await world.installations.get_active_for_pack(
             "demo", scope=ContentFilter.everyone()
@@ -149,7 +154,7 @@ async def test_a_clashing_type_slug_never_half_installs_a_smart_collection(
     """A taken type slug stops the install before any collection is made."""
     world = make_world(_pack(sample_pack))
     await world.graph_repos.node_types.add(
-        NodeType.create(slug="demo-record", label="Mine")
+        NodeType.create(owner_id=world.actor.id, slug="demo-record", label="Mine")
     )
 
     with pytest.raises(SlugClashError):

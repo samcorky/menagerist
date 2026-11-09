@@ -28,6 +28,7 @@ from app.modules.graph.domain.errors import (
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -51,7 +52,7 @@ async def test_create_edge_type_persists_and_commits() -> None:
         SYSTEM_ACTOR,
     )
 
-    assert await repos.edge_types.get(et.id) is et
+    assert await repos.edge_types.get(et.id, scope=ContentFilter.everyone()) is et
     assert uow.committed is True
 
 
@@ -74,7 +75,7 @@ async def test_create_edge_type_persists_attributes_schema() -> None:
         SYSTEM_ACTOR,
     )
 
-    stored = await repos.edge_types.get(et.id)
+    stored = await repos.edge_types.get(et.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.attributes_schema == schema
 
@@ -111,7 +112,12 @@ async def test_create_edge_type_succeeds_after_delete_of_same_slug() -> None:
     )
 
     assert second.id != first.id
-    assert await repos.edge_types.get_by_slug("directed-by") is second
+    assert (
+        await repos.edge_types.get_by_slug(
+            "directed-by", scope=ContentFilter.everyone()
+        )
+        is second
+    )
 
     with pytest.raises(EdgeTypeSlugConflictError):
         await CreateEdgeType(uow, InMemoryAccessGuard()).handle(

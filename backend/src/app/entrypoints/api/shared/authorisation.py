@@ -21,6 +21,10 @@ CONTENT_PERMISSIONS: frozenset[Permission] = frozenset(
         GraphPermission.ITEM_PURGE,
         GraphPermission.TYPE_READ,
         GraphPermission.TYPE_WRITE,
+        GraphPermission.DELETE_NODE_TYPE,
+        GraphPermission.DELETE_EDGE_TYPE,
+        GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE,
+        GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE,
         MediaPermission.ITEM_READ,
         MediaPermission.ITEM_WRITE,
         CollectionPermission.COLLECTION_READ,
@@ -38,10 +42,14 @@ CONTENT_PERMISSIONS: frozenset[Permission] = frozenset(
 # Granted to every signed-in member.
 MEMBER_PERMISSIONS: frozenset[Permission] = CONTENT_PERMISSIONS
 
-# What a token may be granted: the content permissions minus the backup ones and
-# the two irreversible purges.
+# What a token may be granted: the content permissions minus the backup ones, the
+# irreversible purges and the type deletions, which stay with a signed-in person.
 TOKEN_GRANTABLE_PERMISSIONS: frozenset[Permission] = MEMBER_PERMISSIONS - {
     GraphPermission.ITEM_PURGE,
+    GraphPermission.DELETE_NODE_TYPE,
+    GraphPermission.DELETE_EDGE_TYPE,
+    GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE,
+    GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE,
     CollectionPermission.COLLECTION_PURGE,
     BackupPermission.EXPORT_OWN_DATA,
     BackupPermission.IMPORT_OWN_DATA,

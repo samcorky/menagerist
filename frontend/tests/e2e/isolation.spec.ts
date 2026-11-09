@@ -230,7 +230,7 @@ test('each user installs the same example pack and sees only their own copy', as
 		expect(removed.ok(), await removed.text()).toBeTruthy();
 		expect(await idsOf(b.request)).toEqual(idsB);
 	} finally {
-		// Items first (as their owners), then the shared item types (administrators only).
+		// Each person removes their own pack, which also removes their own item types.
 		await removeExamplePacks(a.request);
 		await removeExamplePacks(b.request);
 		await removeExamplePacks(admin);
@@ -239,32 +239,38 @@ test('each user installs the same example pack and sees only their own copy', as
 	}
 });
 
-test('a member cannot delete an item type: no control, and the API refuses', async ({
-	browser,
-	page
+test('item types belong to their owner: only they see them, and only they can delete them', async ({
+	browser
 }) => {
 	const label = uniqueName('Iso type');
 	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+	const a = await asUser(browser, userA);
+	const b = await asUser(browser, userB);
 	const made = await json<{ id: string }>(
-		await admin.post('/api/v1/node-types', { data: { slug, label } })
+		await a.request.post('/api/v1/node-types', { data: { slug, label } })
 	);
 
 	try {
-		const b = await asUser(browser, userB);
+		// The owner sees the type and may delete it.
+		await a.page.goto('/settings/item-types');
+		await expect(a.page.getByText(label, { exact: true }).first()).toBeVisible();
+		await expect(a.page.getByRole('button', { name: 'Delete item type' }).first()).toBeVisible();
+
+		// Another member sees none of it, and the API treats it as missing.
 		await b.page.goto('/settings/item-types');
-		await expect(b.page.getByText(label, { exact: true }).first()).toBeVisible();
-		await expect(b.page.getByRole('button', { name: 'Edit item type' }).first()).toBeVisible();
-		await expect(b.page.getByRole('button', { name: 'Delete item type' })).toHaveCount(0);
+		await expect(b.page.getByRole('heading', { name: 'Item types' }).first()).toBeVisible();
+		await expect(b.page.getByText(label, { exact: true })).toHaveCount(0);
+		expect((await b.request.get(`/api/v1/node-types/${made.id}`)).status()).toBe(404);
+		expect((await b.request.delete(`/api/v1/node-types/${made.id}`)).status()).toBe(404);
 
-		const denied = await b.request.delete(`/api/v1/node-types/${made.id}`);
-		expect(denied.status()).toBe(403);
-		await b.context.close();
+		// An administrator gets no special view either.
+		expect((await admin.get(`/api/v1/node-types/${made.id}`)).status()).toBe(404);
 
-		// An administrator does get the control.
-		await page.goto('/settings/item-types');
-		await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Delete item type' }).first()).toBeVisible();
+		const removed = await a.request.delete(`/api/v1/node-types/${made.id}`);
+		expect(removed.status()).toBe(204);
 	} finally {
-		await admin.delete(`/api/v1/node-types/${made.id}`);
+		await a.request.delete(`/api/v1/node-types/${made.id}`);
+		await a.context.close();
+		await b.context.close();
 	}
 });

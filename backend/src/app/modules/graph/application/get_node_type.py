@@ -12,7 +12,7 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ class GetNodeTypeQuery:
 class GetNodeType(QueryHandler[GraphRepos, GetNodeTypeQuery, NodeType]):
     """Fetch a single node type by id."""
 
-    access: ClassVar[Access] = Requires(GraphPermission.TYPE_READ)
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_READ)
 
     def __init__(
         self,
@@ -45,7 +45,9 @@ class GetNodeType(QueryHandler[GraphRepos, GetNodeTypeQuery, NodeType]):
 
     async def _handle(self, query: GetNodeTypeQuery, actor: Actor) -> NodeType:
         """Return the node type, or raise `NodeTypeNotFoundError` if missing."""
-        node_type = await self._repos.node_types.get(query.node_type_id)
+        node_type = await self._repos.node_types.get(
+            query.node_type_id, scope=self.scope(actor)
+        )
         if node_type is None:
             raise NodeTypeNotFoundError(f"NodeType {query.node_type_id} not found")
         logger.debug("node type fetched", node_type_id=query.node_type_id)

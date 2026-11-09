@@ -14,6 +14,7 @@ from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
+from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.errors import ValidationError
 
 
@@ -53,6 +54,7 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
     description = _optional_text(row, "description")
     if table == "node_types":
         entity: NodeType | EdgeType = NodeType.create(
+            owner_id=SYSTEM_ACTOR.id,
             slug=slug,
             label=label,
             description=description,
@@ -65,6 +67,7 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
         if not isinstance(directional, bool):
             raise ValueError("directional must be a boolean")
         entity = EdgeType.create(
+            owner_id=SYSTEM_ACTOR.id,
             slug=slug,
             label=label,
             description=description,

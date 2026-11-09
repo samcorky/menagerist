@@ -286,7 +286,7 @@ def _repos(nodes: Any, provider: InMemoryExternalConditions | None) -> GraphRepo
 
 
 class _NoTypes:
-    async def list(self, *, after: Any, limit: int) -> list[Any]:  # noqa: ANN401
+    async def list(self, *, scope: Any, after: Any, limit: int) -> list[Any]:  # noqa: ANN401
         return []
 
 

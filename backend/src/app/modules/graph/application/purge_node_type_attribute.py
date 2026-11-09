@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import structlog
 
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ def _purged_attributes(
 class PurgeNodeTypeAttribute(
     CommandHandler[GraphUnitOfWork, PurgeNodeTypeAttributeCommand, None]
 ):
-    """Remove an attribute key from every node of a node type (administrators only).
+    """Remove an attribute key from every node of a node type (its owner only).
 
     The purge spans every person's items.
 
@@ -60,7 +60,7 @@ class PurgeNodeTypeAttribute(
     save instead of writing the purged value back.
     """
 
-    access: ClassVar[Access] = Requires(GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE)
+    access: ClassVar[Access] = Content(GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE)
 
     async def _handle(
         self, command: PurgeNodeTypeAttributeCommand, actor: Actor
@@ -68,18 +68,19 @@ class PurgeNodeTypeAttribute(
         """Purge the key; the count is logged, not returned (it spans every person)."""
         purged = 0
         async with self._uow as repos:
-            node_type = await repos.node_types.get(command.node_type_id)
+            node_type = await repos.node_types.get(
+                command.node_type_id, scope=self.scope(actor)
+            )
             if node_type is None:
                 raise NodeTypeNotFoundError(
                     f"NodeType {command.node_type_id} not found"
                 )
             slug = str(node_type.slug)
             after: uuid.UUID | None = None
-            # admin-wide: affects every user's content
             while page := await repos.nodes.list_with_attribute(
                 slug,
                 command.key,
-                scope=ContentFilter.everyone(),
+                scope=owner_scope(node_type.owner_id),
                 sub_key=command.sub_key,
                 after=after,
                 limit=_PAGE_SIZE,

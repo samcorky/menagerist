@@ -181,7 +181,11 @@ async def _snapshot(world: World) -> tuple[list[str], int, int, int]:
     """Everything an install could have created."""
     return (
         await _names(world),
-        len(await world.graph_repos.node_types.list(after=None, limit=50)),
+        len(
+            await world.graph_repos.node_types.list(
+                after=None, limit=50, scope=ContentFilter.everyone()
+            )
+        ),
         len(
             await world.graph_repos.edges.list(
                 after=None, limit=50, scope=ContentFilter.everyone()
@@ -437,7 +441,14 @@ async def test_removing_the_add_on_leaves_the_base_untouched(
     assert world.collections.collections == {}
     games = await _installation(world, "games")
     assert all(r.outcome is Outcome.OWNED for r in games.entities)
-    assert len(await world.graph_repos.node_types.list(after=None, limit=50)) == 1
+    assert (
+        len(
+            await world.graph_repos.node_types.list(
+                after=None, limit=50, scope=ContentFilter.everyone()
+            )
+        )
+        == 1
+    )
 
 
 async def test_a_kept_add_on_connection_keeps_the_base_item(

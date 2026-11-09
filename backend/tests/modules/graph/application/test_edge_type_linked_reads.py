@@ -54,7 +54,9 @@ def _repos(edge_types: InMemoryEdgeTypeRepository) -> GraphRepos:
 async def test_get_edge_type_fills_in_linked_options() -> None:
     """A linked edge field is returned with the list's options."""
     edge_types = InMemoryEdgeTypeRepository()
-    et = EdgeType.create(slug="rated", label="Rated", attributes_schema=SCHEMA)
+    et = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="rated", label="Rated", attributes_schema=SCHEMA
+    )
     await edge_types.add(et)
 
     result = await GetEdgeType(
@@ -68,7 +70,7 @@ async def test_get_edge_type_fills_in_linked_options() -> None:
 async def test_get_edge_type_returns_the_stored_object_when_nothing_is_linked() -> None:
     """Without a linked field the stored edge type itself is returned."""
     edge_types = InMemoryEdgeTypeRepository()
-    et = EdgeType.create(slug="plain", label="Plain")
+    et = EdgeType.create(owner_id=SYSTEM_ACTOR.id, slug="plain", label="Plain")
     await edge_types.add(et)
 
     result = await GetEdgeType(
@@ -82,7 +84,12 @@ async def test_list_edge_types_fills_in_linked_options() -> None:
     """Listing edge types resolves linked options on each result."""
     edge_types = InMemoryEdgeTypeRepository()
     await edge_types.add(
-        EdgeType.create(slug="rated", label="Rated", attributes_schema=SCHEMA)
+        EdgeType.create(
+            owner_id=SYSTEM_ACTOR.id,
+            slug="rated",
+            label="Rated",
+            attributes_schema=SCHEMA,
+        )
     )
 
     results = await ListEdgeTypes(

@@ -24,7 +24,9 @@ from app.modules.examples.adapters.persistence.unit_of_work import build_example
 from app.modules.examples.domain.installation import Installation
 from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
 from app.modules.graph.domain.edge import Edge
+from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.node_type import NodeType
 from app.modules.identity.adapters.api.dependencies import get_existing_data_claim
 from app.modules.media.adapters.persistence.unit_of_work import build_media_repos
 from app.modules.media.domain.media_asset import MediaAsset
@@ -48,6 +50,8 @@ SETUP_BODY = {
     "password": "a long passphrase",
 }
 TABLES = (
+    "node_types",
+    "edge_types",
     "nodes",
     "edges",
     "collections",
@@ -69,6 +73,8 @@ def _wipe(sync_url: str) -> None:
             "collections",
             "edges",
             "nodes",
+            "edge_types",
+            "node_types",
             "example_installations",
         ):
             connection.execute(sqlalchemy.text(f"DELETE FROM {table}"))
@@ -113,6 +119,13 @@ class Seeded:
 async def _seed(session: AsyncSession) -> None:
     """Rows in every table: ownerless, system-owned, legacy-API and a stranger's."""
     graph = build_graph_repos(session)
+    for i, owner in enumerate((None, SYSTEM, STRANGER, STRANGER)):
+        item_type = NodeType.create(owner_id=SYSTEM, slug=f"t{i}", label="T")
+        item_type.owner_id = owner
+        await graph.node_types.add(item_type)
+        relationship_type = EdgeType.create(owner_id=SYSTEM, slug=f"r{i}", label="R")
+        relationship_type.owner_id = owner
+        await graph.edge_types.add(relationship_type)
     nodes = [Node.create(owner_id=SYSTEM, name=f"n{i}") for i in range(4)]
     for node, owner in zip(nodes, (None, SYSTEM, STRANGER, STRANGER), strict=True):
         node.owner_id = owner
@@ -188,6 +201,7 @@ def test_setup_gives_every_pre_existing_row_to_the_admin(
 
     assert response.status_code == 201
     assert response.json()["claimed"] == {
+        "types": 4,
         "items": 2,
         "connections": 2,
         "collections": 2,
@@ -196,6 +210,10 @@ def test_setup_gives_every_pre_existing_row_to_the_admin(
     }
     admin = uuid.UUID(response.json()["user"]["id"])
     after = _owners(postgres_sync_url)
+    for table in ("node_types", "edge_types"):
+        assert sorted(map(str, after[table])) == sorted(
+            map(str, [admin, admin, STRANGER, STRANGER])
+        )
     assert sorted(map(str, after["nodes"])) == sorted(
         map(str, [admin, admin, STRANGER, STRANGER])
     )

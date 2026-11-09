@@ -29,7 +29,11 @@ from app.modules.graph.application.list_edges import ListEdges, ListEdgesQuery
 from app.modules.graph.application.update_edge import UpdateEdge, UpdateEdgeCommand
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
-from app.modules.graph.domain.errors import EdgeNotFoundError, NodeNotFoundError
+from app.modules.graph.domain.errors import (
+    EdgeNotFoundError,
+    EdgeTypeNotFoundError,
+    NodeNotFoundError,
+)
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
@@ -158,7 +162,10 @@ async def test_create_edge_to_someone_elses_item_is_not_found_and_writes_nothing
         )
 
     assert edges.writes == 0
-    assert await repos.edge_types.get_by_slug("owns") is None
+    assert (
+        await repos.edge_types.get_by_slug("owns", scope=ContentFilter.everyone())
+        is None
+    )
     assert not uow.committed
 
 
@@ -180,7 +187,10 @@ async def test_create_edges_with_one_foreign_endpoint_creates_nothing() -> None:
 
     assert edges.writes == 0
     assert await _all(repos) == []
-    assert await repos.edge_types.get_by_slug("owns") is None
+    assert (
+        await repos.edge_types.get_by_slug("owns", scope=ContentFilter.everyone())
+        is None
+    )
     assert not uow.committed
 
 
@@ -295,18 +305,24 @@ async def test_owner_can_update_and_delete_their_connection() -> None:
 
 
 async def test_edge_type_usage_counts_use_the_viewers_scope() -> None:
-    """Counts never include other people's connections."""
+    """Each person counts their own connections under their own relationship type."""
     repos, _ = _repos()
-    edge_type = EdgeType.create(slug="owns", label="Owns")
-    await repos.edge_types.add(edge_type)
+    alices_type = EdgeType.create(owner_id=ALICE.id, slug="owns", label="Owns")
+    bobs_type = EdgeType.create(owner_id=BOB.id, slug="owns", label="Owns")
+    await repos.edge_types.add(alices_type)
+    await repos.edge_types.add(bobs_type)
     await _connection(repos, ALICE, "owns", attributes={"note": "x"})
     await _connection(repos, BOB, "owns", attributes={"note": "x"})
     await _connection(repos, BOB, "owns", attributes={"note": "y"})
     use_case = CountEdgeTypeAttributeUsage(repos, POLICY)
-    query = CountEdgeTypeAttributeUsageQuery(edge_type_id=edge_type.id, key="note")
 
-    assert await use_case.handle(query, ALICE) == 1
-    assert await use_case.handle(query, BOB) == 2
+    def query(type_id: uuid.UUID) -> CountEdgeTypeAttributeUsageQuery:
+        return CountEdgeTypeAttributeUsageQuery(edge_type_id=type_id, key="note")
+
+    assert await use_case.handle(query(alices_type.id), ALICE) == 1
+    assert await use_case.handle(query(bobs_type.id), BOB) == 2
+    with pytest.raises(EdgeTypeNotFoundError):
+        await use_case.handle(query(bobs_type.id), ALICE)
 
 
 async def test_use_cases_ask_the_guard_for_the_right_check() -> None:

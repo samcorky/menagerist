@@ -165,7 +165,6 @@ from app.modules.presets.ports.preset_usage import PresetUsage
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
 from app.platform.database import get_session_factory
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
-from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -622,9 +621,8 @@ class PresetPackTarget:
 class GraphPackTarget:
     """Implements `GraphTarget` with the graph use cases, run as `actor`.
 
-    Items and connections are the actor's own. Types are shared structure, created
-    by any member; removing one is administrator-only, so that (after the in-use
-    check) runs as the system actor.
+    Items, connections and types are the actor's own. A type is removed as the system
+    actor, by id from the actor's own installation, after the in-use check.
     """
 
     def __init__(
@@ -640,8 +638,14 @@ class GraphPackTarget:
         async with self._stores.read() as repos:
             # Pack slugs are already normalised; edge types normalise on create.
             if kind is EntityKind.ITEM_TYPE:
-                return await repos.node_types.get_by_slug(slug) is not None
-            return await repos.edge_types.get_by_slug(slugify(slug)) is not None
+                return (
+                    await repos.node_types.get_by_slug(slug, scope=self._scope)
+                    is not None
+                )
+            return (
+                await repos.edge_types.get_by_slug(slugify(slug), scope=self._scope)
+                is not None
+            )
 
     async def create_relationship_type(
         self, spec: PackRelationshipType, presets: Mapping[str, uuid.UUID]
@@ -782,16 +786,14 @@ class GraphPackTarget:
                     return True
         return False
 
-    @staticmethod
     async def _inspect_item_type(
-        repos: GraphRepos, entity_id: uuid.UUID
+        self, repos: GraphRepos, entity_id: uuid.UUID
     ) -> Inspection | None:
-        node_type = await repos.node_types.get(entity_id)
+        node_type = await repos.node_types.get(entity_id, scope=self._scope)
         if node_type is None:
             return None
         items = await repos.nodes.list(
-            # all-users check: shared structure
-            scope=ContentFilter.everyone(),
+            scope=self._scope,
             after=None,
             limit=_PAGE,
             type=str(node_type.slug),
@@ -800,16 +802,14 @@ class GraphPackTarget:
             content=_node_type_content(node_type), still_in_use=bool(items)
         )
 
-    @staticmethod
     async def _inspect_relationship_type(
-        repos: GraphRepos, entity_id: uuid.UUID
+        self, repos: GraphRepos, entity_id: uuid.UUID
     ) -> Inspection | None:
-        edge_type = await repos.edge_types.get(entity_id)
+        edge_type = await repos.edge_types.get(entity_id, scope=self._scope)
         if edge_type is None:
             return None
-        # all-users check: shared structure
         in_use = await repos.edges.has_edges_of_type(
-            str(edge_type.slug), scope=ContentFilter.everyone()
+            str(edge_type.slug), scope=self._scope
         )
         return Inspection(content=_edge_type_content(edge_type), still_in_use=in_use)
 

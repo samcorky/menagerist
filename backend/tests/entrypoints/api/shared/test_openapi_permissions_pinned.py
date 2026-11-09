@@ -29,14 +29,6 @@ EXPECTED: dict[tuple[str, str], str] = {
     ("/api/v1/backups/{backup_id}", "delete"): "backup:archive:delete",
     ("/api/v1/backups/{backup_id}/download", "get"): "backup:archive:read",
     ("/api/v1/backups/{backup_id}/verify", "post"): "backup:archive:read",
-    ("/api/v1/edge-types/{edge_type_id}", "delete"): "graph:edge_type:delete",
-    ("/api/v1/edge-types/{edge_type_id}/attributes/{key}", "delete"): (
-        "graph:edge_type:purge_attribute"
-    ),
-    ("/api/v1/node-types/{node_type_id}", "delete"): "graph:node_type:delete",
-    ("/api/v1/node-types/{node_type_id}/attributes/{key}", "delete"): (
-        "graph:node_type:purge_attribute"
-    ),
     ("/api/v1/sessions", "get"): "identity:session:list",
     ("/api/v1/sessions/{session_id}", "delete"): "identity:session:revoke",
     ("/api/v1/users", "get"): "identity:user:list",

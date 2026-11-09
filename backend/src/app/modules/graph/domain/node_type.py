@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any, Final
 
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.mixins import Identifiable, SoftDeletable
+from app.shared_kernel.mixins import Identifiable, Owned, SoftDeletable
 from app.shared_kernel.slug import Slug
 
 # A fixed palette of theme-aware names rather than free colours, so every client can
@@ -54,8 +54,8 @@ def _clean_colour(colour: str | None) -> str | None:
 
 
 @dataclass(kw_only=True, eq=False)
-class NodeType(Identifiable, SoftDeletable):
-    """A controlled vocabulary entry for the node type field."""
+class NodeType(Identifiable, Owned, SoftDeletable):
+    """A controlled vocabulary entry for the node type field, owned by one person."""
 
     slug: Slug
     label: str
@@ -75,6 +75,7 @@ class NodeType(Identifiable, SoftDeletable):
     def create(
         cls,
         *,
+        owner_id: uuid.UUID,
         slug: str,
         label: str,
         description: str | None = None,
@@ -86,6 +87,7 @@ class NodeType(Identifiable, SoftDeletable):
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
+            owner_id=owner_id,
             slug=Slug(slug),
             label=label,
             description=description,

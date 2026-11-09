@@ -71,8 +71,18 @@ async def exported(
             {"id": other_id, "owner_id": other.id, "name": "Private", "type": "secret"},
         ],
         "node_types": [
-            {"id": type_id, "slug": "book", "attributes_schema": None},
-            {"id": uuid7(), "slug": "secret", "attributes_schema": None},
+            {
+                "id": type_id,
+                "owner_id": actor.id,
+                "slug": "book",
+                "attributes_schema": None,
+            },
+            {
+                "id": uuid7(),
+                "owner_id": other.id,
+                "slug": "secret",
+                "attributes_schema": None,
+            },
         ],
         "media_assets": [
             {
@@ -138,29 +148,37 @@ async def test_two_user_round_trip(missing: bool) -> None:
         await use_case.handle(ImportUserDataCommand(backup_id=backup_id), destination)
 
 
-async def test_slug_reuse_and_collision_are_atomic() -> None:
-    """Reuse compatible vocabulary and reject collisions without writes."""
+async def test_types_import_as_the_importers_own_and_collisions_are_atomic() -> None:
+    """Another person's same-slug type is untouched; a reused id writes nothing."""
     store, backup_id, _, _, tables = await exported()
-    existing_type = dict(tables["node_types"][0], id=uuid7())
+    exported_type = tables["node_types"][0]
+    others_type = dict(exported_type, id=uuid7(), owner_id=uuid7())
     existing_owner = uuid7()
     restorer = InMemoryUserDatabaseRestorer(
         "rev",
         {
-            "node_types": [existing_type],
+            "node_types": [others_type],
             "nodes": [{"id": uuid7(), "owner_id": existing_owner}],
         },
     )
+    importer = Actor(id=uuid7())
     await ImportUserData(
         store,
         restorer,
         InMemoryMediaFiles(),
         InMemoryBackupWorkspace(),
         InMemoryAccessGuard(),
-    ).handle(ImportUserDataCommand(backup_id=backup_id), Actor(id=uuid7()))
-    assert restorer.tables["node_types"] == [existing_type]
+    ).handle(ImportUserDataCommand(backup_id=backup_id), importer)
+    imported = [
+        row
+        for row in restorer.tables["node_types"]
+        if str(row["owner_id"]) == str(importer.id)
+    ]
+    assert [row["slug"] for row in imported] == [exported_type["slug"]]
+    assert others_type in restorer.tables["node_types"]
     assert restorer.tables["nodes"][0]["owner_id"] == existing_owner
     for target in (
-        {"node_types": [dict(existing_type, attributes_schema={"different": True})]},
+        {"node_types": [dict(exported_type, owner_id=existing_owner)]},
         {"nodes": [{"id": tables["nodes"][0]["id"], "owner_id": existing_owner}]},
     ):
         restorer = InMemoryUserDatabaseRestorer("rev", target)

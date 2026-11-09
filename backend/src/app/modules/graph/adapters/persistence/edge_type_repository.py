@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 
 from app.modules.graph.adapters.persistence.models import EdgeTypeModel
 from app.modules.graph.domain.edge_type import EdgeType
+from app.platform.orm_mixins import claim_rows, owned_by
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -14,6 +15,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.shared_kernel.content_filter import ContentFilter
+
 logger = structlog.get_logger()
 
 
@@ -21,6 +24,7 @@ def _to_domain(model: EdgeTypeModel) -> EdgeType:
     """Convert an ORM row into the domain entity."""
     return EdgeType(
         id=model.id,
+        owner_id=model.owner_id,
         slug=Slug(model.slug),
         label=model.label,
         reverse_label=model.reverse_label,
@@ -37,6 +41,7 @@ def _to_model(edge_type: EdgeType) -> EdgeTypeModel:
     """Convert a domain entity into its ORM row."""
     return EdgeTypeModel(
         id=edge_type.id,
+        owner_id=edge_type.owner_id,
         slug=str(edge_type.slug),
         label=edge_type.label,
         reverse_label=edge_type.reverse_label,
@@ -67,32 +72,41 @@ class SqlAlchemyEdgeTypeRepository:
         await self._session.merge(_to_model(edge_type))
         await self._session.flush()
 
-    async def get(self, edge_type_id: uuid.UUID) -> EdgeType | None:
-        """Return the edge type with `edge_type_id`, or None if missing or deleted."""
+    async def get(
+        self, edge_type_id: uuid.UUID, *, scope: ContentFilter
+    ) -> EdgeType | None:
+        """Return the edge type, or None if missing, deleted or outside `scope`."""
         logger.debug("fetching edge type", edge_type_id=edge_type_id)
-        model = await self._session.get(EdgeTypeModel, edge_type_id)
-        if model is None or model.deleted_at is not None:
-            return None
-        return _to_domain(model)
+        stmt = select(EdgeTypeModel).where(
+            EdgeTypeModel.id == edge_type_id,
+            EdgeTypeModel.deleted_at.is_(None),
+            owned_by(EdgeTypeModel, scope.user_id),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _to_domain(model) if model else None
 
-    async def get_by_slug(self, slug: str) -> EdgeType | None:
-        """Return the edge type with `slug`, or None if missing or deleted."""
+    async def get_by_slug(self, slug: str, *, scope: ContentFilter) -> EdgeType | None:
+        """Return the edge type with `slug` in `scope`, or None if missing/deleted."""
         logger.debug("fetching edge type by slug", slug=slug)
         stmt = (
             select(EdgeTypeModel)
             .where(EdgeTypeModel.slug == slug)
             .where(EdgeTypeModel.deleted_at.is_(None))
+            .where(owned_by(EdgeTypeModel, scope.user_id))
         )
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[EdgeType]:
-        """List non-deleted edge types ordered by id, starting after `after`."""
+    async def list(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> list[EdgeType]:
+        """List non-deleted edge types in `scope` ordered by id, after `after`."""
         logger.debug("listing edge types", after=after, limit=limit)
         stmt = (
             select(EdgeTypeModel)
             .where(EdgeTypeModel.deleted_at.is_(None))
+            .where(owned_by(EdgeTypeModel, scope.user_id))
             .order_by(EdgeTypeModel.id)
             .limit(limit)
         )
@@ -122,3 +136,11 @@ class SqlAlchemyEdgeTypeRepository:
             delete(EdgeTypeModel).where(EdgeTypeModel.id == edge_type_id)
         )
         await self._session.flush()
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every edge type with no owner or a legacy owner."""
+        return await claim_rows(
+            self._session, EdgeTypeModel, owner_id, legacy_owner_ids
+        )

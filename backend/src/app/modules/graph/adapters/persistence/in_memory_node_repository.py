@@ -459,9 +459,12 @@ class InMemoryNodeRepository:
             key=lambda row: (row.deleted_at, row.id),
         )
 
-    async def has_any_of_type(self, type_slug: str) -> bool:
-        """Return whether any item, live or soft-deleted, has `type_slug`."""
-        return any(row.type == type_slug for row in self._nodes.values())
+    async def has_any_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
+        """Return whether any item in `scope`, live or soft-deleted, has `type_slug`."""
+        return any(
+            row.type == type_slug and scope.covers(row.owner_id)
+            for row in self._nodes.values()
+        )
 
     async def claim_orphaned(
         self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]

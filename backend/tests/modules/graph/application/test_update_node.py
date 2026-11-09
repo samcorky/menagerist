@@ -77,7 +77,7 @@ async def test_update_node_skips_node_type_creation_when_type_exists() -> None:
     from app.modules.graph.domain.node_type import NodeType
 
     node_types = InMemoryNodeTypeRepository()
-    existing = NodeType.create(slug="film", label="Film")
+    existing = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     await node_types.add(existing)
 
     repository = InMemoryNodeRepository()
@@ -120,7 +120,7 @@ async def test_update_node_creates_node_type_when_type_is_new() -> None:
         SYSTEM_ACTOR,
     )
 
-    film_type = await node_types.get_by_slug("film")
+    film_type = await node_types.get_by_slug("film", scope=ContentFilter.everyone())
     assert film_type is not None
     assert film_type.label == "Film"
 
@@ -129,7 +129,9 @@ async def test_update_node_skips_validation_when_node_type_has_no_schema() -> No
     """UpdateNode allows any attributes when the node type defines no schema."""
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=None)
+        NodeType.create(
+            owner_id=uuid.UUID(int=1), slug="film", label="Film", attributes_schema=None
+        )
     )
     repository = InMemoryNodeRepository()
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
@@ -161,7 +163,12 @@ async def test_update_node_validates_attributes_against_schema() -> None:
     }
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+        NodeType.create(
+            owner_id=uuid.UUID(int=1),
+            slug="film",
+            label="Film",
+            attributes_schema=schema,
+        )
     )
     repository = InMemoryNodeRepository()
     node = Node.create(owner_id=uuid.UUID(int=1), name="Alien", type="film")
@@ -194,7 +201,12 @@ async def test_update_node_ignores_stale_value_that_was_not_edited() -> None:
     }
     node_types = InMemoryNodeTypeRepository()
     await node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=schema)
+        NodeType.create(
+            owner_id=uuid.UUID(int=1),
+            slug="film",
+            label="Film",
+            attributes_schema=schema,
+        )
     )
     repository = InMemoryNodeRepository()
     node = Node.create(
@@ -286,6 +298,7 @@ async def test_update_node_rejects_extra_schema_redefining_a_type_field() -> Non
     repos = _empty_repos()
     await repos.node_types.add(
         NodeType.create(
+            owner_id=uuid.UUID(int=1),
             slug="film",
             label="Film",
             attributes_schema={
@@ -366,6 +379,7 @@ async def test_update_node_changes_the_type_and_keeps_the_attributes() -> None:
     repos, use_case = await _world(node)
     await repos.node_types.add(
         NodeType.create(
+            owner_id=uuid.UUID(int=1),
             slug="book",
             label="Book",
             attributes_schema={
@@ -396,7 +410,12 @@ async def test_update_node_clears_the_type_without_creating_one() -> None:
 
     assert result.type is None
     assert result.attributes == {"year": 1979}
-    assert await repos.node_types.list(after=None, limit=10) == []
+    assert (
+        await repos.node_types.list(
+            after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
     stored = await repos.nodes.get(node.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.type is None
@@ -411,7 +430,9 @@ async def test_update_node_retype_creates_the_new_type_when_unknown() -> None:
         UpdateNodeCommand(node_id=node.id, type="Space Opera"), SYSTEM_ACTOR
     )
 
-    created = await repos.node_types.get_by_slug("space-opera")
+    created = await repos.node_types.get_by_slug(
+        "space-opera", scope=ContentFilter.everyone()
+    )
     assert created is not None
     assert created.label == "Space Opera"
 
@@ -437,7 +458,10 @@ async def test_update_node_refuses_a_type_that_clashes_with_the_items_own_field(
     repos, use_case = await _world(node)
     await repos.node_types.add(
         NodeType.create(
-            slug="book", label="Book", attributes_schema=_schema(rating="number")
+            owner_id=uuid.UUID(int=1),
+            slug="book",
+            label="Book",
+            attributes_schema=_schema(rating="number"),
         )
     )
 
@@ -459,12 +483,18 @@ async def test_update_node_checks_attributes_against_the_type_it_is_changing_to(
     repos, use_case = await _world(node)
     await repos.node_types.add(
         NodeType.create(
-            slug="film", label="Film", attributes_schema=_schema(year="string")
+            owner_id=uuid.UUID(int=1),
+            slug="film",
+            label="Film",
+            attributes_schema=_schema(year="string"),
         )
     )
     await repos.node_types.add(
         NodeType.create(
-            slug="book", label="Book", attributes_schema=_schema(year="number")
+            owner_id=uuid.UUID(int=1),
+            slug="book",
+            label="Book",
+            attributes_schema=_schema(year="number"),
         )
     )
 
@@ -483,12 +513,18 @@ async def test_update_node_rejects_attributes_that_do_not_fit_the_new_type() -> 
     repos, use_case = await _world(node)
     await repos.node_types.add(
         NodeType.create(
-            slug="film", label="Film", attributes_schema=_schema(year="string")
+            owner_id=uuid.UUID(int=1),
+            slug="film",
+            label="Film",
+            attributes_schema=_schema(year="string"),
         )
     )
     await repos.node_types.add(
         NodeType.create(
-            slug="book", label="Book", attributes_schema=_schema(year="number")
+            owner_id=uuid.UUID(int=1),
+            slug="book",
+            label="Book",
+            attributes_schema=_schema(year="number"),
         )
     )
 
@@ -512,7 +548,12 @@ async def test_update_node_clear_type_wins_over_a_type_in_the_same_command() -> 
     )
 
     assert result.type is None
-    assert await repos.node_types.list(after=None, limit=10) == []
+    assert (
+        await repos.node_types.list(
+            after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
 
 
 async def _owned_node() -> tuple[UpdateNode, InMemoryNodeRepository, Node, Actor]:

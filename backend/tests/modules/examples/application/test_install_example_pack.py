@@ -75,7 +75,12 @@ async def _assert_nothing_left(world: World) -> None:
         )
         is None
     )
-    assert await world.graph_repos.node_types.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.node_types.list(
+            after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
     assert (
         await world.graph_repos.nodes.list(
             scope=ContentFilter.everyone(), after=None, limit=10
@@ -88,7 +93,12 @@ async def _assert_nothing_left(world: World) -> None:
         )
         == []
     )
-    assert await world.graph_repos.edge_types.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.edge_types.list(
+            after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
     assert await world.preset_repos.presets.list(after=None, limit=10) == []
 
 
@@ -109,7 +119,14 @@ async def test_install_creates_everything_and_records_it(
     assert await world.graph_repos.nodes.list(
         scope=ContentFilter.everyone(), after=None, limit=10
     )
-    assert len(await world.graph_repos.node_types.list(after=None, limit=10)) == 2
+    assert (
+        len(
+            await world.graph_repos.node_types.list(
+                after=None, limit=10, scope=ContentFilter.everyone()
+            )
+        )
+        == 2
+    )
     assert world.uow.committed is True
 
 
@@ -151,9 +168,13 @@ async def test_a_slug_clash_creates_nothing_and_names_the_slug(
     """A taken slug aborts before anything is created and is named."""
     world = make_world()
     if repo == "node_types":
-        await world.graph_repos.node_types.add(NodeType.create(slug=slug, label="Mine"))
+        await world.graph_repos.node_types.add(
+            NodeType.create(owner_id=world.actor.id, slug=slug, label="Mine")
+        )
     else:
-        await world.graph_repos.edge_types.add(EdgeType.create(slug=slug, label="Mine"))
+        await world.graph_repos.edge_types.add(
+            EdgeType.create(owner_id=world.actor.id, slug=slug, label="Mine")
+        )
 
     with pytest.raises(SlugClashError) as excinfo:
         await _use_case(world).handle(_COMMAND, world.actor)
@@ -263,7 +284,11 @@ async def test_a_rollback_keeps_what_the_user_changed_and_says_so(
     world = make_world()
 
     async def edit_then_fail(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
-        node_type = (await world.graph_repos.node_types.list(after=None, limit=10))[0]
+        node_type = (
+            await world.graph_repos.node_types.list(
+                after=None, limit=10, scope=ContentFilter.everyone()
+            )
+        )[0]
         node_type.label = "Renamed by me"
         await world.graph_repos.node_types.save(node_type)
         raise RuntimeError("boom")
@@ -273,7 +298,9 @@ async def test_a_rollback_keeps_what_the_user_changed_and_says_so(
     with pytest.raises(InstallFailedError, match="you had changed were kept"):
         await _use_case(world).handle(_COMMAND, world.actor)
 
-    remaining = await world.graph_repos.node_types.list(after=None, limit=10)
+    remaining = await world.graph_repos.node_types.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
     assert [t.label for t in remaining] == ["Renamed by me"]
 
 

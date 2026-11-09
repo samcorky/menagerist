@@ -99,7 +99,10 @@ async def test_create_edge_validates_attributes_against_schema() -> None:
     repos, source, target = await _repos_with_two_nodes()
     await repos.edge_types.add(
         EdgeType.create(
-            slug="directed-by", label="Directed By", attributes_schema=schema
+            owner_id=uuid.UUID(int=1),
+            slug="directed-by",
+            label="Directed By",
+            attributes_schema=schema,
         )
     )
     uow = InMemoryUnitOfWork(repos)

@@ -9,8 +9,8 @@ import app.modules
 _MODULES = Path(app.modules.__path__[0])
 _ACTOR_NAMES = {"actor_id"}
 
-# Routed through the guard when sharing lands.
-ALLOWED: frozenset[str] = frozenset({"examples/application/install_example_pack.py"})
+# Files still comparing an owner with the actor directly; none at present.
+ALLOWED: frozenset[str] = frozenset()
 
 
 def _is_owner(node: ast.expr) -> bool:

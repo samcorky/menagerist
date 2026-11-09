@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 
 from app.modules.graph.adapters.persistence.models import NodeTypeModel
 from app.modules.graph.domain.node_type import NodeType
+from app.platform.orm_mixins import claim_rows, owned_by
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -14,6 +15,8 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.shared_kernel.content_filter import ContentFilter
+
 logger = structlog.get_logger()
 
 
@@ -21,6 +24,7 @@ def _to_domain(model: NodeTypeModel) -> NodeType:
     """Convert an ORM row into the domain entity."""
     return NodeType(
         id=model.id,
+        owner_id=model.owner_id,
         slug=Slug(model.slug),
         label=model.label,
         description=model.description,
@@ -37,6 +41,7 @@ def _to_model(node_type: NodeType) -> NodeTypeModel:
     """Convert a domain entity into its ORM row."""
     return NodeTypeModel(
         id=node_type.id,
+        owner_id=node_type.owner_id,
         slug=str(node_type.slug),
         label=node_type.label,
         description=node_type.description,
@@ -67,29 +72,37 @@ class SqlAlchemyNodeTypeRepository:
         await self._session.merge(_to_model(node_type))
         await self._session.flush()
 
-    async def get(self, node_type_id: uuid.UUID) -> NodeType | None:
-        """Return the node type with `node_type_id`, or `None` if missing or deleted."""
+    async def get(
+        self, node_type_id: uuid.UUID, *, scope: ContentFilter
+    ) -> NodeType | None:
+        """Return the node type, or `None` if missing, deleted or outside `scope`."""
         logger.debug("fetching node type", node_type_id=node_type_id)
-        model = await self._session.get(NodeTypeModel, node_type_id)
-        if model is None or model.deleted_at is not None:
-            return None
-        return _to_domain(model)
+        stmt = select(NodeTypeModel).where(
+            NodeTypeModel.id == node_type_id,
+            NodeTypeModel.deleted_at.is_(None),
+            owned_by(NodeTypeModel, scope.user_id),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _to_domain(model) if model else None
 
-    async def get_for_removal(self, node_type_id: uuid.UUID) -> NodeType | None:
+    async def get_for_removal(
+        self, node_type_id: uuid.UUID, *, scope: ContentFilter
+    ) -> NodeType | None:
         """Like `get`, but take an exclusive row lock until the transaction ends."""
         stmt = (
             select(NodeTypeModel)
             .where(NodeTypeModel.id == node_type_id)
             .where(NodeTypeModel.deleted_at.is_(None))
+            .where(owned_by(NodeTypeModel, scope.user_id))
             .with_for_update()
         )
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return _to_domain(model) if model else None
 
     async def get_by_slug(
-        self, slug: str, *, guard_item_write: bool = False
+        self, slug: str, *, scope: ContentFilter, guard_item_write: bool = False
     ) -> NodeType | None:
-        """Return the node type with `slug`, or `None` if missing or deleted.
+        """Return the node type with `slug` in `scope`, or `None` if missing or deleted.
 
         `guard_item_write` takes a key-share row lock: it conflicts only with the
         exclusive lock in `get_for_removal`, never with ordinary type edits.
@@ -99,6 +112,7 @@ class SqlAlchemyNodeTypeRepository:
             select(NodeTypeModel)
             .where(NodeTypeModel.slug == slug)
             .where(NodeTypeModel.deleted_at.is_(None))
+            .where(owned_by(NodeTypeModel, scope.user_id))
         )
         if guard_item_write:
             stmt = stmt.with_for_update(key_share=True)
@@ -106,12 +120,15 @@ class SqlAlchemyNodeTypeRepository:
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None
 
-    async def list(self, *, after: uuid.UUID | None, limit: int) -> list[NodeType]:
-        """List non-deleted node types ordered by id, starting after `after`."""
+    async def list(
+        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
+    ) -> list[NodeType]:
+        """List non-deleted node types in `scope` ordered by id, after `after`."""
         logger.debug("listing node types", after=after, limit=limit)
         stmt = (
             select(NodeTypeModel)
             .where(NodeTypeModel.deleted_at.is_(None))
+            .where(owned_by(NodeTypeModel, scope.user_id))
             .order_by(NodeTypeModel.id)
             .limit(limit)
         )
@@ -141,3 +158,11 @@ class SqlAlchemyNodeTypeRepository:
             delete(NodeTypeModel).where(NodeTypeModel.id == node_type_id)
         )
         await self._session.flush()
+
+    async def claim_orphaned(
+        self, owner_id: uuid.UUID, *, legacy_owner_ids: frozenset[uuid.UUID]
+    ) -> int:
+        """Give `owner_id` every node type with no owner or a legacy owner."""
+        return await claim_rows(
+            self._session, NodeTypeModel, owner_id, legacy_owner_ids
+        )

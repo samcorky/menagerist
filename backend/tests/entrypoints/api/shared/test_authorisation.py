@@ -27,6 +27,10 @@ CONTENT_VALUES = frozenset(
         "graph:item:purge",
         "graph:type:read",
         "graph:type:write",
+        "graph:node_type:delete",
+        "graph:edge_type:delete",
+        "graph:node_type:purge_attribute",
+        "graph:edge_type:purge_attribute",
         "media:item:read",
         "media:item:write",
         "collections:collection:read",
@@ -56,10 +60,6 @@ def test_the_admin_only_set_matches_the_catalogue() -> None:
     assert (
         frozenset(
             {
-                "graph:node_type:delete",
-                "graph:edge_type:delete",
-                "graph:node_type:purge_attribute",
-                "graph:edge_type:purge_attribute",
                 "identity:user:create",
                 "identity:user:list",
                 "identity:user:update",

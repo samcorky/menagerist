@@ -39,7 +39,7 @@ from app.modules.examples.domain.pack import (
     PackItemType,
     PackRelationshipType,
 )
-from app.modules.examples.domain.removal import KEEP_IN_USE, KEEP_SHARED
+from app.modules.examples.domain.removal import KEEP_IN_USE
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
@@ -97,9 +97,12 @@ async def _items(world: World, owner: uuid.UUID | None = None) -> list[Node]:
     return await world.graph_repos.nodes.list(scope=scope, after=None, limit=50)
 
 
-async def _type_slugs(world: World) -> set[str]:
-    types = await world.graph_repos.node_types.list(after=None, limit=50)
-    edge_types = await world.graph_repos.edge_types.list(after=None, limit=50)
+async def _type_slugs(world: World, owner: uuid.UUID | None = None) -> set[str]:
+    scope = ContentFilter.everyone() if owner is None else ContentFilter.of(owner)
+    types = await world.graph_repos.node_types.list(after=None, limit=50, scope=scope)
+    edge_types = await world.graph_repos.edge_types.list(
+        after=None, limit=50, scope=scope
+    )
     return {str(t.slug) for t in types} | {str(t.slug) for t in edge_types}
 
 
@@ -119,19 +122,17 @@ def both(make_world: MakeWorld, sample_pack: SamplePack) -> tuple[World, World]:
     return world, world.as_actor(USER_B)
 
 
-async def test_each_person_gets_their_own_items_collections_and_covers(
+async def test_each_person_gets_their_own_items_collections_covers_and_types(
     both: tuple[World, World],
 ) -> None:
-    """A and B install the same pack: separate content, one set of shared types."""
+    """A and B install the same pack: everything is separate, types included."""
     a, b = both
 
     first = await _install(a)
     second = await _install(b)
 
     assert (first.created.items, first.created.item_types) == (2, 3)
-    # B reuses the types A created: no clash, nothing recorded for them.
-    assert (second.created.items, second.created.item_types) == (2, 0)
-    assert second.created.relationship_types == 0
+    assert (second.created.items, second.created.item_types) == (2, 3)
     assert {n.owner_id for n in await _items(a, USER_A.id)} == {USER_A.id}
     assert len(await _items(a, USER_A.id)) == len(await _items(b, USER_B.id)) == 2
     assert len(await _items(a)) == 4
@@ -143,30 +144,33 @@ async def test_each_person_gets_their_own_items_collections_and_covers(
         after=None, limit=50, scope=ContentFilter.everyone()
     )
     assert sorted(e.owner_id for e in edges) == [USER_A.id, USER_B.id]  # type: ignore[type-var]
-    assert len(await a.graph_repos.node_types.list(after=None, limit=50)) == 3
+    for person in (USER_A, USER_B):
+        owned = await a.graph_repos.node_types.list(
+            after=None, limit=50, scope=ContentFilter.of(person.id)
+        )
+        assert len(owned) == 3
+        assert {t.owner_id for t in owned} == {person.id}
 
 
-async def test_shared_types_stay_until_the_last_person_removes_the_pack(
+async def test_removing_a_pack_leaves_the_other_persons_copy_alone(
     both: tuple[World, World],
 ) -> None:
-    """A leaves: types stay for B's items. B leaves too: nothing is left behind."""
+    """A leaves and loses only their own content and types; B keeps everything."""
     a, b = both
     await _install(a)
     await _install(b)
 
     left = await _uninstall(a)
 
-    assert (left.removed.items, left.removed.item_types) == (2, 0)
+    assert (left.removed.items, left.removed.item_types) == (2, 3)
+    # Choice lists stay shared: B's types still use A's.
     assert {(k.kind, k.ref, k.reason) for k in left.kept} == {
-        (EntityKind.ITEM_TYPE, "record", KEEP_IN_USE),
-        (EntityKind.ITEM_TYPE, "person", KEEP_IN_USE),
-        (EntityKind.ITEM_TYPE, "spare", KEEP_SHARED),
-        (EntityKind.RELATIONSHIP_TYPE, "signed-by", KEEP_IN_USE),
-        (EntityKind.PRESET, "grades", KEEP_IN_USE),
+        (EntityKind.PRESET, "grades", KEEP_IN_USE)
     }
     assert await _items(a, USER_A.id) == []
     assert len(await _items(b, USER_B.id)) == 2
-    assert len(await _type_slugs(a)) == 4
+    assert await _type_slugs(a, USER_A.id) == set()
+    assert len(await _type_slugs(a, USER_B.id)) == 4
 
     await _uninstall(b)
 
@@ -174,20 +178,15 @@ async def test_shared_types_stay_until_the_last_person_removes_the_pack(
     assert await _type_slugs(a) == set()
     assert await a.preset_repos.presets.list(after=None, limit=10) == []
     assert await _assets_by_owner(a) == []
-    # A's record of the types they left is closed too.
-    (old,) = await a.installations.list_for_pack(
-        "demo", scope=ContentFilter.of(USER_A.id)
-    )
-    assert all(r.outcome is Outcome.REMOVED for r in old.entities)
 
 
-async def test_another_persons_own_item_keeps_a_shared_type_alive(
+async def test_the_installers_own_item_keeps_their_type_through_removal(
     both: tuple[World, World],
 ) -> None:
-    """Bob's own item of a pack type keeps it through A's removal."""
-    a, b = both
+    """An item of A's own of a pack type keeps that type when the pack goes."""
+    a, _ = both
     await _install(a)
-    mine = Node.create(owner_id=USER_B.id, name="Bob's own", type="demo-record")
+    mine = Node.create(owner_id=USER_A.id, name="My own", type="demo-record")
     await a.graph_repos.nodes.add(mine)
 
     left = await _uninstall(a)
@@ -195,46 +194,8 @@ async def test_another_persons_own_item_keeps_a_shared_type_alive(
     assert (EntityKind.ITEM_TYPE, "record", KEEP_IN_USE) in {
         (k.kind, k.ref, k.reason) for k in left.kept
     }
-    assert "demo-record" in await _type_slugs(a)
-    assert [n.name for n in await _items(b, USER_B.id)] == ["Bob's own"]
-    assert await _items(a, USER_A.id) == []
-
-
-async def test_the_person_who_created_the_types_can_leave_last(
-    both: tuple[World, World],
-) -> None:
-    """B leaves first and removes none of A's types; A then removes them."""
-    a, b = both
-    await _install(a)
-    await _install(b)
-
-    gone = await _uninstall(b)
-
-    assert (gone.removed.item_types, gone.kept) == (0, ())
-    assert len(await _type_slugs(a)) == 4
-
-    await _uninstall(a)
-
-    assert await _type_slugs(a) == set()
-
-
-async def test_a_type_kept_for_someone_elses_content_is_reusable_and_released(
-    both: tuple[World, World],
-) -> None:
-    """A third install reuses types kept after A left; the last one out frees them."""
-    a, b = both
-    c = a.as_actor(USER_C)
-    await _install(a)
-    await _install(b)
-    await _uninstall(a)
-
-    result = await _install(c)
-
-    assert result.created.item_types == 0
-    await _uninstall(b)
-    assert len(await _type_slugs(a)) == 4
-    await _uninstall(c)
-    assert await _type_slugs(a) == set()
+    assert "demo-record" in await _type_slugs(a, USER_A.id)
+    assert [n.name for n in await _items(a, USER_A.id)] == ["My own"]
 
 
 async def test_people_cannot_see_each_others_installations_or_entities(
@@ -266,25 +227,27 @@ async def test_people_cannot_see_each_others_installations_or_entities(
     assert len(await _items(a, USER_A.id)) == 2
 
 
-async def test_a_clash_with_an_unrelated_type_is_still_a_conflict(
+async def test_a_clash_with_the_installers_own_type_is_a_conflict(
     both: tuple[World, World],
 ) -> None:
-    """A type with the pack's slug that no installation of the pack made is a 409."""
-    a, _ = both
+    """A type of the installer's own with the pack's slug is a 409."""
+    a, b = both
     await a.graph_repos.node_types.add(
-        NodeType.create(slug="demo-record", label="Mine")
+        NodeType.create(owner_id=USER_A.id, slug="demo-record", label="Mine")
     )
 
     with pytest.raises(SlugClashError):
         await _install(a)
 
     assert await _items(a) == []
+    # Someone else's type of that name is no obstacle: types are per person.
+    assert (await _install(b)).created.item_types == 3
 
 
 async def test_a_clash_with_another_packs_type_is_still_a_conflict(
     make_world: MakeWorld, sample_pack: SamplePack
 ) -> None:
-    """Only the same pack's types are shared: a different pack's type is a conflict."""
+    """A different pack of the same person cannot take a slug this pack holds."""
     other = replace(
         sample_pack("other"),
         item_types=(
@@ -298,7 +261,7 @@ async def test_a_clash_with_another_packs_type_is_still_a_conflict(
     await _install(world, "demo")
 
     with pytest.raises(SlugClashError):
-        await _install(world.as_actor(USER_B), "other")
+        await _install(world, "other")
 
 
 def _games_and_extras() -> tuple[ExamplePack, ExamplePack]:
@@ -413,6 +376,16 @@ async def test_rows_reowned_to_the_installer_uninstall_cleanly(
     ):
         asset.owner_id = USER_A.id
         await system.media_repos.assets.save(asset)
+    for node_type in await system.graph_repos.node_types.list(
+        after=None, limit=50, scope=ContentFilter.everyone()
+    ):
+        node_type.owner_id = USER_A.id
+        await system.graph_repos.node_types.save(node_type)
+    for edge_type in await system.graph_repos.edge_types.list(
+        after=None, limit=50, scope=ContentFilter.everyone()
+    ):
+        edge_type.owner_id = USER_A.id
+        await system.graph_repos.edge_types.save(edge_type)
     for installation in await system.installations.list_active(
         scope=ContentFilter.everyone()
     ):
@@ -429,61 +402,35 @@ async def test_rows_reowned_to_the_installer_uninstall_cleanly(
     assert await _type_slugs(owner) == set()
 
 
-async def test_a_record_that_no_longer_matches_a_live_type_is_a_conflict(
+async def test_an_edited_kept_choice_list_is_left_when_the_last_person_leaves(
     both: tuple[World, World],
 ) -> None:
-    """A removed install or a vanished type does not make a slug shareable."""
-    a, b = both
-    await _install(a)
-    await _uninstall(a)
-    await a.graph_repos.node_types.add(
-        NodeType.create(slug="demo-record", label="Mine")
-    )
-    with pytest.raises(SlugClashError):
-        await _install(b)
-
-    # A held record whose type was deleted and replaced by an unrelated one.
-    c = a.as_actor(USER_C)
-    for node_type in await a.graph_repos.node_types.list(after=None, limit=50):
-        node_type.soft_delete()
-        await a.graph_repos.node_types.save(node_type)
-    await _install(c)
-    for node_type in await a.graph_repos.node_types.list(after=None, limit=50):
-        node_type.soft_delete()
-        await a.graph_repos.node_types.save(node_type)
-    await a.graph_repos.node_types.add(NodeType.create(slug="demo-record", label="New"))
-    with pytest.raises(SlugClashError):
-        await _install(b)
-
-
-async def test_an_edited_kept_type_is_left_when_the_last_person_leaves(
-    both: tuple[World, World],
-) -> None:
-    """The last person out does not remove a shared type someone edited."""
+    """The last person out does not remove a shared choice list someone edited."""
     a, b = both
     await _install(a)
     await _install(b)
     await _uninstall(a)
-    for node_type in await a.graph_repos.node_types.list(after=None, limit=50):
-        node_type.label = "Edited"
-        await a.graph_repos.node_types.save(node_type)
+    for preset in await a.preset_repos.presets.list(after=None, limit=10):
+        preset.label = "Edited"
+        await a.preset_repos.presets.save(preset)
 
     await _uninstall(b)
 
-    assert len(await a.graph_repos.node_types.list(after=None, limit=50)) == 3
+    assert [
+        p.label for p in await a.preset_repos.presets.list(after=None, limit=10)
+    ] == ["Edited"]
 
 
-async def test_a_kept_type_that_is_already_gone_is_closed_when_the_last_leaves(
+async def test_a_kept_choice_list_that_is_already_gone_is_closed(
     both: tuple[World, World],
 ) -> None:
-    """A shared type deleted by hand needs no removal; its record is closed."""
+    """A shared choice list deleted by hand needs no removal; its record is closed."""
     a, b = both
     await _install(a)
     await _install(b)
     await _uninstall(a)
-    for node_type in await a.graph_repos.node_types.list(after=None, limit=50):
-        node_type.soft_delete()
-        await a.graph_repos.node_types.save(node_type)
+    for preset in await a.preset_repos.presets.list(after=None, limit=10):
+        await a.preset_repos.presets.purge(preset.id)
 
     await _uninstall(b)
 

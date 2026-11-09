@@ -4,13 +4,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.mixins import Identifiable, SoftDeletable
+from app.shared_kernel.mixins import Identifiable, Owned, SoftDeletable
 from app.shared_kernel.slug import Slug
 
 
 @dataclass(kw_only=True, eq=False)
-class EdgeType(Identifiable, SoftDeletable):
-    """A controlled vocabulary entry for edge relationships."""
+class EdgeType(Identifiable, Owned, SoftDeletable):
+    """A controlled vocabulary entry for edge relationships, owned by one person."""
 
     slug: Slug
     label: str
@@ -28,6 +28,7 @@ class EdgeType(Identifiable, SoftDeletable):
     def create(
         cls,
         *,
+        owner_id: uuid.UUID,
         slug: str,
         label: str,
         reverse_label: str | None = None,
@@ -39,6 +40,7 @@ class EdgeType(Identifiable, SoftDeletable):
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
+            owner_id=owner_id,
             slug=Slug(slug),
             label=label,
             reverse_label=reverse_label,

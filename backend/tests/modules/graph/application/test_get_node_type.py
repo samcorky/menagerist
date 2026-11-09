@@ -34,7 +34,7 @@ def _make_repos(node_types: InMemoryNodeTypeRepository) -> GraphRepos:
 async def test_get_node_type_returns_existing() -> None:
     """GetNodeType returns the node type when it exists."""
     node_types = InMemoryNodeTypeRepository()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
     await node_types.add(nt)
     use_case = GetNodeType(_make_repos(node_types), InMemoryAccessGuard())
 
@@ -65,7 +65,9 @@ async def test_get_node_type_fills_in_linked_choice_options() -> None:
         },
     }
     node_types = InMemoryNodeTypeRepository()
-    nt = NodeType.create(slug="film", label="Film", attributes_schema=schema)
+    nt = NodeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="film", label="Film", attributes_schema=schema
+    )
     await node_types.add(nt)
     use_case = GetNodeType(
         _make_repos(node_types), InMemoryAccessGuard(), _Options(["Mint", "Good"])

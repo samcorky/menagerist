@@ -54,7 +54,12 @@ async def _search(repos: GraphRepos, q: str) -> list[Node]:
 async def _film_repos() -> tuple[GraphRepos, Node]:
     repos = _repos()
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=_FILM_SCHEMA)
+        NodeType.create(
+            owner_id=uuid.UUID(int=1),
+            slug="film",
+            label="Film",
+            attributes_schema=_FILM_SCHEMA,
+        )
     )
     film = Node.create(
         owner_id=uuid.UUID(int=1),
@@ -166,7 +171,10 @@ async def test_search_loads_every_page_of_node_types() -> None:
         schema = {"properties": {"hidden": {"x-menagerist": {"archived": True}}}}
         await repos.node_types.add(
             NodeType.create(
-                slug=f"type-{i:03d}", label=f"Type {i}", attributes_schema=schema
+                owner_id=uuid.UUID(int=1),
+                slug=f"type-{i:03d}",
+                label=f"Type {i}",
+                attributes_schema=schema,
             )
         )
     nodes = [

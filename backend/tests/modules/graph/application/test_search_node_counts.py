@@ -63,7 +63,9 @@ async def _use_case(
 ) -> SearchNodeCounts:
     repos = _empty_repos()
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=SCHEMA)
+        NodeType.create(
+            owner_id=ALICE.id, slug="film", label="Film", attributes_schema=SCHEMA
+        )
     )
     for _ in range(films):
         await repos.nodes.add(Node.create(owner_id=ALICE.id, name="f", type="film"))

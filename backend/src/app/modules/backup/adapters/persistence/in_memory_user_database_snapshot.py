@@ -5,6 +5,7 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     OWNED_TABLES,
     SOFT_DELETABLE,
     USER_TABLES,
+    VOCABULARY,
     installation_vocabulary,
     preset_ids,
 )
@@ -72,20 +73,10 @@ class InMemoryUserDatabaseSnapshot:
             if str(row.get("user_id")) == str(scope.user_id)
             and str(row.get("node_id")) in nodes
         ]
-        installation_refs: dict[str, set[str]] = {
-            name: set() for name in ("presets", "node_types", "edge_types")
-        }
+        installation_refs: dict[str, set[str]] = {name: set() for name in VOCABULARY}
         for row in selected["example_installations"]:
             for name, ids in installation_vocabulary(row.get("entities")).items():
                 installation_refs[name].update(ids)
-        for vocabulary, content in (("node_types", "nodes"), ("edge_types", "edges")):
-            slugs = {row.get("type") for row in selected[content]}
-            selected[vocabulary] = [
-                row
-                for row in self.tables.get(vocabulary, [])
-                if (row.get("slug") in slugs and row.get("deleted_at") is None)
-                or str(row.get("id")) in installation_refs[vocabulary]
-            ]
         refs = set().union(
             *(
                 preset_ids(row)

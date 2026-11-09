@@ -72,6 +72,7 @@ async def repos(external: InMemoryExternalConditions) -> GraphRepos:
     built = build_in_memory_graph_repos(external=external, definitions=external)
     await built.node_types.add(
         NodeType.create(
+            owner_id=ALICE,
             slug="film",
             label="Film",
             attributes_schema={
@@ -80,11 +81,15 @@ async def repos(external: InMemoryExternalConditions) -> GraphRepos:
             },
         )
     )
-    await built.edge_types.add(EdgeType.create(slug="made-by", label="Made by"))
     await built.edge_types.add(
-        EdgeType.create(slug="related", label="Related", directional=False)
+        EdgeType.create(owner_id=ALICE, slug="made-by", label="Made by")
     )
-    gone = EdgeType.create(slug="retired", label="Retired")
+    await built.edge_types.add(
+        EdgeType.create(
+            owner_id=ALICE, slug="related", label="Related", directional=False
+        )
+    )
+    gone = EdgeType.create(owner_id=ALICE, slug="retired", label="Retired")
     gone.soft_delete()
     await built.edge_types.add(gone)
     return built

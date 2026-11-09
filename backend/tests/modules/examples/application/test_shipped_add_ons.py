@@ -73,12 +73,20 @@ async def _edges(world: World) -> set[tuple[str, str, str]]:
 
 
 async def _live(world: World) -> int:
-    repos = (
-        world.graph_repos.node_types,
-        world.graph_repos.edge_types,
-        world.preset_repos.presets,
+    everyone = ContentFilter.everyone()
+    others = (
+        len(
+            await world.graph_repos.node_types.list(
+                after=None, limit=500, scope=everyone
+            )
+        )
+        + len(
+            await world.graph_repos.edge_types.list(
+                after=None, limit=500, scope=everyone
+            )
+        )
+        + len(await world.preset_repos.presets.list(after=None, limit=500))
     )
-    others = sum([len(await r.list(after=None, limit=500)) for r in repos])
     items = await world.graph_repos.nodes.list(
         scope=ContentFilter.everyone(), after=None, limit=500
     )

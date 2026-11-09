@@ -123,19 +123,19 @@ def _owners(sync_url: str, table: str) -> list[uuid.UUID]:
     return owners
 
 
-def test_both_people_install_and_remove_with_shared_types(
+def test_both_people_install_and_remove_with_their_own_types(
     client: TestClient, who: _Who, postgres_sync_url: str
 ) -> None:
-    """Own content and covers each, one set of types, removed with the last person."""
+    """Own content, covers and types each, removed independently."""
     who.actor = ALICE
     assert client.put(_INSTALL).status_code == 200
     who.actor = BOB
     second = client.put(_INSTALL)
     assert second.status_code == 200, second.text
-    assert second.json()["created"]["item_types"] == 0
+    assert second.json()["created"]["item_types"] == 1
     assert second.json()["created"]["items"] == 2
 
-    for table in ("nodes", "edges", "collections", "media_assets"):
+    for table in ("node_types", "nodes", "edges", "collections", "media_assets"):
         owners = _owners(postgres_sync_url, table)
         assert set(owners) == {ALICE.id, BOB.id}, table
     assert len(_owners(postgres_sync_url, "example_installations")) == 2
@@ -147,9 +147,10 @@ def test_both_people_install_and_remove_with_shared_types(
     left = client.delete(_INSTALL)
     assert left.status_code == 200, left.text
     assert left.json()["removed"]["items"] == 2
-    assert len(client.get("/api/v1/node-types").json()) == 1
+    assert client.get("/api/v1/node-types").json() == []
     who.actor = BOB
     assert len(client.get("/api/v1/nodes?limit=100").json()) == 2
+    assert len(client.get("/api/v1/node-types").json()) == 1
 
     assert client.delete(_INSTALL).status_code == 200
     assert client.get("/api/v1/node-types").json() == []
@@ -175,43 +176,43 @@ def test_people_cannot_see_each_others_installations_or_example_ids(
     assert len(client.get("/api/v1/examples/entities").json()["item_ids"]) == 2
 
 
-def test_another_persons_own_item_keeps_a_shared_type_alive(
+def test_the_installers_own_item_keeps_their_type_through_removal(
     client: TestClient, who: _Who
 ) -> None:
-    """Bob's own item of a pack type, with no installation, survives Alice's removal."""
+    """Alice's own item of a pack type survives her removal, and keeps the type."""
     who.actor = ALICE
     assert client.put(_INSTALL).status_code == 200
-    who.actor = BOB
-    made = client.post(
-        "/api/v1/nodes", json={"name": "Bob's own", "type": "demo-thing"}
-    )
+    made = client.post("/api/v1/nodes", json={"name": "Mine", "type": "demo-thing"})
     assert made.status_code == 201, made.text
 
-    who.actor = ALICE
     left = client.delete(_INSTALL)
 
     assert left.status_code == 200, left.text
     assert ("item_type", "still in use") in {
         (k["kind"], k["reason"]) for k in left.json()["kept"]
     }
-    who.actor = BOB
-    assert [n["name"] for n in client.get("/api/v1/nodes?limit=100").json()] == [
-        "Bob's own"
-    ]
+    assert [n["name"] for n in client.get("/api/v1/nodes?limit=100").json()] == ["Mine"]
     assert [t["slug"] for t in client.get("/api/v1/node-types").json()] == [
         "demo-thing"
     ]
 
 
-def test_an_unrelated_type_with_the_packs_slug_is_still_a_conflict(
+def test_a_type_with_the_packs_slug_only_blocks_its_own_owner(
     client: TestClient, who: _Who
 ) -> None:
-    """A type Bob made himself blocks the install for everyone."""
+    """Bob's own type of that name does not stop Alice; Alice's would stop Alice."""
     who.actor = BOB
     made = client.post(
         "/api/v1/node-types", json={"slug": "demo-thing", "label": "Mine"}
     )
     assert made.status_code == 201, made.text
+
     who.actor = ALICE
+    assert client.put(_INSTALL).status_code == 200
+    assert client.delete(_INSTALL).status_code == 200
+    made = client.post(
+        "/api/v1/node-types", json={"slug": "demo-thing", "label": "Mine"}
+    )
+    assert made.status_code == 201, made.text
 
     assert client.put(_INSTALL).status_code == 409

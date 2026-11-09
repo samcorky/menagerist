@@ -27,6 +27,10 @@ from app.modules.graph.application.claim_orphaned_items import (
     ClaimOrphanedItems,
     ClaimOrphanedItemsCommand,
 )
+from app.modules.graph.application.claim_orphaned_types import (
+    ClaimOrphanedTypes,
+    ClaimOrphanedTypesCommand,
+)
 from app.modules.identity.adapters.api.dependencies import get_setup_session
 from app.modules.identity.ports.existing_data_claim import ClaimReport
 from app.modules.media.adapters.persistence.unit_of_work import build_media_repos
@@ -53,11 +57,13 @@ class ClaimExistingData:
 
     def __init__(
         self,
+        types: ClaimOrphanedTypes,
         items: ClaimOrphanedItems,
         collections: ClaimLegacyCollections,
         media: ClaimOrphanedMedia,
         installations: ClaimOrphanedInstallations,
     ) -> None:
+        self._types = types
         self._items = items
         self._collections = collections
         self._media = media
@@ -65,6 +71,9 @@ class ClaimExistingData:
 
     async def claim(self, owner_id: uuid.UUID) -> ClaimReport:
         """Make `owner_id` the owner of all unowned and legacy-owned content."""
+        types = await self._types.handle(
+            ClaimOrphanedTypesCommand(owner_id=owner_id), SYSTEM_ACTOR
+        )
         items = await self._items.handle(
             ClaimOrphanedItemsCommand(owner_id=owner_id), SYSTEM_ACTOR
         )
@@ -79,6 +88,7 @@ class ClaimExistingData:
         )
         return ClaimReport(
             counts={
+                "types": types.item_types + types.relationship_types,
                 "items": items.items,
                 "connections": items.connections,
                 "collections": collections,
@@ -100,6 +110,7 @@ def build_claim_existing_data(
     The use cases never commit: the owner of the transaction does.
     """
     return ClaimExistingData(
+        ClaimOrphanedTypes(AmbientUnitOfWork(graph), get_access_guard()),
         ClaimOrphanedItems(AmbientUnitOfWork(graph), get_access_guard()),
         ClaimLegacyCollections(AmbientUnitOfWork(collections), get_access_guard()),
         ClaimOrphanedMedia(AmbientUnitOfWork(media), get_access_guard()),

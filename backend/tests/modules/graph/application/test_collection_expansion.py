@@ -74,7 +74,9 @@ async def _world() -> tuple[GraphRepos, InMemoryExternalConditions]:
         definitions=provider,
     )
     await repos.node_types.add(
-        NodeType.create(slug="film", label="Film", attributes_schema=SCHEMA)
+        NodeType.create(
+            owner_id=ME, slug="film", label="Film", attributes_schema=SCHEMA
+        )
     )
     for rating in (1, 5):
         await repos.nodes.add(

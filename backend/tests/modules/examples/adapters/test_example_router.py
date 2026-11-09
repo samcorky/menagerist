@@ -198,7 +198,7 @@ def test_slug_clash_is_a_409_naming_the_slug(make_world: MakeWorld) -> None:
     world = make_world()
     asyncio.run(
         world.graph_repos.node_types.add(
-            NodeType.create(slug="demo-record", label="Mine")
+            NodeType.create(owner_id=world.actor.id, slug="demo-record", label="Mine")
         )
     )
 

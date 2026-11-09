@@ -34,7 +34,9 @@ def _make_repos(edge_types: InMemoryEdgeTypeRepository) -> GraphRepos:
 async def test_get_edge_type_returns_existing() -> None:
     """GetEdgeType returns the edge type when it exists."""
     edge_types = InMemoryEdgeTypeRepository()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="directed-by", label="Directed By"
+    )
     await edge_types.add(et)
     use_case = GetEdgeType(_make_repos(edge_types), InMemoryAccessGuard())
 

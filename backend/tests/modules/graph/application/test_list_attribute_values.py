@@ -38,7 +38,7 @@ def _repos() -> GraphRepos:
 
 async def _setup() -> tuple[GraphRepos, NodeType]:
     repos = _repos()
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=uuid.UUID(int=1), slug="film", label="Film")
     await repos.node_types.add(node_type)
     nodes = [
         Node.create(

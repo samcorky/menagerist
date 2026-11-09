@@ -182,7 +182,7 @@ async def test_update_node_type_rejects_uncompilable_pattern(
 ) -> None:
     """UpdateNodeType rejects a pattern Python cannot compile."""
     uow, repos = _make_uow()
-    nt = NodeType.create(slug="film", label="Film")
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="film", label="Film")
     await repos.node_types.add(nt)
     with pytest.raises(InvalidSchemaError):
         await UpdateNodeType(uow, InMemoryAccessGuard()).handle(
@@ -210,7 +210,7 @@ async def test_update_edge_type_rejects_uncompilable_pattern(
 ) -> None:
     """UpdateEdgeType rejects a pattern Python cannot compile."""
     uow, repos = _make_uow()
-    et = EdgeType.create(slug="made", label="Made")
+    et = EdgeType.create(owner_id=SYSTEM_ACTOR.id, slug="made", label="Made")
     await repos.edge_types.add(et)
     with pytest.raises(InvalidSchemaError):
         await UpdateEdgeType(uow, InMemoryAccessGuard()).handle(

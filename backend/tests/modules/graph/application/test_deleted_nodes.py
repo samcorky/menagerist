@@ -160,7 +160,9 @@ async def test_restore_clears_only_the_mark_and_keeps_live_connections() -> None
 async def test_restore_an_item_whose_type_exists() -> None:
     """A live item type does not block."""
     repos = _repos()
-    await repos.node_types.add(NodeType.create(slug="film", label="Film"))
+    await repos.node_types.add(
+        NodeType.create(owner_id=ALICE.id, slug="film", label="Film")
+    )
     item = await _item(repos, "Alien", deleted_ago=1, type="film")
 
     result = await _restore(repos).handle(RestoreNodeCommand(node_id=item.id), ALICE)
@@ -171,7 +173,7 @@ async def test_restore_an_item_whose_type_exists() -> None:
 async def test_restore_refuses_when_the_item_type_was_deleted() -> None:
     """A deleted type is a 409 naming the slug; the item stays deleted."""
     repos = _repos()
-    node_type = NodeType.create(slug="film", label="Film")
+    node_type = NodeType.create(owner_id=ALICE.id, slug="film", label="Film")
     node_type.soft_delete()
     await repos.node_types.add(node_type)
     item = await _item(repos, "Alien", deleted_ago=1, type="film")

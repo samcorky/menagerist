@@ -68,7 +68,9 @@ async def _names(world: World) -> list[str]:
 
 
 async def _slugs(world: World) -> list[str]:
-    types = await world.graph_repos.node_types.list(after=None, limit=10)
+    types = await world.graph_repos.node_types.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
     return sorted(str(t.slug) for t in types)
 
 
@@ -163,7 +165,9 @@ async def test_a_type_whose_slug_the_user_changed_is_not_adopted(
 ) -> None:
     """A renamed kept type is the user's; the pack gets a fresh one."""
     world = await _kept_world(make_world)
-    types = await world.graph_repos.node_types.list(after=None, limit=10)
+    types = await world.graph_repos.node_types.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
     mine = types[0]
     mine.slug = "my-records"  # type: ignore[assignment]
     await world.graph_repos.node_types.save(mine)
@@ -193,7 +197,7 @@ async def test_a_clash_with_something_that_is_not_a_kept_example_still_conflicts
     """The user's own type with a needed slug is never silently merged."""
     world = await _kept_world(make_world)
     await world.graph_repos.node_types.add(
-        NodeType.create(slug="demo-person", label="Mine")
+        NodeType.create(owner_id=world.actor.id, slug="demo-person", label="Mine")
     )
 
     with pytest.raises(SlugClashError, match="demo-person"):
@@ -213,7 +217,7 @@ async def test_a_relationship_type_clash_still_conflicts(
     """The same holds for relationship types."""
     world = await _kept_world(make_world)
     await world.graph_repos.edge_types.add(
-        EdgeType.create(slug="demo-signed-by", label="Mine")
+        EdgeType.create(owner_id=world.actor.id, slug="demo-signed-by", label="Mine")
     )
 
     with pytest.raises(SlugClashError, match="demo-signed-by"):

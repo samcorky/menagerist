@@ -14,7 +14,7 @@ from app.modules.graph.domain.node_type import NodeType
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ class UpdateNodeTypeCommand:
 class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, NodeType]):
     """Update an existing node type's editable fields."""
 
-    access: ClassVar[Access] = Requires(GraphPermission.TYPE_WRITE)
+    access: ClassVar[Access] = Content(GraphPermission.TYPE_WRITE)
 
     def __init__(
         self,
@@ -67,7 +67,9 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
         else:
             attributes_schema = None
         async with self._uow as repos:
-            node_type = await repos.node_types.get(command.node_type_id)
+            node_type = await repos.node_types.get(
+                command.node_type_id, scope=self.scope(actor)
+            )
             if node_type is None:
                 raise NodeTypeNotFoundError(
                     f"NodeType {command.node_type_id} not found"

@@ -37,7 +37,9 @@ class CountNodeTypeAttributeUsage(
         self, query: CountNodeTypeAttributeUsageQuery, actor: Actor
     ) -> int:
         """Return the count, or raise `NodeTypeNotFoundError` if the type is missing."""
-        node_type = await self._repos.node_types.get(query.node_type_id)
+        node_type = await self._repos.node_types.get(
+            query.node_type_id, scope=self.scope(actor)
+        )
         if node_type is None:
             raise NodeTypeNotFoundError(f"NodeType {query.node_type_id} not found")
         count = await self._repos.nodes.count_with_attribute(

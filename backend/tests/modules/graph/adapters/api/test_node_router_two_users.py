@@ -179,7 +179,7 @@ def test_patch_with_if_match_of_someone_elses_item_is_404(world: _World) -> None
 
 
 def test_usage_counts_and_value_suggestions_are_per_person(world: _World) -> None:
-    """Attribute usage and suggestions only reflect the caller's own items."""
+    """Attribute usage and suggestions only reflect the caller's own types and items."""
     alice = world.act_as(ALICE)
     node_type = alice.post(
         "/api/v1/node-types", json={"slug": "film", "label": "Film"}
@@ -191,6 +191,12 @@ def test_usage_counts_and_value_suggestions_are_per_person(world: _World) -> Non
     assert alice.get(f"{base}/values").json() == [{"value": "R", "count": 1}]
 
     bob = world.act_as(BOB)
-    assert bob.get(f"/api/v1/node-types/{node_type['id']}").status_code == 200
-    assert bob.get(f"{base}/usage").json() == {"count": 0}
-    assert bob.get(f"{base}/values").json() == []
+    assert bob.get(f"/api/v1/node-types/{node_type['id']}").status_code == 404
+    assert bob.get(f"{base}/usage").status_code == 404
+    assert bob.get(f"{base}/values").status_code == 404
+    bobs_type = bob.post(
+        "/api/v1/node-types", json={"slug": "film", "label": "Film"}
+    ).json()
+    bobs_base = f"/api/v1/node-types/{bobs_type['id']}/attributes/rating"
+    assert bob.get(f"{bobs_base}/usage").json() == {"count": 0}
+    assert bob.get(f"{bobs_base}/values").json() == []

@@ -76,8 +76,18 @@ async def _assert_empty(world: World) -> None:
         )
         == []
     )
-    assert await world.graph_repos.node_types.list(after=None, limit=10) == []
-    assert await world.graph_repos.edge_types.list(after=None, limit=10) == []
+    assert (
+        await world.graph_repos.node_types.list(
+            after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
+    assert (
+        await world.graph_repos.edge_types.list(
+            after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
     assert (
         await world.graph_repos.edges.list(
             after=None, limit=10, scope=ContentFilter.everyone()
@@ -140,7 +150,14 @@ async def test_reinstalling_after_removal_succeeds(make_world: MakeWorld) -> Non
     )
     assert installation is not None
     assert installation.status is InstallationStatus.INSTALLED
-    assert len(await world.graph_repos.node_types.list(after=None, limit=10)) == 2
+    assert (
+        len(
+            await world.graph_repos.node_types.list(
+                after=None, limit=10, scope=ContentFilter.everyone()
+            )
+        )
+        == 2
+    )
 
 
 async def test_an_edited_item_is_kept_and_so_are_the_types_it_needs(
@@ -283,7 +300,7 @@ async def test_a_preset_another_type_uses_is_kept(make_world: MakeWorld) -> None
     """A preset the user's own type refers to is kept."""
     world = await _installed(make_world)
     preset = (await world.preset_repos.presets.list(after=None, limit=10))[0]
-    mine = NodeType.create(slug="mine", label="Mine")
+    mine = NodeType.create(owner_id=world.actor.id, slug="mine", label="Mine")
     mine.attributes_schema = {
         "type": "object",
         "properties": {
@@ -435,5 +452,7 @@ async def test_a_users_connection_of_the_pack_relationship_type_keeps_it(
         await world.graph_repos.edges.get(mine.id, scope=ContentFilter.everyone())
         is not None
     )
-    kept_types = await world.graph_repos.edge_types.list(after=None, limit=10)
+    kept_types = await world.graph_repos.edge_types.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
     assert [str(t.slug) for t in kept_types] == ["demo-signed-by"]

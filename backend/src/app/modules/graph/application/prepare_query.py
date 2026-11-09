@@ -49,7 +49,7 @@ async def _resolve_connections(
     if named.slugs:
         directional = {
             str(t.slug): t.directional
-            for t in await load_edge_types(repos)
+            for t in await load_edge_types(repos, scope)
             if str(t.slug) in named.slugs
         }
     visible: set[uuid.UUID] = set()
@@ -80,7 +80,7 @@ async def prepare_query(
             itself.
     """
     parsed = parse_query(raw)
-    node_types = await load_node_types(repos)
+    node_types = await load_node_types(repos, scope)
     schemas = {str(t.slug): t.attributes_schema or {} for t in node_types}
     resolution = resolve_fields(parsed, schemas)
     expansion = await expand_collections(

@@ -65,10 +65,11 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
                 raise NodeNotFoundError(f"Node {command.target_id} not found")
 
             slug = slugify(command.type)
-            edge_type = await repos.edge_types.get_by_slug(slug)
+            edge_type = await repos.edge_types.get_by_slug(slug, scope=scope)
             if edge_type is None:
                 await repos.edge_types.add(
                     EdgeType.create(
+                        owner_id=actor.id,
                         slug=slug,
                         label=command.type.replace("-", " ").title(),
                     )

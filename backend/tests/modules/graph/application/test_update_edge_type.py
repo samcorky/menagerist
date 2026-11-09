@@ -23,6 +23,7 @@ from app.modules.graph.domain.errors import EdgeTypeNotFoundError, InvalidSchema
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -39,7 +40,9 @@ def _make_uow() -> tuple[InMemoryUnitOfWork[GraphRepos], GraphRepos]:
 async def test_update_edge_type_persists_and_commits() -> None:
     """UpdateEdgeType saves the changed edge type and commits."""
     uow, repos = _make_uow()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="directed-by", label="Directed By"
+    )
     await repos.edge_types.add(et)
     use_case = UpdateEdgeType(uow, InMemoryAccessGuard())
 
@@ -49,7 +52,7 @@ async def test_update_edge_type_persists_and_commits() -> None:
     )
 
     assert result.label == "Helmed By"
-    stored = await repos.edge_types.get(et.id)
+    stored = await repos.edge_types.get(et.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.label == "Helmed By"
     assert uow.committed is True
@@ -58,7 +61,9 @@ async def test_update_edge_type_persists_and_commits() -> None:
 async def test_update_edge_type_persists_attributes_schema() -> None:
     """UpdateEdgeType stores a valid JSON Schema when provided."""
     uow, repos = _make_uow()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="directed-by", label="Directed By"
+    )
     await repos.edge_types.add(et)
     schema = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -75,7 +80,7 @@ async def test_update_edge_type_persists_attributes_schema() -> None:
     )
 
     assert result.attributes_schema == schema
-    stored = await repos.edge_types.get(et.id)
+    stored = await repos.edge_types.get(et.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.attributes_schema == schema
 
@@ -83,7 +88,9 @@ async def test_update_edge_type_persists_attributes_schema() -> None:
 async def test_update_edge_type_raises_on_invalid_schema() -> None:
     """UpdateEdgeType rejects a schema that is not valid JSON Schema."""
     uow, repos = _make_uow()
-    et = EdgeType.create(slug="directed-by", label="Directed By")
+    et = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="directed-by", label="Directed By"
+    )
     await repos.edge_types.add(et)
     use_case = UpdateEdgeType(uow, InMemoryAccessGuard())
 

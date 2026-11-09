@@ -115,20 +115,11 @@ def _reuse_vocabulary(
     candidates = [
         item
         for item in rows
-        if (
-            (name != "presets" and item.get("slug") == row.get("slug"))
-            or (
-                name == "presets"
-                and item.get("kind") == row.get("kind")
-                and item.get("label") == row.get("label")
-            )
-        )
+        if item.get("kind") == row.get("kind")
+        and item.get("label") == row.get("label")
         and item.get("deleted_at") is None
     ]
-    if existing is not None and (
-        not compatible(name, row, existing)
-        or (name != "presets" and existing.get("slug") != row.get("slug"))
-    ):
+    if existing is not None and not compatible(name, row, existing):
         raise ImportCollisionError("Vocabulary identifier conflict.")
     matched = existing or next(
         (item for item in candidates if compatible(name, row, item)), None
@@ -136,8 +127,6 @@ def _reuse_vocabulary(
     if matched:
         remap[f"{name}:{row['id']}"] = str(matched["id"])
         return True
-    if candidates and name != "presets":
-        raise ImportCollisionError("Incompatible type slug.")
     return False
 
 

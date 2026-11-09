@@ -19,6 +19,7 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
 
 NOW = datetime.now(UTC)
@@ -46,13 +47,13 @@ class _World:
         return result.item_types, result.relationship_types
 
     async def item_type(self, slug: str, *, deleted_at: datetime | None) -> NodeType:
-        node_type = NodeType.create(slug=slug, label=slug)
+        node_type = NodeType.create(owner_id=OWNER, slug=slug, label=slug)
         node_type.deleted_at = deleted_at
         await self.repos.node_types.add(node_type)
         return node_type
 
     async def edge_type(self, slug: str, *, deleted_at: datetime | None) -> EdgeType:
-        edge_type = EdgeType.create(slug=slug, label=slug)
+        edge_type = EdgeType.create(owner_id=OWNER, slug=slug, label=slug)
         edge_type.deleted_at = deleted_at
         await self.repos.edge_types.add(edge_type)
         return edge_type
@@ -104,8 +105,11 @@ async def test_expired_unused_types_are_purged_and_the_rest_kept() -> None:
     assert await w.run() == (1, 1)
 
     assert await w.remaining() == (1, 1)
-    assert await w.repos.node_types.get(live.id) is live
-    assert await w.repos.edge_types.get(live_link.id) is live_link
+    assert await w.repos.node_types.get(live.id, scope=ContentFilter.everyone()) is live
+    assert (
+        await w.repos.edge_types.get(live_link.id, scope=ContentFilter.everyone())
+        is live_link
+    )
 
 
 @pytest.mark.parametrize("deleted_at", [None, LONG_AGO])
