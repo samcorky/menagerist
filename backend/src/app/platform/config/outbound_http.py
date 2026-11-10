@@ -2,7 +2,7 @@ import re
 from functools import lru_cache
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 
 from app.platform.config._base import MenageristBaseSettings
 
@@ -37,30 +37,30 @@ class OutboundHttpSettings(MenageristBaseSettings, group="http"):
     )
     http_proxy: SecretStr | None = Field(
         default=None,
-        validation_alias="HTTP_PROXY",
+        validation_alias=AliasChoices("MENAGERIST_HTTP_PROXY", "HTTP_PROXY"),
         description=(
             "Proxy for outbound `http://` requests, as `http://host:port` with "
-            + "optional `user:password@`. Empty uses none. The standard "
-            + "`HTTP_PROXY` name."
+            + "optional `user:password@`. Empty uses none, even when the standard "
+            + "`HTTP_PROXY` is set, which this overrides."
         ),
     )
     https_proxy: SecretStr | None = Field(
         default=None,
-        validation_alias="HTTPS_PROXY",
+        validation_alias=AliasChoices("MENAGERIST_HTTPS_PROXY", "HTTPS_PROXY"),
         description=(
             "Proxy for outbound `https://` requests, as `http://host:port` with "
-            + "optional `user:password@`. Empty uses none. The standard "
-            + "`HTTPS_PROXY` name."
+            + "optional `user:password@`. Empty uses none, even when the standard "
+            + "`HTTPS_PROXY` is set, which this overrides."
         ),
     )
     no_proxy: str = Field(
         default="",
-        validation_alias="NO_PROXY",
+        validation_alias=AliasChoices("MENAGERIST_NO_PROXY", "NO_PROXY"),
         max_length=1000,
         description=(
             "Comma-separated host names, domains (`example.com` also matches its "
             + "subdomains), IP addresses and network ranges that skip the proxy, "
-            + "or `*` for all. The standard `NO_PROXY` name."
+            + "or `*` for all. Overrides the standard `NO_PROXY`."
         ),
     )
     connect_timeout_seconds: float = Field(

@@ -1,6 +1,13 @@
 import pytest
 
-_PROXY_VARIABLES = ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY")
+_PROXY_VARIABLES = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "MENAGERIST_HTTP_PROXY",
+    "MENAGERIST_HTTPS_PROXY",
+    "MENAGERIST_NO_PROXY",
+)
 
 
 @pytest.fixture(autouse=True)
