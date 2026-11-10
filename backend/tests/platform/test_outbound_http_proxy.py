@@ -302,3 +302,37 @@ def test_a_proxy_that_is_not_a_web_address_is_refused(
 
     with pytest.raises(ValidationError):
         OutboundHttpSettings()
+
+
+def test_the_prefixed_names_win_over_the_standard_ones(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The MENAGERIST_ names win over the standard ones."""
+    monkeypatch.setenv("HTTP_PROXY", "http://standard:1")
+    monkeypatch.setenv("MENAGERIST_HTTP_PROXY", "http://prefixed:2")
+    monkeypatch.setenv("HTTPS_PROXY", "http://standard:1")
+    monkeypatch.setenv("MENAGERIST_HTTPS_PROXY", "http://prefixed:3")
+    monkeypatch.setenv("NO_PROXY", "standard.example")
+    monkeypatch.setenv("MENAGERIST_NO_PROXY", "prefixed.example")
+
+    settings = OutboundHttpSettings()
+
+    assert settings.http_proxy is not None
+    assert settings.http_proxy.get_secret_value() == "http://prefixed:2"
+    assert settings.https_proxy is not None
+    assert settings.https_proxy.get_secret_value() == "http://prefixed:3"
+    assert settings.no_proxy == "prefixed.example"
+
+
+def test_an_empty_prefixed_name_turns_off_an_inherited_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty MENAGERIST_ name turns off a proxy inherited from the environment."""
+    monkeypatch.setenv("HTTP_PROXY", PROXY)
+    monkeypatch.setenv("HTTPS_PROXY", PROXY)
+    monkeypatch.setenv("MENAGERIST_HTTP_PROXY", "")
+    monkeypatch.setenv("MENAGERIST_HTTPS_PROXY", "")
+
+    settings = OutboundHttpSettings()
+
+    assert (settings.http_proxy, settings.https_proxy) == (None, None)
