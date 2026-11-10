@@ -45,10 +45,14 @@ _EMBEDDING_NETWORKS = tuple(
 )
 
 
-def build_user_agent(version: str, contact: str) -> str:
-    """`Menagerist/<version> (+<project url>[; contact: <contact>])`."""
-    comment = f"+{PROJECT_URL}" + (f"; contact: {contact}" if contact else "")
-    return f"Menagerist/{version} ({comment})"
+def build_user_agent(version: str, contact: str = "", note: str = "") -> str:
+    """`Menagerist/<version> (+<project url>[; contact: <contact>][; <note>])`."""
+    parts = [f"+{PROJECT_URL}"]
+    if contact:
+        parts.append(f"contact: {contact}")
+    if note:
+        parts.append(note)
+    return f"Menagerist/{version} ({'; '.join(parts)})"
 
 
 def is_public_address(address: str) -> bool:
@@ -93,7 +97,9 @@ class HttpxOutboundHttp:
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self._settings = settings
-        self._user_agent = build_user_agent(version, settings.contact)
+        self._user_agent = build_user_agent(
+            version, settings.contact, settings.user_agent_note
+        )
         self._resolver = resolver
         self._transport = transport
 
