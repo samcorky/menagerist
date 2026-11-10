@@ -1,4 +1,3 @@
-import httpx2
 import pytest
 
 from app.modules.system.adapters.platform.github_release_provider import (
@@ -10,61 +9,68 @@ from app.modules.system.domain.release import (
     ReleaseCheckError,
     RepositoryRef,
 )
+from app.shared_kernel.outbound_http import (
+    InMemoryOutboundHttp,
+    OutboundFailure,
+    OutboundHttpError,
+    OutboundResponse,
+)
 
 REPOSITORY = RepositoryRef(owner="samcorky", name="menagerist")
-
-
-def provider(handler: httpx2.MockTransport) -> GitHubReleaseProvider:
-    """Provider."""
-    return GitHubReleaseProvider(user_agent="menagerist/test", transport=handler)
+URL = "https://api.github.com/repos/samcorky/menagerist/releases"
 
 
 def serving(
-    status: int = 200, body: object = None, **kwargs: object
-) -> httpx2.MockTransport:
-    """Serving."""
+    status: int = 200,
+    body: object = None,
+    *,
+    headers: dict[str, str] | None = None,
+    content: bytes | None = None,
+    url: str = URL,
+) -> tuple[GitHubReleaseProvider, InMemoryOutboundHttp]:
+    """A provider whose one GitHub URL answers with the given response."""
+    import json
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
-        """Handler."""
-        return httpx2.Response(status, json=body if body is not None else [], **kwargs)  # type: ignore[arg-type]
-
-    return httpx2.MockTransport(handler)
+    http = InMemoryOutboundHttp()
+    http.reply(
+        URL,
+        OutboundResponse(
+            url=url,
+            status=status,
+            headers=headers or {},
+            body=content if content is not None else json.dumps(body or []).encode(),
+        ),
+    )
+    return GitHubReleaseProvider(http), http
 
 
 async def test_releases_are_read_from_the_api_with_no_credentials() -> None:
     """Releases are read from the api with no credentials."""
-    seen: list[httpx2.Request] = []
+    provider, http = serving(
+        body=[
+            {
+                "tag_name": "v0.2026.11.0",
+                "name": "  Spring clean  ",
+                "draft": False,
+                "prerelease": False,
+                "published_at": "2026-11-01T12:00:00Z",
+                "html_url": "https://evil.example/phish",
+            },
+            {"tag_name": "0.2026.12.0rc1", "name": " ", "prerelease": True},
+            {"tag_name": "0.2026.13.0", "draft": True},
+            {"tag_name": ""},
+            {"name": "no tag"},
+            "junk",
+        ]
+    )
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
-        """Handler."""
-        seen.append(request)
-        return httpx2.Response(
-            200,
-            json=[
-                {
-                    "tag_name": "v0.2026.11.0",
-                    "name": "  Spring clean  ",
-                    "draft": False,
-                    "prerelease": False,
-                    "published_at": "2026-11-01T12:00:00Z",
-                    "html_url": "https://evil.example/phish",
-                },
-                {"tag_name": "0.2026.12.0rc1", "name": " ", "prerelease": True},
-                {"tag_name": "0.2026.13.0", "draft": True},
-                {"tag_name": ""},
-                {"name": "no tag"},
-                "junk",
-            ],
-        )
+    releases = await provider.releases(REPOSITORY)
 
-    releases = await provider(httpx2.MockTransport(handler)).releases(REPOSITORY)
-
-    request = seen[0]
-    assert request.url.host == "api.github.com"
-    assert request.url.path == "/repos/samcorky/menagerist/releases"
-    assert request.url.params["per_page"] == "30"
-    assert request.headers["User-Agent"] == "menagerist/test"
-    assert "authorization" not in request.headers
+    (request,) = http.requests
+    assert request.url == URL
+    assert request.params == {"per_page": 30}
+    assert request.max_bytes == MAX_BODY_BYTES
+    assert not {"authorization", "user-agent"} & {k.lower() for k in request.headers}
     assert [r.version for r in releases] == ["v0.2026.11.0", "0.2026.12.0rc1"]
     # The link is rebuilt from the tag, never taken from the response.
     assert releases[0].url == (
@@ -79,9 +85,9 @@ async def test_releases_are_read_from_the_api_with_no_credentials() -> None:
 
 async def test_an_unreadable_publication_time_is_ignored() -> None:
     """An unreadable publication time is ignored."""
-    body = [{"tag_name": "1.0.0", "published_at": "yesterday"}]
+    provider, _ = serving(body=[{"tag_name": "1.0.0", "published_at": "yesterday"}])
 
-    releases = await provider(serving(body=body)).releases(REPOSITORY)
+    releases = await provider.releases(REPOSITORY)
 
     assert releases[0].published_at is None
 
@@ -103,30 +109,32 @@ async def test_an_unsuccessful_status_is_a_fixed_failure(
     status: int, headers: dict[str, str], failure: CheckFailure
 ) -> None:
     """An unsuccessful status is a fixed failure."""
+    provider, _ = serving(status, headers=headers)
+
     with pytest.raises(ReleaseCheckError) as raised:
-        await provider(serving(status, headers=headers)).releases(REPOSITORY)
+        await provider.releases(REPOSITORY)
 
     assert raised.value.failure is failure
 
 
 @pytest.mark.parametrize(
-    ("raised", "failure"),
+    ("outbound", "failure"),
     [
-        (httpx2.ReadTimeout("slow"), CheckFailure.TIMEOUT),
-        (httpx2.ConnectError("down"), CheckFailure.NETWORK),
+        (OutboundFailure.TIMEOUT, CheckFailure.TIMEOUT),
+        (OutboundFailure.TOO_LARGE, CheckFailure.BAD_RESPONSE),
+        (OutboundFailure.NETWORK, CheckFailure.NETWORK),
+        (OutboundFailure.BLOCKED_ADDRESS, CheckFailure.NETWORK),
     ],
 )
-async def test_a_transport_error_is_a_fixed_failure(
-    raised: Exception, failure: CheckFailure
+async def test_an_outbound_failure_is_a_fixed_failure(
+    outbound: OutboundFailure, failure: CheckFailure
 ) -> None:
-    """A transport error is a fixed failure."""
-
-    def handler(request: httpx2.Request) -> httpx2.Response:
-        """Handler."""
-        raise raised
+    """An outbound failure is a fixed failure."""
+    http = InMemoryOutboundHttp()
+    http.reply(URL, OutboundHttpError(outbound))
 
     with pytest.raises(ReleaseCheckError) as caught:
-        await provider(httpx2.MockTransport(handler)).releases(REPOSITORY)
+        await GitHubReleaseProvider(http).releases(REPOSITORY)
 
     assert caught.value.failure is failure
 
@@ -134,38 +142,19 @@ async def test_a_transport_error_is_a_fixed_failure(
 @pytest.mark.parametrize("content", [b"not json", b'{"tag_name": "1.0.0"}'])
 async def test_a_body_that_is_not_a_list_of_releases_is_refused(content: bytes) -> None:
     """A body that is not a list of releases is refused."""
-    transport = httpx2.MockTransport(
-        lambda request: httpx2.Response(200, content=content)
-    )
+    provider, _ = serving(content=content)
 
     with pytest.raises(ReleaseCheckError) as caught:
-        await provider(transport).releases(REPOSITORY)
+        await provider.releases(REPOSITORY)
 
     assert caught.value.failure is CheckFailure.BAD_RESPONSE
 
 
-async def test_an_oversized_body_is_refused() -> None:
-    """An oversized body is refused."""
-    transport = httpx2.MockTransport(
-        lambda request: httpx2.Response(200, content=b" " * (MAX_BODY_BYTES + 1))
-    )
+async def test_a_response_from_another_host_is_refused() -> None:
+    """A response from another host is refused."""
+    provider, _ = serving(body=[{"tag_name": "9.9.9"}], url="https://evil.example/x")
 
     with pytest.raises(ReleaseCheckError) as caught:
-        await provider(transport).releases(REPOSITORY)
-
-    assert caught.value.failure is CheckFailure.BAD_RESPONSE
-
-
-async def test_a_redirect_off_the_api_host_is_refused() -> None:
-    """A redirect off the api host is refused."""
-
-    def handler(request: httpx2.Request) -> httpx2.Response:
-        """Handler."""
-        if request.url.host == "api.github.com":
-            return httpx2.Response(301, headers={"location": "https://evil.example/x"})
-        return httpx2.Response(200, json=[{"tag_name": "9.9.9"}])
-
-    with pytest.raises(ReleaseCheckError) as caught:
-        await provider(httpx2.MockTransport(handler)).releases(REPOSITORY)
+        await provider.releases(REPOSITORY)
 
     assert caught.value.failure is CheckFailure.BAD_RESPONSE

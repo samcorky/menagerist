@@ -9,6 +9,10 @@ from app.platform.config.identity_cli import (
 )
 from app.platform.config.logging import LoggingSettings, LogLevel, get_logging_settings
 from app.platform.config.media import MediaSettings, get_media_settings
+from app.platform.config.outbound_http import (
+    OutboundHttpSettings,
+    get_outbound_http_settings,
+)
 from app.platform.config.rate_limit import RateLimitSettings, get_rate_limit_settings
 from app.platform.config.release import ReleaseSettings, get_release_settings
 from app.platform.config.retention import RetentionSettings, get_retention_settings
@@ -27,6 +31,7 @@ INSTANCE_SETTINGS = (
     get_identity_settings,
     get_logging_settings,
     get_media_settings,
+    get_outbound_http_settings,
     get_rate_limit_settings,
     get_release_settings,
     get_retention_settings,
@@ -44,6 +49,7 @@ ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
     IdentityCliSettings,
     LoggingSettings,
     MediaSettings,
+    OutboundHttpSettings,
     RateLimitSettings,
     ReleaseSettings,
     RetentionSettings,
@@ -65,6 +71,7 @@ __all__ = [
     "LoggingSettings",
     "MediaSettings",
     "MenageristBaseSettings",
+    "OutboundHttpSettings",
     "RateLimitSettings",
     "ReleaseSettings",
     "RetentionSettings",
@@ -79,6 +86,7 @@ __all__ = [
     "get_identity_settings",
     "get_logging_settings",
     "get_media_settings",
+    "get_outbound_http_settings",
     "get_rate_limit_settings",
     "get_release_settings",
     "get_retention_settings",
