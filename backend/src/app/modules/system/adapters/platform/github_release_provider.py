@@ -2,10 +2,9 @@
 
 import json
 from datetime import datetime
+from http import HTTPStatus
 from typing import TYPE_CHECKING
-from urllib.parse import quote
-
-import httpx2
+from urllib.parse import quote, urlsplit
 
 from app.modules.system.domain.release import (
     CheckFailure,
@@ -13,9 +12,12 @@ from app.modules.system.domain.release import (
     ReleaseCheckError,
     RepositoryRef,
 )
+from app.shared_kernel.outbound_http import OutboundFailure, OutboundHttpError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from app.shared_kernel.outbound_http import OutboundHttp, OutboundResponse
 
 API_HOST = "api.github.com"
 # One page, newest first: enough to find the highest version while bounding the
@@ -23,77 +25,56 @@ API_HOST = "api.github.com"
 # releases would need paging, which nothing here warrants yet.
 PAGE_SIZE = 30
 MAX_BODY_BYTES = 2 * 1024 * 1024
-TIMEOUT_SECONDS = 10.0
+_FAILURES = {
+    OutboundFailure.TIMEOUT: CheckFailure.TIMEOUT,
+    OutboundFailure.TOO_LARGE: CheckFailure.BAD_RESPONSE,
+}
 
 
 class GitHubReleaseProvider:
     """Fetches one bounded page of releases; never sends a token or follows a host."""
 
-    def __init__(
-        self,
-        *,
-        user_agent: str,
-        transport: httpx2.AsyncBaseTransport | None = None,
-    ) -> None:
-        self._user_agent = user_agent
-        self._transport = transport
+    def __init__(self, http: OutboundHttp) -> None:
+        self._http = http
 
     async def releases(self, repository: RepositoryRef) -> list[Release]:
         """Return the repository's published releases, drafts excluded."""
         # Built from validated parts, so a build's URL can reach nothing but this
         # API.
         url = f"https://{API_HOST}/repos/{repository.slug}/releases"
-        headers = {
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": self._user_agent,
-        }
         try:
-            async with (
-                httpx2.AsyncClient(
-                    timeout=TIMEOUT_SECONDS,
-                    transport=self._transport,
-                    follow_redirects=True,
-                ) as client,
-                client.stream(
-                    "GET", url, params={"per_page": PAGE_SIZE}, headers=headers
-                ) as response,
-            ):
-                if response.url.host != API_HOST:
-                    raise ReleaseCheckError(CheckFailure.BAD_RESPONSE)
-                self._check_status(response)
-                body = await self._read_bounded(response)
-        except httpx2.TimeoutException as exc:
-            raise ReleaseCheckError(CheckFailure.TIMEOUT) from exc
-        except httpx2.HTTPError as exc:
-            raise ReleaseCheckError(CheckFailure.NETWORK) from exc
-        return _parse(body, repository)
+            response = await self._http.get(
+                url,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                params={"per_page": PAGE_SIZE},
+                max_bytes=MAX_BODY_BYTES,
+            )
+        except OutboundHttpError as exc:
+            raise ReleaseCheckError(
+                _FAILURES.get(exc.failure, CheckFailure.NETWORK)
+            ) from exc
+        if urlsplit(response.url).hostname != API_HOST:
+            raise ReleaseCheckError(CheckFailure.BAD_RESPONSE)
+        self._check_status(response)
+        return _parse(response.body, repository)
 
     @staticmethod
-    def _check_status(response: httpx2.Response) -> None:
-        status = response.status_code
-        if status == httpx2.codes.NOT_FOUND:
+    def _check_status(response: OutboundResponse) -> None:
+        status = response.status
+        if status == HTTPStatus.NOT_FOUND:
             raise ReleaseCheckError(CheckFailure.NOT_FOUND)
         exhausted = response.headers.get("x-ratelimit-remaining") == "0"
-        if status == httpx2.codes.TOO_MANY_REQUESTS or (
-            status == httpx2.codes.FORBIDDEN and exhausted
+        if status == HTTPStatus.TOO_MANY_REQUESTS or (
+            status == HTTPStatus.FORBIDDEN and exhausted
         ):
             raise ReleaseCheckError(CheckFailure.RATE_LIMITED)
-        if status >= httpx2.codes.INTERNAL_SERVER_ERROR:
+        if status >= HTTPStatus.INTERNAL_SERVER_ERROR:
             raise ReleaseCheckError(CheckFailure.NETWORK)
-        if status != httpx2.codes.OK:
+        if status != HTTPStatus.OK:
             raise ReleaseCheckError(CheckFailure.BAD_RESPONSE)
-
-    @staticmethod
-    async def _read_bounded(response: httpx2.Response) -> bytes:
-        chunks: list[bytes] = []
-        size = 0
-        async for chunk in response.aiter_bytes():
-            size += len(chunk)
-            if size > MAX_BODY_BYTES:
-                raise ReleaseCheckError(CheckFailure.BAD_RESPONSE)
-            chunks.append(chunk)
-        return b"".join(chunks)
 
 
 def _parse(body: bytes, repository: RepositoryRef) -> list[Release]:

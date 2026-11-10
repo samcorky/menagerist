@@ -94,6 +94,17 @@ Configuration for the media module.
 | `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` | whole number | `72` | 1 or more | Hours to keep media files that are no longer referenced. |
 | `MENAGERIST_MEDIA_MAX_UPLOAD_SIZE` | whole number | `104857600` | more than 0 | Maximum accepted media upload size in bytes. |
 
+## Http
+
+How Menagerist behaves when it calls out to other web services.
+
+| Variable | Type | Default | Allowed values | Notes |
+| --- | --- | --- | --- | --- |
+| `MENAGERIST_HTTP_CONTACT` | text | empty | any | An email address or web address added to the User-Agent of every outbound request, so a service that throttles this instance can reach you. Empty sends no contact. Plain text only: no brackets or semicolons. |
+| `MENAGERIST_HTTP_CONNECT_TIMEOUT_SECONDS` | text | `5.0` | more than 0 | Seconds to wait for a connection to an outbound service. |
+| `MENAGERIST_HTTP_READ_TIMEOUT_SECONDS` | text | `10.0` | more than 0 | Seconds to wait for each part of an outbound service's reply. |
+| `MENAGERIST_HTTP_MAX_RESPONSE_BYTES` | whole number | `2097152` | 1024 or more | Largest reply, in bytes, accepted from an outbound service unless the caller asks for a smaller one. |
+
 ## Rate_Limit
 
 Request limits on the endpoints that are expensive to serve.

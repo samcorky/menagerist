@@ -14,9 +14,9 @@ from app.modules.system.application.check_for_updates import (
 )
 from app.modules.system.application.setting_keys import RELEASE_CHANNEL
 from app.modules.system.domain.release import ReleaseChannel
-from app.platform.app_info import load_app_info
 from app.platform.config.release import get_release_settings
 from app.platform.database import get_session_factory
+from app.platform.outbound_http import outbound_http
 from app.shared_kernel.jobs import JobContribution, JobDefinition, Overlap, job
 from app.shared_kernel.progress import NULL_PROGRESS
 
@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
 
 def release_provider() -> GitHubReleaseProvider:
-    """The release source, identifying this build to it."""
-    return GitHubReleaseProvider(user_agent=f"menagerist/{load_app_info().version}")
+    """The release source, reached through the shared outbound client."""
+    return GitHubReleaseProvider(outbound_http())
 
 
 @job(
