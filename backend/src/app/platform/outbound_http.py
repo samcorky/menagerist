@@ -6,6 +6,12 @@ NAT, multicast and reserved space). The connection is then made to the address t
 was checked, with the real host kept for the `Host` header and certificate check, so
 a name that resolves differently a moment later cannot slip past the check. Redirects
 are followed by hand so each hop gets the same treatment.
+
+When a proxy is configured (`HTTP_PROXY`, `HTTPS_PROXY`, minus hosts in `NO_PROXY`),
+the proxy makes the connection, so the address cannot be pinned. The host is still
+resolved here and refused if it is not public, but a name this host cannot resolve is
+left to the proxy, which is then the enforcement point for it. Only the settings
+configure a proxy: the HTTP library never reads the environment itself.
 """
 
 import asyncio
@@ -33,6 +39,7 @@ PROJECT_URL = "https://github.com/samcorky/menagerist"
 MAX_REDIRECTS = 5
 
 type Resolver = Callable[[str, int], Awaitable[list[str]]]
+type ProxyTransportFactory = Callable[[str], httpx2.AsyncBaseTransport]
 
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _CREDENTIAL_HEADERS = frozenset({"authorization", "cookie", "proxy-authorization"})
@@ -53,6 +60,36 @@ def build_user_agent(version: str, contact: str = "", note: str = "") -> str:
     if note:
         parts.append(note)
     return f"Menagerist/{version} ({'; '.join(parts)})"
+
+
+def bypasses_proxy(host: str, no_proxy: str) -> bool:
+    """Whether `host` is listed in a `NO_PROXY` value.
+
+    Entries are `*`, host names or domains (which also match subdomains, with or
+    without a leading dot), IP addresses and network ranges.
+    """
+    name = host.lower().strip("[]")
+    try:
+        ip = ipaddress.ip_address(name)
+    except ValueError:
+        ip = None
+    for raw in no_proxy.split(","):
+        entry = raw.strip().lower()
+        if entry == "*":
+            return True
+        if entry and ip is not None and _in_network(ip, entry):
+            return True
+        domain = entry.lstrip(".")
+        if domain and (name == domain or name.endswith(f".{domain}")):
+            return True
+    return False
+
+
+def _in_network(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, entry: str) -> bool:
+    try:
+        return ip in ipaddress.ip_network(entry, strict=False)
+    except ValueError:
+        return False
 
 
 def is_public_address(address: str) -> bool:
@@ -85,6 +122,10 @@ async def resolve_host(host: str, port: int) -> list[str]:
     return list(dict.fromkeys(str(entry[4][0]) for entry in found))
 
 
+def _proxy_transport(proxy: str) -> httpx2.AsyncBaseTransport:
+    return httpx2.AsyncHTTPTransport(proxy=proxy)
+
+
 class HttpxOutboundHttp:
     """Reads over HTTP(S) from public addresses, within the configured limits."""
 
@@ -95,6 +136,7 @@ class HttpxOutboundHttp:
         version: str,
         resolver: Resolver = resolve_host,
         transport: httpx2.AsyncBaseTransport | None = None,
+        proxy_transport: ProxyTransportFactory = _proxy_transport,
     ) -> None:
         self._settings = settings
         self._user_agent = build_user_agent(
@@ -102,6 +144,7 @@ class HttpxOutboundHttp:
         )
         self._resolver = resolver
         self._transport = transport
+        self._proxy_transport = proxy_transport
 
     @property
     def user_agent(self) -> str:
@@ -125,22 +168,12 @@ class HttpxOutboundHttp:
             target = httpx2.URL(url, params=params)
         except (httpx2.InvalidURL, ValueError) as exc:
             raise OutboundHttpError(OutboundFailure.INVALID_URL) from exc
-        timeout = httpx2.Timeout(
-            self._settings.read_timeout_seconds,
-            connect=self._settings.connect_timeout_seconds,
-        )
-        async with httpx2.AsyncClient(
-            timeout=timeout,
-            transport=self._transport,
-            follow_redirects=False,
-            trust_env=False,
-        ) as client:
-            for _ in range(MAX_REDIRECTS + 1):
-                response = await self._hop(client, target, sent, limit)
-                location = response.headers.get("location")
-                if response.status not in _REDIRECT_STATUSES or location is None:
-                    return response
-                target = self._next(target, location, sent)
+        for _ in range(MAX_REDIRECTS + 1):
+            response = await self._hop(target, sent, limit)
+            location = response.headers.get("location")
+            if response.status not in _REDIRECT_STATUSES or location is None:
+                return response
+            target = self._next(target, location, sent)
         raise OutboundHttpError(OutboundFailure.TOO_MANY_REDIRECTS)
 
     @staticmethod
@@ -157,20 +190,36 @@ class HttpxOutboundHttp:
         return following
 
     async def _hop(
-        self,
-        client: httpx2.AsyncClient,
-        target: httpx2.URL,
-        headers: Mapping[str, str],
-        limit: int,
+        self, target: httpx2.URL, headers: Mapping[str, str], limit: int
     ) -> OutboundResponse:
-        address = await self._vetted_address(target)
+        port = self._checked_port(target)
+        proxy = self._proxy_for(target)
+        if proxy is None:
+            address = await self._vetted_address(target, port)
+            request_url = target.copy_with(host=address)
+            request_headers = {**headers, "Host": target.netloc.decode("ascii")}
+            extensions = {"sni_hostname": target.host}
+            transport = self._transport
+        else:
+            await self._vet_before_proxy(target, port)
+            request_url, request_headers, extensions = target, dict(headers), {}
+            transport = self._proxy_transport(proxy)
+        timeout = httpx2.Timeout(
+            self._settings.read_timeout_seconds,
+            connect=self._settings.connect_timeout_seconds,
+        )
         try:
-            async with client.stream(
-                "GET",
-                target.copy_with(host=address),
-                headers={**headers, "Host": target.netloc.decode("ascii")},
-                extensions={"sni_hostname": target.host},
-            ) as response:
+            async with (
+                httpx2.AsyncClient(
+                    timeout=timeout,
+                    transport=transport,
+                    follow_redirects=False,
+                    trust_env=False,
+                ) as client,
+                client.stream(
+                    "GET", request_url, headers=request_headers, extensions=extensions
+                ) as response,
+            ):
                 body = await _read_bounded(response, limit)
                 return OutboundResponse(
                     url=str(target),
@@ -183,21 +232,49 @@ class HttpxOutboundHttp:
         except httpx2.HTTPError as exc:
             raise OutboundHttpError(OutboundFailure.NETWORK) from exc
 
-    async def _vetted_address(self, target: httpx2.URL) -> str:
-        """The address to connect to, once every address `target` names is public."""
+    def _proxy_for(self, target: httpx2.URL) -> str | None:
+        """The proxy `target` goes through, if one is set and it is not exempt."""
+        if bypasses_proxy(target.host, self._settings.no_proxy):
+            return None
+        secret = (
+            self._settings.https_proxy
+            if target.scheme == "https"
+            else self._settings.http_proxy
+        )
+        return secret.get_secret_value() if secret else None
+
+    @staticmethod
+    def _checked_port(target: httpx2.URL) -> int:
         if target.scheme not in _DEFAULT_PORTS or not target.host:
             raise OutboundHttpError(OutboundFailure.INVALID_URL)
-        port = target.port or _DEFAULT_PORTS[target.scheme]
-        addresses = (
-            [target.host]
-            if _is_ip_literal(target.host)
-            else await self._resolver(target.host, port)
-        )
+        return target.port or _DEFAULT_PORTS[target.scheme]
+
+    async def _addresses(self, target: httpx2.URL, port: int) -> list[str]:
+        if _is_ip_literal(target.host):
+            return [target.host]
+        return await self._resolver(target.host, port)
+
+    async def _vetted_address(self, target: httpx2.URL, port: int) -> str:
+        """The address to connect to, once every address `target` names is public."""
+        addresses = await self._addresses(target, port)
         if not addresses:
             raise OutboundHttpError(OutboundFailure.NETWORK)
         if not all(is_public_address(address) for address in addresses):
             raise OutboundHttpError(OutboundFailure.BLOCKED_ADDRESS)
         return addresses[0]
+
+    async def _vet_before_proxy(self, target: httpx2.URL, port: int) -> None:
+        """Refuse a name that resolves here to a non-public address.
+
+        A name this host cannot resolve is left to the proxy, which commonly is the
+        only resolver such a network has.
+        """
+        try:
+            addresses = await self._addresses(target, port)
+        except OutboundHttpError:
+            return
+        if not all(is_public_address(address) for address in addresses):
+            raise OutboundHttpError(OutboundFailure.BLOCKED_ADDRESS)
 
 
 def _is_ip_literal(host: str) -> bool:

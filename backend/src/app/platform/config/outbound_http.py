@@ -1,7 +1,8 @@
 import re
 from functools import lru_cache
+from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 
 from app.platform.config._base import MenageristBaseSettings
 
@@ -11,6 +12,7 @@ _HEADER_SAFE = re.compile(r"[ -~]*")
 _FORBIDDEN_IN_HEADER_TEXT = "();"
 MAX_CONTACT_LENGTH = 200
 MAX_NOTE_LENGTH = 100
+_PROXY_SCHEMES = frozenset({"http", "https"})
 
 
 class OutboundHttpSettings(MenageristBaseSettings, group="http"):
@@ -31,6 +33,34 @@ class OutboundHttpSettings(MenageristBaseSettings, group="http"):
             "A short note added to the User-Agent of every outbound request after "
             + "the contact, for example `self-hosted`. Empty adds nothing. Plain "
             + "text only: no brackets or semicolons."
+        ),
+    )
+    http_proxy: SecretStr | None = Field(
+        default=None,
+        validation_alias="HTTP_PROXY",
+        description=(
+            "Proxy for outbound `http://` requests, as `http://host:port` with "
+            + "optional `user:password@`. Empty uses none. The standard "
+            + "`HTTP_PROXY` name."
+        ),
+    )
+    https_proxy: SecretStr | None = Field(
+        default=None,
+        validation_alias="HTTPS_PROXY",
+        description=(
+            "Proxy for outbound `https://` requests, as `http://host:port` with "
+            + "optional `user:password@`. Empty uses none. The standard "
+            + "`HTTPS_PROXY` name."
+        ),
+    )
+    no_proxy: str = Field(
+        default="",
+        validation_alias="NO_PROXY",
+        max_length=1000,
+        description=(
+            "Comma-separated host names, domains (`example.com` also matches its "
+            + "subdomains), IP addresses and network ranges that skip the proxy, "
+            + "or `*` for all. The standard `NO_PROXY` name."
         ),
     )
     connect_timeout_seconds: float = Field(
@@ -63,6 +93,23 @@ class OutboundHttpSettings(MenageristBaseSettings, group="http"):
     @classmethod
     def _note_is_header_safe(cls, value: str) -> str:
         return _header_safe(value, MAX_NOTE_LENGTH)
+
+    @field_validator("http_proxy", "https_proxy")
+    @classmethod
+    def _proxy_is_a_web_address(cls, value: SecretStr | None) -> SecretStr | None:
+        text = value.get_secret_value().strip() if value else ""
+        if not text:
+            return None
+        try:
+            parts = urlsplit(text)
+            usable = parts.scheme in _PROXY_SCHEMES and bool(parts.hostname)
+            _ = parts.port  # raises for a port that is not a number
+        except ValueError:
+            usable = False
+        if not usable:
+            message = "must be an http:// or https:// address with a host"
+            raise ValueError(message)
+        return SecretStr(text)
 
 
 def _header_safe(value: str, max_length: int) -> str:
