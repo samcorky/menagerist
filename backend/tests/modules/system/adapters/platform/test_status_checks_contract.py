@@ -14,6 +14,9 @@ from typing import Any, get_args
 from app.modules.system.adapters.platform.checks.cors_configuration_check import (
     CorsConfigurationCheck,
 )
+from app.modules.system.adapters.platform.checks.outbound_proxy_check import (
+    OutboundProxyCheck,
+)
 from app.modules.system.adapters.platform.checks.proxy_configuration_check import (
     ProxyConfigurationCheck,
 )
@@ -147,5 +150,18 @@ async def test_live_cors_check_reports_its_listed_key_and_unit() -> None:
     result = await CorsConfigurationCheck(origins=[]).run()
 
     assert result
+    for key, observed in result.items():
+        assert listed.get(key) == observed.observed_unit, key
+
+
+async def test_live_outbound_proxy_check_reports_listed_keys_and_units() -> None:
+    """The outbound proxy check needs no I/O either."""
+    listed = {c["key"]: c["unit"] for c in _contract()["checks"]}
+
+    result = await OutboundProxyCheck(
+        http_proxy=None, https_proxy=None, no_proxy=""
+    ).run()
+
+    assert len(result) == 3
     for key, observed in result.items():
         assert listed.get(key) == observed.observed_unit, key

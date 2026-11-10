@@ -77,6 +77,11 @@ export function formatObservedValue(value: unknown, unit: string | null | undefi
 		if (value === 0) return 'Nothing unusual in the last hour';
 		return `${value} flagged ${value === 1 ? 'request' : 'requests'} in the last hour`;
 	}
+	if (unit === 'proxy') return value === null ? 'Not used' : `Through ${value}`;
+	if (unit === 'exempt hosts') {
+		if (value === 0) return 'No exemptions';
+		return `${value} ${value === 1 ? 'entry skips' : 'entries skip'} the proxy`;
+	}
 	return String(value);
 }
 

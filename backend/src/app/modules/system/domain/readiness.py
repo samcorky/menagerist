@@ -16,7 +16,7 @@ class CheckObservation:
     """A single measured readiness observation (health-check draft terminology)."""
 
     component_type: str
-    observed_value: float | str
+    observed_value: float | str | None
     observed_unit: str
     status: CheckStatus
     time: datetime

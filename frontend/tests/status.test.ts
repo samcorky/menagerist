@@ -193,6 +193,22 @@ describe('formatObservedValue for CORS', () => {
 	});
 });
 
+describe('formatObservedValue for the outbound proxy', () => {
+	it('says no proxy is used when none is set', () => {
+		expect(formatObservedValue(null, 'proxy')).toBe('Not used');
+	});
+
+	it('names the proxy that is used', () => {
+		expect(formatObservedValue('proxy.example:3128', 'proxy')).toBe('Through proxy.example:3128');
+	});
+
+	it('counts the NO_PROXY entries, singular for one', () => {
+		expect(formatObservedValue(0, 'exempt hosts')).toBe('No exemptions');
+		expect(formatObservedValue(1, 'exempt hosts')).toBe('1 entry skips the proxy');
+		expect(formatObservedValue(3, 'exempt hosts')).toBe('3 entries skip the proxy');
+	});
+});
+
 describe('releaseViewOf', () => {
 	const base: ReleaseResponse = { channel: 'stable', provider: 'github', status: 'unknown' };
 	const newer: ReleaseResponse = {

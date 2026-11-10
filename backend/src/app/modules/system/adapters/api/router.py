@@ -108,9 +108,12 @@ class CheckObservation(BaseModel):
         ),
     ]
     observed_value: Annotated[
-        float | str,
+        float | str | None,
         Field(
-            description="Measured quantity or descriptor.",
+            description=(
+                "Measured quantity or descriptor; null when there is nothing to "
+                + "measure, such as no proxy configured."
+            ),
             examples=[1.23],
         ),
     ]
