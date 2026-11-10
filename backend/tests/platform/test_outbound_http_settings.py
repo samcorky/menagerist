@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from app.platform.config.outbound_http import (
     MAX_CONTACT_LENGTH,
+    MAX_NOTE_LENGTH,
     OutboundHttpSettings,
     get_outbound_http_settings,
 )
@@ -13,6 +14,7 @@ def test_the_defaults_send_no_contact_and_bound_every_request() -> None:
     settings = OutboundHttpSettings()
 
     assert settings.contact == ""
+    assert settings.user_agent_note == ""
     assert settings.connect_timeout_seconds == 5.0
     assert settings.read_timeout_seconds == 10.0
     assert settings.max_response_bytes == 2 * 1024 * 1024
@@ -61,3 +63,36 @@ def test_limits_outside_their_range_are_refused(limits: dict[str, float]) -> Non
 def test_the_settings_are_cached() -> None:
     """The settings are cached."""
     assert get_outbound_http_settings() is get_outbound_http_settings()
+
+
+def test_the_note_is_read_from_its_environment_variable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The note is read from its environment variable."""
+    monkeypatch.setenv("MENAGERIST_HTTP_USER_AGENT_NOTE", " self-hosted ")
+
+    assert OutboundHttpSettings().user_agent_note == "self-hosted"
+
+
+@pytest.mark.parametrize(
+    "note",
+    [
+        "a\r\nX-Injected: 1",
+        "tab\there",
+        "caf\u00e9",
+        "self (hosted)",
+        "a; b",
+        "x" * (MAX_NOTE_LENGTH + 1),
+    ],
+)
+def test_a_note_that_could_break_the_header_is_refused(note: str) -> None:
+    """A note that could break the header is refused."""
+    with pytest.raises(ValidationError):
+        OutboundHttpSettings(user_agent_note=note)
+
+
+def test_a_note_of_the_longest_allowed_length_is_accepted() -> None:
+    """A note of the longest allowed length is accepted."""
+    note = "x" * MAX_NOTE_LENGTH
+
+    assert OutboundHttpSettings(user_agent_note=note).user_agent_note == note

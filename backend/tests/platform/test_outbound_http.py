@@ -81,6 +81,12 @@ def test_the_user_agent_names_the_product_version_and_project() -> None:
     assert build_user_agent("1.2.3", "me@example.com") == (
         f"Menagerist/1.2.3 (+{PROJECT}; contact: me@example.com)"
     )
+    assert build_user_agent("1.2.3", note="self-hosted") == (
+        f"Menagerist/1.2.3 (+{PROJECT}; self-hosted)"
+    )
+    assert build_user_agent("1.2.3", "me@example.com", "self-hosted") == (
+        f"Menagerist/1.2.3 (+{PROJECT}; contact: me@example.com; self-hosted)"
+    )
 
 
 def test_the_client_exposes_its_user_agent() -> None:
