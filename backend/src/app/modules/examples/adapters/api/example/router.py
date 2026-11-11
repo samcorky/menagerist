@@ -107,6 +107,7 @@ async def install_example_pack(
     Returns 409 if the set is already added, if you already have an item type or
     relationship type with a name it needs that is not a kept example, or if it is an
     add-on and a set it needs is not added yet (nothing is created in any case).
+    Returns 500 if a step fails part-way; what had been created is removed first.
     """
     result = await use_case.handle(InstallExamplePackCommand(pack_id=pack_id), actor)
     return InstallResultResponse.from_domain(result)
