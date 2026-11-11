@@ -189,7 +189,7 @@ def test_a_failed_install_is_a_500_problem_without_the_cause(
     assert response.headers["content-type"].startswith("application/problem+json")
     assert response.json()["detail"] == "An unexpected error occurred."
     assert "boom" not in response.text
-    (entry,) = [e for e in logs if e["event"] == "unhandled exception"]
+    (entry,) = [e for e in logs if e["event"] == "menagerist error"]
     assert "boom" in str(entry["exc_info"])
 
 

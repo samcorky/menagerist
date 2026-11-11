@@ -26,7 +26,6 @@ from app.modules.examples.adapters.covers.pillow_cover_renderer import (
     PillowCoverRenderer,
 )
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
-from app.modules.examples.domain.errors import InstallFailedError
 from app.modules.examples.ports.pack_targets import Created  # noqa: TC001
 from app.modules.media.adapters.api.dependencies import get_media_storage
 from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
@@ -415,8 +414,7 @@ def test_a_failure_part_way_through_the_covers_leaves_no_media(
     app = cast("FastAPI", client.app)
     app.dependency_overrides[get_cover_pack_target] = failing
 
-    with pytest.raises(InstallFailedError, match="Nothing was left behind"):
-        client.put("/api/v1/examples/demo/installation")
+    assert client.put("/api/v1/examples/demo/installation").status_code == 500
 
     assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
     assert client.get("/api/v1/nodes?limit=100").json() == []
@@ -641,8 +639,7 @@ def test_a_refused_pack_definition_rolls_the_whole_install_back_on_postgres(
     """A definition the collections check refuses leaves no rows behind."""
     c = smart_client
 
-    with pytest.raises(InstallFailedError, match="Nothing was left behind"):
-        c.put("/api/v1/examples/badsmart/installation")
+    assert c.put("/api/v1/examples/badsmart/installation").status_code == 500
 
     assert c.get("/api/v1/nodes?limit=100").json() == []
     assert c.get("/api/v1/node-types").json() == []

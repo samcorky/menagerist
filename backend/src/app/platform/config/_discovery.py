@@ -18,6 +18,7 @@ from app.platform.config._fields import (
     unwrap,
 )
 from app.platform.config._markers import Public, Scope, Tunable
+from app.shared_kernel.errors import MenageristError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -27,7 +28,7 @@ _SECRET = (SecretStr, SecretBytes)
 _CREDENTIAL_URL = (AnyUrl, MultiHostUrl)
 
 
-class SettingDeclarationError(ValueError):
+class SettingDeclarationError(MenageristError):
     """A settings field is marked in a way the settings module cannot honour."""
 
 

@@ -98,7 +98,7 @@ Same discipline for ownership boundaries: a use case reconciling system-owned da
 
 ## Shared kernel
 
-`shared_kernel/` is a top-level package, a sibling of `modules/` and `platform/`, for domain vocabulary that doesn't belong to one bounded context: the `Identifiable`/`Timestamped`/`SoftDeletable` mixins entities compose from, base exception types (`DomainError`, `NotFoundError`, `ConflictError`, `ValidationError`, `ForbiddenError`) that module-specific errors subclass, and the `Actor`/`AuthorisationPort`/`UnitOfWork`/CQRS Protocols every module depends on. Same purity rule as any module's `domain/` layer: zero framework imports. A mixin or error type genuinely specific to one module stays in that module's `domain/` instead.
+`shared_kernel/` is a top-level package, a sibling of `modules/` and `platform/`, for domain vocabulary that doesn't belong to one bounded context: the `Identifiable`/`Timestamped`/`SoftDeletable` mixins entities compose from, base exception types that module-specific errors subclass (`MenageristError` is the root of every exception raised on purpose, with `DomainError` for rule violations, which the API maps to 4xx through `NotFoundError`, `ConflictError`, `ValidationError` and `ForbiddenError`, and `InfrastructureError` for failures outside the rules; the API answers either a bare `MenageristError` or an `InfrastructureError` with a 500 and logs it as a warning rather than an error; `tests/architecture/test_exception_hierarchy.py` fails a class that extends `Exception` directly), and the `Actor`/`AuthorisationPort`/`UnitOfWork`/CQRS Protocols every module depends on. Same purity rule as any module's `domain/` layer: zero framework imports. A mixin or error type genuinely specific to one module stays in that module's `domain/` instead.
 
 `platform/` is the other kind of shared code: infra with exactly one plausible implementation (the database engine, logging config, package metadata). `shared_kernel/` is for domain concepts that cut across contexts; `platform/` is for infra that has no domain shape to begin with.
 
@@ -198,8 +198,8 @@ The backend uses **structlog** (configured in `platform/logging_config.py`) with
 |---|---|
 | `INFO` | One log per mutating action (create, update, delete, promote, attach, detach, stage, orphan, cleanup). Logged after `commit()` so only committed work is recorded. |
 | `DEBUG` | Trace-level detail: repository method calls, SQL queries (via SQLAlchemy's stdlib logger), file operations, thumbnail generation steps. Application logs require `MENAGERIST_LOG_LEVEL=DEBUG`; SQL queries require `MENAGERIST_LOG_SQLALCHEMY_LEVEL=DEBUG`. |
-| `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level). |
-| `ERROR` | Unhandled exceptions, caught by the global exception handler. |
+| `WARNING` | Recoverable anomalies that need attention (content-type mismatch, degraded trust level), and any `MenageristError` that is not a domain rule (such as an `InfrastructureError`), which the global handler answers with a 500. |
+| `ERROR` | Unhandled exceptions (anything that is not a `MenageristError`), caught by the global exception handler. |
 
 **Third-party noise** - `configure_logging` pins `alembic.runtime.*` and `markdown_it` (rich's Markdown parser, which logs every rule at DEBUG) to WARNING, so `MENAGERIST_LOG_LEVEL=DEBUG` shows the application's own lines.
 

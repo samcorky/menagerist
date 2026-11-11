@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol
 
+from app.shared_kernel.errors import InfrastructureError
+
 
 class OutboundFailure(StrEnum):
     """Why a request could not be completed."""
@@ -23,7 +25,7 @@ class OutboundFailure(StrEnum):
     NETWORK = "network"
 
 
-class OutboundHttpError(Exception):
+class OutboundHttpError(InfrastructureError):
     """A request was refused or failed before a usable response arrived."""
 
     def __init__(self, failure: OutboundFailure) -> None:
