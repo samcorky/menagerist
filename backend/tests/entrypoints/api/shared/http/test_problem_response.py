@@ -11,10 +11,13 @@ from structlog.testing import capture_logs
 
 from app.entrypoints.api.shared.http.problem_response import register_exception_handlers
 from app.shared_kernel.errors import (
+    InfrastructureError,
+    MenageristError,
     NotFoundError,
     TooManyRequestsError,
     UnauthenticatedError,
 )
+from app.shared_kernel.outbound_http import OutboundFailure, OutboundHttpError
 
 
 def _client(error: Exception) -> TestClient:
@@ -80,6 +83,31 @@ def test_unhandled_error_text_is_logged_not_returned() -> None:
     assert "RuntimeError" not in response.text
     (entry,) = [e for e in logs if e["event"] == "unhandled exception"]
     assert str(entry["exc_info"]) == secret
+
+
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [
+        (InfrastructureError("connect to 10.0.0.5 refused"), 500),
+        (MenageristError("connect to 10.0.0.5 refused"), 500),
+        (OutboundHttpError(OutboundFailure.NETWORK), 502),
+    ],
+)
+def test_a_menagerist_error_is_a_logged_warning_that_hides_its_text(
+    error: MenageristError, status: int
+) -> None:
+    """An error we raised on purpose is a warning, and still hides its text."""
+    secret = "10.0.0.5"
+    with capture_logs() as logs:
+        response = _client(error).get("/boom")
+
+    assert response.status_code == status
+    assert response.json()["status"] == status
+    assert response.json()["detail"] == "An unexpected error occurred."
+    assert secret not in response.text
+    (entry,) = [e for e in logs if e["event"] == "menagerist error"]
+    assert entry["log_level"] == "warning"
+    assert not [e for e in logs if e["event"] == "unhandled exception"]
 
 
 class _Login(BaseModel, extra="forbid"):

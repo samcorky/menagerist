@@ -1,7 +1,22 @@
 from typing import ClassVar
 
 
-class DomainError(Exception):
+class MenageristError(Exception):
+    """Root of every exception Menagerist raises on purpose.
+
+    Anything that is not a `MenageristError` is a bug or a library failure.
+    """
+
+
+class InfrastructureError(MenageristError):
+    """A failure outside the domain rules: a service, file or network gave way.
+
+    Not the caller's mistake, so the API answers 500 and the message is logged,
+    never sent: it may carry paths or addresses.
+    """
+
+
+class DomainError(MenageristError):
     """Base type for exceptions raised by domain/application code."""
 
     # RFC 9457 `type` of the problem response; subclasses may name their own.

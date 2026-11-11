@@ -1,6 +1,11 @@
 from typing import TYPE_CHECKING
 
-from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
+from app.shared_kernel.errors import (
+    ConflictError,
+    InfrastructureError,
+    NotFoundError,
+    ValidationError,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -53,9 +58,9 @@ class InvalidInstallationStateError(ConflictError):
     """Raised when an installation is asked to make an impossible change."""
 
 
-class InstallFailedError(Exception):
+class InstallFailedError(InfrastructureError):
     """Raised when an install failed part-way and was rolled back.
 
     Deliberately not a `DomainError`: it is a server-side failure, so the API
-    reports it through the catch-all handler as a 500 problem response.
+    reports it as a 500 problem response.
     """

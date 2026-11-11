@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -12,11 +13,13 @@ from app.shared_kernel.errors import (
     ConflictError,
     DomainError,
     ForbiddenError,
+    MenageristError,
     NotFoundError,
     TooManyRequestsError,
     UnauthenticatedError,
     ValidationError,
 )
+from app.shared_kernel.outbound_http import OutboundHttpError
 
 if TYPE_CHECKING:
     from fastapi import FastAPI, Request
@@ -31,6 +34,13 @@ _STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
     ForbiddenError: 403,
     UnauthenticatedError: 401,
     TooManyRequestsError: 429,
+}
+
+# Most specific first: a `MenageristError` that is not a domain rule is the
+# server's failure unless its type says otherwise.
+_STATUS_BY_MENAGERIST_ERROR: dict[type[MenageristError], int] = {
+    OutboundHttpError: 502,
+    MenageristError: 500,
 }
 
 
@@ -143,6 +153,50 @@ def error_response(
     )
 
 
+def _internal_error_response(
+    request: Request,
+    exc: Exception,
+    event: str,
+    *,
+    status_code: int = 500,
+    deliberate: bool = False,
+) -> JSONResponse:
+    """Answer a server-side failure without the exception text.
+
+    The text may hold secrets or paths, so it is logged, not sent. A failure we
+    raised on purpose is a warning; anything else is a bug (error).
+    """
+    log = logger.warning if deliberate else logger.error
+    log(event, exc_info=exc, method=request.method, path=request.url.path)
+    return JSONResponse(
+        status_code=status_code,
+        media_type="application/problem+json",
+        content={
+            "type": "about:blank",
+            "title": HTTPStatus(status_code).phrase,
+            "status": status_code,
+            "detail": "An unexpected error occurred.",
+            "instance": str(request.url),
+        },
+    )
+
+
+def _menagerist_response(request: Request, exc: Exception) -> JSONResponse:
+    """Answer a `MenageristError` that is not a domain rule: not a bug.
+
+    Covers `InfrastructureError` and any other error raised on purpose, so it is
+    logged as a warning; only a non-Menagerist exception is logged as an error.
+    """
+    status_code = next(
+        status
+        for error_type, status in _STATUS_BY_MENAGERIST_ERROR.items()
+        if isinstance(exc, error_type)
+    )
+    return _internal_error_response(
+        request, exc, "menagerist error", status_code=status_code, deliberate=True
+    )
+
+
 def _problem_response(request: Request, exc: Exception) -> JSONResponse:
     """Translate a `DomainError` into an RFC 9457 problem+json response.
 
@@ -152,23 +206,7 @@ def _problem_response(request: Request, exc: Exception) -> JSONResponse:
     """
     # Anything else is a 500; its text may hold secrets, so it is logged, not sent.
     if not isinstance(exc, DomainError):
-        logger.error(
-            "unhandled exception",
-            exc_info=exc,
-            method=request.method,
-            path=request.url.path,
-        )
-        return JSONResponse(
-            status_code=500,
-            media_type="application/problem+json",
-            content={
-                "type": "about:blank",
-                "title": "Internal Server Error",
-                "status": 500,
-                "detail": "An unexpected error occurred.",
-                "instance": str(request.url),
-            },
-        )
+        return _internal_error_response(request, exc, "unhandled exception")
 
     status_code = next(
         status
@@ -286,6 +324,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     for outage_type in DATABASE_OUTAGE_ERRORS:
         app.add_exception_handler(outage_type, _database_unavailable_response)
+
+    for menagerist_type in _STATUS_BY_MENAGERIST_ERROR:
+        app.add_exception_handler(menagerist_type, _menagerist_response)
 
     # Catch-all for any unhandled exception, returning a 500 problem response.
     app.add_exception_handler(Exception, _problem_response)
