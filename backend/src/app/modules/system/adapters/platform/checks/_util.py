@@ -12,7 +12,7 @@ logger = structlog.get_logger()
 
 
 def observation(
-    observed_value: float | str,
+    observed_value: float | str | None,
     observed_unit: str,
     *,
     now: datetime,

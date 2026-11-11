@@ -26,6 +26,9 @@ from app.modules.system.adapters.platform.checks.database_migration_check import
 from app.modules.system.adapters.platform.checks.database_pool_utilization_check import (  # noqa: E501
     DatabasePoolUtilizationCheck,
 )
+from app.modules.system.adapters.platform.checks.outbound_proxy_check import (
+    OutboundProxyCheck,
+)
 from app.modules.system.adapters.platform.checks.proxy_configuration_check import (
     ProxyConfigurationCheck,
 )
@@ -49,6 +52,7 @@ from app.modules.system.domain.release import ReleaseChannel
 from app.platform.config.api import get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
+from app.platform.config.outbound_http import get_outbound_http_settings
 from app.platform.database import get_session_factory
 from app.platform.storage_probe import storage_directories
 
@@ -75,6 +79,7 @@ def get_storage_check() -> StorageCheck:
 def _readiness_registry(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> ReadinessCheckRegistry:
+    outbound = get_outbound_http_settings()
     return ReadinessCheckRegistry(
         [
             DatabaseConnectivityCheck(session_factory),
@@ -82,6 +87,11 @@ def _readiness_registry(
             DatabasePoolUtilizationCheck(),
             ProxyConfigurationCheck(),
             CorsConfigurationCheck(get_api_settings().cors_origins),
+            OutboundProxyCheck(
+                http_proxy=outbound.http_proxy,
+                https_proxy=outbound.https_proxy,
+                no_proxy=outbound.no_proxy,
+            ),
             get_storage_check(),
             SchedulerWorkerCheck(session_factory),
         ]

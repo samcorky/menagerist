@@ -51,6 +51,21 @@
       "sample": 2
     },
     {
+      "key": "configuration:outboundHttpProxy",
+      "unit": "proxy",
+      "sample": "proxy.example:3128"
+    },
+    {
+      "key": "configuration:outboundHttpsProxy",
+      "unit": "proxy",
+      "sample": "proxy.example:3128"
+    },
+    {
+      "key": "configuration:outboundNoProxy",
+      "unit": "exempt hosts",
+      "sample": 2
+    },
+    {
       "key": "storage:*Writable",
       "unit": "state",
       "sample": "not-writable"
