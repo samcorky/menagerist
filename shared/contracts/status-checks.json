@@ -61,7 +61,7 @@
       "sample": "proxy.example:3128"
     },
     {
-      "key": "configuration:outboundNoProxy",
+      "key": "configuration:outboundProxyExemptions",
       "unit": "exempt hosts",
       "sample": 2
     },

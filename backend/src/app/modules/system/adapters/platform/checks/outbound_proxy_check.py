@@ -42,7 +42,7 @@ class OutboundProxyCheck:
             "configuration:outboundHttpsProxy": observation(
                 self._https, "proxy", now=now
             ),
-            "configuration:outboundNoProxy": observation(
+            "configuration:outboundProxyExemptions": observation(
                 self._exempt, "exempt hosts", now=now
             ),
         }

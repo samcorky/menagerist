@@ -76,6 +76,16 @@ describe('every known check can be shown', () => {
 	});
 });
 
+describe('the outbound proxy labels', () => {
+	it.each([
+		['outboundHttpProxy', 'Outbound HTTP Proxy'],
+		['outboundHttpsProxy', 'Outbound HTTPS Proxy'],
+		['outboundProxyExemptions', 'Outbound Proxy Exemptions']
+	])('%s reads as "%s"', (metric, label) => {
+		expect(formatLabel(metric)).toBe(label);
+	});
+});
+
 describe('the lists stay honest', () => {
 	it('has no repeated check key', () => {
 		const keys = KNOWN_CHECKS.map(({ key }) => key);

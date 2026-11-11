@@ -9,7 +9,7 @@ from app.modules.system.domain.readiness import CheckStatus
 
 HTTP = "configuration:outboundHttpProxy"
 HTTPS = "configuration:outboundHttpsProxy"
-EXEMPT = "configuration:outboundNoProxy"
+EXEMPT = "configuration:outboundProxyExemptions"
 
 
 def _check(
