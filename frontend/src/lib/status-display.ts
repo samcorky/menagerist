@@ -56,7 +56,8 @@ export function formatLabel(camel: string): string {
 	return camel
 		.replace(/([A-Z])/g, ' $1')
 		.replace(/^./, (s) => s.toUpperCase())
-		.replace(/\bCors\b/g, 'CORS');
+		.replace(/\bCors\b/g, 'CORS')
+		.replace(/\bHttps?\b/g, (word) => word.toUpperCase());
 }
 
 export function formatGroup(key: string): string {
