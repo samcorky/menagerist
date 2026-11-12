@@ -1,8 +1,6 @@
 import {
-	listNodes,
 	listNodeTypes,
 	searchEverything as searchApi,
-	type NodeResponse,
 	type NodeTypeResponse,
 	type SearchHitResponse,
 	type SearchKind
@@ -12,19 +10,18 @@ import {
 	type PaletteGroup,
 	type PaletteLayout,
 	type PalettePage,
-	matchPages,
-	rankByName
+	matchPages
 } from '$lib/palette-search';
 import { normaliseQuery } from '$lib/search-palette';
 
 export type GroupKey = PaletteGroup;
 export type AsyncGroupKey = Exclude<GroupKey, 'pages'>;
 export type GroupState<T> = { status: 'ok'; rows: T[] } | { status: 'error' };
-/** One row of any searched group: the server's hit, or an item of the collection in view. */
+/** One row of any searched group, as the server ranked it. */
 export type Hit = SearchHitResponse;
 export type Results = Record<AsyncGroupKey, GroupState<Hit>> & { pages: PalettePage[] };
 
-/** Where the person is, which decides the extra collection search and how many rows each group gets. */
+/** Where the person is, which decides which collection the server favours and how many rows each group gets. */
 export type SearchScope = { layout: PaletteLayout };
 
 export const DEFAULT_SCOPE: SearchScope = {
@@ -79,19 +76,6 @@ export function loadItemTypes(): Promise<NodeTypeResponse[]> {
 	return typesPromise;
 }
 
-/** An item of the collection in view, shaped like the server's hits. */
-function itemHit(node: NodeResponse): Hit {
-	return {
-		kind: 'item',
-		ref: node.id,
-		title: node.name,
-		description: node.description ?? null,
-		group: node.type ?? null,
-		attributes: node.attributes ?? null,
-		score: 0
-	};
-}
-
 const emptyGroups = (): Omit<Results, 'pages'> => ({
 	items: { status: 'ok', rows: [] },
 	collections: { status: 'ok', rows: [] },
@@ -124,22 +108,42 @@ export async function searchEverything(
 	const { caps, collection } = scope.layout;
 
 	// One request answers every kind the server knows; a retry asks again for the same.
+	// The collection in view rides along, so its items come back marked and ranked first.
 	const server = async (): Promise<void> => {
-		const groups = SERVER_GROUPS.filter(wanted);
+		const groups = SERVER_GROUPS.filter(
+			(key) => wanted(key) || (key === 'items' && wanted('collectionItems'))
+		);
 		if (groups.length === 0) return;
-		const limit = Math.min(MAX_LIMIT, Math.max(...groups.map((key) => caps[key])));
+		const room = caps.items + (collection ? caps.collectionItems : 0);
+		const limit = Math.min(
+			MAX_LIMIT,
+			Math.max(...groups.map((key) => (key === 'items' ? room : caps[key])))
+		);
 		const failed = (keys: AsyncGroupKey[]) =>
 			emit(Object.fromEntries(keys.map((key) => [key, { status: 'error' }])));
 		try {
-			const result = await searchApi({ query: { q, limit } });
+			const result = await searchApi({
+				query: collection ? { q, limit, collection } : { q, limit }
+			});
 			if (result.error || !result.data) return failed(groups);
 			const down = new Set(result.data.failed.map((kind) => KIND_GROUP[kind]));
 			const partial: Partial<Results> = {};
 			for (const key of groups) {
-				const rows = result.data.results
-					.filter((hit) => KIND_GROUP[hit.kind] === key)
-					.slice(0, caps[key]);
-				partial[key as 'items'] = down.has(key) ? { status: 'error' } : { status: 'ok', rows };
+				const all = result.data.results.filter((hit) => KIND_GROUP[hit.kind] === key);
+				if (key === 'items') {
+					const mine = all.filter((hit) => hit.in_collection);
+					const others = all.filter((hit) => !hit.in_collection);
+					partial.items = down.has(key)
+						? { status: 'error' }
+						: { status: 'ok', rows: others.slice(0, caps.items) };
+					partial.collectionItems = down.has(key)
+						? { status: 'error' }
+						: { status: 'ok', rows: mine.slice(0, caps.collectionItems) };
+				} else {
+					partial[key as 'collections'] = down.has(key)
+						? { status: 'error' }
+						: { status: 'ok', rows: all.slice(0, caps[key]) };
+				}
 			}
 			emit(partial);
 		} catch {
@@ -147,28 +151,5 @@ export async function searchEverything(
 		}
 	};
 
-	// The collection in view is searched on its own: the server has no collection filter yet.
-	const inCollection = async (): Promise<void> => {
-		if (!wanted('collectionItems')) return;
-		let state: GroupState<Hit>;
-		try {
-			if (!collection) {
-				state = { status: 'ok', rows: [] };
-			} else {
-				const result = await listNodes({
-					query: { q, collection, limit: caps.collectionItems }
-				});
-				if (result.error || !result.data) throw new Error('items unavailable');
-				const rows = rankByName(result.data, q, (row) => row.name)
-					.slice(0, caps.collectionItems)
-					.map(itemHit);
-				state = { status: 'ok', rows };
-			}
-		} catch {
-			state = { status: 'error' };
-		}
-		emit({ collectionItems: state });
-	};
-
-	await Promise.all([server(), inCollection()]);
+	await server();
 }

@@ -7,16 +7,21 @@ this kind out".
 """
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends
 
 from app.modules.collections.adapters.api.dependencies import (
     get_list_collections_use_case,
+    get_resolve_collection_use_case,
 )
 from app.modules.collections.application.list_collections import (
     ListCollections,
     ListCollectionsQuery,
+)
+from app.modules.collections.application.resolve_collection import (
+    ResolveCollection,
+    ResolveCollectionQuery,
 )
 from app.modules.graph.adapters.api.dependencies import (
     get_list_node_types_use_case,
@@ -54,18 +59,38 @@ def _mentions(query: str, *texts: str | None) -> bool:
 
 
 class ItemSource:
-    """Items, matched by the graph module on name, description and field values."""
+    """Items, matched by the graph module on name, description and field values.
+
+    Given a collection, the items in it are fetched on their own, so a good match
+    there is not crowded out by better-scoring ones elsewhere, then marked.
+    """
 
     kind = SearchKind.ITEM
 
-    def __init__(self, use_case: ListNodes) -> None:
+    def __init__(self, use_case: ListNodes, resolver: ResolveCollection) -> None:
         self._use_case = use_case
+        self._resolver = resolver
 
-    async def find(self, query: str, limit: int, actor: Actor) -> list[SearchHit]:
-        """Return items matching `query`."""
-        result = await self._use_case.handle(
-            ListNodesQuery(q=query, limit=limit), actor
-        )
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
+        """Return items matching `query`, marking those in `collection`."""
+        members: list[Any] = []
+        if collection is not None:
+            collection_id = await self._resolver.handle(
+                ResolveCollectionQuery(id_or_slug=collection), actor
+            )
+            members = (
+                await self._use_case.handle(
+                    ListNodesQuery(q=query, limit=limit, collection=collection_id),
+                    actor,
+                )
+            ).items
+        everywhere = (
+            await self._use_case.handle(ListNodesQuery(q=query, limit=limit), actor)
+        ).items
+        member_ids = {node.id for node in members}
+        nodes = members + [node for node in everywhere if node.id not in member_ids]
         return [
             SearchHit(
                 kind=self.kind,
@@ -74,8 +99,9 @@ class ItemSource:
                 description=node.description,
                 group=node.type,
                 attributes=node.attributes,
+                in_collection=node.id in member_ids,
             )
-            for node in result.items
+            for node in nodes
         ]
 
 
@@ -87,7 +113,9 @@ class CollectionSource:
     def __init__(self, use_case: ListCollections) -> None:
         self._use_case = use_case
 
-    async def find(self, query: str, limit: int, actor: Actor) -> list[SearchHit]:
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
         """Return collections matching `query`."""
         result = await self._use_case.handle(
             ListCollectionsQuery(q=query, limit=limit), actor
@@ -113,7 +141,9 @@ class ItemTypeSource:
     def __init__(self, use_case: ListNodeTypes) -> None:
         self._use_case = use_case
 
-    async def find(self, query: str, limit: int, actor: Actor) -> list[SearchHit]:
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
         """Return item types matching `query`."""
         hits: list[SearchHit] = []
         after = None
@@ -147,7 +177,9 @@ class SettingSource:
     def __init__(self, use_case: ListSettings) -> None:
         self._use_case = use_case
 
-    async def find(self, query: str, limit: int, actor: Actor) -> list[SearchHit]:
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
         """Return settings matching `query`."""
         settings = await self._use_case.handle(ListSettingsQuery(), actor)
         return [
@@ -176,7 +208,9 @@ class ScheduledTaskSource:
     def __init__(self, use_case: ListJobs) -> None:
         self._use_case = use_case
 
-    async def find(self, query: str, limit: int, actor: Actor) -> list[SearchHit]:
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
         """Return scheduled tasks matching `query`."""
         statuses = await self._use_case.handle(
             ListJobsQuery(
@@ -198,6 +232,7 @@ class ScheduledTaskSource:
 
 def get_search_sources(
     nodes: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
+    resolver: Annotated[ResolveCollection, Depends(get_resolve_collection_use_case)],
     collections: Annotated[ListCollections, Depends(get_list_collections_use_case)],
     node_types: Annotated[ListNodeTypes, Depends(get_list_node_types_use_case)],
     settings: Annotated[ListSettings, Depends(get_list_settings_use_case)],
@@ -205,7 +240,7 @@ def get_search_sources(
 ) -> list[SearchSource]:
     """Return one source per kind, each backed by its owner's use case."""
     return [
-        ItemSource(nodes),
+        ItemSource(nodes, resolver),
         CollectionSource(collections),
         ItemTypeSource(node_types),
         SettingSource(settings),

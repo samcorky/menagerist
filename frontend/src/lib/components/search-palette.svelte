@@ -108,17 +108,14 @@
 	const layout = $derived(paletteLayout(page.url.pathname));
 	const canSettings = $derived(auth.can('settings:instance:read'));
 	const canTasks = $derived(auth.can('scheduling:job:read'));
-	// Items of the collection being viewed show in their own group, not twice.
-	const otherItems = $derived.by(() => {
-		const inCollection = new Set(okRows(groups.collectionItems).map((r) => r.ref));
-		return okRows(groups.items).filter((r) => !inCollection.has(r.ref));
-	});
 	const hint = $derived(
 		`Type to search items, collections, item types and pages${canSettings || canTasks ? ', settings and scheduled tasks' : ''}`
 	);
 
 	const pending = $derived(debouncing || loading.length > 0);
 	const okRows = <T,>(state: GroupState<T>): T[] => (state.status === 'ok' ? state.rows : []);
+	// The server marks items of the collection being viewed, and they show in their own group.
+	const otherItems = $derived(okRows(groups.items));
 	const showSeeAllCollections = $derived(collectionsAtCap(okRows(groups.collections).length));
 	const failedKeys = $derived(
 		ASYNC_KEYS.filter((key) => groups[key].status === 'error' && !loading.includes(key))
@@ -154,11 +151,11 @@
 		score('itemTypes', okRows(groups.itemTypes));
 		score('settings', okRows(groups.settings));
 		score('tasks', okRows(groups.tasks));
-		// Rows the browser found itself have no server score, so it rates them the same way.
-		const local = (names: string[]) => Math.max(...names.map((n) => localScore(n, query)));
-		const inView = okRows(groups.collectionItems);
-		if (inView.length > 0) best.collectionItems = local(inView.map((r) => r.title));
-		if (groups.pages.length > 0) best.pages = local(groups.pages.map((r) => r.label));
+		score('collectionItems', okRows(groups.collectionItems));
+		// Pages are matched in the browser, so it rates them on the server's scale.
+		if (groups.pages.length > 0) {
+			best.pages = Math.max(...groups.pages.map((r) => localScore(r.label, query)));
+		}
 		return orderGroups(layout.order, best);
 	});
 	// First row in display order that can be opened

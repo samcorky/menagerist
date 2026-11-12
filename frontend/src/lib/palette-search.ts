@@ -150,7 +150,7 @@ export function descriptionSnippet(
 	return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`;
 }
 
-/** The server's scale, for rows the client ranks itself (pages, the collection in view). */
+/** The server's scale, for rows the client ranks itself (the pages). */
 const RANK_SCORE = [100, 80, 60, 40] as const;
 
 /** How well `name` matches `query`, on the same scale as the server's scores. */

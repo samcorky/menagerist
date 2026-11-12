@@ -7,6 +7,7 @@ import structlog
 
 from app.modules.search.domain.search_hit import (
     ELSEWHERE,
+    IN_COLLECTION_BONUS,
     SearchHit,
     SearchKind,
     SearchOutcome,
@@ -14,7 +15,7 @@ from app.modules.search.domain.search_hit import (
 )
 from app.shared_kernel.access import Access, OwnAccount
 from app.shared_kernel.cqrs import UseCase
-from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.errors import ForbiddenError, NotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -37,6 +38,8 @@ class SearchQuery:
 
     q: str
     limit: int = 5
+    # A collection's id or slug, to favour the items in it.
+    collection: str | None = None
 
 
 class Search(UseCase[SearchQuery, SearchOutcome]):
@@ -60,9 +63,13 @@ class Search(UseCase[SearchQuery, SearchOutcome]):
         wanted = min(request.limit * OVERFETCH, MAX_CANDIDATES)
         for source in self._sources:
             try:
-                found = await source.find(request.q, wanted, actor)
+                found = await source.find(
+                    request.q, wanted, actor, collection=request.collection
+                )
             except ForbiddenError:
                 continue
+            except NotFoundError:
+                raise
             except Exception:
                 logger.exception("search source failed", kind=source.kind)
                 failed.append(source.kind)
@@ -75,7 +82,10 @@ class Search(UseCase[SearchQuery, SearchOutcome]):
     def _best(found: list[SearchHit], request: SearchQuery) -> list[SearchHit]:
         """Score a source's candidates and keep the best `limit`."""
         rated = [
-            hit.rated(score(request.q, hit.title, hit.description) or ELSEWHERE)
+            hit.rated(
+                (score(request.q, hit.title, hit.description) or ELSEWHERE)
+                + (IN_COLLECTION_BONUS if hit.in_collection else 0)
+            )
             for hit in found
         ]
         rated.sort(key=lambda h: (-h.score, h.title.casefold()))

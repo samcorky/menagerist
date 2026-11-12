@@ -11,7 +11,7 @@ import {
 } from './helpers';
 
 /** The global search popup: opened by `/` or the header button, driven from the keyboard. */
-const { makeItem, makeItemType, makeCollection, cleanUp } = ownedData();
+const { makeItem, makeItemType, makeCollection, addToCollection, cleanUp } = ownedData();
 
 test.afterEach(async ({ request }) => {
 	await cleanUp(request);
@@ -502,4 +502,22 @@ test('on the admin settings page, settings come before items', async ({ page }) 
 	await input(page).fill('backup');
 	const first = popup(page).getByRole('listbox').getByRole('option').first();
 	await expect(first).toHaveAttribute('data-value', /^setting:/);
+});
+
+test('on a collection page its items lead, ahead of the same match elsewhere', async ({
+	page,
+	request
+}) => {
+	const token = uniqueName('Shelfword');
+	const outside = await makeItem(request, `${token} outside`);
+	const inside = await makeItem(request, `${token} inside`);
+	const collection = await makeCollection(request, uniqueName('Shelf'));
+	await addToCollection(request, collection.id, [inside.id]);
+
+	await openWithSlash(page, `/collections/${await collectionSlug(request, collection.id)}`);
+	await input(page).fill(token);
+	const options = popup(page).getByRole('option');
+	await expect(options.first()).toContainText(inside.name);
+	await expect(popup(page).getByText(outside.name)).toBeVisible();
+	await expect(popup(page).getByText('In this collection', { exact: true })).toBeVisible();
 });

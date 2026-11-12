@@ -26,6 +26,10 @@ class SearchHitResponse(BaseModel):
     attributes: dict[str, Any] | None = Field(
         default=None, description="An item's field values."
     )
+    in_collection: bool = Field(
+        default=False,
+        description="Whether an item is in the collection the search was asked about.",
+    )
     score: int = Field(description="How well it matches; higher is better.")
 
     model_config = ConfigDict(
