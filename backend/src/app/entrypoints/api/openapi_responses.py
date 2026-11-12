@@ -198,10 +198,11 @@ _RESPONSES: dict[str, dict[str, Any]] = {
         },
     ),
     "InternalError": _problem(
-        "Unexpected server error. The detail is generic; the cause is only logged.",
+        "Unexpected server error, or a step that gave way part-way. The detail is"
+        + " generic; the cause is only logged.",
         {
             "internal_error": (
-                "Unhandled error",
+                "Server error",
                 problem_example(
                     500, "Internal Server Error", "An unexpected error occurred."
                 ),

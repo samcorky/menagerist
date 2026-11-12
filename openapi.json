@@ -168,7 +168,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -176,7 +176,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -325,7 +325,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -333,7 +333,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -461,7 +461,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -469,7 +469,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -614,7 +614,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -622,7 +622,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -774,7 +774,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -782,7 +782,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -933,7 +933,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -941,7 +941,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -1081,7 +1081,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1089,7 +1089,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -1211,7 +1211,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1219,7 +1219,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -1350,7 +1350,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1358,7 +1358,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -1529,7 +1529,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1537,7 +1537,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -1702,7 +1702,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1710,7 +1710,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -1885,7 +1885,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1893,7 +1893,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -2118,7 +2118,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2126,7 +2126,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -2449,7 +2449,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2457,7 +2457,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -2657,7 +2657,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2665,7 +2665,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -2873,7 +2873,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2881,7 +2881,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -3005,7 +3005,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3013,7 +3013,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -3232,7 +3232,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3240,7 +3240,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -3474,7 +3474,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3482,7 +3482,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -3716,7 +3716,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3724,7 +3724,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -3840,7 +3840,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3848,7 +3848,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -4083,7 +4083,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4091,7 +4091,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -4342,7 +4342,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4350,7 +4350,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -4526,7 +4526,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4534,7 +4534,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -4755,7 +4755,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4763,7 +4763,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -4965,7 +4965,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4973,7 +4973,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -5168,7 +5168,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5176,7 +5176,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -5341,7 +5341,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5349,7 +5349,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -5572,7 +5572,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5580,7 +5580,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -5805,7 +5805,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5813,7 +5813,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -6005,7 +6005,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6013,7 +6013,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -6234,7 +6234,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6242,7 +6242,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -6462,7 +6462,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6470,7 +6470,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -6646,7 +6646,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6654,7 +6654,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -6860,7 +6860,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6868,7 +6868,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -7076,7 +7076,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7084,7 +7084,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -7297,7 +7297,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7305,7 +7305,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -7525,7 +7525,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7533,7 +7533,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -7671,7 +7671,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7679,7 +7679,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -7895,7 +7895,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7903,7 +7903,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -8117,7 +8117,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8125,7 +8125,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -8290,7 +8290,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8298,7 +8298,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -8504,7 +8504,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8512,7 +8512,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -8720,7 +8720,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8728,7 +8728,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -8941,7 +8941,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8949,7 +8949,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -9169,7 +9169,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9177,7 +9177,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -9332,7 +9332,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9340,7 +9340,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -9556,7 +9556,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9564,7 +9564,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -9729,7 +9729,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9737,7 +9737,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -10033,7 +10033,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10041,7 +10041,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -10300,7 +10300,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10308,7 +10308,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -10585,7 +10585,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10593,7 +10593,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -10886,7 +10886,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10894,7 +10894,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -11070,7 +11070,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11078,7 +11078,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -11252,7 +11252,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11260,7 +11260,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -11459,7 +11459,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11467,7 +11467,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -11696,7 +11696,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11704,7 +11704,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -11890,7 +11890,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11898,7 +11898,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -12110,7 +12110,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12118,7 +12118,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -12304,7 +12304,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12312,7 +12312,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -12514,7 +12514,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12522,7 +12522,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -12724,7 +12724,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12732,7 +12732,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -12894,7 +12894,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12902,7 +12902,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -13108,7 +13108,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13116,7 +13116,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -13356,7 +13356,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13364,7 +13364,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -13543,7 +13543,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13551,7 +13551,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -13751,7 +13751,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13759,7 +13759,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -13980,7 +13980,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13988,7 +13988,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -14242,7 +14242,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14250,7 +14250,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -14443,7 +14443,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14451,7 +14451,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -14618,7 +14618,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14626,7 +14626,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -14717,7 +14717,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14725,7 +14725,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -14894,7 +14894,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14902,7 +14902,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15065,7 +15065,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15073,7 +15073,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15179,7 +15179,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15187,7 +15187,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15283,7 +15283,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15291,7 +15291,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15491,7 +15491,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15499,7 +15499,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15667,7 +15667,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15675,7 +15675,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15807,7 +15807,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15815,7 +15815,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15935,7 +15935,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -15943,7 +15943,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -15975,7 +15975,7 @@
           "Examples"
         ],
         "summary": "Install Example Pack",
-        "description": "Add an example set: its item types, items, connections and saved lists.\n\nAnything an earlier removal kept (because you changed it or used it) and that\nstill exists is taken back rather than created again; `adopted` counts those and\n`created` counts only what is new. A collection taken back is left as you have\nit, so items created this time are not added to it. `linked` counts connections\nto other added sets that were made because of this install.\n\nReturns 409 if the set is already added, if you already have an item type or\nrelationship type with a name it needs that is not a kept example, or if it is an\nadd-on and a set it needs is not added yet (nothing is created in any case).\n\n**Requires permission:** `examples:pack:install`",
+        "description": "Add an example set: its item types, items, connections and saved lists.\n\nAnything an earlier removal kept (because you changed it or used it) and that\nstill exists is taken back rather than created again; `adopted` counts those and\n`created` counts only what is new. A collection taken back is left as you have\nit, so items created this time are not added to it. `linked` counts connections\nto other added sets that were made because of this install.\n\nReturns 409 if the set is already added, if you already have an item type or\nrelationship type with a name it needs that is not a kept example, or if it is an\nadd-on and a set it needs is not added yet (nothing is created in any case).\nReturns 500 if a step fails part-way; what had been created is removed first.\n\n**Requires permission:** `examples:pack:install`",
         "operationId": "install_example_pack",
         "security": [
           {
@@ -16152,7 +16152,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16160,7 +16160,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -16359,7 +16359,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16367,7 +16367,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -16604,7 +16604,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16612,7 +16612,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -16890,7 +16890,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16898,7 +16898,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -17109,7 +17109,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17117,7 +17117,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -17349,7 +17349,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17357,7 +17357,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -17630,7 +17630,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17638,7 +17638,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -17819,7 +17819,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -17827,7 +17827,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -18007,7 +18007,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18015,7 +18015,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -18249,7 +18249,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18257,7 +18257,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -18467,7 +18467,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18475,7 +18475,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -18677,7 +18677,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18685,7 +18685,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -18850,7 +18850,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18858,7 +18858,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -18983,7 +18983,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -18991,7 +18991,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -19082,7 +19082,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19090,7 +19090,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -19242,7 +19242,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19250,7 +19250,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -19440,7 +19440,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19448,7 +19448,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -19553,7 +19553,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19561,7 +19561,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -19661,7 +19661,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19669,7 +19669,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -19841,7 +19841,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19849,7 +19849,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -19960,7 +19960,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -19968,7 +19968,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -20074,7 +20074,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20082,7 +20082,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -20250,7 +20250,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20258,7 +20258,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -20438,7 +20438,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20446,7 +20446,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -20598,7 +20598,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20606,7 +20606,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -20731,7 +20731,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20739,7 +20739,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -20874,7 +20874,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -20882,7 +20882,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -21024,7 +21024,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21032,7 +21032,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -21119,7 +21119,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21127,7 +21127,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -21238,7 +21238,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21246,7 +21246,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -21456,7 +21456,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21464,7 +21464,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -21677,7 +21677,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21685,7 +21685,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -21834,7 +21834,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21842,7 +21842,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -21969,7 +21969,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21977,7 +21977,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22120,7 +22120,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22128,7 +22128,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22213,7 +22213,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22221,7 +22221,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22313,7 +22313,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22321,7 +22321,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22364,7 +22364,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22372,7 +22372,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22507,7 +22507,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22515,7 +22515,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22658,7 +22658,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22666,7 +22666,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22758,7 +22758,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22766,7 +22766,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22851,7 +22851,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22859,7 +22859,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
@@ -22896,7 +22896,7 @@
             }
           },
           "500": {
-            "description": "Unexpected server error. The detail is generic; the cause is only logged.",
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22904,7 +22904,7 @@
                 },
                 "examples": {
                   "internal_error": {
-                    "summary": "Unhandled error",
+                    "summary": "Server error",
                     "value": {
                       "type": "about:blank",
                       "title": "Internal Server Error",
