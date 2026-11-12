@@ -2,6 +2,7 @@ name: Bug report
 description: Something does not work as it should
 title: "[bug] "
 labels: [bug]
+type: Bug
 body:
   - type: textarea
     id: what
