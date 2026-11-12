@@ -5,13 +5,12 @@ import {
 	matchRank,
 	rankByName,
 	matchPages,
-	matchItemTypes,
-	matchSettings,
-	matchTasks,
 	paletteLayout,
 	settingPath,
 	taskPath,
-	descriptionSnippet
+	descriptionSnippet,
+	localScore,
+	orderGroups
 } from '../src/lib/palette-search';
 import { foldText } from '../src/lib/fold-text';
 
@@ -109,35 +108,6 @@ describe('matchPages', () => {
 	});
 });
 
-describe('matchItemTypes', () => {
-	const types = [
-		{ label: 'Board game', slug: 'board-game' },
-		{ label: 'Film', slug: 'film' },
-		{ label: 'Short film', slug: 'short-film' },
-		{ label: 'Telefilm', slug: 'tv' },
-		{ label: 'Album', slug: 'album' },
-		{ label: 'Movie', slug: 'film-extra' }
-	];
-	it('matches label or slug, ranked by label', () => {
-		expect(matchItemTypes(types, 'film').map((t) => t.label)).toEqual([
-			'Film',
-			'Short film',
-			'Telefilm'
-		]);
-	});
-	it('matches on slug alone', () => {
-		expect(matchItemTypes(types, 'extra').map((t) => t.label)).toEqual(['Movie']);
-	});
-	it('yields nothing for an empty query', () => {
-		expect(matchItemTypes(types, ' ')).toEqual([]);
-	});
-	it('caps results and matches regex characters literally', () => {
-		expect(matchItemTypes(types, 'm')).toHaveLength(GROUP_CAPS.itemTypes);
-		expect(matchItemTypes(types, '(')).toEqual([]);
-		expect(matchItemTypes(types, '.*')).toEqual([]);
-	});
-});
-
 describe('accent-insensitive matching', () => {
 	it('folds case and accents', () => {
 		expect(foldText('Café ÉCOLE')).toBe('cafe ecole');
@@ -151,59 +121,8 @@ describe('accent-insensitive matching', () => {
 		expect(matchRank('Le café-bar', 'cafe')).toBe(2);
 		expect(matchRank('Bureau', 'cafe')).toBe(3);
 	});
-	it('matches item types by label or slug', () => {
-		const types = [
-			{ label: 'Café', slug: 'cafe-x' },
-			{ label: 'Other', slug: 'other' }
-		];
-		expect(matchItemTypes(types, 'cafe')).toEqual([types[0]]);
-		expect(matchItemTypes([{ label: 'Cafe', slug: 'c' }], 'café')).toHaveLength(1);
-	});
 	it('matches pages by folded query', () => {
 		expect(matchPages('ÎTEMS').map((p) => p.path)).toContain('/items');
-	});
-});
-
-const setting = (key: string, title: string, description: string | null = null) => ({
-	key,
-	group: key.split('.')[0],
-	title,
-	description
-});
-
-describe('matchSettings', () => {
-	const all = [
-		setting(
-			'backup.keep_last',
-			'Backups to keep',
-			'How many backups are kept before the oldest goes'
-		),
-		setting('trash.retention_days', 'Days before deleted items are removed'),
-		setting('updates.check', 'Check for updates', 'Looks for a newer release')
-	];
-	it('matches title, description and section name, ignoring accents and case', () => {
-		expect(matchSettings(all, 'KEPT').map((s) => s.key)).toEqual(['backup.keep_last']);
-		expect(matchSettings(all, 'úpdates').map((s) => s.key)).toEqual(['updates.check']);
-		expect(matchSettings(all, 'backups').map((s) => s.key)).toEqual(['backup.keep_last']);
-	});
-	it('ranks a title prefix above a description hit and honours the cap', () => {
-		const rows = [setting('a.x', 'Other', 'check'), setting('a.y', 'Check it')];
-		expect(matchSettings(rows, 'check').map((s) => s.key)).toEqual(['a.y', 'a.x']);
-		expect(matchSettings(rows, 'check', 1)).toHaveLength(1);
-		expect(matchSettings(rows, '  ')).toEqual([]);
-	});
-});
-
-describe('matchTasks', () => {
-	const tasks = [
-		{ job_key: 'backup', title: 'Nightly backup', description: 'Copies everything' },
-		{ job_key: 'purge', title: 'Empty the bin', description: 'Removes old deleted items' }
-	];
-	it('matches title and description', () => {
-		expect(matchTasks(tasks, 'backup').map((t) => t.job_key)).toEqual(['backup']);
-		expect(matchTasks(tasks, 'deleted').map((t) => t.job_key)).toEqual(['purge']);
-		expect(matchTasks(tasks, 'nothing')).toEqual([]);
-		expect(matchTasks(tasks, '')).toEqual([]);
 	});
 });
 
@@ -250,6 +169,9 @@ describe('paletteLayout', () => {
 		expect(layout.order).toHaveLength(7);
 		expect(paletteLayout('/collections/%E0%A4%A').collection).toBe('%E0%A4%A');
 	});
+	it('gives no group extra rows when no page leads', () => {
+		expect(paletteLayout('/').caps).toEqual(GROUP_CAPS);
+	});
 	it('gives only the leading group extra rows', () => {
 		const { caps } = paletteLayout('/admin/settings');
 		expect(caps.settings).toBe(GROUP_CAPS.settings + 3);
@@ -275,5 +197,42 @@ describe('descriptionSnippet', () => {
 		expect(descriptionSnippet('Retention', long, 'zebra')).toBeNull();
 		expect(descriptionSnippet('Retention', null, 'x')).toBeNull();
 		expect(descriptionSnippet('Retention', long, '  ')).toBeNull();
+	});
+});
+
+describe('localScore', () => {
+	it('uses the same scale as the server for rows the browser ranks', () => {
+		expect(localScore('Film', 'film')).toBe(100);
+		expect(localScore('Filmography', 'film')).toBe(80);
+		expect(localScore('Short film', 'film')).toBe(60);
+		expect(localScore('Telefilm', 'film')).toBe(40);
+	});
+});
+
+describe('orderGroups', () => {
+	const pageOrder = [
+		'collectionItems',
+		'items',
+		'collections',
+		'itemTypes',
+		'pages',
+		'settings',
+		'tasks'
+	] as const;
+	it('puts the group with the best match first', () => {
+		const order = orderGroups([...pageOrder], { items: 40, settings: 100 });
+		expect(order.slice(0, 2)).toEqual(['settings', 'items']);
+	});
+	it('lets the page break a tie, and keeps empty groups last in page order', () => {
+		const order = orderGroups([...pageOrder], { tasks: 80, items: 80, collections: 80 });
+		expect(order).toEqual([
+			'items',
+			'collections',
+			'tasks',
+			'collectionItems',
+			'itemTypes',
+			'pages',
+			'settings'
+		]);
 	});
 });

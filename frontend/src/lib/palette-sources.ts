@@ -1,107 +1,55 @@
 import {
-	listCollections,
-	listInstanceSettings,
-	listJobs,
 	listNodes,
 	listNodeTypes,
-	type CollectionResponse,
-	type JobResponse,
-	type SettingResponse,
+	searchEverything as searchApi,
 	type NodeResponse,
-	type NodeTypeResponse
+	type NodeTypeResponse,
+	type SearchHitResponse,
+	type SearchKind
 } from '$lib/api/client';
 import {
 	GROUP_CAPS,
+	type PaletteGroup,
 	type PaletteLayout,
 	type PalettePage,
-	matchItemTypes,
 	matchPages,
-	matchSettings,
-	matchTasks,
 	rankByName
 } from '$lib/palette-search';
 import { normaliseQuery } from '$lib/search-palette';
 
-export type GroupKey =
-	'items' | 'collections' | 'itemTypes' | 'pages' | 'settings' | 'tasks' | 'collectionItems';
+export type GroupKey = PaletteGroup;
 export type AsyncGroupKey = Exclude<GroupKey, 'pages'>;
 export type GroupState<T> = { status: 'ok'; rows: T[] } | { status: 'error' };
-export type Results = {
-	items: GroupState<NodeResponse>;
-	collections: GroupState<CollectionResponse>;
-	itemTypes: GroupState<NodeTypeResponse>;
-	settings: GroupState<SettingResponse>;
-	tasks: GroupState<JobResponse>;
-	collectionItems: GroupState<NodeResponse>;
-	pages: PalettePage[];
-};
+/** One row of any searched group: the server's hit, or an item of the collection in view. */
+export type Hit = SearchHitResponse;
+export type Results = Record<AsyncGroupKey, GroupState<Hit>> & { pages: PalettePage[] };
 
-/** What the person may open and where they are, from which the groups searched follow. */
-export type SearchScope = {
-	layout: PaletteLayout;
-	canSettings: boolean;
-	canTasks: boolean;
-};
+/** Where the person is, which decides the extra collection search and how many rows each group gets. */
+export type SearchScope = { layout: PaletteLayout };
 
 export const DEFAULT_SCOPE: SearchScope = {
-	layout: {
-		order: [],
-		collection: null,
-		caps: { ...GROUP_CAPS }
-	},
-	canSettings: false,
-	canTasks: false
+	layout: { order: [], collection: null, caps: { ...GROUP_CAPS } }
 };
+
+// The kind the server reports for each group it answers.
+const KIND_GROUP: Record<SearchKind, AsyncGroupKey> = {
+	item: 'items',
+	collection: 'collections',
+	item_type: 'itemTypes',
+	setting: 'settings',
+	scheduled_task: 'tasks'
+};
+const SERVER_GROUPS = Object.values(KIND_GROUP);
+const MAX_LIMIT = 50;
 
 const ITEM_TYPE_PAGE = 100;
 export const ITEM_TYPE_CAP = 1000;
 
 let typesPromise: Promise<NodeTypeResponse[]> | null = null;
-let settingsPromise: Promise<SettingResponse[]> | null = null;
-let tasksPromise: Promise<JobResponse[]> | null = null;
 
-/** Clears the cached lists (tests). */
+/** Clears the cached item type list (tests). */
 export function resetItemTypeCache(): void {
 	typesPromise = null;
-	settingsPromise = null;
-	tasksPromise = null;
-}
-
-// Cached once like the item types; a failed load is dropped so the next search retries.
-function cached<T>(
-	current: Promise<T> | null,
-	set: (p: Promise<T> | null) => void,
-	load: () => Promise<T>
-) {
-	if (current) return current;
-	const attempt = load();
-	set(attempt);
-	attempt.catch(() => set(null));
-	return attempt;
-}
-
-function loadSettings(): Promise<SettingResponse[]> {
-	return cached(
-		settingsPromise,
-		(p) => (settingsPromise = p),
-		async () => {
-			const result = await listInstanceSettings();
-			if (result.error || !result.data) throw new Error('settings unavailable');
-			return result.data;
-		}
-	);
-}
-
-function loadTasks(): Promise<JobResponse[]> {
-	return cached(
-		tasksPromise,
-		(p) => (tasksPromise = p),
-		async () => {
-			const result = await listJobs();
-			if (result.error || !result.data) throw new Error('tasks unavailable');
-			return result.data;
-		}
-	);
 }
 
 /** Pages through every item type by cursor, stopping at a short page or {@link ITEM_TYPE_CAP}. */
@@ -131,7 +79,29 @@ export function loadItemTypes(): Promise<NodeTypeResponse[]> {
 	return typesPromise;
 }
 
-/** Search every source and report each group as it settles. */
+/** An item of the collection in view, shaped like the server's hits. */
+function itemHit(node: NodeResponse): Hit {
+	return {
+		kind: 'item',
+		ref: node.id,
+		title: node.name,
+		description: node.description ?? null,
+		group: node.type ?? null,
+		attributes: node.attributes ?? null,
+		score: 0
+	};
+}
+
+const emptyGroups = (): Omit<Results, 'pages'> => ({
+	items: { status: 'ok', rows: [] },
+	collections: { status: 'ok', rows: [] },
+	itemTypes: { status: 'ok', rows: [] },
+	settings: { status: 'ok', rows: [] },
+	tasks: { status: 'ok', rows: [] },
+	collectionItems: { status: 'ok', rows: [] }
+});
+
+/** Search everything and report each group as it settles. */
 export async function searchEverything(
 	query: string,
 	onUpdate: (partial: Partial<Results>) => void,
@@ -145,15 +115,7 @@ export async function searchEverything(
 	};
 
 	if (!q) {
-		emit({
-			items: { status: 'ok', rows: [] },
-			collections: { status: 'ok', rows: [] },
-			itemTypes: { status: 'ok', rows: [] },
-			settings: { status: 'ok', rows: [] },
-			tasks: { status: 'ok', rows: [] },
-			collectionItems: { status: 'ok', rows: [] },
-			pages: []
-		});
+		emit({ ...emptyGroups(), pages: [] });
 		return;
 	}
 
@@ -161,43 +123,52 @@ export async function searchEverything(
 	const wanted = (key: AsyncGroupKey) => !only || only.includes(key);
 	const { caps, collection } = scope.layout;
 
-	const settle = async <T>(key: AsyncGroupKey, load: () => Promise<T[]>): Promise<void> => {
-		if (!wanted(key)) return;
-		let state: GroupState<T>;
+	// One request answers every kind the server knows; a retry asks again for the same.
+	const server = async (): Promise<void> => {
+		const groups = SERVER_GROUPS.filter(wanted);
+		if (groups.length === 0) return;
+		const limit = Math.min(MAX_LIMIT, Math.max(...groups.map((key) => caps[key])));
+		const failed = (keys: AsyncGroupKey[]) =>
+			emit(Object.fromEntries(keys.map((key) => [key, { status: 'error' }])));
 		try {
-			state = { status: 'ok', rows: await load() };
+			const result = await searchApi({ query: { q, limit } });
+			if (result.error || !result.data) return failed(groups);
+			const down = new Set(result.data.failed.map((kind) => KIND_GROUP[kind]));
+			const partial: Partial<Results> = {};
+			for (const key of groups) {
+				const rows = result.data.results
+					.filter((hit) => KIND_GROUP[hit.kind] === key)
+					.slice(0, caps[key]);
+				partial[key as 'items'] = down.has(key) ? { status: 'error' } : { status: 'ok', rows };
+			}
+			emit(partial);
+		} catch {
+			failed(groups);
+		}
+	};
+
+	// The collection in view is searched on its own: the server has no collection filter yet.
+	const inCollection = async (): Promise<void> => {
+		if (!wanted('collectionItems')) return;
+		let state: GroupState<Hit>;
+		try {
+			if (!collection) {
+				state = { status: 'ok', rows: [] };
+			} else {
+				const result = await listNodes({
+					query: { q, collection, limit: caps.collectionItems }
+				});
+				if (result.error || !result.data) throw new Error('items unavailable');
+				const rows = rankByName(result.data, q, (row) => row.name)
+					.slice(0, caps.collectionItems)
+					.map(itemHit);
+				state = { status: 'ok', rows };
+			}
 		} catch {
 			state = { status: 'error' };
 		}
-		emit({ [key]: state });
+		emit({ collectionItems: state });
 	};
 
-	// A group the person may not open, or that has no context here, is simply empty.
-	const none = async (): Promise<never[]> => [];
-
-	await Promise.all([
-		settle('items', async () => {
-			const result = await listNodes({ query: { q, limit: caps.items } });
-			if (result.error || !result.data) throw new Error('items unavailable');
-			return rankByName(result.data, q, (row) => row.name).slice(0, caps.items);
-		}),
-		settle('collectionItems', async () => {
-			if (!collection) return none();
-			const result = await listNodes({ query: { q, collection, limit: caps.collectionItems } });
-			if (result.error || !result.data) throw new Error('items unavailable');
-			return rankByName(result.data, q, (row) => row.name).slice(0, caps.collectionItems);
-		}),
-		settle('collections', async () => {
-			const result = await listCollections({ query: { q, limit: caps.collections } });
-			if (result.error || !result.data) throw new Error('collections unavailable');
-			return rankByName(result.data, q, (row) => row.name).slice(0, caps.collections);
-		}),
-		settle('itemTypes', async () => matchItemTypes(await loadItemTypes(), q, caps.itemTypes)),
-		settle('settings', async () =>
-			scope.canSettings ? matchSettings(await loadSettings(), q, caps.settings) : none()
-		),
-		settle('tasks', async () =>
-			scope.canTasks ? matchTasks(await loadTasks(), q, caps.tasks) : none()
-		)
-	]);
+	await Promise.all([server(), inCollection()]);
 }
