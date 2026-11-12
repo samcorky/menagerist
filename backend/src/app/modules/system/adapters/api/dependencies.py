@@ -46,6 +46,7 @@ from app.modules.system.application.get_version_detail import (
     GetVersionDetail,
     VersionDetailSources,
 )
+from app.modules.system.application.get_web_app_manifest import GetWebAppManifest
 from app.modules.system.application.run_browser_check import RunBrowserCheck
 from app.modules.system.application.setting_keys import RELEASE_CHANNEL
 from app.modules.system.domain.release import ReleaseChannel
@@ -121,6 +122,12 @@ def get_get_version_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetVersion:
     return GetVersion(PackageAppInfoAdapter(), guard)
+
+
+def get_get_web_app_manifest_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> GetWebAppManifest:
+    return GetWebAppManifest(guard, public_origin=get_api_settings().public_origin)
 
 
 async def get_version_detail_sources(

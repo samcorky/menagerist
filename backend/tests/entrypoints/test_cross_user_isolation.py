@@ -304,6 +304,7 @@ ALLOWED: dict[Route, str] = {
     ("GET", "/api/health"): PUBLIC,
     ("GET", "/api/health/ready"): PUBLIC,
     ("GET", "/api/v1/system/version"): PUBLIC,
+    ("GET", "/manifest.webmanifest"): PUBLIC,
     ("GET", "/api/favicon.ico"): PUBLIC,
     ("GET", "/api/docs/favicon.svg"): PUBLIC,
     ("GET", "/api/docs/logo.svg"): PUBLIC,

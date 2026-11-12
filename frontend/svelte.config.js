@@ -19,6 +19,14 @@ const config = {
 		alias: {
 			$shared: fileURLToPath(new URL('../shared', import.meta.url))
 		},
+		prerender: {
+			// The manifest is served by the backend, so the crawler cannot find it in the
+			// build. Every other broken link still fails the build.
+			handleHttpError: ({ path, message }) => {
+				if (path === '/manifest.webmanifest') return;
+				throw new Error(message);
+			}
+		},
 		adapter: adapter({
 			pages: 'build',
 			assets: 'build',

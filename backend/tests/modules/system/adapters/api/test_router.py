@@ -467,6 +467,52 @@ def test_readiness_passes_with_real_db(ready_client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_manifest_is_served_without_credentials_with_its_own_headers() -> None:
+    """The manifest is public, typed for browsers and revalidated rather than stored."""
+    response = TestClient(create_app()).get("/manifest.webmanifest")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/manifest+json")
+    assert response.headers["cache-control"] == "no-cache"
+    assert response.headers["etag"]
+    assert response.json()["id"] == "/"
+    assert "set-cookie" not in response.headers
+
+
+def test_manifest_omits_an_absent_shortcut_short_name() -> None:
+    """Optional fields are left out rather than sent as null, which browsers reject."""
+    shortcuts = (
+        TestClient(create_app()).get("/manifest.webmanifest").json()["shortcuts"]
+    )
+
+    assert shortcuts[0]["short_name"] == "Add item"
+    assert "short_name" not in shortcuts[-1]
+
+
+def test_manifest_revalidates_by_etag() -> None:
+    """A matching If-None-Match gets a bodiless 304; a stale one gets the document."""
+    client = TestClient(create_app())
+    etag = client.get("/manifest.webmanifest").headers["etag"]
+
+    fresh = client.get("/manifest.webmanifest", headers={"If-None-Match": etag})
+    stale = client.get("/manifest.webmanifest", headers={"If-None-Match": '"old"'})
+
+    assert fresh.status_code == 304
+    assert fresh.content == b""
+    assert fresh.headers["cache-control"] == "no-cache"
+    assert stale.status_code == 200
+
+
+def test_manifest_urls_ignore_the_host_header() -> None:
+    """Public URLs never come from request headers, so a forged Host is harmless."""
+    response = TestClient(create_app()).get(
+        "/manifest.webmanifest",
+        headers={"Host": "evil.example", "X-Forwarded-Host": "evil.example"},
+    )
+
+    assert "evil.example" not in response.text
+
+
 def test_public_version_has_only_name_and_version() -> None:
     """No commit, branch or migration head for an anonymous caller."""
     data = TestClient(create_app()).get("/api/v1/system/version").json()

@@ -23161,6 +23161,38 @@
           }
         }
       }
+    },
+    "/manifest.webmanifest": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Web app manifest",
+        "description": "Serve the manifest browsers read to install the instance as an app.\n\nIt sets its own caching, as the API default of `no-store` would stop browsers\nkeeping it: they revalidate by ETag on each use instead.",
+        "operationId": "get_web_app_manifest",
+        "responses": {
+          "200": {
+            "description": "The manifest, revalidated by `ETag` on each use.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/manifest+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebAppManifestResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: `If-None-Match` matched, so no body."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -25884,6 +25916,135 @@
           {
             "password": "a long passphrase",
             "username": "alice"
+          }
+        ]
+      },
+      "ManifestIconResponse": {
+        "properties": {
+          "src": {
+            "type": "string",
+            "title": "Src",
+            "description": "Address of the icon image."
+          },
+          "sizes": {
+            "type": "string",
+            "title": "Sizes",
+            "description": "Pixel size, as width x height."
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Media type of the image."
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose",
+            "description": "How the icon is used: `any` or `maskable`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "src",
+          "sizes",
+          "type",
+          "purpose"
+        ],
+        "title": "ManifestIconResponse",
+        "description": "An install icon.",
+        "examples": [
+          {
+            "purpose": "any",
+            "sizes": "192x192",
+            "src": "/icon-192.png",
+            "type": "image/png"
+          }
+        ]
+      },
+      "ManifestScreenshotResponse": {
+        "properties": {
+          "src": {
+            "type": "string",
+            "title": "Src",
+            "description": "Address of the screenshot image."
+          },
+          "sizes": {
+            "type": "string",
+            "title": "Sizes",
+            "description": "Pixel size, as width x height."
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Media type of the image."
+          },
+          "form_factor": {
+            "type": "string",
+            "title": "Form Factor",
+            "description": "Screen the shot suits: `narrow` or `wide`."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Text alternative for the screenshot."
+          }
+        },
+        "type": "object",
+        "required": [
+          "src",
+          "sizes",
+          "type",
+          "form_factor",
+          "label"
+        ],
+        "title": "ManifestScreenshotResponse",
+        "description": "An install-prompt screenshot.",
+        "examples": [
+          {
+            "form_factor": "narrow",
+            "label": "Browse your items on a phone",
+            "sizes": "780x1688",
+            "src": "/screenshot-narrow.png",
+            "type": "image/png"
+          }
+        ]
+      },
+      "ManifestShortcutResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Label shown in the launcher menu."
+          },
+          "short_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Name",
+            "description": "Shorter label for tight spaces; absent when not needed."
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Address the shortcut opens."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url"
+        ],
+        "title": "ManifestShortcutResponse",
+        "description": "A launcher shortcut.",
+        "examples": [
+          {
+            "name": "Add an item",
+            "short_name": "Add item",
+            "url": "/items/new"
           }
         ]
       },
@@ -29140,6 +29301,158 @@
           {
             "current_version": "1.2.3",
             "name": "menagerist"
+          }
+        ]
+      },
+      "WebAppManifestResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Stable identity of the app; changing it forks installs."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Full name of the installed app."
+          },
+          "short_name": {
+            "type": "string",
+            "title": "Short Name",
+            "description": "Name shown where space is tight."
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What the app is for."
+          },
+          "start_url": {
+            "type": "string",
+            "title": "Start Url",
+            "description": "Address a launched app opens."
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "description": "Addresses that belong to the app."
+          },
+          "display": {
+            "type": "string",
+            "title": "Display",
+            "description": "Preferred display mode."
+          },
+          "display_override": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Display Override",
+            "description": "Display modes to try, in order of preference."
+          },
+          "orientation": {
+            "type": "string",
+            "title": "Orientation",
+            "description": "Preferred screen orientation."
+          },
+          "lang": {
+            "type": "string",
+            "title": "Lang",
+            "description": "Language of the manifest's text."
+          },
+          "dir": {
+            "type": "string",
+            "title": "Dir",
+            "description": "Text direction of the manifest's text."
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Categories",
+            "description": "Categories that describe the app."
+          },
+          "background_color": {
+            "type": "string",
+            "title": "Background Color",
+            "description": "Splash screen colour."
+          },
+          "theme_color": {
+            "type": "string",
+            "title": "Theme Color",
+            "description": "Title bar colour."
+          },
+          "icons": {
+            "items": {
+              "$ref": "#/components/schemas/ManifestIconResponse"
+            },
+            "type": "array",
+            "title": "Icons",
+            "description": "Install icons."
+          },
+          "shortcuts": {
+            "items": {
+              "$ref": "#/components/schemas/ManifestShortcutResponse"
+            },
+            "type": "array",
+            "title": "Shortcuts",
+            "description": "Launcher shortcuts."
+          },
+          "screenshots": {
+            "items": {
+              "$ref": "#/components/schemas/ManifestScreenshotResponse"
+            },
+            "type": "array",
+            "title": "Screenshots",
+            "description": "Screenshots for install prompts."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "short_name",
+          "description",
+          "start_url",
+          "scope",
+          "display",
+          "display_override",
+          "orientation",
+          "lang",
+          "dir",
+          "categories",
+          "background_color",
+          "theme_color",
+          "icons",
+          "shortcuts",
+          "screenshots"
+        ],
+        "title": "WebAppManifestResponse",
+        "description": "The web app manifest. Field names are the manifest spec's, so snake_case.",
+        "examples": [
+          {
+            "background_color": "#ffffff",
+            "categories": [
+              "productivity"
+            ],
+            "description": "A self-hosted platform for organising things.",
+            "dir": "ltr",
+            "display": "standalone",
+            "display_override": [
+              "standalone",
+              "minimal-ui"
+            ],
+            "icons": [],
+            "id": "/",
+            "lang": "en-GB",
+            "name": "Menagerist",
+            "orientation": "any",
+            "scope": "/",
+            "screenshots": [],
+            "short_name": "Menagerist",
+            "shortcuts": [],
+            "start_url": "/",
+            "theme_color": "#ffffff"
           }
         ]
       },

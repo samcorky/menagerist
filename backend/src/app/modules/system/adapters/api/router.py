@@ -1,5 +1,6 @@
+import hashlib
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
@@ -18,6 +19,7 @@ from app.modules.system.adapters.api.dependencies import (
     get_get_health_use_case,
     get_get_version_detail_use_case,
     get_get_version_use_case,
+    get_get_web_app_manifest_use_case,
     get_release_channel,
     get_run_browser_check_use_case,
     get_update_checks_enabled,
@@ -40,6 +42,10 @@ from app.modules.system.application.get_version_detail import (
     GetVersionDetail,
     GetVersionDetailQuery,
 )
+from app.modules.system.application.get_web_app_manifest import (
+    GetWebAppManifest,
+    GetWebAppManifestQuery,
+)
 from app.modules.system.application.run_browser_check import (
     RunBrowserCheck,
     RunBrowserCheckQuery,
@@ -59,6 +65,9 @@ from app.modules.system.domain.release import (
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
+if TYPE_CHECKING:
+    from app.modules.system.domain.web_app_manifest import WebAppManifest
+
 # Probes keep their root paths (orchestrators and the Docker healthcheck call them
 # with no session); the rest sit under `/api/v1/system`.
 probes_router = APIRouter(tags=["System"], route_class=PermissionAwareRoute)
@@ -66,8 +75,16 @@ public_router = APIRouter(
     prefix="/system", tags=["System"], route_class=PermissionAwareRoute
 )
 router = APIRouter(prefix="/system", tags=["System"], route_class=PermissionAwareRoute)
+# Browsers fetch the manifest from the origin root, outside `/api`.
+manifest_router = APIRouter(route_class=PermissionAwareRoute)
 
 _EXAMPLE_ISO = "2026-01-01T00:00:00.000000+00:00"
+
+
+class ManifestJSONResponse(JSONResponse):
+    """JSONResponse with Content-Type: application/manifest+json."""
+
+    media_type = "application/manifest+json"
 
 
 class HealthJSONResponse(JSONResponse):
@@ -644,6 +661,195 @@ async def get_health_ready_detail(
     if report.status is CheckStatus.FAIL:
         response.status_code = 503
     return ReadyDetailResponse.from_domain(report)
+
+
+class ManifestIconResponse(BaseModel):
+    """An install icon."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                    "purpose": "any",
+                }
+            ]
+        }
+    )
+
+    src: Annotated[str, Field(description="Address of the icon image.")]
+    sizes: Annotated[str, Field(description="Pixel size, as width x height.")]
+    type: Annotated[str, Field(description="Media type of the image.")]
+    purpose: Annotated[
+        str, Field(description="How the icon is used: `any` or `maskable`.")
+    ]
+
+
+class ManifestShortcutResponse(BaseModel):
+    """A launcher shortcut."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"name": "Add an item", "short_name": "Add item", "url": "/items/new"}
+            ]
+        }
+    )
+
+    name: Annotated[str, Field(description="Label shown in the launcher menu.")]
+    short_name: Annotated[
+        str | None,
+        Field(description="Shorter label for tight spaces; absent when not needed."),
+    ] = None
+    url: Annotated[str, Field(description="Address the shortcut opens.")]
+
+
+class ManifestScreenshotResponse(BaseModel):
+    """An install-prompt screenshot."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "src": "/screenshot-narrow.png",
+                    "sizes": "780x1688",
+                    "type": "image/png",
+                    "form_factor": "narrow",
+                    "label": "Browse your items on a phone",
+                }
+            ]
+        }
+    )
+
+    src: Annotated[str, Field(description="Address of the screenshot image.")]
+    sizes: Annotated[str, Field(description="Pixel size, as width x height.")]
+    type: Annotated[str, Field(description="Media type of the image.")]
+    form_factor: Annotated[
+        str, Field(description="Screen the shot suits: `narrow` or `wide`.")
+    ]
+    label: Annotated[str, Field(description="Text alternative for the screenshot.")]
+
+
+class WebAppManifestResponse(BaseModel):
+    """The web app manifest. Field names are the manifest spec's, so snake_case."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "/",
+                    "name": "Menagerist",
+                    "short_name": "Menagerist",
+                    "description": "A self-hosted platform for organising things.",
+                    "start_url": "/",
+                    "scope": "/",
+                    "display": "standalone",
+                    "display_override": ["standalone", "minimal-ui"],
+                    "orientation": "any",
+                    "lang": "en-GB",
+                    "dir": "ltr",
+                    "categories": ["productivity"],
+                    "background_color": "#ffffff",
+                    "theme_color": "#ffffff",
+                    "icons": [],
+                    "shortcuts": [],
+                    "screenshots": [],
+                }
+            ]
+        }
+    )
+
+    id: Annotated[
+        str,
+        Field(description="Stable identity of the app; changing it forks installs."),
+    ]
+    name: Annotated[str, Field(description="Full name of the installed app.")]
+    short_name: Annotated[str, Field(description="Name shown where space is tight.")]
+    description: Annotated[str, Field(description="What the app is for.")]
+    start_url: Annotated[str, Field(description="Address a launched app opens.")]
+    scope: Annotated[str, Field(description="Addresses that belong to the app.")]
+    display: Annotated[str, Field(description="Preferred display mode.")]
+    display_override: Annotated[
+        list[str], Field(description="Display modes to try, in order of preference.")
+    ]
+    orientation: Annotated[str, Field(description="Preferred screen orientation.")]
+    lang: Annotated[str, Field(description="Language of the manifest's text.")]
+    dir: Annotated[str, Field(description="Text direction of the manifest's text.")]
+    categories: Annotated[
+        list[str], Field(description="Categories that describe the app.")
+    ]
+    background_color: Annotated[str, Field(description="Splash screen colour.")]
+    theme_color: Annotated[str, Field(description="Title bar colour.")]
+    icons: Annotated[list[ManifestIconResponse], Field(description="Install icons.")]
+    shortcuts: Annotated[
+        list[ManifestShortcutResponse], Field(description="Launcher shortcuts.")
+    ]
+    screenshots: Annotated[
+        list[ManifestScreenshotResponse],
+        Field(description="Screenshots for install prompts."),
+    ]
+
+    @classmethod
+    def from_domain(cls, manifest: WebAppManifest) -> WebAppManifestResponse:
+        """Build the response from the domain manifest."""
+        return cls(
+            id=manifest.id,
+            name=manifest.name,
+            short_name=manifest.short_name,
+            description=manifest.description,
+            start_url=manifest.start_url,
+            scope=manifest.scope,
+            display=manifest.display,
+            display_override=list(manifest.display_override),
+            orientation=manifest.orientation,
+            lang=manifest.lang,
+            dir=manifest.dir,
+            categories=list(manifest.categories),
+            background_color=manifest.background_color,
+            theme_color=manifest.theme_color,
+            icons=[ManifestIconResponse(**vars(i)) for i in manifest.icons],
+            shortcuts=[ManifestShortcutResponse(**vars(s)) for s in manifest.shortcuts],
+            screenshots=[
+                ManifestScreenshotResponse(**vars(s)) for s in manifest.screenshots
+            ],
+        )
+
+
+@manifest_router.get(
+    "/manifest.webmanifest",
+    tags=["System"],
+    summary="Web app manifest",
+    operation_id="get_web_app_manifest",
+    response_model=WebAppManifestResponse,
+    response_class=ManifestJSONResponse,
+    responses={
+        200: {
+            "description": "The manifest, revalidated by `ETag` on each use.",
+            "headers": {"ETag": {"schema": {"type": "string"}}},
+        },
+        304: {"description": "Not modified: `If-None-Match` matched, so no body."},
+    },
+)
+async def get_web_app_manifest(
+    request: Request,
+    use_case: Annotated[GetWebAppManifest, Depends(get_get_web_app_manifest_use_case)],
+) -> WebAppManifestResponse | Response:
+    """Serve the manifest browsers read to install the instance as an app.
+
+    It sets its own caching, as the API default of `no-store` would stop browsers
+    keeping it: they revalidate by ETag on each use instead.
+    """
+    manifest = await use_case.handle(GetWebAppManifestQuery(), SYSTEM_ACTOR)
+    body = WebAppManifestResponse.from_domain(manifest).model_dump_json(
+        exclude_none=True
+    )
+    etag = f'"{hashlib.sha256(body.encode()).hexdigest()[:32]}"'
+    headers = {"Cache-Control": "no-cache", "ETag": etag}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(body, media_type="application/manifest+json", headers=headers)
 
 
 @public_router.get(

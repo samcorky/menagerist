@@ -37,6 +37,7 @@ EXPECTED_PUBLIC: frozenset[str] = frozenset(
         "system.GetHealth",
         "system.GetHealthReady",
         "system.GetVersion",
+        "system.GetWebAppManifest",
     }
 )
 EXPECTED_SYSTEM: frozenset[str] = frozenset(
