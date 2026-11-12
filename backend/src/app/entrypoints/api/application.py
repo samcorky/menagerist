@@ -58,6 +58,7 @@ from app.modules.media.adapters.api.media.router import (
 )
 from app.modules.presets.adapters.api.preset.router import router as preset_router
 from app.modules.scheduling.adapters.api.router import router as scheduling_router
+from app.modules.search.adapters.api.router import router as search_router
 from app.modules.settings.adapters.api.router import router as settings_router
 from app.modules.system.adapters.api.router import (
     probes_router as system_probes_router,
@@ -100,6 +101,7 @@ api_v1_router.include_router(node_media_router)
 api_v1_router.include_router(preset_router)
 api_v1_router.include_router(scheduling_router)
 api_v1_router.include_router(settings_router)
+api_v1_router.include_router(search_router)
 api_v1_router.include_router(example_router)
 api_v1_router.include_router(collection_router)
 api_v1_router.include_router(auth_router)

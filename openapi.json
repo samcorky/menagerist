@@ -15692,6 +15692,192 @@
         "x-required-permission": "settings:instance:write"
       }
     },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "v1",
+          "Search"
+        ],
+        "summary": "Search Everything",
+        "description": "Search items, collections, item types, settings and scheduled tasks at once.\n\nResults are ranked across kinds, best first. Settings and scheduled tasks\nappear only for people allowed to open them. A kind that could not be searched\nis named in `failed`; the rest are still returned. Blank text finds nothing.",
+        "operationId": "search_everything",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Text to look for.",
+              "default": "",
+              "title": "Q"
+            },
+            "description": "Text to look for."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Most results per kind.",
+              "default": 5,
+              "title": "Limit"
+            },
+            "description": "Most results per kind."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                },
+                "example": {
+                  "results": [
+                    {
+                      "kind": "setting",
+                      "ref": "backup.keep_last",
+                      "title": "Backups to keep",
+                      "description": "Minimum number of ordinary backups to retain.",
+                      "group": "backup",
+                      "score": 80
+                    },
+                    {
+                      "kind": "item_type",
+                      "ref": "film",
+                      "title": "Film",
+                      "score": 60
+                    }
+                  ],
+                  "failed": []
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "Sign in with an account to search.",
+                  "instance": "https://menagerist.example/api/v1/search"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/search"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/examples": {
       "get": {
         "tags": [
@@ -27379,6 +27565,160 @@
         "title": "SchedulingPermission",
         "description": "Scheduler permissions remain administrative and non-content-scoped."
       },
+      "SearchHitResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SearchKind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "An id (item, collection), slug (item type) or key (setting, task)."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "What it is called, as shown in the results."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What it is or does, when the owner has said."
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group",
+            "description": "An item's type slug, or a setting's section."
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug",
+            "description": "A collection's address."
+          },
+          "item_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Count",
+            "description": "How many items a collection holds."
+          },
+          "attributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes",
+            "description": "An item's field values."
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score",
+            "description": "How well it matches; higher is better."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ref",
+          "title",
+          "score"
+        ],
+        "title": "SearchHitResponse",
+        "description": "One thing the search found.",
+        "examples": [
+          {
+            "description": "Minimum number of ordinary backups to retain.",
+            "group": "backup",
+            "kind": "setting",
+            "ref": "backup.keep_last",
+            "score": 80,
+            "title": "Backups to keep"
+          }
+        ]
+      },
+      "SearchKind": {
+        "type": "string",
+        "enum": [
+          "item",
+          "collection",
+          "item_type",
+          "setting",
+          "scheduled_task"
+        ],
+        "title": "SearchKind",
+        "description": "The kinds of thing the search can find, in the order ties are shown."
+      },
+      "SearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHitResponse"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Everything found across the kinds, best match first."
+          },
+          "failed": {
+            "items": {
+              "$ref": "#/components/schemas/SearchKind"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "Kinds whose search failed; the other results are still valid."
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "failed"
+        ],
+        "title": "SearchResponse",
+        "description": "Everything found, best first, and the kinds that could not be searched.",
+        "examples": [
+          {
+            "failed": [],
+            "results": [
+              {
+                "kind": "item_type",
+                "ref": "film",
+                "score": 100,
+                "title": "Film"
+              }
+            ]
+          }
+        ]
+      },
       "SessionResponse": {
         "properties": {
           "id": {
@@ -28850,6 +29190,10 @@
     {
       "name": "Scheduling",
       "description": "See, run and preview the background jobs."
+    },
+    {
+      "name": "Search",
+      "description": "Find items, collections, item types, settings and tasks."
     },
     {
       "name": "Settings",
