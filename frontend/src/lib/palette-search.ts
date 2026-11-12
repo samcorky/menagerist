@@ -171,3 +171,25 @@ export function paletteLayout(pathname: string): PaletteLayout {
 	if (order[0]) caps[order[0]] += LEAD_BONUS;
 	return { order, collection, caps };
 }
+
+const SNIPPET_RADIUS = 40;
+
+/**
+ * Why a result matched when its title did not: a short stretch of the description around the
+ * first hit, with ellipses where it is cut. Null when the title matched or the description did not.
+ */
+export function descriptionSnippet(
+	title: string,
+	description: string | null | undefined,
+	query: string
+): string | null {
+	const q = foldText(query.trim());
+	if (!q || !description || foldText(title).includes(q)) return null;
+	const text = description.replace(/\s+/g, ' ').trim();
+	const at = foldText(text).indexOf(q);
+	// Folding can change a string's length (ligatures); the start is then a close guess
+	if (at < 0) return null;
+	const start = Math.max(0, at - SNIPPET_RADIUS);
+	const end = Math.min(text.length, at + q.length + SNIPPET_RADIUS);
+	return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`;
+}

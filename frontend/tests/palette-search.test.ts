@@ -10,7 +10,8 @@ import {
 	matchTasks,
 	paletteLayout,
 	settingPath,
-	taskPath
+	taskPath,
+	descriptionSnippet
 } from '../src/lib/palette-search';
 import { foldText } from '../src/lib/fold-text';
 
@@ -253,5 +254,26 @@ describe('paletteLayout', () => {
 		const { caps } = paletteLayout('/admin/settings');
 		expect(caps.settings).toBe(GROUP_CAPS.settings + 3);
 		expect(caps.tasks).toBe(GROUP_CAPS.tasks);
+	});
+});
+
+describe('descriptionSnippet', () => {
+	const long =
+		'This is a rather long description about how many backups are kept before the oldest goes away for good and cannot be brought back again later on';
+	it('quotes the description around the hit, accent-insensitively', () => {
+		expect(descriptionSnippet('Retention', 'Keeps the backups', 'BACKUPS')).toBe(
+			'Keeps the backups'
+		);
+		expect(descriptionSnippet('Retention', 'Café menu', 'cafe')).toBe('Café menu');
+		const snippet = descriptionSnippet('Retention', long, 'oldest');
+		expect(snippet?.startsWith('…')).toBe(true);
+		expect(snippet?.endsWith('…')).toBe(true);
+		expect(snippet).toContain('oldest');
+	});
+	it('says nothing when the title matched or the description did not', () => {
+		expect(descriptionSnippet('Backups to keep', long, 'backups')).toBeNull();
+		expect(descriptionSnippet('Retention', long, 'zebra')).toBeNull();
+		expect(descriptionSnippet('Retention', null, 'x')).toBeNull();
+		expect(descriptionSnippet('Retention', long, '  ')).toBeNull();
 	});
 });

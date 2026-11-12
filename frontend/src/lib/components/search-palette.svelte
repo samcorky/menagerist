@@ -30,6 +30,7 @@
 		type StaticRoute
 	} from '$lib/palette-search';
 	import { groupLabel } from '$lib/settings-form';
+	import { descriptionSnippet } from '$lib/palette-search';
 	import { matchContext } from '$lib/search-context';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import {
@@ -500,6 +501,11 @@
 						<p class="truncate text-xs text-muted-foreground">
 							Setting · {groupLabel(setting.group)}
 						</p>
+						{#if descriptionSnippet(setting.title, setting.description, query)}
+							<p class="truncate text-xs text-muted-foreground">
+								{descriptionSnippet(setting.title, setting.description, query)}
+							</p>
+						{/if}
 					</div>
 				</Command.Item>
 			{/each}
@@ -522,6 +528,11 @@
 					<div class="min-w-0 flex-1">
 						<span class="block truncate font-medium">{task.title}</span>
 						<p class="truncate text-xs text-muted-foreground">Scheduled task</p>
+						{#if descriptionSnippet(task.title, task.description, query)}
+							<p class="truncate text-xs text-muted-foreground">
+								{descriptionSnippet(task.title, task.description, query)}
+							</p>
+						{/if}
 					</div>
 				</Command.Item>
 			{/each}
