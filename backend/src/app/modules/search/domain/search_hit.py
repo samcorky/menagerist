@@ -24,6 +24,8 @@ WORD_PREFIX = 60
 CONTAINS = 40
 DESCRIPTION = 20
 ELSEWHERE = 10
+# Added to an item in the collection being viewed, so it beats the same match elsewhere.
+IN_COLLECTION_BONUS = 5
 
 
 def _words(text: str) -> list[str]:
@@ -73,6 +75,8 @@ class SearchHit:
     item_count: int | None = None
     # An item's field values, which the client uses to say why it matched.
     attributes: dict[str, Any] | None = field(default=None, hash=False)
+    # An item that belongs to the collection the search was asked about.
+    in_collection: bool = False
     score: int = 0
 
     def rated(self, value: int) -> SearchHit:
@@ -86,6 +90,7 @@ class SearchHit:
             slug=self.slug,
             item_count=self.item_count,
             attributes=self.attributes,
+            in_collection=self.in_collection,
             score=value,
         )
 

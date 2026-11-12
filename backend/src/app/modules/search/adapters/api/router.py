@@ -9,7 +9,7 @@ from app.modules.search.adapters.api.dependencies import get_search_use_case
 from app.modules.search.adapters.api.schemas import SearchResponse
 from app.modules.search.application.search import Search, SearchQuery
 from app.shared_kernel.actor import Actor
-from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.errors import ForbiddenError, NotFoundError
 
 _EXAMPLE = {
     "results": [
@@ -29,6 +29,9 @@ _EXAMPLE = {
 router = APIRouter(prefix="/search", tags=["Search"], route_class=PermissionAwareRoute)
 
 _FORBIDDEN = error_response(ForbiddenError, detail="Sign in with an account to search.")
+_NOT_FOUND = error_response(
+    NotFoundError, detail="Collection weekend-watchlist not found"
+)
 
 
 @router.get(
@@ -38,6 +41,7 @@ _FORBIDDEN = error_response(ForbiddenError, detail="Sign in with an account to s
     responses={
         200: {"content": {"application/json": {"example": _EXAMPLE}}},
         **_FORBIDDEN,
+        **_NOT_FOUND,
     },
 )
 async def search_everything(
@@ -46,13 +50,27 @@ async def search_everything(
     response: Response,
     q: Annotated[str, Query(max_length=200, description="Text to look for.")] = "",
     limit: Annotated[int, Query(ge=1, le=50, description="Most results per kind.")] = 5,
+    collection: Annotated[
+        str | None,
+        Query(
+            max_length=200,
+            description=(
+                "A collection's id or slug. Items in it are marked `in_collection` "
+                + "and rank above the same match outside it."
+            ),
+            examples=["weekend-watchlist"],
+        ),
+    ] = None,
 ) -> SearchResponse:
     """Search items, collections, item types, settings and scheduled tasks at once.
 
     Results are ranked across kinds, best first. Settings and scheduled tasks
     appear only for people allowed to open them. A kind that could not be searched
     is named in `failed`; the rest are still returned. Blank text finds nothing.
+    A `collection` the person cannot see is not found.
     """
     response.headers["Cache-Control"] = "private, no-store"
-    outcome = await use_case.handle(SearchQuery(q=q.strip(), limit=limit), actor)
+    outcome = await use_case.handle(
+        SearchQuery(q=q.strip(), limit=limit, collection=collection), actor
+    )
     return SearchResponse.from_domain(outcome)

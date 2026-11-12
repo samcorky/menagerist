@@ -11,7 +11,7 @@ from app.modules.search.application.search import MAX_CANDIDATES, Search, Search
 from app.modules.search.domain.search_hit import ELSEWHERE, SearchHit, SearchKind
 from app.shared_kernel.access_guard import DenyAllAccessGuard, InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
-from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.errors import ForbiddenError, NotFoundError
 
 MEMBER = Actor(id=uuid7(), roles=frozenset({"member"}))
 
@@ -118,3 +118,32 @@ async def test_blank_text_finds_nothing_and_asks_no_one() -> None:
     outcome = await search(items).handle(SearchQuery(q="   "), MEMBER)
     assert outcome.hits == []
     assert items.asked == []
+
+
+async def test_an_item_in_the_collection_beats_the_same_match_outside_it() -> None:
+    """The collection bonus lifts a hit above an equal one elsewhere."""
+    inside = SearchHit(kind=SearchKind.ITEM, ref="in", title="Film", in_collection=True)
+    outside = SearchHit(kind=SearchKind.ITEM, ref="out", title="Film")
+    items = InMemorySearchSource(SearchKind.ITEM, [outside, inside])
+    outcome = await search(items).handle(SearchQuery(q="film"), MEMBER)
+    assert [h.ref for h in outcome.hits] == ["in", "out"]
+    assert outcome.hits[0].in_collection
+    assert outcome.hits[0].score > outcome.hits[1].score
+
+
+async def test_the_collection_reaches_every_source() -> None:
+    """Each source is told which collection was asked about."""
+    items = InMemorySearchSource(SearchKind.ITEM)
+    types = InMemorySearchSource(SearchKind.ITEM_TYPE)
+    await search(items, types).handle(
+        SearchQuery(q="film", collection="watchlist"), MEMBER
+    )
+    assert items.collections_asked == ["watchlist"]
+    assert types.collections_asked == ["watchlist"]
+
+
+async def test_an_unknown_collection_fails_the_search_instead_of_one_kind() -> None:
+    """A collection nobody can see is a 404, not a quiet `failed` entry."""
+    items = InMemorySearchSource(SearchKind.ITEM, unknown_collection=True)
+    with pytest.raises(NotFoundError):
+        await search(items).handle(SearchQuery(q="film", collection="nope"), MEMBER)
