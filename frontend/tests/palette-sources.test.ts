@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { listNodes, listNodeTypes, searchApi } = vi.hoisted(() => ({
-	listNodes: vi.fn(),
+const { listNodeTypes, searchApi } = vi.hoisted(() => ({
 	listNodeTypes: vi.fn(),
 	searchApi: vi.fn()
 }));
-vi.mock('$lib/api/client', () => ({ listNodes, listNodeTypes, searchEverything: searchApi }));
+vi.mock('$lib/api/client', () => ({ listNodeTypes, searchEverything: searchApi }));
 import {
 	ITEM_TYPE_CAP,
 	loadItemTypes,
@@ -39,7 +38,6 @@ function merged(updates: Partial<Results>[]): Partial<Results> {
 beforeEach(() => {
 	vi.resetAllMocks();
 	resetItemTypeCache();
-	listNodes.mockResolvedValue({ data: [] });
 	listNodeTypes.mockResolvedValue({ data: [] });
 	searchApi.mockResolvedValue({ data: { results: [], failed: [] } });
 });
@@ -136,7 +134,6 @@ describe('searchEverything', () => {
 		const { updates, done } = run('   ');
 		await done;
 		expect(searchApi).not.toHaveBeenCalled();
-		expect(listNodes).not.toHaveBeenCalled();
 		const all = merged(updates);
 		expect(all.pages).toEqual([]);
 		expect(all.settings).toEqual({ status: 'ok', rows: [] });
@@ -145,37 +142,46 @@ describe('searchEverything', () => {
 });
 
 describe('the collection in view', () => {
-	it('searches it as well, ranked, shaped like the server rows, with room for the lead group', async () => {
-		listNodes.mockResolvedValue({
-			data: [
-				{ id: 'b', name: 'xx film', type: 'movie', attributes: { year: 1 } },
-				{ id: 'a', name: 'Film', type: 'movie', attributes: {} }
-			]
+	const member = (title: string) => ({ ...hit('item', title), in_collection: true });
+
+	it('is sent to the server, which marks its items; they show in their own group', async () => {
+		searchApi.mockResolvedValue({
+			data: { results: [member('Film'), hit('item', 'Film b'), member('xx film')], failed: [] }
 		});
 		const { updates, done } = run('film', undefined, '/collections/my-films');
 		await done;
-		expect(listNodes).toHaveBeenCalledWith({
-			query: { q: 'film', collection: 'my-films', limit: 8 }
+		expect(searchApi).toHaveBeenCalledTimes(1);
+		expect(searchApi).toHaveBeenCalledWith({
+			query: { q: 'film', limit: 13, collection: 'my-films' }
 		});
-		const rows = (merged(updates).collectionItems as { rows: { ref: string; group: string }[] })
-			.rows;
-		expect(rows.map((r) => r.ref)).toEqual(['a', 'b']);
-		expect(rows[0]).toMatchObject({ kind: 'item', title: 'Film', group: 'movie' });
+		const all = merged(updates);
+		expect(all.collectionItems).toEqual({
+			status: 'ok',
+			rows: [member('Film'), member('xx film')]
+		});
+		expect(all.items).toEqual({ status: 'ok', rows: [hit('item', 'Film b')] });
 	});
 
-	it('is not searched elsewhere', async () => {
+	it('is left out of the request elsewhere', async () => {
 		const { updates, done } = run('film');
 		await done;
-		expect(listNodes).not.toHaveBeenCalled();
+		expect(searchApi).toHaveBeenCalledWith({ query: { q: 'film', limit: 5 } });
 		expect(merged(updates).collectionItems).toEqual({ status: 'ok', rows: [] });
 	});
 
-	it('reports its own failure without touching the server groups', async () => {
-		listNodes.mockResolvedValue({ error: {} });
+	it('fails with the items it came with', async () => {
+		searchApi.mockResolvedValue({ data: { results: [], failed: ['item'] } });
 		const { updates, done } = run('film', undefined, '/collections/my-films');
 		await done;
 		expect(merged(updates).collectionItems).toEqual({ status: 'error' });
-		expect(merged(updates).items).toMatchObject({ status: 'ok' });
+		expect(merged(updates).items).toEqual({ status: 'error' });
+	});
+
+	it('is refreshed by retrying the collection items alone', async () => {
+		searchApi.mockResolvedValue({ data: { results: [member('Film')], failed: [] } });
+		const { updates, done } = run('film', ['collectionItems'], '/collections/my-films');
+		await done;
+		expect(Object.keys(merged(updates)).sort()).toEqual(['collectionItems', 'items']);
 	});
 });
 

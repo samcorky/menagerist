@@ -15699,7 +15699,7 @@
           "Search"
         ],
         "summary": "Search Everything",
-        "description": "Search items, collections, item types, settings and scheduled tasks at once.\n\nResults are ranked across kinds, best first. Settings and scheduled tasks\nappear only for people allowed to open them. A kind that could not be searched\nis named in `failed`; the rest are still returned. Blank text finds nothing.",
+        "description": "Search items, collections, item types, settings and scheduled tasks at once.\n\nResults are ranked across kinds, best first. Settings and scheduled tasks\nappear only for people allowed to open them. A kind that could not be searched\nis named in `failed`; the rest are still returned. Blank text finds nothing.\nA `collection` the person cannot see is not found.",
         "operationId": "search_everything",
         "security": [
           {
@@ -15736,6 +15736,28 @@
               "title": "Limit"
             },
             "description": "Most results per kind."
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A collection's id or slug. Items in it are marked `in_collection` and rank above the same match outside it.",
+              "examples": [
+                "weekend-watchlist"
+              ],
+              "title": "Collection"
+            },
+            "description": "A collection's id or slug. Items in it are marked `in_collection` and rank above the same match outside it."
           }
         ],
         "responses": {
@@ -15822,6 +15844,23 @@
                   "title": "ForbiddenError",
                   "status": 403,
                   "detail": "Sign in with an account to search.",
+                  "instance": "https://menagerist.example/api/v1/search"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist, or is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NotFoundError",
+                  "status": 404,
+                  "detail": "Collection weekend-watchlist not found",
                   "instance": "https://menagerist.example/api/v1/search"
                 }
               }
@@ -27732,6 +27771,12 @@
             ],
             "title": "Attributes",
             "description": "An item's field values."
+          },
+          "in_collection": {
+            "type": "boolean",
+            "title": "In Collection",
+            "description": "Whether an item is in the collection the search was asked about.",
+            "default": false
           },
           "score": {
             "type": "integer",
