@@ -1,21 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { listNodes, listCollections, listNodeTypes, listInstanceSettings, listJobs } = vi.hoisted(
-	() => ({
-		listInstanceSettings: vi.fn(),
-		listJobs: vi.fn(),
-		listNodes: vi.fn(),
-		listCollections: vi.fn(),
-		listNodeTypes: vi.fn()
-	})
-);
-vi.mock('$lib/api/client', () => ({
-	listNodes,
-	listCollections,
-	listNodeTypes,
-	listInstanceSettings,
-	listJobs
+const { listNodeTypes, searchApi } = vi.hoisted(() => ({
+	listNodeTypes: vi.fn(),
+	searchApi: vi.fn()
 }));
+vi.mock('$lib/api/client', () => ({ listNodeTypes, searchEverything: searchApi }));
 import {
 	ITEM_TYPE_CAP,
 	loadItemTypes,
@@ -26,13 +15,19 @@ import {
 } from '$lib/palette-sources';
 import { paletteLayout } from '$lib/palette-search';
 
-const node = (name: string) => ({ id: name, name });
-const coll = (name: string) => ({ id: name, name });
+const hit = (kind: string, title: string, score = 80) => ({ kind, ref: title, title, score });
 const type = (label: string) => ({ id: label, label, slug: label.toLowerCase() });
+const scopeFor = (path: string): SearchScope => ({ layout: paletteLayout(path) });
 
-function run(query: string, isCurrent = () => true) {
+function run(query: string, only?: Parameters<typeof searchEverything>[3], path = '/') {
 	const updates: Partial<Results>[] = [];
-	const done = searchEverything(query, (p) => updates.push(p), isCurrent);
+	const done = searchEverything(
+		query,
+		(p) => updates.push(p),
+		() => true,
+		only,
+		scopeFor(path)
+	);
 	return { updates, done };
 }
 
@@ -43,183 +38,169 @@ function merged(updates: Partial<Results>[]): Partial<Results> {
 beforeEach(() => {
 	vi.resetAllMocks();
 	resetItemTypeCache();
-	listNodes.mockResolvedValue({ data: [] });
-	listCollections.mockResolvedValue({ data: [] });
 	listNodeTypes.mockResolvedValue({ data: [] });
+	searchApi.mockResolvedValue({ data: { results: [], failed: [] } });
 });
 
 describe('searchEverything', () => {
-	it('ranks and caps every group', async () => {
-		listNodes.mockResolvedValue({
-			data: [
-				node('xx film 1'),
-				node('xx film 2'),
-				node('Film'),
-				node('Filmography'),
-				node('xx film 3'),
-				node('Film zzz')
-			]
-		});
-		listCollections.mockResolvedValue({
-			data: [coll('xx film 1'), coll('xx film 2'), coll('Film'), coll('Filmography')]
-		});
-		listNodeTypes.mockResolvedValue({
-			data: [type('Short film'), type('Film'), type('Other'), type('Films'), type('Telefilm')]
+	it('asks the server once and sorts its rows into groups, capped per group', async () => {
+		searchApi.mockResolvedValue({
+			data: {
+				results: [
+					...Array.from({ length: 7 }, (_, n) => hit('item', `Film ${n}`)),
+					hit('collection', 'Films'),
+					hit('item_type', 'Film'),
+					hit('setting', 'Backups to keep'),
+					hit('scheduled_task', 'Nightly backup')
+				],
+				failed: []
+			}
 		});
 		const { updates, done } = run('  film ');
 		await done;
+		expect(searchApi).toHaveBeenCalledTimes(1);
+		expect(searchApi).toHaveBeenCalledWith({ query: { q: 'film', limit: 5 } });
 		const all = merged(updates);
-		expect(listNodes).toHaveBeenCalledWith({ query: { q: 'film', limit: 5 } });
-		expect(listCollections).toHaveBeenCalledWith({ query: { q: 'film', limit: 3 } });
-		expect(all.items).toEqual({
-			status: 'ok',
-			rows: [
-				node('Film'),
-				node('Filmography'),
-				node('Film zzz'),
-				node('xx film 1'),
-				node('xx film 2')
-			]
-		});
-		expect(all.collections).toEqual({
-			status: 'ok',
-			rows: [coll('Film'), coll('Filmography'), coll('xx film 1')]
-		});
-		expect(all.itemTypes).toEqual({
-			status: 'ok',
-			rows: [type('Film'), type('Films'), type('Short film')]
-		});
-		expect(all.pages).toEqual([]);
+		expect(all.items).toMatchObject({ status: 'ok' });
+		expect((all.items as { rows: unknown[] }).rows).toHaveLength(5);
+		expect(all.collections).toEqual({ status: 'ok', rows: [hit('collection', 'Films')] });
+		expect(all.itemTypes).toEqual({ status: 'ok', rows: [hit('item_type', 'Film')] });
+		expect(all.settings).toEqual({ status: 'ok', rows: [hit('setting', 'Backups to keep')] });
+		expect(all.tasks).toEqual({ status: 'ok', rows: [hit('scheduled_task', 'Nightly backup')] });
 	});
 
-	it('starts every request without waiting for the others', async () => {
-		listNodes.mockReturnValue(new Promise(() => {}));
-		void run('film');
+	it('reports pages straight away, before the server has answered', async () => {
+		searchApi.mockReturnValue(new Promise(() => {}));
+		const { updates } = run('settings');
 		await Promise.resolve();
-		expect(listCollections).toHaveBeenCalledTimes(1);
-		expect(listNodeTypes).toHaveBeenCalledTimes(1);
-	});
-
-	it('drops sources that settle after the search is superseded', async () => {
-		const defer = <T>() => {
-			let resolve!: (v: T) => void;
-			const promise = new Promise<T>((r) => (resolve = r));
-			return { promise, resolve };
-		};
-		const nodes = defer<unknown>();
-		const colls = defer<unknown>();
-		const types = defer<unknown>();
-		listNodes.mockReturnValue(nodes.promise);
-		listCollections.mockReturnValue(colls.promise);
-		listNodeTypes.mockReturnValue(types.promise);
-		let current = true;
-		const { updates, done } = run('film', () => current);
-		nodes.resolve({ data: [node('Film')] });
-		await vi.waitFor(() => expect(updates.some((u) => 'items' in u)).toBe(true));
-		const before = updates.length;
-		current = false;
-		colls.resolve({ data: [coll('Film')] });
-		types.resolve({ data: [type('Film')] });
-		await done;
-		expect(updates).toHaveLength(before);
-		expect(merged(updates)).not.toHaveProperty('collections');
-		expect(merged(updates).items).toEqual({ status: 'ok', rows: [node('Film')] });
-	});
-
-	it('shares one in-flight item type request between overlapping searches', async () => {
-		listNodeTypes.mockReturnValue(new Promise(() => {}));
-		void run('film');
-		void run('fil');
-		await Promise.resolve();
-		expect(listNodeTypes).toHaveBeenCalledTimes(1);
-	});
-
-	it('reports pages in the first update', async () => {
-		const { updates, done } = run('settings');
 		expect(updates[0].pages?.map((p) => p.path)).toContain('/settings');
-		await done;
+		expect(updates.some((u) => 'items' in u)).toBe(false);
 	});
 
-	it('marks only a rejecting source as an error', async () => {
-		listCollections.mockRejectedValue(new Error('boom'));
-		listNodes.mockResolvedValue({ data: [node('a')] });
-		const { updates, done } = run('a');
+	it('marks only a kind the server could not search as an error', async () => {
+		searchApi.mockResolvedValue({
+			data: { results: [hit('item', 'Film')], failed: ['collection'] }
+		});
+		const { updates, done } = run('film');
 		await done;
 		const all = merged(updates);
 		expect(all.collections).toEqual({ status: 'error' });
-		expect(all.items).toEqual({ status: 'ok', rows: [node('a')] });
-		expect(all.itemTypes?.status).toBe('ok');
+		expect(all.items).toMatchObject({ status: 'ok' });
 	});
 
-	it('treats an error result as a failed source', async () => {
-		listNodes.mockResolvedValue({ error: { detail: 'x' } });
-		listNodeTypes.mockResolvedValue({});
-		const { updates, done } = run('a');
-		await done;
-		const all = merged(updates);
-		expect(all.items).toEqual({ status: 'error' });
-		expect(all.itemTypes).toEqual({ status: 'error' });
-	});
-
-	it('fetches item types once across searches', async () => {
-		listNodeTypes.mockResolvedValue({ data: [type('Film')] });
-		await run('film').done;
-		await run('fil').done;
-		expect(listNodeTypes).toHaveBeenCalledTimes(1);
-	});
-
-	it('retries item types after a failure', async () => {
-		listNodeTypes.mockRejectedValueOnce(new Error('boom'));
-		await run('film').done;
-		listNodeTypes.mockResolvedValue({ data: [type('Film')] });
+	it('marks every server group as an error when the request fails', async () => {
+		searchApi.mockResolvedValue({ error: {} });
 		const { updates, done } = run('film');
 		await done;
-		expect(listNodeTypes).toHaveBeenCalledTimes(2);
-		expect(merged(updates).itemTypes).toEqual({ status: 'ok', rows: [type('Film')] });
+		const all = merged(updates);
+		for (const key of ['items', 'collections', 'itemTypes', 'settings', 'tasks'] as const) {
+			expect(all[key]).toEqual({ status: 'error' });
+		}
+		searchApi.mockRejectedValue(new Error('offline'));
+		const again = run('film');
+		await again.done;
+		expect(merged(again.updates).items).toEqual({ status: 'error' });
 	});
 
-	it('retries item types after an error result', async () => {
-		listNodeTypes.mockResolvedValueOnce({ error: {} });
-		await run('film').done;
-		await run('film').done;
-		expect(listNodeTypes).toHaveBeenCalledTimes(2);
-	});
-
-	it('never updates when no longer current', async () => {
-		const { updates, done } = run('film', () => false);
+	it('re-asks only for the requested groups', async () => {
+		searchApi.mockResolvedValue({ data: { results: [hit('collection', 'Films')], failed: [] } });
+		const { updates, done } = run('film', ['collections']);
 		await done;
-		expect(updates).toEqual([]);
+		expect(Object.keys(merged(updates)).sort()).toEqual(['collections']);
+		expect(searchApi).toHaveBeenCalledWith({ query: { q: 'film', limit: 3 } });
+	});
+
+	it('asks for as many as the largest group on this page needs', async () => {
+		await run('film', undefined, '/admin/settings').done;
+		expect(searchApi).toHaveBeenCalledWith({ query: { q: 'film', limit: 7 } });
+	});
+
+	it('drops answers that arrive after the search is superseded', async () => {
+		let current = true;
+		const updates: Partial<Results>[] = [];
+		searchApi.mockImplementation(async () => {
+			current = false;
+			return { data: { results: [hit('item', 'Film')], failed: [] } };
+		});
+		await searchEverything(
+			'film',
+			(p) => updates.push(p),
+			() => current
+		);
+		expect(updates.some((u) => 'items' in u)).toBe(false);
 	});
 
 	it('makes no requests for a blank query', async () => {
 		const { updates, done } = run('   ');
 		await done;
-		expect(listNodes).not.toHaveBeenCalled();
-		expect(listCollections).not.toHaveBeenCalled();
-		expect(listNodeTypes).not.toHaveBeenCalled();
-		expect(merged(updates)).toEqual({
-			items: { status: 'ok', rows: [] },
-			collections: { status: 'ok', rows: [] },
-			itemTypes: { status: 'ok', rows: [] },
-			settings: { status: 'ok', rows: [] },
-			tasks: { status: 'ok', rows: [] },
-			collectionItems: { status: 'ok', rows: [] },
-			pages: []
+		expect(searchApi).not.toHaveBeenCalled();
+		const all = merged(updates);
+		expect(all.pages).toEqual([]);
+		expect(all.settings).toEqual({ status: 'ok', rows: [] });
+		expect(all.collectionItems).toEqual({ status: 'ok', rows: [] });
+	});
+});
+
+describe('the collection in view', () => {
+	const member = (title: string) => ({ ...hit('item', title), in_collection: true });
+
+	it('is sent to the server, which marks its items; they show in their own group', async () => {
+		searchApi.mockResolvedValue({
+			data: { results: [member('Film'), hit('item', 'Film b'), member('xx film')], failed: [] }
 		});
+		const { updates, done } = run('film', undefined, '/collections/my-films');
+		await done;
+		expect(searchApi).toHaveBeenCalledTimes(1);
+		expect(searchApi).toHaveBeenCalledWith({
+			query: { q: 'film', limit: 13, collection: 'my-films' }
+		});
+		const all = merged(updates);
+		expect(all.collectionItems).toEqual({
+			status: 'ok',
+			rows: [member('Film'), member('xx film')]
+		});
+		expect(all.items).toEqual({ status: 'ok', rows: [hit('item', 'Film b')] });
 	});
 
-	it('re-runs only the requested sources', async () => {
-		listCollections.mockResolvedValue({ data: [coll('Film')] });
-		const updates: Partial<Results>[] = [];
-		await searchEverything(
-			'film',
-			(p) => updates.push(p),
-			() => true,
-			['collections']
-		);
-		expect(listNodes).not.toHaveBeenCalled();
-		expect(listNodeTypes).not.toHaveBeenCalled();
-		expect(updates).toEqual([{ collections: { status: 'ok', rows: [coll('Film')] } }]);
+	it('is left out of the request elsewhere', async () => {
+		const { updates, done } = run('film');
+		await done;
+		expect(searchApi).toHaveBeenCalledWith({ query: { q: 'film', limit: 5 } });
+		expect(merged(updates).collectionItems).toEqual({ status: 'ok', rows: [] });
+	});
+
+	it('fails with the items it came with', async () => {
+		searchApi.mockResolvedValue({ data: { results: [], failed: ['item'] } });
+		const { updates, done } = run('film', undefined, '/collections/my-films');
+		await done;
+		expect(merged(updates).collectionItems).toEqual({ status: 'error' });
+		expect(merged(updates).items).toEqual({ status: 'error' });
+	});
+
+	it('is refreshed by retrying the collection items alone', async () => {
+		searchApi.mockResolvedValue({ data: { results: [member('Film')], failed: [] } });
+		const { updates, done } = run('film', ['collectionItems'], '/collections/my-films');
+		await done;
+		expect(Object.keys(merged(updates)).sort()).toEqual(['collectionItems', 'items']);
+	});
+});
+
+describe('loadItemTypes', () => {
+	it('fetches item types once across calls', async () => {
+		listNodeTypes.mockResolvedValue({ data: [type('Film')] });
+		await loadItemTypes();
+		await loadItemTypes();
+		expect(listNodeTypes).toHaveBeenCalledTimes(1);
+	});
+
+	it('retries after a failure and after an error result', async () => {
+		listNodeTypes.mockRejectedValueOnce(new Error('boom'));
+		await expect(loadItemTypes()).rejects.toThrow();
+		listNodeTypes.mockResolvedValueOnce({ error: {} });
+		await expect(loadItemTypes()).rejects.toThrow();
+		listNodeTypes.mockResolvedValue({ data: [type('Film')] });
+		await expect(loadItemTypes()).resolves.toEqual([type('Film')]);
+		expect(listNodeTypes).toHaveBeenCalledTimes(3);
 	});
 });
 
@@ -246,22 +227,26 @@ describe('loadItemTypes paging', () => {
 		expect(listNodeTypes).toHaveBeenCalledTimes(3);
 	});
 
-	it('fails the source on a page 2 error and retries on the next search', async () => {
+	it('fails on a page 2 error and loads again on the next call', async () => {
 		listNodeTypes
 			.mockResolvedValueOnce({ data: many(0, 100) })
 			.mockResolvedValueOnce({ error: { detail: 'x' } });
-		const first = run('t');
-		await first.done;
-		expect(merged(first.updates).itemTypes).toEqual({ status: 'error' });
+		await expect(loadItemTypes()).rejects.toThrow();
 
 		listNodeTypes.mockReset();
 		listNodeTypes
 			.mockResolvedValueOnce({ data: many(0, 100) })
 			.mockResolvedValueOnce({ data: many(100, 5) });
-		const second = run('t');
-		await second.done;
-		expect(merged(second.updates).itemTypes).toMatchObject({ status: 'ok' });
+		await expect(loadItemTypes()).resolves.toHaveLength(105);
 		expect(listNodeTypes).toHaveBeenCalledTimes(2);
+	});
+
+	it('shares one in-flight request between overlapping calls', async () => {
+		listNodeTypes.mockReturnValue(new Promise(() => {}));
+		void loadItemTypes();
+		void loadItemTypes();
+		await Promise.resolve();
+		expect(listNodeTypes).toHaveBeenCalledTimes(1);
 	});
 
 	it('stops at the safety cap', async () => {
@@ -274,81 +259,5 @@ describe('loadItemTypes paging', () => {
 		const all = await loadItemTypes();
 		expect(all).toHaveLength(ITEM_TYPE_CAP);
 		expect(listNodeTypes).toHaveBeenCalledTimes(ITEM_TYPE_CAP / 100);
-	});
-});
-
-describe('settings, scheduled tasks and the collection in view', () => {
-	const scope = (path: string, can = true): SearchScope => ({
-		layout: paletteLayout(path),
-		canSettings: can,
-		canTasks: can
-	});
-	const searchWith = async (query: string, s: SearchScope) => {
-		const updates: Partial<Results>[] = [];
-		await searchEverything(
-			query,
-			(p) => updates.push(p),
-			() => true,
-			undefined,
-			s
-		);
-		return merged(updates);
-	};
-
-	beforeEach(() => {
-		listInstanceSettings.mockResolvedValue({
-			data: [
-				{ key: 'backup.keep_last', group: 'backup', title: 'Backups to keep', description: null }
-			]
-		});
-		listJobs.mockResolvedValue({
-			data: [{ job_key: 'backup', title: 'Nightly backup', description: 'Copies everything' }]
-		});
-	});
-
-	it('finds settings and scheduled tasks for someone allowed to open them', async () => {
-		const all = await searchWith('backup', scope('/'));
-		expect(all.settings).toMatchObject({ status: 'ok', rows: [{ key: 'backup.keep_last' }] });
-		expect(all.tasks).toMatchObject({ status: 'ok', rows: [{ job_key: 'backup' }] });
-	});
-
-	it('never asks for them without permission', async () => {
-		const all = await searchWith('backup', scope('/', false));
-		expect(listInstanceSettings).not.toHaveBeenCalled();
-		expect(listJobs).not.toHaveBeenCalled();
-		expect(all.settings).toEqual({ status: 'ok', rows: [] });
-		expect(all.tasks).toEqual({ status: 'ok', rows: [] });
-	});
-
-	it('loads each list once and retries after a failure', async () => {
-		listJobs.mockResolvedValueOnce({ error: {} });
-		expect((await searchWith('backup', scope('/'))).tasks).toEqual({ status: 'error' });
-		await searchWith('back', scope('/'));
-		await searchWith('night', scope('/'));
-		expect(listJobs).toHaveBeenCalledTimes(2);
-		expect(listInstanceSettings).toHaveBeenCalledTimes(1);
-	});
-
-	it('reports a failing settings list on its own', async () => {
-		listInstanceSettings.mockResolvedValue({ error: {} });
-		const all = await searchWith('backup', scope('/'));
-		expect(all.settings).toEqual({ status: 'error' });
-		expect(all.tasks).toMatchObject({ status: 'ok' });
-	});
-
-	it('searches the collection in view as well, with the extra room for the lead group', async () => {
-		listNodes.mockResolvedValue({ data: [node('Film')] });
-		const all = await searchWith('film', scope('/collections/my-films'));
-		expect(listNodes).toHaveBeenCalledWith({
-			query: { q: 'film', collection: 'my-films', limit: 8 }
-		});
-		expect(listNodes).toHaveBeenCalledWith({ query: { q: 'film', limit: 5 } });
-		expect(all.collectionItems).toEqual({ status: 'ok', rows: [node('Film')] });
-	});
-
-	it('does not search a collection elsewhere', async () => {
-		const all = await searchWith('film', scope('/'));
-		expect(listNodes).toHaveBeenCalledTimes(1);
-		expect(all.collectionItems).toEqual({ status: 'ok', rows: [] });
 	});
 });

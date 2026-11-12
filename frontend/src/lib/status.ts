@@ -77,7 +77,9 @@ export function formatObservedValue(value: unknown, unit: string | null | undefi
 		if (value === 0) return 'Nothing unusual in the last hour';
 		return `${value} flagged ${value === 1 ? 'request' : 'requests'} in the last hour`;
 	}
-	if (unit === 'proxy') return value === null ? 'Not used' : `Through ${value}`;
+	// The API leaves out a null, so an unset proxy arrives as no value at all.
+	if (unit === 'proxy')
+		return value === null || value === undefined ? 'Not used' : `Through ${value}`;
 	if (unit === 'exempt hosts') {
 		if (value === 0) return 'No exemptions';
 		return `${value} ${value === 1 ? 'entry skips' : 'entries skip'} the proxy`;
@@ -130,6 +132,10 @@ export interface ReleaseView {
 	notesUrl: string | null;
 	/** Why the last attempt failed, in words, or null. */
 	failureNote: string | null;
+	/** The commits between this build and edge, only when it is behind. */
+	compareUrl: string | null;
+	/** Whether the deployment allows checking at all; false hides Check now. */
+	checksEnabled: boolean;
 }
 
 const CHANNEL_LABELS = { stable: 'Stable', preview: 'Preview' } as const;
@@ -161,10 +167,15 @@ function titleWithoutVersion(title: string, latest: string): string {
  * How the Status page describes the last release check. An uncheckable build is never
  * reported as up to date, and a failed attempt keeps showing the last good answer.
  */
-export function releaseViewOf(release: ReleaseResponse, installed?: string | null): ReleaseView {
+export function releaseViewOf(
+	release: ReleaseResponse,
+	installed?: string | null,
+	checksEnabled = true
+): ReleaseView {
 	const latest = release.latest_version ? bareVersion(release.latest_version) : null;
 	const channel = CHANNEL_LABELS[release.channel];
 	const failureNote = release.failure ? FAILURE_NOTES[release.failure] : null;
+	const edge = release.edge ?? null;
 
 	let tone: ReleaseTone = 'neutral';
 	let badge: string;
@@ -185,8 +196,20 @@ export function releaseViewOf(release: ReleaseResponse, installed?: string | nul
 			summary = `This build is newer than the latest ${channel.toLowerCase()} release, ${latest}.`;
 			break;
 		case 'development':
-			badge = 'Development build';
-			summary = `This is a development build, so it cannot be compared with releases. The latest ${channel.toLowerCase()} release is ${latest}.`;
+			// A development build is told about edge instead, since comparing it with
+			// releases says nothing about whether its image is stale.
+			if (edge?.status === 'current') {
+				tone = 'ok';
+				badge = 'Current edge build';
+				summary = 'This is the current edge build.';
+			} else if (edge?.status === 'behind') {
+				tone = 'attention';
+				badge = 'Newer edge build';
+				summary = `A newer edge build is available (${edge.installed_revision} → ${edge.edge_revision}).`;
+			} else {
+				badge = 'Development build';
+				summary = `This is a development build, so it cannot be compared with releases. The latest ${channel.toLowerCase()} release is ${latest}.`;
+			}
 			break;
 		case 'no_release':
 			badge = 'No releases yet';
@@ -213,6 +236,9 @@ export function releaseViewOf(release: ReleaseResponse, installed?: string | nul
 	if (release.published_at) {
 		rows.push({ label: 'Published', value: release.published_at, time: true });
 	}
+	if (edge && edge.status !== 'unknown' && edge.edge_revision) {
+		rows.push({ label: 'Edge build', value: edge.edge_revision });
+	}
 	if (release.checked_at) {
 		rows.push({ label: 'Last checked', value: release.checked_at, time: true });
 	}
@@ -220,5 +246,26 @@ export function releaseViewOf(release: ReleaseResponse, installed?: string | nul
 		rows.push({ label: 'Last attempt', value: release.last_attempt_at, time: true });
 	}
 
-	return { tone, badge, summary, rows, notesUrl: safeNotesUrl(release.url), failureNote };
+	if (!checksEnabled) {
+		// The deployment decides this, so there is nothing an administrator can do here.
+		// Never invite the reader to press a button that is hidden.
+		const turnedOff = 'Update checks are turned off by this deployment.';
+		summary =
+			release.status === 'unknown' && !failureNote
+				? `${turnedOff} Nothing is contacted, so no release has been looked for.`
+				: `${summary} ${turnedOff} Nothing is contacted, so the result above may be out of date.`;
+		badge = 'Checks turned off';
+		tone = 'neutral';
+	}
+
+	return {
+		tone,
+		badge,
+		summary,
+		rows,
+		notesUrl: safeNotesUrl(release.url),
+		failureNote,
+		compareUrl: safeNotesUrl(edge?.compare_url),
+		checksEnabled
+	};
 }

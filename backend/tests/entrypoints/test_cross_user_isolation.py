@@ -1166,6 +1166,9 @@ def _shape(response: Response) -> tuple[object, ...]:
 
 # Variants whose value cannot match anything of A's even for A, and why.
 EMPTY_FOR_A: dict[tuple[str, str], str] = {
+    ("/api/v1/search", "bare"): "blank text finds nothing",
+    ("/api/v1/search", "query:limit"): "blank text finds nothing",
+    ("/api/v1/search", "query:collection"): "blank text finds nothing",
     (
         "/api/v1/node-types/{node_type_id}/attributes/{key}/usage",
         "query:sub_key",
@@ -1414,3 +1417,27 @@ def test_a_collection_condition_naming_a_foreign_collection_reads_like_an_unknow
             assert mine.json()["warnings"], "the stale id is reported"
             count = bob.get(f"/api/v1/collections/{mine.json()['id']}/items/count")
             assert count.json()["count"] == 0, count.text
+
+
+def test_searching_with_a_foreign_collection_reads_like_an_unknown_one(
+    world: World,
+) -> None:
+    """B gets the 404 of a missing collection; A's search finds the item, marked."""
+    seed = world.seed()
+    ghost = str(uuid.uuid7())
+
+    bob = world.act_as(BOB)
+    response = bob.get(
+        "/api/v1/search", params={"q": "Xenomorph", "collection": seed.collection}
+    )
+    unknown = bob.get("/api/v1/search", params={"q": "Xenomorph", "collection": ghost})
+
+    assert response.status_code == 404, response.text
+    assert _shape(response) == _shape(unknown)
+    owner = world.act_as(ALICE).get(
+        "/api/v1/search", params={"q": "Xenomorph", "collection": seed.collection}
+    )
+    assert owner.status_code == 200
+    assert [h["ref"] for h in owner.json()["results"] if h["in_collection"]] == [
+        seed.item
+    ]

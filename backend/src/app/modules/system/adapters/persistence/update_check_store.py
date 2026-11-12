@@ -35,6 +35,7 @@ def _to_domain(model: UpdateCheckModel) -> UpdateCheck:
         last_success_at=model.last_success_at,
         last_attempt_at=model.last_attempt_at,
         failure=None if model.failure is None else CheckFailure(model.failure),
+        edge_revision=model.edge_revision,
     )
 
 
@@ -63,6 +64,7 @@ class SqlAlchemyUpdateCheckStore:
             "last_success_at": check.last_success_at,
             "last_attempt_at": check.last_attempt_at,
             "failure": None if check.failure is None else check.failure.value,
+            "edge_revision": check.edge_revision,
         }
         statement = insert(UpdateCheckModel).values(key=key, **values)
         await self._session.execute(

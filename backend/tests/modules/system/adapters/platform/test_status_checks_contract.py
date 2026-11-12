@@ -11,6 +11,8 @@ import re
 from pathlib import Path
 from typing import Any, get_args
 
+from pydantic import SecretStr
+
 from app.modules.system.adapters.platform.checks.cors_configuration_check import (
     CorsConfigurationCheck,
 )
@@ -159,7 +161,7 @@ async def test_live_outbound_proxy_check_reports_listed_keys_and_units() -> None
     listed = {c["key"]: c["unit"] for c in _contract()["checks"]}
 
     result = await OutboundProxyCheck(
-        http_proxy=None, https_proxy=None, no_proxy=""
+        http_proxy=SecretStr("http://proxy.example:3128"), https_proxy=None, no_proxy=""
     ).run()
 
     assert len(result) == 3

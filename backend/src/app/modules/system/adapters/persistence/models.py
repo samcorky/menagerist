@@ -27,3 +27,6 @@ class UpdateCheckModel(Base):
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     failure: Mapped[str | None]
+    # The revision the published edge image was built from; null when it was not
+    # read, which is every build that is not a development one.
+    edge_revision: Mapped[str | None]

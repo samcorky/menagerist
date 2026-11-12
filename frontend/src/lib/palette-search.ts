@@ -1,6 +1,6 @@
 import type { RouteId } from '$app/types';
 import { foldText } from '$lib/fold-text';
-import { groupLabel, settingId } from '$lib/settings-form';
+import { settingId } from '$lib/settings-form';
 import { jobId } from '$lib/scheduled-tasks';
 
 export const GROUP_CAPS = {
@@ -65,52 +65,8 @@ export function matchPages(query: string): PalettePage[] {
 		.map(({ label, path }) => ({ label, path }));
 }
 
-/** Item types whose label or slug contains the query, best first. */
-export function matchItemTypes<T extends { label: string; slug: string }>(
-	types: T[],
-	query: string,
-	cap: number = GROUP_CAPS.itemTypes
-): T[] {
-	const q = foldText(query.trim());
-	if (!q) return [];
-	const hits = types.filter((t) => contains(t.label, q) || contains(t.slug, q));
-	return rankByName(hits, q, (t) => t.label).slice(0, cap);
-}
-
-export type PaletteSetting = {
-	key: string;
-	group: string;
-	title: string;
-	description: string | null;
-};
-export type PaletteTask = { job_key: string; title: string; description: string };
-
-/** Settings whose title, description or section name contains the query, best title first. */
-export function matchSettings<T extends PaletteSetting>(
-	settings: T[],
-	query: string,
-	cap: number = GROUP_CAPS.settings
-): T[] {
-	const q = foldText(query.trim());
-	if (!q) return [];
-	const hits = settings.filter(
-		(s) =>
-			contains(s.title, q) || contains(s.description ?? '', q) || contains(groupLabel(s.group), q)
-	);
-	return rankByName(hits, q, (s) => s.title).slice(0, cap);
-}
-
-/** Scheduled tasks whose title or description contains the query, best title first. */
-export function matchTasks<T extends PaletteTask>(
-	tasks: T[],
-	query: string,
-	cap: number = GROUP_CAPS.tasks
-): T[] {
-	const q = foldText(query.trim());
-	if (!q) return [];
-	const hits = tasks.filter((t) => contains(t.title, q) || contains(t.description, q));
-	return rankByName(hits, q, (t) => t.title).slice(0, cap);
-}
+export type PaletteSetting = { key: string; group: string };
+export type PaletteTask = { job_key: string };
 
 /** Where a setting lives: its section of the admin settings page, scrolled to the setting. */
 export function settingPath(
@@ -168,7 +124,7 @@ export function paletteLayout(pathname: string): PaletteLayout {
 
 	const order = [...lead, ...DEFAULT_ORDER.filter((key) => !lead.includes(key))];
 	const caps: Record<PaletteGroup, number> = { ...GROUP_CAPS };
-	if (order[0]) caps[order[0]] += LEAD_BONUS;
+	if (lead.length > 0) caps[order[0]] += LEAD_BONUS;
 	return { order, collection, caps };
 }
 
@@ -192,4 +148,28 @@ export function descriptionSnippet(
 	const start = Math.max(0, at - SNIPPET_RADIUS);
 	const end = Math.min(text.length, at + q.length + SNIPPET_RADIUS);
 	return `${start > 0 ? '…' : ''}${text.slice(start, end).trim()}${end < text.length ? '…' : ''}`;
+}
+
+/** The server's scale, for rows the client ranks itself (the pages). */
+const RANK_SCORE = [100, 80, 60, 40] as const;
+
+/** How well `name` matches `query`, on the same scale as the server's scores. */
+export function localScore(name: string, query: string): number {
+	return RANK_SCORE[matchRank(name, query)];
+}
+
+/**
+ * Groups in the order to show them: the group holding the best match first, and where
+ * matches tie, the order the current page asks for. Groups with nothing to show go last,
+ * in page order, so a slow group does not move the rest when it arrives.
+ */
+export function orderGroups(
+	pageOrder: PaletteGroup[],
+	best: Partial<Record<PaletteGroup, number>>
+): PaletteGroup[] {
+	const rank = (key: PaletteGroup) => pageOrder.indexOf(key);
+	const withHits = pageOrder.filter((key) => best[key] !== undefined);
+	const without = pageOrder.filter((key) => best[key] === undefined);
+	withHits.sort((a, b) => (best[b] ?? 0) - (best[a] ?? 0) || rank(a) - rank(b));
+	return [...withHits, ...without];
 }

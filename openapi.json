@@ -15692,6 +15692,231 @@
         "x-required-permission": "settings:instance:write"
       }
     },
+    "/api/v1/search": {
+      "get": {
+        "tags": [
+          "v1",
+          "Search"
+        ],
+        "summary": "Search Everything",
+        "description": "Search items, collections, item types, settings and scheduled tasks at once.\n\nResults are ranked across kinds, best first. Settings and scheduled tasks\nappear only for people allowed to open them. A kind that could not be searched\nis named in `failed`; the rest are still returned. Blank text finds nothing.\nA `collection` the person cannot see is not found.",
+        "operationId": "search_everything",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Text to look for.",
+              "default": "",
+              "title": "Q"
+            },
+            "description": "Text to look for."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Most results per kind.",
+              "default": 5,
+              "title": "Limit"
+            },
+            "description": "Most results per kind."
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A collection's id or slug. Items in it are marked `in_collection` and rank above the same match outside it.",
+              "examples": [
+                "weekend-watchlist"
+              ],
+              "title": "Collection"
+            },
+            "description": "A collection's id or slug. Items in it are marked `in_collection` and rank above the same match outside it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                },
+                "example": {
+                  "results": [
+                    {
+                      "kind": "setting",
+                      "ref": "backup.keep_last",
+                      "title": "Backups to keep",
+                      "description": "Minimum number of ordinary backups to retain.",
+                      "group": "backup",
+                      "score": 80
+                    },
+                    {
+                      "kind": "item_type",
+                      "ref": "film",
+                      "title": "Film",
+                      "score": 60
+                    }
+                  ],
+                  "failed": []
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "Sign in with an account to search.",
+                  "instance": "https://menagerist.example/api/v1/search"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist, or is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NotFoundError",
+                  "status": 404,
+                  "detail": "Collection weekend-watchlist not found",
+                  "instance": "https://menagerist.example/api/v1/search"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/search"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/search"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/examples": {
       "get": {
         "tags": [
@@ -22157,7 +22382,7 @@
           "System"
         ],
         "summary": "Check for a newer release",
-        "description": "Look for a newer release now (administrators).\n\nThe result is stored: read it from `GET /system/version/detail`. A failed\ncheck is recorded there, not raised. A repeat within a minute answers from the\nstored result without contacting GitHub again.\n\n**Requires permission:** `system:release:check`",
+        "description": "Look for a newer release now (administrators).\n\nThe result is stored: read it from `GET /system/version/detail`. A failed\ncheck is recorded there, not raised. A repeat within a minute answers from the\nstored result without contacting GitHub again. A development build also has the\npublished edge image read, from `ghcr.io`.\n\nAnswers 409 when the deployment has turned update checks off, in which case\nnothing is contacted.\n\n**Requires permission:** `system:release:check`",
         "operationId": "check_for_updates",
         "responses": {
           "204": {
@@ -22207,6 +22432,23 @@
                   "title": "ForbiddenError",
                   "status": 403,
                   "detail": "You do not have permission to do that.",
+                  "instance": "https://menagerist.example/api/v1/system/version/check"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Update checks are turned off by the deployment, so nothing is contacted.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "UpdateChecksDisabledError",
+                  "status": 409,
+                  "detail": "Update checks are turned off by the deployment.",
                   "instance": "https://menagerist.example/api/v1/system/version/check"
                 }
               }
@@ -24590,6 +24832,70 @@
             "copy_media": true,
             "copy_relationships": true,
             "name": "Alien (director's cut)"
+          }
+        ]
+      },
+      "EdgeBuildResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "behind",
+              "unknown"
+            ],
+            "title": "Status",
+            "description": "`current` when this build is the published edge image, `behind` when edge was built from another revision, `unknown` when edge could not be read or this build has no revision to compare. How many builds apart they are is not reported: a registry cannot say, and a commit count is not a build count."
+          },
+          "installed_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed Revision",
+            "description": "The shortened revision this build was made from."
+          },
+          "edge_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Revision",
+            "description": "The shortened revision the edge image was built from."
+          },
+          "compare_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compare Url",
+            "description": "Where to read the commits between the two, when behind."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EdgeBuildResponse",
+        "description": "Whether a development build is the published edge image.",
+        "examples": [
+          {
+            "compare_url": "https://github.com/example/menagerist/compare/c75e612...9fa1e22",
+            "edge_revision": "9fa1e22",
+            "installed_revision": "c75e612",
+            "status": "behind"
           }
         ]
       },
@@ -27215,6 +27521,17 @@
             ],
             "title": "Failure",
             "description": "Why the last attempt failed, if it did. The last good answer is kept and still shown."
+          },
+          "edge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EdgeBuildResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this build is the current edge image. Only present for a development build, where comparing versions says nothing."
           }
         },
         "type": "object",
@@ -27378,6 +27695,166 @@
         ],
         "title": "SchedulingPermission",
         "description": "Scheduler permissions remain administrative and non-content-scoped."
+      },
+      "SearchHitResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SearchKind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "An id (item, collection), slug (item type) or key (setting, task)."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "What it is called, as shown in the results."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What it is or does, when the owner has said."
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group",
+            "description": "An item's type slug, or a setting's section."
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug",
+            "description": "A collection's address."
+          },
+          "item_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Count",
+            "description": "How many items a collection holds."
+          },
+          "attributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes",
+            "description": "An item's field values."
+          },
+          "in_collection": {
+            "type": "boolean",
+            "title": "In Collection",
+            "description": "Whether an item is in the collection the search was asked about.",
+            "default": false
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score",
+            "description": "How well it matches; higher is better."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ref",
+          "title",
+          "score"
+        ],
+        "title": "SearchHitResponse",
+        "description": "One thing the search found.",
+        "examples": [
+          {
+            "description": "Minimum number of ordinary backups to retain.",
+            "group": "backup",
+            "kind": "setting",
+            "ref": "backup.keep_last",
+            "score": 80,
+            "title": "Backups to keep"
+          }
+        ]
+      },
+      "SearchKind": {
+        "type": "string",
+        "enum": [
+          "item",
+          "collection",
+          "item_type",
+          "setting",
+          "scheduled_task"
+        ],
+        "title": "SearchKind",
+        "description": "The kinds of thing the search can find, in the order ties are shown."
+      },
+      "SearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHitResponse"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Everything found across the kinds, best match first."
+          },
+          "failed": {
+            "items": {
+              "$ref": "#/components/schemas/SearchKind"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "Kinds whose search failed; the other results are still valid."
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "failed"
+        ],
+        "title": "SearchResponse",
+        "description": "Everything found, best first, and the kinds that could not be searched.",
+        "examples": [
+          {
+            "failed": [],
+            "results": [
+              {
+                "kind": "item_type",
+                "ref": "film",
+                "score": 100,
+                "title": "Film"
+              }
+            ]
+          }
+        ]
       },
       "SessionResponse": {
         "properties": {
@@ -28599,6 +29076,15 @@
               }
             ],
             "description": "Update status from the last stored check. Absent when this build names no GitHub repository, so there is nothing to check."
+          },
+          "update_checks_enabled": {
+            "type": "boolean",
+            "title": "Update Checks Enabled",
+            "description": "Whether the deployment lets this instance look for newer builds. False means nothing contacts github.com or ghcr.io, the scheduled check is not registered and Check now is unavailable; only the deployment can turn it back on.",
+            "default": true,
+            "examples": [
+              true
+            ]
           }
         },
         "type": "object",
@@ -28850,6 +29336,10 @@
     {
       "name": "Scheduling",
       "description": "See, run and preview the background jobs."
+    },
+    {
+      "name": "Search",
+      "description": "Find items, collections, item types, settings and tasks."
     },
     {
       "name": "Settings",

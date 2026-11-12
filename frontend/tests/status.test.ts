@@ -196,6 +196,7 @@ describe('formatObservedValue for CORS', () => {
 describe('formatObservedValue for the outbound proxy', () => {
 	it('says no proxy is used when none is set', () => {
 		expect(formatObservedValue(null, 'proxy')).toBe('Not used');
+		expect(formatObservedValue(undefined, 'proxy')).toBe('Not used');
 	});
 
 	it('names the proxy that is used', () => {
@@ -337,5 +338,108 @@ describe('safeNotesUrl', () => {
 		expect(safeNotesUrl('http://github.com/o/r')).toBeNull();
 		expect(safeNotesUrl(null)).toBeNull();
 		expect(safeNotesUrl(undefined)).toBeNull();
+	});
+});
+
+describe('releaseViewOf for a development build', () => {
+	const dev: ReleaseResponse = {
+		channel: 'stable',
+		provider: 'github',
+		status: 'development',
+		latest_version: '0.2026.10.0',
+		url: 'https://github.com/o/r/releases/tag/0.2026.10.0',
+		checked_at: '2026-11-02T03:00:00Z'
+	};
+
+	it('says a build at edge revision is the current edge', () => {
+		const view = releaseViewOf({
+			...dev,
+			edge: { status: 'current', installed_revision: 'c75e612', edge_revision: 'c75e612' }
+		});
+
+		expect(view.tone).toBe('ok');
+		expect(view.badge).toBe('Current edge build');
+		expect(view.summary).toBe('This is the current edge build.');
+		expect(view.compareUrl).toBeNull();
+		expect(view.rows).toContainEqual({ label: 'Edge build', value: 'c75e612' });
+	});
+
+	it('names both revisions and links the comparison when behind edge', () => {
+		const view = releaseViewOf({
+			...dev,
+			edge: {
+				status: 'behind',
+				installed_revision: 'c75e612',
+				edge_revision: '9fa1e22',
+				compare_url: 'https://github.com/o/r/compare/c75e612...9fa1e22'
+			}
+		});
+
+		expect(view.tone).toBe('attention');
+		expect(view.badge).toBe('Newer edge build');
+		expect(view.summary).toContain('c75e612 → 9fa1e22');
+		expect(view.compareUrl).toBe('https://github.com/o/r/compare/c75e612...9fa1e22');
+	});
+
+	it('keeps the old wording when edge could not be read', () => {
+		const view = releaseViewOf({ ...dev, edge: { status: 'unknown' } });
+
+		expect(view.badge).toBe('Development build');
+		expect(view.summary).toContain('cannot be compared with releases');
+		expect(view.rows.map((row) => row.label)).not.toContain('Edge build');
+	});
+
+	it('keeps the old wording when the API sends no edge at all', () => {
+		const view = releaseViewOf(dev);
+
+		expect(view.badge).toBe('Development build');
+		expect(view.compareUrl).toBeNull();
+	});
+
+	it('never links a comparison that is not a GitHub page', () => {
+		const view = releaseViewOf({
+			...dev,
+			edge: {
+				status: 'behind',
+				installed_revision: 'c75e612',
+				edge_revision: '9fa1e22',
+				compare_url: 'https://evil.example/compare'
+			}
+		});
+
+		expect(view.compareUrl).toBeNull();
+	});
+});
+
+describe('releaseViewOf when the deployment turns checks off', () => {
+	const base: ReleaseResponse = { channel: 'stable', provider: 'github', status: 'unknown' };
+
+	it('says so and does not invite a check that cannot be made', () => {
+		const view = releaseViewOf(base, '0.2026.10.0', false);
+
+		expect(view.checksEnabled).toBe(false);
+		expect(view.badge).toBe('Checks turned off');
+		expect(view.summary).toContain('turned off by this deployment');
+		expect(view.summary).not.toContain('Check now');
+	});
+
+	it('keeps the last stored answer but warns it may be stale', () => {
+		const view = releaseViewOf(
+			{
+				...base,
+				status: 'update_available',
+				latest_version: '0.2026.11.0',
+				checked_at: '2026-11-02T03:00:00Z'
+			},
+			'0.2026.10.0',
+			false
+		);
+
+		expect(view.summary).toContain('0.2026.11.0');
+		expect(view.summary).toContain('may be out of date');
+	});
+
+	it('reports checks as on by default', () => {
+		expect(releaseViewOf(base).checksEnabled).toBe(true);
 	});
 });

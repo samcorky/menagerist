@@ -294,18 +294,22 @@ export async function removeExamplePacks(request: APIRequestContext) {
 }
 
 /**
- * Makes every collections search request (`GET /collection?...`) fail with a 500 until the
- * returned function is called. Single-collection reads are left alone.
+ * Makes the search endpoint (`GET /search?...`) report collections as unsearchable, with the
+ * other kinds still answering, until the returned function is called.
  */
 export async function failCollectionSearch(page: Page): Promise<() => Promise<void>> {
-	const pattern = /\/api\/v1\/collections\?/;
-	await page.route(pattern, (route) =>
-		route.fulfill({
-			status: 500,
-			contentType: 'application/json',
-			body: JSON.stringify({ detail: 'Forced failure' })
-		})
-	);
+	// The search endpoint answers every kind; make it report collections as unsearchable.
+	const pattern = /\/api\/v1\/search\?/;
+	await page.route(pattern, async (route) => {
+		const response = await route.fetch();
+		const body = (await response.json()) as {
+			results: { kind: string }[];
+			failed: string[];
+		};
+		body.results = body.results.filter((hit) => hit.kind !== 'collection');
+		body.failed = ['collection'];
+		await route.fulfill({ response, json: body });
+	});
 	return () => page.unroute(pattern);
 }
 

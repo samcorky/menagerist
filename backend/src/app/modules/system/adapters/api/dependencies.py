@@ -36,7 +36,7 @@ from app.modules.system.adapters.platform.checks.storage_check import StorageChe
 from app.modules.system.adapters.platform.readiness_check_registry import (
     ReadinessCheckRegistry,
 )
-from app.modules.system.adapters.scheduling.jobs import release_provider
+from app.modules.system.adapters.scheduling.jobs import image_provider, release_provider
 from app.modules.system.application.check_for_updates import CheckForUpdates
 from app.modules.system.application.get_health import GetHealth
 from app.modules.system.application.get_health_ready import GetHealthReady
@@ -53,6 +53,7 @@ from app.platform.config.api import get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.config.outbound_http import get_outbound_http_settings
+from app.platform.config.release import get_release_settings
 from app.platform.database import get_session_factory
 from app.platform.storage_probe import storage_directories
 
@@ -140,6 +141,11 @@ async def get_release_channel() -> ReleaseChannel:
     return ReleaseChannel(await get_settings_reader().get(RELEASE_CHANNEL))
 
 
+def get_update_checks_enabled() -> bool:
+    """Whether the deployment lets this instance look for newer builds."""
+    return get_release_settings().check_enabled
+
+
 def get_get_version_detail_use_case(
     sources: Annotated[VersionDetailSources, Depends(get_version_detail_sources)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
@@ -158,6 +164,8 @@ def get_check_for_updates_use_case(
         guard,
         app_info=PackageAppInfoAdapter(),
         provider=release_provider(),
+        images=image_provider(),
+        enabled=get_release_settings().check_enabled,
     )
 
 

@@ -5,6 +5,9 @@ from typing import TYPE_CHECKING
 
 from app.modules.system.adapters.persistence.unit_of_work import create_system_uow
 from app.modules.system.adapters.platform.app_info_adapter import PackageAppInfoAdapter
+from app.modules.system.adapters.platform.ghcr_published_image_provider import (
+    GhcrPublishedImageProvider,
+)
 from app.modules.system.adapters.platform.github_release_provider import (
     GitHubReleaseProvider,
 )
@@ -30,6 +33,11 @@ def release_provider() -> GitHubReleaseProvider:
     return GitHubReleaseProvider(outbound_http())
 
 
+def image_provider() -> GhcrPublishedImageProvider:
+    """The registry the edge image is read from, through the same client."""
+    return GhcrPublishedImageProvider(outbound_http())
+
+
 @job(
     JobDefinition(
         job_key="system.update_check",
@@ -51,6 +59,8 @@ async def check_for_updates(
         get_access_guard(),
         app_info=PackageAppInfoAdapter(),
         provider=release_provider(),
+        images=image_provider(),
+        enabled=get_release_settings().check_enabled,
     ).handle(
         CheckForUpdatesCommand(
             channel=ReleaseChannel(await get_settings_reader().get(RELEASE_CHANNEL)),
@@ -62,9 +72,18 @@ async def check_for_updates(
 
 def system_schedules() -> dict[str, str]:
     """Expose the deployment schedule to the settings-backed schedule source."""
+    if not get_release_settings().check_enabled:
+        return {}
     return {"release.check_schedule": get_release_settings().check_schedule}
 
 
 def system_job_contribution() -> JobContribution:
-    """The system module's jobs and their deployment schedule."""
-    return JobContribution.from_handlers(check_for_updates, schedules=system_schedules)
+    """The system module's jobs and their deployment schedule.
+
+    With update checks turned off the job is not registered at all, so no cron is
+    evaluated and the Scheduled tasks page offers no row to run by hand. Leaving it
+    registered with an empty schedule would still show a runnable "Not scheduled"
+    row, which is the thing the switch is meant to rule out.
+    """
+    handlers = (check_for_updates,) if get_release_settings().check_enabled else ()
+    return JobContribution.from_handlers(*handlers, schedules=system_schedules)

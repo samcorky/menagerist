@@ -83,6 +83,7 @@ EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
         "identity.RevokeOwnSession",
         "identity.RotateApiToken",
         "identity.SetOwnDisplayName",
+        "search.Search",
     }
 )
 EXPECTED_CONTENT: frozenset[str] = frozenset(
