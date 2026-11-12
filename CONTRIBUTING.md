@@ -384,6 +384,20 @@ Generated release notes group pull requests by label (`.github/release.yml`), so
 
 A pull request appears under the first section it matches, in the order above; one with no label lands under "Other changes". Renovate follows the same titles: `chore(deps):` for dependencies, `ci(deps):` for GitHub Actions, `build(deps):` for Docker images and the build system, and `fix(security):` for vulnerability updates, so its pull requests are labelled like any other.
 
+## Issues
+
+File an issue from one of the forms (feature, bug or documentation). Each form sets the issue's GitHub type, a title prefix and a label:
+
+| Form            | Type    | Prefix      | Label                         |
+| --------------- | ------- | ----------- | ----------------------------- |
+| Feature request | Feature | `[feature]` | `enhancement`                 |
+| Bug report      | Bug     | `[bug]`     | `bug`                         |
+| Documentation   | Task    | `[docs]`    | `documentation`, `area: docs` |
+
+Maintenance work, such as a refactor or a dependency or CI change, is a Task with the `maintenance` label and a `[chore]` prefix. The type says what kind of work it is; `area: ...` labels say which part of the product it touches, and other labels such as `breaking-change` flag something special. Release notes are grouped by the labels on pull requests (see [Labels and release notes](#labels-and-release-notes)), not by issue type.
+
+The project board adds its own fields: Status, Priority, Size and Theme, the product area an issue belongs to (for example Collector essentials). The account-level issue fields (Priority, Start date, Target date and Effort) are left at their defaults and are optional. Put the milestone on the issue, not on the pull request that closes it, and have the pull request say `Closes #123`.
+
 ## Architecture
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [backend/README.md](backend/README.md), and [frontend/README.md](frontend/README.md).
