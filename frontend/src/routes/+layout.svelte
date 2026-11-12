@@ -19,6 +19,7 @@
 	import { TooltipProvider } from '$lib/components/ui/tooltip/index.js';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import { sidebar } from '$lib/sidebar.svelte';
+	import { isManageRoute } from '$lib/manage-nav';
 	import { isTextEntry } from '$lib/text-entry';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { PAGE_ALIGN, type PageAlignSource } from '$lib/page-context';
@@ -186,7 +187,9 @@
 	const collectionsActive = $derived(pathname.startsWith(resolve('/collections')));
 	const newActive = $derived(captureController.open);
 	const searchActive = $derived(searchPaletteController.open);
-	const settingsActive = $derived(pathname.startsWith(resolve('/settings')));
+	// Every page in the settings and administration area, from the one registry, so entries that
+	// live outside /settings (Status, Recently deleted) still light the tab up.
+	const settingsActive = $derived(isManageRoute(pathname));
 
 	$effect(() => {
 		return registerShortcut({

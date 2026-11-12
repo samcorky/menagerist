@@ -7,6 +7,7 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import {
 		activeManageHref,
+		isManageRoute,
 		mainDestinations,
 		manageGroups,
 		type ManageItem
@@ -22,7 +23,9 @@
 	const groups = $derived(manageGroups(can));
 	const active = $derived(activeManageHref(pathname, can));
 	const rail = $derived(sidebar.mode === 'rail');
-	const hubActive = $derived(pathname === '/settings' || pathname === '/admin');
+	// The Settings row at the foot stands in for both hub pages, which have no sidebar entry of
+	// their own; a page below them highlights that page's own row instead.
+	const hubActive = $derived(isManageRoute(pathname) && active === undefined);
 
 	let panel = $state<HTMLElement | null>(null);
 	// Where focus was when the drawer opened, so closing it hands focus back (the burger).
