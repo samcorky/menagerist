@@ -70,6 +70,8 @@ def test_domain_layer_has_no_framework_dependencies() -> None:
         .matching("abc*")
         .matching("collections*")
         .matching("mimetypes*")
+        # `packaging` is a pure value library; the release check orders versions with it
+        .matching("packaging*")
         .matching("re*")
     )
     assert_passes(rule)
