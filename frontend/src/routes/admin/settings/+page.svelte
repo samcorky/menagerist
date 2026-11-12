@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { Check, Pencil, Info, Server, RefreshCw, RotateCcw, X } from '@lucide/svelte';
@@ -18,11 +20,15 @@
 	import {
 		coerce,
 		formProp,
+		groupOfSetting,
 		groupSettings,
 		isChanged,
 		lockedNote,
+		pickSection,
 		restartNote,
 		schemaProperties,
+		settingId,
+		settingKeyFromHash,
 		sourceLabel,
 		staleNote,
 		updateBody,
@@ -32,10 +38,11 @@
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
 	import IconButton from '$lib/components/icon-button.svelte';
+	import SettingsSectionNav, { type Section } from '$lib/components/settings-section-nav.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import { desktop } from '$lib/viewport.svelte';
 
 	const canRead = $derived(auth.can('settings:instance:read'));
 	const canWrite = $derived(auth.can('settings:instance:write'));
@@ -49,6 +56,22 @@
 	let saving = $state<string | null>(null);
 
 	const groups = $derived(groupSettings(items));
+	// One section shows at a time. `?section=` names it; a `#setting-<key>` link also picks the
+	// section holding that setting, so a link to one setting needs nothing else.
+	const linkedKey = $derived(settingKeyFromHash(page.url.hash));
+	const activeKey = $derived(
+		pickSection(groups, page.url.searchParams.get('section'), groupOfSetting(items, linkedKey))
+	);
+	const activeGroup = $derived(groups.find((g) => g.group === activeKey));
+	const sections = $derived<Section[]>(
+		groups.map((g) => ({
+			key: g.group,
+			label: g.label,
+			count: g.items.length,
+			href: `${resolve('/admin/settings')}?section=${encodeURIComponent(g.group)}`
+		}))
+	);
+	let highlighted = $state<string | null>(null);
 	const props = $derived(schemaProperties(schema));
 	const loadingDisplay = delayedLoading();
 	$effect(() => loadingDisplay.set(loading));
@@ -57,13 +80,28 @@
 		else loading = false;
 	});
 
-	function headingId(key: string) {
-		return `setting-${key}`;
-	}
 	async function focusHeading(key: string) {
 		await tick();
-		document.getElementById(headingId(key))?.focus();
+		document.getElementById(settingId(key))?.focus();
 	}
+	function openSection(section: Section) {
+		void goto(section.href, { noScroll: true, keepFocus: true });
+	}
+	// Brings a linked setting into view and marks it for a moment once the page has loaded.
+	$effect(() => {
+		const key = linkedKey;
+		if (loading || key === null || !items.some((item) => item.key === key)) return;
+		let timer: ReturnType<typeof setTimeout>;
+		void tick().then(() => {
+			const heading = document.getElementById(settingId(key));
+			if (!heading) return;
+			heading.scrollIntoView({ block: 'center' });
+			heading.focus({ preventScroll: true });
+			highlighted = key;
+			timer = setTimeout(() => (highlighted = null), 2500);
+		});
+		return () => clearTimeout(timer);
+	});
 	function widgetFor(item: SettingResponse) {
 		const schemaProperty = props[item.key];
 		if (schemaProperty === undefined) return null;
@@ -260,106 +298,123 @@
 			</p>
 		{/if}
 
-		{#each groups as group (group.group)}
-			<CollapsibleSection
-				id="admin-settings-{group.group}"
-				title={group.label}
-				count={group.items.length}
-				class="gap-2"
-			>
-				<ul class="divide-y rounded-xl border bg-card" aria-busy={loading}>
-					{#each group.items as item (item.key)}
-						{@const widget = widgetFor(item)}
-						{@const editable = canWrite && !item.locked && widget !== null}
-						{@const isSaving = saving === item.key}
-						{@const locked = lockedNote(item)}
-						{@const restart = restartNote(item)}
-						{@const stale = staleNote(item)}
-						<li class="grid gap-x-8 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-							<div class="space-y-1">
-								<div class="flex flex-wrap items-center gap-2">
-									<h3
-										id={headingId(item.key)}
-										tabindex="-1"
-										class="font-heading font-semibold outline-none focus-visible:underline"
-									>
-										{item.title}
-									</h3>
-									<Badge variant="secondary">
-										{#if item.source === 'env'}
-											<Server aria-hidden="true" />
-										{:else if item.source === 'default'}
-											<Info aria-hidden="true" />
-										{:else}
-											<Pencil aria-hidden="true" />
-										{/if}
-										{sourceLabel(item)}
-									</Badge>
-								</div>
-								{#if item.description}
-									<p class="text-sm text-muted-foreground">{item.description}</p>
-								{/if}
-								{#if locked}<p class="text-sm text-muted-foreground">{locked}</p>{/if}
-								{#if restart}<p class="text-sm text-muted-foreground">{restart}</p>{/if}
-								{#if stale}<p class="text-sm text-muted-foreground">{stale}</p>{/if}
-							</div>
-
-							<div class="space-y-2">
-								{#if editable && widget}
-									{@const Input = widget.core.InputWidget}
-									<div class:opacity-60={isSaving}>
-										<Input
-											value={drafts[item.key]}
-											onChange={(value) => setDraft(item.key, value)}
-											ariaLabel={item.title}
-											prop={widget.prop}
-										/>
-									</div>
-								{:else if widget?.core.ViewWidget}
-									{@const View = widget.core.ViewWidget}
-									<View value={item.value} prop={widget.prop} />
-								{:else}
-									<p class="text-sm">{plainText(item.value)}</p>
-								{/if}
-
-								{#if fieldErrors[item.key]}
-									<p role="alert" class="text-sm text-destructive">{fieldErrors[item.key]}</p>
-								{/if}
-
-								{#if editable && (changed(item) || item.source === 'instance')}
+		{#if activeGroup}
+			<div class="grid gap-4 lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-8">
+				<div class="lg:sticky lg:top-4 lg:self-start">
+					<SettingsSectionNav
+						{sections}
+						active={activeKey}
+						variant={desktop.current ? 'list' : 'select'}
+						onselect={openSection}
+					/>
+				</div>
+				<section class="flex min-w-0 flex-col gap-2" aria-labelledby="settings-section-heading">
+					<h2 id="settings-section-heading" class="font-heading text-lg font-semibold">
+						{activeGroup.label}
+					</h2>
+					<ul class="divide-y rounded-xl border bg-card" aria-busy={loading}>
+						{#each activeGroup.items as item (item.key)}
+							{@const widget = widgetFor(item)}
+							{@const editable = canWrite && !item.locked && widget !== null}
+							{@const isSaving = saving === item.key}
+							{@const locked = lockedNote(item)}
+							{@const restart = restartNote(item)}
+							{@const stale = staleNote(item)}
+							<li
+								class="grid gap-x-8 gap-y-2 px-4 py-3 transition-colors duration-700 motion-reduce:transition-none lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] {highlighted ===
+								item.key
+									? 'bg-accent'
+									: ''}"
+							>
+								<div class="space-y-1">
 									<div class="flex flex-wrap items-center gap-2">
-										{#if changed(item)}
-											<Button
-												class="pointer-coarse:h-11"
-												disabled={isSaving}
-												onclick={() => save(item)}
-											>
-												{#if isSaving}<Spinner
-														class="motion-reduce:animate-none"
-														aria-hidden="true"
-													/>{:else}<Check class="size-4" aria-hidden="true" />{/if}
-												{isSaving ? 'Saving...' : 'Save'}
-											</Button>
-											<IconButton label="Discard" disabled={isSaving} onclick={() => discard(item)}>
-												<X />
-											</IconButton>
-										{/if}
-										{#if item.source === 'instance'}
-											<IconButton
-												label="Reset to default"
-												disabled={isSaving}
-												onclick={() => reset(item)}
-											>
-												<RotateCcw />
-											</IconButton>
-										{/if}
+										<h3
+											id={settingId(item.key)}
+											tabindex="-1"
+											class="font-heading font-semibold outline-none focus-visible:underline"
+										>
+											{item.title}
+										</h3>
+										<Badge variant="secondary">
+											{#if item.source === 'env'}
+												<Server aria-hidden="true" />
+											{:else if item.source === 'default'}
+												<Info aria-hidden="true" />
+											{:else}
+												<Pencil aria-hidden="true" />
+											{/if}
+											{sourceLabel(item)}
+										</Badge>
 									</div>
-								{/if}
-							</div>
-						</li>
-					{/each}
-				</ul>
-			</CollapsibleSection>
-		{/each}
+									{#if item.description}
+										<p class="text-sm text-muted-foreground">{item.description}</p>
+									{/if}
+									{#if locked}<p class="text-sm text-muted-foreground">{locked}</p>{/if}
+									{#if restart}<p class="text-sm text-muted-foreground">{restart}</p>{/if}
+									{#if stale}<p class="text-sm text-muted-foreground">{stale}</p>{/if}
+								</div>
+
+								<div class="space-y-2">
+									{#if editable && widget}
+										{@const Input = widget.core.InputWidget}
+										<div class:opacity-60={isSaving}>
+											<Input
+												value={drafts[item.key]}
+												onChange={(value) => setDraft(item.key, value)}
+												ariaLabel={item.title}
+												prop={widget.prop}
+											/>
+										</div>
+									{:else if widget?.core.ViewWidget}
+										{@const View = widget.core.ViewWidget}
+										<View value={item.value} prop={widget.prop} />
+									{:else}
+										<p class="text-sm">{plainText(item.value)}</p>
+									{/if}
+
+									{#if fieldErrors[item.key]}
+										<p role="alert" class="text-sm text-destructive">{fieldErrors[item.key]}</p>
+									{/if}
+
+									{#if editable && (changed(item) || item.source === 'instance')}
+										<div class="flex flex-wrap items-center gap-2">
+											{#if changed(item)}
+												<Button
+													class="pointer-coarse:h-11"
+													disabled={isSaving}
+													onclick={() => save(item)}
+												>
+													{#if isSaving}<Spinner
+															class="motion-reduce:animate-none"
+															aria-hidden="true"
+														/>{:else}<Check class="size-4" aria-hidden="true" />{/if}
+													{isSaving ? 'Saving...' : 'Save'}
+												</Button>
+												<IconButton
+													label="Discard"
+													disabled={isSaving}
+													onclick={() => discard(item)}
+												>
+													<X />
+												</IconButton>
+											{/if}
+											{#if item.source === 'instance'}
+												<IconButton
+													label="Reset to default"
+													disabled={isSaving}
+													onclick={() => reset(item)}
+												>
+													<RotateCcw />
+												</IconButton>
+											{/if}
+										</div>
+									{/if}
+								</div>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			</div>
+		{/if}
 	{/if}
 </Page>

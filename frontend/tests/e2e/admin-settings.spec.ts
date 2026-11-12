@@ -68,17 +68,36 @@ test('discarding an edit puts the saved value back without saving', async ({ pag
 	await expect(card.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
 });
 
-test('setting groups fold away and stay folded after a reload', async ({ page }) => {
+test('one section shows at a time and the section is in the link', async ({ page }) => {
 	await page.goto('/admin/settings');
-	const toggle = page.locator('main button[aria-expanded]').first();
-	await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-	await toggle.click();
-	await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-	await page.reload();
-	const again = page.locator('main button[aria-expanded]').first();
-	await expect(again).toHaveAttribute('aria-expanded', 'false');
-	await again.click();
-	await expect(again).toHaveAttribute('aria-expanded', 'true');
+	const section = page.getByRole('navigation', { name: 'Settings sections' });
+	await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible();
+	await expect(page.getByLabel('Backups to keep', { exact: true })).toBeVisible();
+
+	await section.getByRole('link', { name: /^Scheduled tasks/ }).click();
+	await expect(page).toHaveURL(/\?section=scheduler/);
+	await expect(page.getByRole('heading', { name: 'Scheduled tasks', exact: true })).toBeVisible();
+	await expect(page.getByLabel('Backups to keep', { exact: true })).toHaveCount(0);
+	await expect(section.getByRole('link', { name: /^Scheduled tasks/ })).toHaveAttribute(
+		'aria-current',
+		'page'
+	);
+
+	await page.goBack();
+	await expect(page.getByLabel('Backups to keep', { exact: true })).toBeVisible();
+});
+
+test('a link to one setting opens its section and highlights it', async ({ page }) => {
+	await page.goto('/admin/settings#setting-backup.keep_last');
+	const heading = page.getByRole('heading', { name: 'Backups to keep', exact: true });
+	await expect(heading).toBeVisible();
+	await expect(heading).toBeFocused();
+	await expect(page.getByRole('listitem').filter({ has: heading })).toHaveClass(/bg-accent/);
+});
+
+test('an unknown section falls back to the first', async ({ page }) => {
+	await page.goto('/admin/settings?section=nope');
+	await expect(page.getByLabel('Backups to keep', { exact: true })).toBeVisible();
 });
 
 test('Save and Discard only appear while a value differs from the saved one', async ({ page }) => {
