@@ -15,10 +15,12 @@ if TYPE_CHECKING:
 class OutboundProxyCheck:
     """Reports whether outbound web requests go through a proxy.
 
-    Pure inspection of settings, no I/O. It is informational and always passes: an
-    unset proxy is the normal case and reads as a null value. Only the host and port
-    of a proxy are shown, never its user name or password. It sends no `output`, which
-    is kept for warnings and failures.
+    Pure inspection of settings, no I/O. It is informational and always passes. With
+    no proxy set, which is the normal case, it reports nothing at all, exemptions
+    included, since they mean nothing without a proxy. With either set it reports all
+    three, and an unset one has no value. Only the host and port of a proxy are shown,
+    never its user name or password. It sends no `output`, which is kept for warnings
+    and failures.
     """
 
     def __init__(
@@ -33,7 +35,9 @@ class OutboundProxyCheck:
         self._exempt = len([e for e in no_proxy.split(",") if e.strip()])
 
     async def run(self) -> Mapping[str, CheckObservation]:
-        """Report each proxy, and how many hosts skip it."""
+        """Report each proxy, and how many hosts skip it, when a proxy is in use."""
+        if self._http is None and self._https is None:
+            return {}
         now = datetime.now(UTC)
         return {
             "configuration:outboundHttpProxy": observation(

@@ -196,6 +196,7 @@ describe('formatObservedValue for CORS', () => {
 describe('formatObservedValue for the outbound proxy', () => {
 	it('says no proxy is used when none is set', () => {
 		expect(formatObservedValue(null, 'proxy')).toBe('Not used');
+		expect(formatObservedValue(undefined, 'proxy')).toBe('Not used');
 	});
 
 	it('names the proxy that is used', () => {
