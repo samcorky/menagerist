@@ -33,6 +33,7 @@ backend/src/app/
 │   ├── graph/       # nodes, edges, node types, edge types
 │   ├── identity/    # accounts, sessions, sign-in, first-run setup, identity CLI
 │   ├── media/       # attachments and images
+│   ├── search/      # one ranked search over items, collections, item types, settings and scheduled tasks, answered by sources bridged from the owning modules
 │   └── system/      # health, readiness, version (public: minimal; detail needs system:diagnostics:read)
 ├── shared_kernel/   # Actor, access stances and guard, ContentFilter, error base types, UoW protocol, use case bases
 ├── platform/        # database engine, session factory, logging (one plausible implementation each)

@@ -1166,6 +1166,8 @@ def _shape(response: Response) -> tuple[object, ...]:
 
 # Variants whose value cannot match anything of A's even for A, and why.
 EMPTY_FOR_A: dict[tuple[str, str], str] = {
+    ("/api/v1/search", "bare"): "blank text finds nothing",
+    ("/api/v1/search", "query:limit"): "blank text finds nothing",
     (
         "/api/v1/node-types/{node_type_id}/attributes/{key}/usage",
         "query:sub_key",

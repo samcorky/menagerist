@@ -76,6 +76,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "See, run and preview the background jobs.",
     },
     {
+        "name": "Search",
+        "description": "Find items, collections, item types, settings and tasks.",
+    },
+    {
         "name": "Settings",
         "description": "Read and change instance settings, and fetch their schema.",
     },
