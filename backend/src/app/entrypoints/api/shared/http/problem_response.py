@@ -153,6 +153,17 @@ def error_response(
     )
 
 
+_INTERNAL_ERROR_DETAIL = "An unexpected error occurred."
+
+
+def _status_for_menagerist_error(error_type: type[Exception]) -> int:
+    return next(
+        status
+        for base, status in _STATUS_BY_MENAGERIST_ERROR.items()
+        if issubclass(error_type, base)
+    )
+
+
 def _internal_error_response(
     request: Request,
     exc: Exception,
@@ -175,7 +186,7 @@ def _internal_error_response(
             "type": "about:blank",
             "title": HTTPStatus(status_code).phrase,
             "status": status_code,
-            "detail": "An unexpected error occurred.",
+            "detail": _INTERNAL_ERROR_DETAIL,
             "instance": str(request.url),
         },
     )
@@ -187,11 +198,7 @@ def _menagerist_response(request: Request, exc: Exception) -> JSONResponse:
     Covers `InfrastructureError` and any other error raised on purpose, so it is
     logged as a warning; only a non-Menagerist exception is logged as an error.
     """
-    status_code = next(
-        status
-        for error_type, status in _STATUS_BY_MENAGERIST_ERROR.items()
-        if isinstance(exc, error_type)
-    )
+    status_code = _status_for_menagerist_error(type(exc))
     return _internal_error_response(
         request, exc, "menagerist error", status_code=status_code, deliberate=True
     )
