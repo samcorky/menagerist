@@ -752,6 +752,7 @@
 					<ReleaseCard
 						release={buildInfo.release}
 						installedVersion={buildInfo.current_version}
+						checksEnabled={buildInfo.update_checks_enabled ?? true}
 						canCheck={auth.can('system:release:check')}
 						checking={checkingUpdates}
 						checkError={updateCheckError}

@@ -11,6 +11,18 @@ from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves t
 class ReleaseSettings(MenageristBaseSettings, group="release"):
     """Which releases the instance looks for and how often."""
 
+    check_enabled: Annotated[
+        bool,
+        Field(
+            title="Update checks",
+            description=(
+                "Whether this instance ever contacts github.com and ghcr.io to look "
+                + "for newer builds. Off turns off both the scheduled check and the "
+                + "Status page's Check now, and is set by the deployment, so an "
+                + "administrator cannot turn it back on from the interface."
+            ),
+        ),
+    ] = True
     channel: Annotated[
         Literal["stable", "preview"],
         Field(

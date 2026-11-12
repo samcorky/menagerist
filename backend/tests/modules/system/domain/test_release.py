@@ -4,12 +4,17 @@ import pytest
 
 from app.modules.system.domain.release import (
     CheckFailure,
+    EdgeStatus,
     Release,
     ReleaseChannel,
     ReleaseStatus,
+    RepositoryRef,
     UpdateCheck,
     UpdateStatus,
     assess,
+    edge_image,
+    is_comparable_with_edge,
+    is_development,
     parse_github_repository,
     select_latest,
 )
@@ -27,7 +32,12 @@ def release(version: str, *, prerelease: bool = False) -> Release:
     )
 
 
-def check(latest: Release | None, *, success: bool = True) -> UpdateCheck:
+def check(
+    latest: Release | None,
+    *,
+    success: bool = True,
+    edge_revision: str | None = None,
+) -> UpdateCheck:
     """Check."""
     return UpdateCheck(
         source="o/r",
@@ -35,6 +45,31 @@ def check(latest: Release | None, *, success: bool = True) -> UpdateCheck:
         latest=latest,
         last_success_at=NOW if success else None,
         last_attempt_at=NOW,
+        edge_revision=edge_revision,
+    )
+
+
+REPOSITORY = RepositoryRef(owner="o", name="r")
+DEV = "0.2026.11.0.dev1"
+EDGE_COMMIT = "9fa1e22aa58ef51db1ce97032320be85dafa143a"
+OTHER_COMMIT = "c75e612bb58ef51db1ce97032320be85dafa143a"
+
+
+def edge_status(
+    *,
+    installed_revision: str | None = OTHER_COMMIT,
+    edge_revision: str | None = EDGE_COMMIT,
+    installed: str = DEV,
+    dirty: bool | None = False,
+) -> ReleaseStatus:
+    """A status for a build that can be compared with the edge image."""
+    return ReleaseStatus.of(
+        installed=installed,
+        dirty=dirty,
+        channel=ReleaseChannel.STABLE,
+        check=check(release("0.2026.10.0"), edge_revision=edge_revision),
+        repository=REPOSITORY,
+        installed_revision=installed_revision,
     )
 
 
@@ -265,3 +300,147 @@ def test_the_storage_key_separates_repositories_and_channels() -> None:
     }
 
     assert len(keys) == 3
+
+
+def test_a_development_build_at_edges_revision_is_current() -> None:
+    """A development build at edge's revision is current."""
+    status = edge_status(installed_revision=EDGE_COMMIT)
+
+    assert status.status is UpdateStatus.DEVELOPMENT
+    assert status.edge is not None
+    assert status.edge.status is EdgeStatus.CURRENT
+    assert status.edge.installed_revision == EDGE_COMMIT[:7]
+    assert status.edge.edge_revision == EDGE_COMMIT[:7]
+    # Nothing to compare against, so no link is offered.
+    assert status.edge.compare_url is None
+
+
+def test_a_development_build_at_another_revision_is_behind_edge() -> None:
+    """A development build at another revision is behind edge."""
+    status = edge_status()
+
+    assert status.edge is not None
+    assert status.edge.status is EdgeStatus.BEHIND
+    assert status.edge.installed_revision == OTHER_COMMIT[:7]
+    assert status.edge.edge_revision == EDGE_COMMIT[:7]
+    assert status.edge.compare_url == (
+        f"https://github.com/o/r/compare/{OTHER_COMMIT[:7]}...{EDGE_COMMIT[:7]}"
+    )
+
+
+def test_revisions_are_compared_shortened_so_two_lengths_still_match() -> None:
+    """Revisions are compared shortened, so two lengths still match."""
+    status = edge_status(installed_revision=EDGE_COMMIT[:7], edge_revision=EDGE_COMMIT)
+
+    assert status.edge is not None
+    assert status.edge.status is EdgeStatus.CURRENT
+
+
+@pytest.mark.parametrize(
+    ("installed_revision", "edge_revision"),
+    [
+        (None, EDGE_COMMIT),
+        (OTHER_COMMIT, None),
+        ("", EDGE_COMMIT),
+        (None, None),
+    ],
+)
+def test_edge_is_unknown_without_both_revisions(
+    installed_revision: str | None, edge_revision: str | None
+) -> None:
+    """Edge is unknown without both revisions."""
+    status = edge_status(
+        installed_revision=installed_revision, edge_revision=edge_revision
+    )
+
+    assert status.edge is not None
+    assert status.edge.status is EdgeStatus.UNKNOWN
+    assert status.edge.compare_url is None
+
+
+def test_an_uncommitted_build_is_never_reported_as_the_current_edge() -> None:
+    """An uncommitted build is never reported as the current edge."""
+    status = edge_status(installed_revision=EDGE_COMMIT, dirty=True)
+
+    assert status.edge is not None
+    # The commit matches, but the running code has changes the image does not.
+    assert status.edge.status is EdgeStatus.UNKNOWN
+
+
+def test_a_release_build_is_not_compared_with_edge_at_all() -> None:
+    """A release build is not compared with edge at all."""
+    status = edge_status(installed="0.2026.10.0")
+
+    assert status.status is not UpdateStatus.DEVELOPMENT
+    assert status.edge is None
+
+
+def test_edge_is_left_out_when_no_repository_is_known() -> None:
+    """Edge is left out when no repository is known."""
+    status = ReleaseStatus.of(
+        installed=DEV,
+        dirty=False,
+        channel=ReleaseChannel.STABLE,
+        check=check(release("0.2026.10.0"), edge_revision=EDGE_COMMIT),
+    )
+
+    assert status.status is UpdateStatus.DEVELOPMENT
+    assert status.edge is None
+
+
+def test_a_failed_check_keeps_the_edge_revision_it_last_read() -> None:
+    """A failed check keeps the edge revision it last read."""
+    succeeded = check(release("0.2026.10.0")).succeeded(
+        latest=release("0.2026.10.0"), at=NOW, edge_revision=EDGE_COMMIT
+    )
+
+    failed = succeeded.failed(CheckFailure.TIMEOUT, at=NOW + timedelta(hours=1))
+
+    assert failed.edge_revision == EDGE_COMMIT
+
+
+@pytest.mark.parametrize(
+    ("installed", "dirty", "expected"),
+    [
+        (DEV, False, True),
+        ("0.2026.10.0", True, True),
+        ("0.2026.10.0", False, False),
+        ("not-a-version", False, False),
+    ],
+)
+def test_a_development_build_is_a_dev_version_or_an_uncommitted_one(
+    installed: str, dirty: bool, expected: bool
+) -> None:
+    """A development build is a dev version or an uncommitted one."""
+    assert is_development(installed, dirty=dirty) is expected
+
+
+@pytest.mark.parametrize(
+    ("installed", "dirty", "revision", "expected"),
+    [
+        (DEV, False, EDGE_COMMIT, True),
+        # Uncommitted: its commit says nothing about the running code.
+        (DEV, True, EDGE_COMMIT, False),
+        # No revision of its own to compare.
+        (DEV, False, None, False),
+        (DEV, False, "  ", False),
+        # A release build is compared with releases instead.
+        ("0.2026.10.0", False, EDGE_COMMIT, False),
+    ],
+)
+def test_the_registry_is_only_read_when_it_could_say_something(
+    installed: str, dirty: bool, revision: str | None, expected: bool
+) -> None:
+    """The registry is only read when it could say something."""
+    result = is_comparable_with_edge(installed, dirty=dirty, revision=revision)
+
+    assert result is expected
+
+
+def test_the_edge_image_is_named_the_way_ghcr_addresses_a_package() -> None:
+    """A registry path is lower case, whatever case the repository uses."""
+    image = edge_image(RepositoryRef(owner="SamCorky", name="Menagerist"))
+
+    assert image.repository == "samcorky/menagerist"
+    assert image.tag == "edge"
+    assert image.reference == "samcorky/menagerist:edge"

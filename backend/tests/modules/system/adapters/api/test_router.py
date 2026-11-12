@@ -21,6 +21,7 @@ from app.modules.system.adapters.api.dependencies import (
     get_get_health_ready_use_case,
     get_get_version_detail_use_case,
     get_release_channel,
+    get_update_checks_enabled,
 )
 from app.modules.system.adapters.persistence.in_memory_update_check_store import (
     InMemoryUpdateCheckStore,
@@ -34,6 +35,9 @@ from app.modules.system.adapters.platform.in_memory_app_info_adapter import (
 )
 from app.modules.system.adapters.platform.in_memory_health_check_adapter import (
     InMemoryHealthCheckAdapter,
+)
+from app.modules.system.adapters.platform.in_memory_published_image_provider import (
+    InMemoryPublishedImageProvider,
 )
 from app.modules.system.adapters.platform.in_memory_release_provider import (
     InMemoryReleaseProvider,
@@ -477,6 +481,10 @@ def _app_with_updates(
     failure: CheckFailure | None = None,
     channel: ReleaseChannel = ReleaseChannel.STABLE,
     role: str = "admin",
+    enabled: bool = True,
+    version: str = "0.2026.10.0",
+    commit_sha: str | None = None,
+    edge_revision: str | None = None,
 ) -> tuple[FastAPI, InMemoryUpdateCheckStore, InMemoryReleaseProvider]:
     """An app whose release source, store and channel are in memory."""
     app = create_app()
@@ -485,8 +493,9 @@ def _app_with_updates(
     info = InMemoryAppInfoAdapter(
         AppInfo(
             name="menagerist",
-            version="0.2026.10.0",
+            version=version,
             dirty=False,
+            commit_sha=commit_sha,
             repository_url=repository_url,
             migration_head=("abc",),
         )
@@ -494,11 +503,17 @@ def _app_with_updates(
     store = InMemoryUpdateCheckStore()
     provider = InMemoryReleaseProvider(releases, failure=failure)
     app.dependency_overrides[get_release_channel] = lambda: channel
+    app.dependency_overrides[get_update_checks_enabled] = lambda: enabled
     app.dependency_overrides[get_get_version_detail_use_case] = lambda: (
         GetVersionDetail(VersionDetailSources(app_info=info, updates=store), guard)
     )
     app.dependency_overrides[get_check_for_updates_use_case] = lambda: CheckForUpdates(
-        create_in_memory_system_uow(store), guard, app_info=info, provider=provider
+        create_in_memory_system_uow(store),
+        guard,
+        app_info=info,
+        provider=provider,
+        images=InMemoryPublishedImageProvider(edge_revision),
+        enabled=enabled,
     )
     return app, store, provider
 
@@ -571,6 +586,81 @@ def test_a_failed_check_is_reported_and_not_an_error() -> None:
     assert release["status"] == "unknown"
     assert release["failure"] == "rate_limited"
     assert "checked_at" not in release
+
+
+def test_a_development_build_is_told_whether_it_is_the_current_edge() -> None:
+    """A development build is told whether it is the current edge."""
+    installed = "c75e612aa58ef51db1ce97032320be85dafa143a"
+    edge = "9fa1e22bb58ef51db1ce97032320be85dafa143a"
+    app, _, _ = _app_with_updates(
+        releases=[
+            Release(
+                version="0.2026.10.0",
+                title="Older",
+                url="https://github.com/o/r/releases/tag/0.2026.10.0",
+            )
+        ],
+        version="0.2026.11.0.dev1",
+        commit_sha=installed,
+        edge_revision=edge,
+    )
+    client = TestClient(app)
+
+    client.post("/api/v1/system/version/check")
+    release = client.get("/api/v1/system/version/detail").json()["release"]
+
+    assert release["status"] == "development"
+    assert release["edge"] == {
+        "status": "behind",
+        "installed_revision": "c75e612",
+        "edge_revision": "9fa1e22",
+        "compare_url": "https://github.com/o/r/compare/c75e612...9fa1e22",
+    }
+
+
+def test_a_release_build_is_given_no_edge_row() -> None:
+    """A release build is given no edge row."""
+    app, _, _ = _app_with_updates(
+        releases=[
+            Release(
+                version="0.2026.11.0",
+                title="Newer",
+                url="https://github.com/o/r/releases/tag/0.2026.11.0",
+            )
+        ],
+        commit_sha="c75e612aa58ef51db1ce97032320be85dafa143a",
+        edge_revision="9fa1e22bb58ef51db1ce97032320be85dafa143a",
+    )
+    client = TestClient(app)
+
+    client.post("/api/v1/system/version/check")
+    release = client.get("/api/v1/system/version/detail").json()["release"]
+
+    assert release["status"] == "update_available"
+    assert "edge" not in release
+
+
+def test_a_turned_off_deployment_refuses_check_now_and_says_so() -> None:
+    """A turned off deployment refuses check now and says so."""
+    app, store, provider = _app_with_updates(enabled=False)
+    client = TestClient(app)
+
+    checked = client.post("/api/v1/system/version/check")
+    detail = client.get("/api/v1/system/version/detail").json()
+
+    assert checked.status_code == 409
+    assert provider.calls == []
+    assert store.checks == {}
+    assert detail["update_checks_enabled"] is False
+
+
+def test_update_checks_are_reported_as_on_by_default() -> None:
+    """Update checks are reported as on by default."""
+    app, _, _ = _app_with_updates()
+
+    detail = TestClient(app).get("/api/v1/system/version/detail").json()
+
+    assert detail["update_checks_enabled"] is True
 
 
 def test_check_now_is_forbidden_for_members() -> None:
