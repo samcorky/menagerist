@@ -117,6 +117,8 @@ Bulk deletion follows §14 (“X items deleted → Undo”). On mobile use a bot
 
 With a mouse on a screen at least 768px wide, search is the field in the top bar and its results open in a dropdown beneath it: `/` focuses it, arrows and Enter choose, Escape clears the text and then closes it. Touch devices and phones keep the full-screen search sheet.
 
+Search reads the page you are on: what you are looking at ranks first and everything is still searched (on a collection page that collection's items lead under "In this collection"; on admin pages Settings and Scheduled tasks lead). Administrators also find individual settings and scheduled tasks, each opening its page at that setting or task, highlighted; people without access never see them.
+
 Search is fast, forgiving and natural-language friendly: examples include “matrix”, “signed items”, “things from 1999”, “keanu reeves” and “recently added”. Never require query syntax; offer useful fuzzy/browsable results where possible.
 
 Search the name, description and every text/number detail, including fields absent from cards. Explain hidden-field matches in one muted line, for example “Matched in Director: Ridley Scott”. Group result kinds where useful using collector-facing names (Items, People, Collections, Tags).

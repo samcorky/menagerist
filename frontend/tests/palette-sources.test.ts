@@ -1,18 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { listNodes, listCollections, listNodeTypes } = vi.hoisted(() => ({
-	listNodes: vi.fn(),
-	listCollections: vi.fn(),
-	listNodeTypes: vi.fn()
+const { listNodes, listCollections, listNodeTypes, listInstanceSettings, listJobs } = vi.hoisted(
+	() => ({
+		listInstanceSettings: vi.fn(),
+		listJobs: vi.fn(),
+		listNodes: vi.fn(),
+		listCollections: vi.fn(),
+		listNodeTypes: vi.fn()
+	})
+);
+vi.mock('$lib/api/client', () => ({
+	listNodes,
+	listCollections,
+	listNodeTypes,
+	listInstanceSettings,
+	listJobs
 }));
-vi.mock('$lib/api/client', () => ({ listNodes, listCollections, listNodeTypes }));
 import {
 	ITEM_TYPE_CAP,
 	loadItemTypes,
 	resetItemTypeCache,
 	searchEverything,
-	type Results
+	type Results,
+	type SearchScope
 } from '$lib/palette-sources';
+import { paletteLayout } from '$lib/palette-search';
 
 const node = (name: string) => ({ id: name, name });
 const coll = (name: string) => ({ id: name, name });
@@ -103,14 +115,15 @@ describe('searchEverything', () => {
 		let current = true;
 		const { updates, done } = run('film', () => current);
 		nodes.resolve({ data: [node('Film')] });
-		await vi.waitFor(() => expect(updates.length).toBe(2));
+		await vi.waitFor(() => expect(updates.some((u) => 'items' in u)).toBe(true));
+		const before = updates.length;
 		current = false;
 		colls.resolve({ data: [coll('Film')] });
 		types.resolve({ data: [type('Film')] });
 		await done;
-		expect(updates).toHaveLength(2);
-		expect(updates[0]).toHaveProperty('pages');
-		expect(updates[1]).toEqual({ items: { status: 'ok', rows: [node('Film')] } });
+		expect(updates).toHaveLength(before);
+		expect(merged(updates)).not.toHaveProperty('collections');
+		expect(merged(updates).items).toEqual({ status: 'ok', rows: [node('Film')] });
 	});
 
 	it('shares one in-flight item type request between overlapping searches', async () => {
@@ -188,6 +201,9 @@ describe('searchEverything', () => {
 			items: { status: 'ok', rows: [] },
 			collections: { status: 'ok', rows: [] },
 			itemTypes: { status: 'ok', rows: [] },
+			settings: { status: 'ok', rows: [] },
+			tasks: { status: 'ok', rows: [] },
+			collectionItems: { status: 'ok', rows: [] },
 			pages: []
 		});
 	});
@@ -258,5 +274,81 @@ describe('loadItemTypes paging', () => {
 		const all = await loadItemTypes();
 		expect(all).toHaveLength(ITEM_TYPE_CAP);
 		expect(listNodeTypes).toHaveBeenCalledTimes(ITEM_TYPE_CAP / 100);
+	});
+});
+
+describe('settings, scheduled tasks and the collection in view', () => {
+	const scope = (path: string, can = true): SearchScope => ({
+		layout: paletteLayout(path),
+		canSettings: can,
+		canTasks: can
+	});
+	const searchWith = async (query: string, s: SearchScope) => {
+		const updates: Partial<Results>[] = [];
+		await searchEverything(
+			query,
+			(p) => updates.push(p),
+			() => true,
+			undefined,
+			s
+		);
+		return merged(updates);
+	};
+
+	beforeEach(() => {
+		listInstanceSettings.mockResolvedValue({
+			data: [
+				{ key: 'backup.keep_last', group: 'backup', title: 'Backups to keep', description: null }
+			]
+		});
+		listJobs.mockResolvedValue({
+			data: [{ job_key: 'backup', title: 'Nightly backup', description: 'Copies everything' }]
+		});
+	});
+
+	it('finds settings and scheduled tasks for someone allowed to open them', async () => {
+		const all = await searchWith('backup', scope('/'));
+		expect(all.settings).toMatchObject({ status: 'ok', rows: [{ key: 'backup.keep_last' }] });
+		expect(all.tasks).toMatchObject({ status: 'ok', rows: [{ job_key: 'backup' }] });
+	});
+
+	it('never asks for them without permission', async () => {
+		const all = await searchWith('backup', scope('/', false));
+		expect(listInstanceSettings).not.toHaveBeenCalled();
+		expect(listJobs).not.toHaveBeenCalled();
+		expect(all.settings).toEqual({ status: 'ok', rows: [] });
+		expect(all.tasks).toEqual({ status: 'ok', rows: [] });
+	});
+
+	it('loads each list once and retries after a failure', async () => {
+		listJobs.mockResolvedValueOnce({ error: {} });
+		expect((await searchWith('backup', scope('/'))).tasks).toEqual({ status: 'error' });
+		await searchWith('back', scope('/'));
+		await searchWith('night', scope('/'));
+		expect(listJobs).toHaveBeenCalledTimes(2);
+		expect(listInstanceSettings).toHaveBeenCalledTimes(1);
+	});
+
+	it('reports a failing settings list on its own', async () => {
+		listInstanceSettings.mockResolvedValue({ error: {} });
+		const all = await searchWith('backup', scope('/'));
+		expect(all.settings).toEqual({ status: 'error' });
+		expect(all.tasks).toMatchObject({ status: 'ok' });
+	});
+
+	it('searches the collection in view as well, with the extra room for the lead group', async () => {
+		listNodes.mockResolvedValue({ data: [node('Film')] });
+		const all = await searchWith('film', scope('/collections/my-films'));
+		expect(listNodes).toHaveBeenCalledWith({
+			query: { q: 'film', collection: 'my-films', limit: 8 }
+		});
+		expect(listNodes).toHaveBeenCalledWith({ query: { q: 'film', limit: 5 } });
+		expect(all.collectionItems).toEqual({ status: 'ok', rows: [node('Film')] });
+	});
+
+	it('does not search a collection elsewhere', async () => {
+		const all = await searchWith('film', scope('/'));
+		expect(listNodes).toHaveBeenCalledTimes(1);
+		expect(all.collectionItems).toEqual({ status: 'ok', rows: [] });
 	});
 });

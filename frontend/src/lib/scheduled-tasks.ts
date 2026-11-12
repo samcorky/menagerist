@@ -94,3 +94,21 @@ export function lastRunLabel(
 ): string {
 	return format(run.started_at ?? run.scheduled_for);
 }
+
+const JOB_ID_PREFIX = 'job-';
+
+/** The element id of a scheduled task's row, which a link's `#` fragment points at. */
+export function jobId(jobKey: string): string {
+	return `${JOB_ID_PREFIX}${jobKey}`;
+}
+
+/** The task a URL fragment (`#job-<key>`) points at, or null for any other fragment. */
+export function jobKeyFromHash(hash: string): string | null {
+	const id = hash.startsWith('#') ? hash.slice(1) : hash;
+	if (!id.startsWith(JOB_ID_PREFIX) || id.length === JOB_ID_PREFIX.length) return null;
+	try {
+		return decodeURIComponent(id.slice(JOB_ID_PREFIX.length));
+	} catch {
+		return null;
+	}
+}

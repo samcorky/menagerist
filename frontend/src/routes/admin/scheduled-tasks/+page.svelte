@@ -1,7 +1,8 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { toast } from 'svelte-sonner';
 	import { Check, ChevronDown, RotateCcw } from '@lucide/svelte';
 	import {
@@ -26,6 +27,8 @@
 	import { percentOf } from '$lib/progress';
 	import {
 		isActive,
+		jobId,
+		jobKeyFromHash,
 		lastRunLabel,
 		nextRunLabel,
 		runDuration,
@@ -78,6 +81,13 @@
 	let panels = $state<Record<string, Panel | undefined>>({});
 	let history = $state<Record<string, History>>({});
 	let announcement = $state('');
+	// A `#job-<key>` link brings that task into view and marks it for a moment.
+	const linkedJob = $derived(jobKeyFromHash(page.url.hash));
+	let highlightedJob = $state<string | null>(null);
+	const markClass = (job: JobResponse) =>
+		highlightedJob === job.job_key
+			? 'bg-accent transition-colors duration-700 motion-reduce:transition-none'
+			: 'transition-colors duration-700 motion-reduce:transition-none';
 
 	// Schedules live in the settings, so a task's schedule is edited through them.
 	let settings = $state.raw<SettingResponse[]>([]);
@@ -224,6 +234,21 @@
 			if (panels[setting.key] === undefined) drafts[setting.key] = setting.value;
 		}
 	}
+
+	$effect(() => {
+		const key = linkedJob;
+		if (loading || key === null || !jobs.some((job) => job.job_key === key)) return;
+		let timer: ReturnType<typeof setTimeout>;
+		void tick().then(() => {
+			const row = document.getElementById(jobId(key));
+			if (!row) return;
+			row.scrollIntoView({ block: 'center' });
+			row.focus({ preventScroll: true });
+			highlightedJob = key;
+			timer = setTimeout(() => (highlightedJob = null), 2500);
+		});
+		return () => clearTimeout(timer);
+	});
 
 	$effect(() => {
 		if (canRead) {
@@ -663,7 +688,7 @@
 				>
 					{#each jobs as job (job.job_key)}
 						{@const setting = scheduleSetting(job)}
-						<Table.Row>
+						<Table.Row id={jobId(job.job_key)} tabindex={-1} class={markClass(job)}>
 							<Table.Head scope="row" class="h-auto max-w-xs px-4 py-3 align-top whitespace-normal">
 								<div class="font-medium">{job.title}</div>
 								{#if job.description}
@@ -693,8 +718,8 @@
 				<ul class="space-y-3" aria-label="Scheduled tasks">
 					{#each jobs as job (job.job_key)}
 						{@const setting = scheduleSetting(job)}
-						<li>
-							<Card.Root>
+						<li id={jobId(job.job_key)} tabindex="-1" class="rounded-xl outline-none">
+							<Card.Root class={markClass(job)}>
 								<Card.Content class="flex flex-col gap-3 p-4">
 									<div class="space-y-0.5">
 										<h2 class="font-medium">{job.title}</h2>
