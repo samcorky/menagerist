@@ -68,5 +68,7 @@ class GetVersionDetail(
             dirty=app_info.dirty,
             channel=query.channel,
             check=check,
+            repository=repository,
+            installed_revision=app_info.commit_sha,
         )
         return VersionDetail(app_info=app_info, release=release)

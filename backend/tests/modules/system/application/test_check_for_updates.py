@@ -15,6 +15,9 @@ from app.modules.system.adapters.persistence.unit_of_work import (
 from app.modules.system.adapters.platform.in_memory_app_info_adapter import (
     InMemoryAppInfoAdapter,
 )
+from app.modules.system.adapters.platform.in_memory_published_image_provider import (
+    InMemoryPublishedImageProvider,
+)
 from app.modules.system.adapters.platform.in_memory_release_provider import (
     InMemoryReleaseProvider,
 )
@@ -30,8 +33,10 @@ from app.modules.system.application.get_version_detail import (
 from app.modules.system.domain.app_info import AppInfo
 from app.modules.system.domain.release import (
     CheckFailure,
+    EdgeStatus,
     Release,
     ReleaseChannel,
+    UpdateChecksDisabledError,
     UpdateStatus,
 )
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
@@ -42,14 +47,25 @@ ADMIN = Actor(id=uuid.UUID(int=1), roles=frozenset({"admin"}))
 MEMBER = Actor(id=uuid.UUID(int=2), roles=frozenset({"member"}))
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 REPOSITORY = "https://github.com/o/r"
+VERSION = "0.2026.10.0"
+DEV_VERSION = "0.2026.11.0.dev1"
+COMMIT = "c75e612aa58ef51db1ce97032320be85dafa143a"
+EDGE_COMMIT = "9fa1e22bb58ef51db1ce97032320be85dafa143a"
 
 
-def app_info(*, repository_url: str | None = REPOSITORY) -> AppInfo:
+def app_info(
+    *,
+    repository_url: str | None = REPOSITORY,
+    version: str = VERSION,
+    dirty: bool | None = False,
+    commit_sha: str | None = COMMIT,
+) -> AppInfo:
     """App info."""
     return AppInfo(
         name="menagerist",
-        version="0.2026.10.0",
-        dirty=False,
+        version=version,
+        dirty=dirty,
+        commit_sha=commit_sha,
         repository_url=repository_url,
         migration_head=("abc",),
     )
@@ -74,16 +90,32 @@ class Harness:
         *,
         failure: CheckFailure | None = None,
         repository_url: str | None = REPOSITORY,
+        version: str = VERSION,
+        dirty: bool | None = False,
+        edge_revision: str | None = None,
+        edge_failure: CheckFailure | None = None,
+        enabled: bool = True,
     ) -> None:
         self.store = InMemoryUpdateCheckStore()
         self.uow = create_in_memory_system_uow(self.store)
         self.provider = InMemoryReleaseProvider(releases, failure=failure)
-        self.info = InMemoryAppInfoAdapter(app_info(repository_url=repository_url))
+        self.images = InMemoryPublishedImageProvider(
+            edge_revision, failure=edge_failure
+        )
+        self.info = InMemoryAppInfoAdapter(
+            app_info(repository_url=repository_url, version=version, dirty=dirty)
+        )
+        self.enabled = enabled
 
     def check(self) -> CheckForUpdates:
         """Check."""
         return CheckForUpdates(
-            self.uow, GUARD, app_info=self.info, provider=self.provider
+            self.uow,
+            GUARD,
+            app_info=self.info,
+            provider=self.provider,
+            images=self.images,
+            enabled=self.enabled,
         )
 
     def detail(self) -> GetVersionDetail:
@@ -247,3 +279,122 @@ async def test_a_build_without_a_github_repository_has_nothing_to_check(
     assert detail.release is None
     assert harness.provider.calls == []
     assert not harness.uow.committed
+
+
+async def test_a_development_build_stores_the_published_edge_revision() -> None:
+    """A development build stores the published edge revision."""
+    harness = Harness(
+        [release("0.2026.10.0")], version=DEV_VERSION, edge_revision=COMMIT
+    )
+
+    outcome = await harness.check().handle(command(), ADMIN)
+
+    assert outcome is not None
+    assert outcome.edge_revision == COMMIT
+    assert [image.tag for image in harness.images.calls] == ["edge"]
+    assert harness.images.calls[0].repository == "o/r"
+
+
+async def test_a_release_build_never_reads_the_registry() -> None:
+    """A release build never reads the registry."""
+    harness = Harness([release("0.2026.11.0")], edge_revision=COMMIT)
+
+    outcome = await harness.check().handle(command(), ADMIN)
+
+    assert outcome is not None
+    assert outcome.edge_revision is None
+    assert harness.images.calls == []
+
+
+async def test_an_uncommitted_build_never_reads_the_registry() -> None:
+    """Its commit cannot describe the running code, so the read would be thrown away."""
+    harness = Harness([release("0.2026.10.0")], dirty=True, edge_revision=COMMIT)
+
+    outcome = await harness.check().handle(command(), ADMIN)
+
+    assert outcome is not None
+    assert outcome.edge_revision is None
+    assert harness.images.calls == []
+
+
+async def test_a_build_with_no_revision_never_reads_the_registry() -> None:
+    """With no commit of its own there is nothing to compare edge against."""
+    harness = Harness([release("0.2026.10.0")], version=DEV_VERSION)
+    harness.info = InMemoryAppInfoAdapter(
+        app_info(version=DEV_VERSION, commit_sha=None)
+    )
+
+    outcome = await harness.check().handle(command(), ADMIN)
+
+    assert outcome is not None
+    assert outcome.edge_revision is None
+    assert harness.images.calls == []
+
+
+async def test_an_unreadable_registry_leaves_the_release_check_successful() -> None:
+    """An unreadable registry leaves the release check successful."""
+    harness = Harness(
+        [release("0.2026.10.0")],
+        version=DEV_VERSION,
+        edge_failure=CheckFailure.RATE_LIMITED,
+    )
+
+    outcome = await harness.check().handle(command(), ADMIN)
+
+    assert outcome is not None
+    # The release was read, so the check succeeded; only edge is unknown.
+    assert outcome.last_success_at == NOW
+    assert outcome.failure is None
+    assert outcome.latest is not None
+    assert outcome.edge_revision is None
+
+
+async def test_an_image_with_no_revision_label_is_not_a_failure() -> None:
+    """An image with no revision label is not a failure."""
+    harness = Harness([release("0.2026.10.0")], version=DEV_VERSION, edge_revision=None)
+
+    outcome = await harness.check().handle(command(), ADMIN)
+
+    assert outcome is not None
+    assert outcome.failure is None
+    assert outcome.edge_revision is None
+
+
+async def test_a_turned_off_deployment_contacts_nothing_and_refuses() -> None:
+    """A turned off deployment contacts nothing and refuses."""
+    harness = Harness([release("0.2026.11.0")], enabled=False)
+
+    with pytest.raises(UpdateChecksDisabledError):
+        await harness.check().handle(command(), ADMIN)
+
+    assert harness.provider.calls == []
+    assert harness.images.calls == []
+    assert harness.store.checks == {}
+
+
+async def test_a_turned_off_deployment_refuses_the_scheduled_run_too() -> None:
+    """The job's own actor is refused as well, so the schedule cannot call out."""
+    harness = Harness([release("0.2026.11.0")], enabled=False)
+
+    with pytest.raises(UpdateChecksDisabledError):
+        await harness.check().handle(command(), SYSTEM_ACTOR)
+
+    assert harness.provider.calls == []
+    assert harness.images.calls == []
+
+
+async def test_the_detail_view_compares_a_development_build_with_edge() -> None:
+    """The detail view compares a development build with edge."""
+    harness = Harness(
+        [release("0.2026.10.0")], version=DEV_VERSION, edge_revision=EDGE_COMMIT
+    )
+    await harness.check().handle(command(), ADMIN)
+
+    detail = await harness.detail().handle(GetVersionDetailQuery(), ADMIN)
+
+    assert detail.release is not None
+    assert detail.release.status is UpdateStatus.DEVELOPMENT
+    assert detail.release.edge is not None
+    assert detail.release.edge.status is EdgeStatus.BEHIND
+    assert detail.release.edge.installed_revision == COMMIT[:7]
+    assert detail.release.edge.edge_revision == EDGE_COMMIT[:7]

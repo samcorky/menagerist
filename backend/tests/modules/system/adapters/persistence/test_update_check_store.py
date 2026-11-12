@@ -35,6 +35,7 @@ def _check(**overrides: object) -> UpdateCheck:
         ),
         "last_success_at": NOW,
         "last_attempt_at": NOW,
+        "edge_revision": "c75e612aa58ef51db1ce97032320be85dafa143a",
     }
     return UpdateCheck(**{**values, **overrides})  # type: ignore[arg-type]
 
@@ -102,3 +103,16 @@ async def test_each_key_keeps_its_own_row(db_session: AsyncSession) -> None:
     assert preview is not None
     assert stable.channel is ReleaseChannel.STABLE
     assert preview.channel is ReleaseChannel.PREVIEW
+
+
+async def test_a_result_with_no_edge_revision_is_stored_without_one(
+    db_session: AsyncSession,
+) -> None:
+    """A release build reads no edge image, so the column stays null."""
+    store = SqlAlchemyUpdateCheckStore(db_session)
+
+    await store.save(KEY, _check(edge_revision=None))
+
+    stored = await store.get(KEY)
+    assert stored is not None
+    assert stored.edge_revision is None

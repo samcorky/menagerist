@@ -20,6 +20,7 @@ from app.modules.system.adapters.api.dependencies import (
     get_get_version_use_case,
     get_release_channel,
     get_run_browser_check_use_case,
+    get_update_checks_enabled,
 )
 from app.modules.system.application.check_for_updates import (
     CheckForUpdates,
@@ -49,7 +50,12 @@ from app.modules.system.domain.readiness import (
     CheckStatus,
     ReadinessReport,
 )
-from app.modules.system.domain.release import ReleaseChannel, ReleaseStatus
+from app.modules.system.domain.release import (
+    EdgeComparison,
+    ReleaseChannel,
+    ReleaseStatus,
+    UpdateChecksDisabledError,
+)
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError
 
@@ -246,6 +252,58 @@ class VersionResponse(BaseModel):
     ]
 
 
+class EdgeBuildResponse(BaseModel):
+    """Whether a development build is the published edge image."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "status": "behind",
+                    "installed_revision": "c75e612",
+                    "edge_revision": "9fa1e22",
+                    "compare_url": "https://github.com/example/menagerist/compare/c75e612...9fa1e22",
+                }
+            ]
+        }
+    )
+
+    status: Annotated[
+        Literal["current", "behind", "unknown"],
+        Field(
+            description=(
+                "`current` when this build is the published edge image, `behind` "
+                + "when edge was built from another revision, `unknown` when edge "
+                + "could not be read or this build has no revision to compare. How "
+                + "many builds apart they are is not reported: a registry cannot "
+                + "say, and a commit count is not a build count."
+            )
+        ),
+    ]
+    installed_revision: Annotated[
+        str | None,
+        Field(description="The shortened revision this build was made from."),
+    ] = None
+    edge_revision: Annotated[
+        str | None,
+        Field(description="The shortened revision the edge image was built from."),
+    ] = None
+    compare_url: Annotated[
+        str | None,
+        Field(description="Where to read the commits between the two, when behind."),
+    ] = None
+
+    @classmethod
+    def from_domain(cls, edge: EdgeComparison) -> EdgeBuildResponse:
+        """Build the API schema from the domain comparison."""
+        return cls(
+            status=edge.status.value,
+            installed_revision=edge.installed_revision,
+            edge_revision=edge.edge_revision,
+            compare_url=edge.compare_url,
+        )
+
+
 class ReleaseResponse(BaseModel):
     """What is known about newer releases, from the last stored check."""
 
@@ -326,6 +384,16 @@ class ReleaseResponse(BaseModel):
         ),
     ] = None
 
+    edge: Annotated[
+        EdgeBuildResponse | None,
+        Field(
+            description=(
+                "Whether this build is the current edge image. Only present for a "
+                + "development build, where comparing versions says nothing."
+            )
+        ),
+    ] = None
+
     @classmethod
     def from_domain(cls, status: ReleaseStatus) -> ReleaseResponse:
         """Build the API schema from the domain status."""
@@ -342,6 +410,11 @@ class ReleaseResponse(BaseModel):
             checked_at=status.checked_at,
             last_attempt_at=status.last_attempt_at,
             failure=None if status.failure is None else status.failure.value,
+            edge=(
+                None
+                if status.edge is None
+                else EdgeBuildResponse.from_domain(status.edge)
+            ),
         )
 
 
@@ -422,6 +495,18 @@ class VersionDetailResponse(VersionResponse):
             ),
         ),
     ] = None
+    update_checks_enabled: Annotated[
+        bool,
+        Field(
+            description=(
+                "Whether the deployment lets this instance look for newer builds. "
+                + "False means nothing contacts github.com or ghcr.io, the "
+                + "scheduled check is not registered and Check now is unavailable; "
+                + "only the deployment can turn it back on."
+            ),
+            examples=[True],
+        ),
+    ] = True
 
 
 def _check_ex(
@@ -584,6 +669,7 @@ async def get_version(
 async def get_version_detail(
     use_case: Annotated[GetVersionDetail, Depends(get_get_version_detail_use_case)],
     channel: Annotated[ReleaseChannel, Depends(get_release_channel)],
+    checks_enabled: Annotated[bool, Depends(get_update_checks_enabled)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> VersionDetailResponse:
     """Report version, build provenance and update status (administrators).
@@ -606,6 +692,7 @@ async def get_version_detail(
             if detail.release is None
             else ReleaseResponse.from_domain(detail.release)
         ),
+        update_checks_enabled=checks_enabled,
     )
 
 
@@ -615,7 +702,13 @@ async def get_version_detail(
     operation_id="check_for_updates",
     status_code=204,
     dependencies=[Depends(verify_csrf)],
-    responses=error_response(ForbiddenError, detail=_FORBIDDEN),
+    responses={
+        **error_response(ForbiddenError, detail=_FORBIDDEN),
+        **error_response(
+            UpdateChecksDisabledError,
+            detail="Update checks are turned off by the deployment.",
+        ),
+    },
 )
 async def check_for_updates(
     use_case: Annotated[CheckForUpdates, Depends(get_check_for_updates_use_case)],
@@ -626,7 +719,11 @@ async def check_for_updates(
 
     The result is stored: read it from `GET /system/version/detail`. A failed
     check is recorded there, not raised. A repeat within a minute answers from the
-    stored result without contacting GitHub again.
+    stored result without contacting GitHub again. A development build also has the
+    published edge image read, from `ghcr.io`.
+
+    Answers 409 when the deployment has turned update checks off, in which case
+    nothing is contacted.
     """
     await use_case.handle(
         CheckForUpdatesCommand(channel=channel, now=datetime.now(UTC)), actor

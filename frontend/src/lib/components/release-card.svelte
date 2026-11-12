@@ -10,6 +10,7 @@
 	let {
 		release,
 		installedVersion = null,
+		checksEnabled = true,
 		canCheck,
 		checking,
 		checkError,
@@ -18,13 +19,18 @@
 		release: ReleaseResponse;
 		/** The running build's version, shown beside the latest release. */
 		installedVersion?: string | null;
+		/** Whether the deployment allows update checks at all. */
+		checksEnabled?: boolean;
 		canCheck: boolean;
 		checking: boolean;
 		checkError: string | null;
 		onCheck: () => void;
 	} = $props();
 
-	const view = $derived(releaseViewOf(release, installedVersion));
+	const view = $derived(releaseViewOf(release, installedVersion, checksEnabled));
+	// The deployment switch hides the button outright: the permission is not the thing
+	// standing in the way, so offering it to be pressed would only fail.
+	const showCheck = $derived(canCheck && view.checksEnabled);
 
 	const toneClass: Record<ReleaseTone, string> = {
 		ok: 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400',
@@ -73,9 +79,9 @@
 		{#if checkError}
 			<p role="alert" class="px-5 text-sm text-destructive">{checkError}</p>
 		{/if}
-		{#if view.notesUrl || canCheck}
+		{#if view.notesUrl || view.compareUrl || showCheck}
 			<div class="flex flex-wrap gap-2 border-t border-border/80 px-5 py-4">
-				{#if canCheck}
+				{#if showCheck}
 					<Button
 						variant="outline"
 						class="pointer-coarse:h-11"
@@ -96,6 +102,19 @@
 					>
 						<ExternalLink class="size-4" />
 						Release notes
+						<span class="sr-only"> (opens in a new tab)</span>
+					</Button>
+				{/if}
+				{#if view.compareUrl}
+					<Button
+						variant="ghost"
+						class="pointer-coarse:h-11"
+						href={view.compareUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						<ExternalLink class="size-4" />
+						What changed
 						<span class="sr-only"> (opens in a new tab)</span>
 					</Button>
 				{/if}

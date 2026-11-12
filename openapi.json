@@ -22382,7 +22382,7 @@
           "System"
         ],
         "summary": "Check for a newer release",
-        "description": "Look for a newer release now (administrators).\n\nThe result is stored: read it from `GET /system/version/detail`. A failed\ncheck is recorded there, not raised. A repeat within a minute answers from the\nstored result without contacting GitHub again.\n\n**Requires permission:** `system:release:check`",
+        "description": "Look for a newer release now (administrators).\n\nThe result is stored: read it from `GET /system/version/detail`. A failed\ncheck is recorded there, not raised. A repeat within a minute answers from the\nstored result without contacting GitHub again. A development build also has the\npublished edge image read, from `ghcr.io`.\n\nAnswers 409 when the deployment has turned update checks off, in which case\nnothing is contacted.\n\n**Requires permission:** `system:release:check`",
         "operationId": "check_for_updates",
         "responses": {
           "204": {
@@ -22432,6 +22432,23 @@
                   "title": "ForbiddenError",
                   "status": 403,
                   "detail": "You do not have permission to do that.",
+                  "instance": "https://menagerist.example/api/v1/system/version/check"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Update checks are turned off by the deployment, so nothing is contacted.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "UpdateChecksDisabledError",
+                  "status": 409,
+                  "detail": "Update checks are turned off by the deployment.",
                   "instance": "https://menagerist.example/api/v1/system/version/check"
                 }
               }
@@ -24815,6 +24832,70 @@
             "copy_media": true,
             "copy_relationships": true,
             "name": "Alien (director's cut)"
+          }
+        ]
+      },
+      "EdgeBuildResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "behind",
+              "unknown"
+            ],
+            "title": "Status",
+            "description": "`current` when this build is the published edge image, `behind` when edge was built from another revision, `unknown` when edge could not be read or this build has no revision to compare. How many builds apart they are is not reported: a registry cannot say, and a commit count is not a build count."
+          },
+          "installed_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed Revision",
+            "description": "The shortened revision this build was made from."
+          },
+          "edge_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edge Revision",
+            "description": "The shortened revision the edge image was built from."
+          },
+          "compare_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compare Url",
+            "description": "Where to read the commits between the two, when behind."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EdgeBuildResponse",
+        "description": "Whether a development build is the published edge image.",
+        "examples": [
+          {
+            "compare_url": "https://github.com/example/menagerist/compare/c75e612...9fa1e22",
+            "edge_revision": "9fa1e22",
+            "installed_revision": "c75e612",
+            "status": "behind"
           }
         ]
       },
@@ -27440,6 +27521,17 @@
             ],
             "title": "Failure",
             "description": "Why the last attempt failed, if it did. The last good answer is kept and still shown."
+          },
+          "edge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EdgeBuildResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this build is the current edge image. Only present for a development build, where comparing versions says nothing."
           }
         },
         "type": "object",
@@ -28984,6 +29076,15 @@
               }
             ],
             "description": "Update status from the last stored check. Absent when this build names no GitHub repository, so there is nothing to check."
+          },
+          "update_checks_enabled": {
+            "type": "boolean",
+            "title": "Update Checks Enabled",
+            "description": "Whether the deployment lets this instance look for newer builds. False means nothing contacts github.com or ghcr.io, the scheduled check is not registered and Check now is unavailable; only the deployment can turn it back on.",
+            "default": true,
+            "examples": [
+              true
+            ]
           }
         },
         "type": "object",

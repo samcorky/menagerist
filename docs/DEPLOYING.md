@@ -13,16 +13,16 @@ The `menagerist` container applies database migrations when it starts. Before it
 
 `compose.yaml` follows the `latest` image unless `MENAGERIST_IMAGE` says otherwise ([Compose variables](settings.md#compose)). Set it in a `.env` file next to `compose.yaml` to choose another tag:
 
-| Tag | What it is |
-|---|---|
-| `latest` | The most recent release. The `0.` in the version only means the project is not yet stable, so those releases count; release candidates (`0.2026.11.0rc1`) do not. |
-| `0.2026.11.0` | One release, by version, which never moves, even when a hotfix (`0.2026.11.0.post1`) follows it. Pin this to update only when you choose to. |
+| Tag                 | What it is                                                                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `latest`            | The most recent release. The `0.` in the version only means the project is not yet stable, so those releases count; release candidates (`0.2026.11.0rc1`) do not.                                                        |
+| `0.2026.11.0`       | One release, by version, which never moves, even when a hotfix (`0.2026.11.0.post1`) follows it. Pin this to update only when you choose to.                                                                             |
 | `0.2026.11.0.post1` | A hotfix for that release, made for a fix to the release process or packaging rather than for new features. It gets its own exact tag and moves `latest`, `0.2026.11` and `0.2026`; `0.2026.11.0` stays as it was built. |
-| `0.2026.11` | The newest release of that month, including a `.post` hotfix. Follow this to take patches and hotfixes but not the next month's changes. |
-| `0.2026` | The newest release of that year. |
-| `0.2026.11.0rc1` | A release candidate, published ahead of its release for testing. |
-| `edge` | The latest commit on `main`. |
-| `sha-<commit>` | One exact commit, by its first seven characters. Not every commit on `main` gets one: a newer merge cancels an older build that is still running. |
+| `0.2026.11`         | The newest release of that month, including a `.post` hotfix. Follow this to take patches and hotfixes but not the next month's changes.                                                                                 |
+| `0.2026`            | The newest release of that year.                                                                                                                                                                                         |
+| `0.2026.11.0rc1`    | A release candidate, published ahead of its release for testing.                                                                                                                                                         |
+| `edge`              | The latest commit on `main`.                                                                                                                                                                                             |
+| `sha-<commit>`      | One exact commit, by its first seven characters. Not every commit on `main` gets one: a newer merge cancels an older build that is still running.                                                                        |
 
 A tag moves only when the release is the newest it covers. A hotfix for an older month (a `.post` of `0.2026.10.0` once `0.2026.11.0` is out) moves its own month tag, `0.2026.10`, but not `0.2026` or `latest`, which stay with the newer release. Pre-releases move none of the shared tags. Moving `latest` or a month tag back to an older release is not supported: pin the exact version instead.
 
@@ -68,6 +68,14 @@ Menagerist leaves TLS to a reverse proxy. [REVERSE-PROXY.md](REVERSE-PROXY.md) l
 ## Deployment notes
 
 No other website may call the API unless you list its origin in `MENAGERIST_API_CORS_ORIGINS` (only needed if the frontend is hosted separately). Menagerist does not send `Strict-Transport-Security`; set it at the TLS-terminating proxy (see [REVERSE-PROXY.md](REVERSE-PROXY.md#send-hsts-from-the-proxy)). The public `/api/health/ready` answers only pass or fail; measurements are for administrators at `/api/v1/system/health/ready/detail`.
+
+## Looking for updates
+
+The update check contacts two hosts: `github.com` (the repository's releases) and, on a development build such as the `edge` image, `ghcr.io`, to read which commit the published `edge` image was built from and tell you whether yours is the current one. Both are read anonymously, with no token, and are sent only what any request sends: your address and a `Menagerist/<version>` user agent. Nothing about your collection leaves the instance.
+
+It runs on `MENAGERIST_RELEASE_CHECK_SCHEDULE` (default `20 5 * * *`) and whenever an administrator chooses Check now on the Status page. Set the schedule empty to stop the timer while leaving Check now available.
+
+To stop the instance calling out at all, set `MENAGERIST_RELEASE_CHECK_ENABLED=false`. The scheduled job is then not registered (so it is not on Administration > Scheduled tasks and cannot be run by hand), Check now is unavailable, and the Status page says checks are turned off by the deployment. It is a deployment setting on purpose, so an administrator cannot turn it back on from the interface; changing it needs a restart of both the app and the worker.
 
 ## Database memory tuning
 
