@@ -1,11 +1,11 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
+	import SettingsTile from '$lib/components/settings-tile.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		Tag,
 		ArrowLeftRight,
 		Bookmark,
-		ChevronRight,
 		Activity,
 		Sparkles,
 		Shield,
@@ -26,186 +26,58 @@
 	</div>
 
 	<div class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
-		<a href={resolve('/settings/item-types')} class="group block">
-			<div
-				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-			>
-				<div class="flex items-start gap-4">
-					<div
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-					>
-						<Tag class="size-5" />
-					</div>
-					<div>
-						<p class="font-heading font-semibold">Item types</p>
-						<p class="mt-0.5 text-sm text-muted-foreground">
-							Organise your items with types like "Film", "Person", or "Event".
-						</p>
-					</div>
-				</div>
-				<ChevronRight
-					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-				/>
-			</div>
-		</a>
-
-		<a href={resolve('/settings/relationships')} class="group block">
-			<div
-				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-			>
-				<div class="flex items-start gap-4">
-					<div
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-					>
-						<ArrowLeftRight class="size-5" />
-					</div>
-					<div>
-						<p class="font-heading font-semibold">Relationship types</p>
-						<p class="mt-0.5 text-sm text-muted-foreground">
-							Define how items connect - "Directed by", "Signed by", "Part of".
-						</p>
-					</div>
-				</div>
-				<ChevronRight
-					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-				/>
-			</div>
-		</a>
-
-		<a href={resolve('/settings/saved-fields')} class="group block">
-			<div
-				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-			>
-				<div class="flex items-start gap-4">
-					<div
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-					>
-						<Bookmark class="size-5" />
-					</div>
-					<div>
-						<p class="font-heading font-semibold">Saved fields</p>
-						<p class="mt-0.5 text-sm text-muted-foreground">
-							Reuse a field or a list of choices across item types.
-						</p>
-					</div>
-				</div>
-				<ChevronRight
-					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-				/>
-			</div>
-		</a>
-
-		<a href={resolve('/settings/examples')} class="group block">
-			<div
-				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-			>
-				<div class="flex items-start gap-4">
-					<div
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-					>
-						<Sparkles class="size-5" />
-					</div>
-					<div>
-						<p class="font-heading font-semibold">Examples</p>
-						<p class="mt-0.5 text-sm text-muted-foreground">
-							Explore Menagerist with ready-made example items.
-						</p>
-					</div>
-				</div>
-				<ChevronRight
-					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-				/>
-			</div>
-		</a>
-
-		<a href={resolve('/recently-deleted')} class="group block">
-			<div
-				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-			>
-				<div class="flex items-start gap-4">
-					<div
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-					>
-						<Trash2 class="size-5" />
-					</div>
-					<div>
-						<p class="font-heading font-semibold">Recently deleted</p>
-						<p class="mt-0.5 text-sm text-muted-foreground">
-							Restore items and collections you deleted, or delete them for good.
-						</p>
-					</div>
-				</div>
-				<ChevronRight
-					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-				/>
-			</div>
-		</a>
+		<SettingsTile
+			href={resolve('/settings/item-types')}
+			icon={Tag}
+			title="Item types"
+			description="Organise your items with types like &quot;Film&quot;, &quot;Person&quot;, or &quot;Event&quot;."
+		/>
+		<SettingsTile
+			href={resolve('/settings/relationships')}
+			icon={ArrowLeftRight}
+			title="Relationship types"
+			description="Define how items connect - &quot;Directed by&quot;, &quot;Signed by&quot;, &quot;Part of&quot;."
+		/>
+		<SettingsTile
+			href={resolve('/settings/saved-fields')}
+			icon={Bookmark}
+			title="Saved fields"
+			description="Reuse a field or a list of choices across item types."
+		/>
+		<SettingsTile
+			href={resolve('/settings/examples')}
+			icon={Sparkles}
+			title="Examples"
+			description="Explore Menagerist with ready-made example items."
+		/>
+		<SettingsTile
+			href={resolve('/recently-deleted')}
+			icon={Trash2}
+			title="Recently deleted"
+			description="Restore items and collections you deleted, or delete them for good."
+		/>
 
 		{#if auth.isAdmin}
-			<a href={resolve('/admin')} class="group block">
-				<div
-					class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-						>
-							<Shield class="size-5" />
-						</div>
-						<div>
-							<p class="font-heading font-semibold">Administration</p>
-							<p class="mt-0.5 text-sm text-muted-foreground">Manage users and active devices.</p>
-						</div>
-					</div>
-					<ChevronRight
-						class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-					/>
-				</div>
-			</a>
+			<SettingsTile
+				href={resolve('/admin')}
+				icon={Shield}
+				title="Administration"
+				description="Manage users and active devices."
+			/>
 		{/if}
 
-		<a href={resolve('/settings/account')} class="group block">
-			<div
-				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-			>
-				<div class="flex items-start gap-4">
-					<div
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-					>
-						<UserRound class="size-5" />
-					</div>
-					<div>
-						<p class="font-heading font-semibold">Account</p>
-						<p class="mt-0.5 text-sm text-muted-foreground">Change your password.</p>
-					</div>
-				</div>
-				<ChevronRight
-					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-				/>
-			</div>
-		</a>
+		<SettingsTile
+			href={resolve('/settings/account')}
+			icon={UserRound}
+			title="Account"
+			description="Change your password."
+		/>
 
-		<a href={resolve('/status')} class="group block">
-			<div
-				class="flex items-center justify-between rounded-xl border bg-card p-5 transition-colors group-hover:bg-muted/50"
-			>
-				<div class="flex items-start gap-4">
-					<div
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-foreground"
-					>
-						<Activity class="size-5" />
-					</div>
-					<div>
-						<p class="font-heading font-semibold">System status</p>
-						<p class="mt-0.5 text-sm text-muted-foreground">
-							Health checks, database connectivity, and build info.
-						</p>
-					</div>
-				</div>
-				<ChevronRight
-					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-				/>
-			</div>
-		</a>
+		<SettingsTile
+			href={resolve('/status')}
+			icon={Activity}
+			title="System status"
+			description="Health checks, database connectivity, and build info."
+		/>
 	</div>
 </Page>
