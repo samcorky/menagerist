@@ -15745,6 +15745,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SearchResponse"
+                },
+                "example": {
+                  "results": [
+                    {
+                      "kind": "setting",
+                      "ref": "backup.keep_last",
+                      "title": "Backups to keep",
+                      "description": "Minimum number of ordinary backups to retain.",
+                      "group": "backup",
+                      "score": 80
+                    },
+                    {
+                      "kind": "item_type",
+                      "ref": "film",
+                      "title": "Film",
+                      "score": 60
+                    }
+                  ],
+                  "failed": []
                 }
               }
             }
@@ -27558,7 +27577,8 @@
           },
           "title": {
             "type": "string",
-            "title": "Title"
+            "title": "Title",
+            "description": "What it is called, as shown in the results."
           },
           "description": {
             "anyOf": [
@@ -27569,7 +27589,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "What it is or does, when the owner has said."
           },
           "group": {
             "anyOf": [
@@ -27665,7 +27686,8 @@
               "$ref": "#/components/schemas/SearchHitResponse"
             },
             "type": "array",
-            "title": "Results"
+            "title": "Results",
+            "description": "Everything found across the kinds, best match first."
           },
           "failed": {
             "items": {

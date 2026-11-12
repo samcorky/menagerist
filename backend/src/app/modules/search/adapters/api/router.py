@@ -11,6 +11,21 @@ from app.modules.search.application.search import Search, SearchQuery
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
 
+_EXAMPLE = {
+    "results": [
+        {
+            "kind": "setting",
+            "ref": "backup.keep_last",
+            "title": "Backups to keep",
+            "description": "Minimum number of ordinary backups to retain.",
+            "group": "backup",
+            "score": 80,
+        },
+        {"kind": "item_type", "ref": "film", "title": "Film", "score": 60},
+    ],
+    "failed": [],
+}
+
 router = APIRouter(prefix="/search", tags=["Search"], route_class=PermissionAwareRoute)
 
 _FORBIDDEN = error_response(ForbiddenError, detail="Sign in with an account to search.")
@@ -20,7 +35,10 @@ _FORBIDDEN = error_response(ForbiddenError, detail="Sign in with an account to s
     "",
     response_model=SearchResponse,
     operation_id="search_everything",
-    responses={**_FORBIDDEN},
+    responses={
+        200: {"content": {"application/json": {"example": _EXAMPLE}}},
+        **_FORBIDDEN,
+    },
 )
 async def search_everything(
     use_case: Annotated[Search, Depends(get_search_use_case)],

@@ -12,8 +12,10 @@ class SearchHitResponse(BaseModel):
     ref: str = Field(
         description="An id (item, collection), slug (item type) or key (setting, task)."
     )
-    title: str
-    description: str | None = None
+    title: str = Field(description="What it is called, as shown in the results.")
+    description: str | None = Field(
+        default=None, description="What it is or does, when the owner has said."
+    )
     group: str | None = Field(
         default=None, description="An item's type slug, or a setting's section."
     )
@@ -50,7 +52,9 @@ class SearchHitResponse(BaseModel):
 class SearchResponse(BaseModel):
     """Everything found, best first, and the kinds that could not be searched."""
 
-    results: list[SearchHitResponse]
+    results: list[SearchHitResponse] = Field(
+        description="Everything found across the kinds, best match first."
+    )
     failed: list[SearchKind] = Field(
         description="Kinds whose search failed; the other results are still valid."
     )
