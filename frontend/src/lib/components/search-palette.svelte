@@ -2,9 +2,17 @@
 	import { tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { auth } from '$lib/auth.svelte.js';
 	import { ArrowRight, Search } from '@lucide/svelte';
 	import { collectionRouteParams } from '$lib/collections';
-	import type { CollectionResponse, NodeResponse, NodeTypeResponse } from '$lib/api/client';
+	import type {
+		CollectionResponse,
+		JobResponse,
+		NodeResponse,
+		NodeTypeResponse,
+		SettingResponse
+	} from '$lib/api/client';
 	import { delayedLoading } from '$lib/delayed-loading.svelte';
 	import { loadExampleIds } from '$lib/examples';
 	import {
@@ -14,7 +22,15 @@
 		type GroupState,
 		type Results
 	} from '$lib/palette-sources';
-	import type { StaticRoute } from '$lib/palette-search';
+	import {
+		paletteLayout,
+		settingPath,
+		taskPath,
+		type PaletteGroup,
+		type StaticRoute
+	} from '$lib/palette-search';
+	import { groupLabel } from '$lib/settings-form';
+	import { descriptionSnippet } from '$lib/palette-search';
 	import { matchContext } from '$lib/search-context';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import {
@@ -37,17 +53,30 @@
 	const DEBOUNCE_MS = 250;
 	const SEE_ALL_VALUE = 'see-all-results';
 	const SEE_ALL_COLLECTIONS_VALUE = 'see-all-collections';
-	const ASYNC_KEYS: AsyncGroupKey[] = ['items', 'collections', 'itemTypes'];
+	const ASYNC_KEYS: AsyncGroupKey[] = [
+		'items',
+		'collections',
+		'itemTypes',
+		'settings',
+		'tasks',
+		'collectionItems'
+	];
 	const GROUP_NOUN: Record<AsyncGroupKey, string> = {
 		items: 'items',
 		collections: 'collections',
-		itemTypes: 'item types'
+		itemTypes: 'item types',
+		settings: 'settings',
+		tasks: 'scheduled tasks',
+		collectionItems: 'items in this collection'
 	};
 
 	const emptyResults = (): Results => ({
 		items: { status: 'ok', rows: [] },
 		collections: { status: 'ok', rows: [] },
 		itemTypes: { status: 'ok', rows: [] },
+		settings: { status: 'ok', rows: [] },
+		tasks: { status: 'ok', rows: [] },
+		collectionItems: { status: 'ok', rows: [] },
 		pages: []
 	});
 
@@ -78,6 +107,19 @@
 	// §13a: the 300 ms starts when the request does, not at the keystroke
 	const spinner = delayedLoading();
 
+	// What the person is looking at decides which groups come first.
+	const layout = $derived(paletteLayout(page.url.pathname));
+	const canSettings = $derived(auth.can('settings:instance:read'));
+	const canTasks = $derived(auth.can('scheduling:job:read'));
+	// Items of the collection being viewed show in their own group, not twice.
+	const otherItems = $derived.by(() => {
+		const inCollection = new Set(okRows(groups.collectionItems).map((r) => r.id));
+		return okRows(groups.items).filter((r) => !inCollection.has(r.id));
+	});
+	const hint = $derived(
+		`Type to search items, collections, item types and pages${canSettings || canTasks ? ', settings and scheduled tasks' : ''}`
+	);
+
 	const pending = $derived(debouncing || loading.length > 0);
 	const okRows = <T,>(state: GroupState<T>): T[] => (state.status === 'ok' ? state.rows : []);
 	const showSeeAllCollections = $derived(collectionsAtCap(okRows(groups.collections).length));
@@ -85,9 +127,12 @@
 		ASYNC_KEYS.filter((key) => groups[key].status === 'error' && !loading.includes(key))
 	);
 	const count = $derived(
-		okRows(groups.items).length +
+		otherItems.length +
+			okRows(groups.collectionItems).length +
 			okRows(groups.collections).length +
 			okRows(groups.itemTypes).length +
+			okRows(groups.settings).length +
+			okRows(groups.tasks).length +
 			groups.pages.length
 	);
 	const paletteState = $derived({
@@ -103,28 +148,35 @@
 	const staleKeys = $derived(debouncing ? [...ASYNC_KEYS, 'pages' as const] : loading);
 	// First row in display order that can be opened
 	const firstValue = $derived(
-		firstLiveValue([
-			{
-				values: okRows(groups.items).map((r) => `item:${r.id}`),
-				stale: staleKeys.includes('items')
-			},
-			{
-				values: [
+		firstLiveValue(
+			layout.order.map((key) => ({
+				values: rowValues(key),
+				stale: staleKeys.includes(key)
+			}))
+		)
+	);
+
+	function rowValues(key: PaletteGroup): string[] {
+		switch (key) {
+			case 'items':
+				return otherItems.map((r) => `item:${r.id}`);
+			case 'collectionItems':
+				return okRows(groups.collectionItems).map((r) => `item:${r.id}`);
+			case 'collections':
+				return [
 					...okRows(groups.collections).map((r) => `collection:${r.id}`),
 					...(showSeeAllCollections ? [SEE_ALL_COLLECTIONS_VALUE] : [])
-				],
-				stale: staleKeys.includes('collections')
-			},
-			{
-				values: okRows(groups.itemTypes).map((r) => `type:${r.slug}`),
-				stale: staleKeys.includes('itemTypes')
-			},
-			{
-				values: groups.pages.map((r) => `page:${r.path}`),
-				stale: staleKeys.includes('pages')
-			}
-		])
-	);
+				];
+			case 'itemTypes':
+				return okRows(groups.itemTypes).map((r) => `type:${r.slug}`);
+			case 'settings':
+				return okRows(groups.settings).map((r) => `setting:${r.key}`);
+			case 'tasks':
+				return okRows(groups.tasks).map((r) => `task:${r.job_key}`);
+			case 'pages':
+				return groups.pages.map((r) => `page:${r.path}`);
+		}
+	}
 
 	function typeOf(item: NodeResponse): NodeTypeResponse | undefined {
 		return types.find((t) => t.slug === item.type);
@@ -146,7 +198,7 @@
 		autoHighlight = highlighted;
 	}
 
-	const isStale = (key: AsyncGroupKey | 'pages') => staleKeys.includes(key);
+	const isStale = (key: PaletteGroup) => staleKeys.includes(key);
 	const retryBusy = (key: AsyncGroupKey) => debouncing || loading.includes(key);
 	// An errored group shows its retry row; one hidden while a new query reloads it does not
 	const showFailed = (key: AsyncGroupKey) =>
@@ -184,7 +236,8 @@
 				settleHighlight();
 			},
 			() => mine === seq,
-			only
+			only,
+			{ layout, canSettings, canTasks }
 		);
 	}
 
@@ -286,7 +339,7 @@
 		spinner.set(false);
 	}
 
-	function choose(key: AsyncGroupKey | 'pages', go: () => void) {
+	function choose(key: PaletteGroup, go: () => void) {
 		if (isStale(key)) return seeAll();
 		navigating = true;
 		onOpenChange(false);
@@ -311,6 +364,9 @@
 			() => void goto(resolve(`/items?${new URLSearchParams({ type: slug }).toString()}`))
 		);
 	const openPage = (path: StaticRoute) => choose('pages', () => void goto(resolve(path)));
+	const openSetting = (setting: SettingResponse) =>
+		choose('settings', () => void goto(resolve(settingPath(setting))));
+	const openTask = (task: JobResponse) => choose('tasks', () => void goto(resolve(taskPath(task))));
 
 	function seeAll() {
 		const search = seeAllSearch(query);
@@ -340,10 +396,174 @@
 	</div>
 {/snippet}
 
+{#snippet itemGroup(key: 'items' | 'collectionItems', heading: string, rows: NodeResponse[])}
+	{#if showFailed(key)}
+		<Command.Group {heading}>{@render failedRow(key)}</Command.Group>
+	{:else if rows.length > 0}
+		<Command.Group {heading}>
+			{#each rows as item (item.id)}
+				{@const sub = subtitle(item)}
+				<Command.Item
+					disabled={isStale(key)}
+					value={`item:${item.id}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={() => openItem(item)}
+				>
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center gap-2">
+							<span class="truncate font-medium">{item.name}</span>
+							{#if exampleIds.has(item.id)}
+								<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
+							{/if}
+						</div>
+						{#if sub}
+							<p class="truncate text-xs text-muted-foreground">{sub}</p>
+						{/if}
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
+{#snippet collectionsGroup()}
+	{#if showFailed('collections')}
+		<Command.Group heading="Collections">{@render failedRow('collections')}</Command.Group>
+	{:else if okRows(groups.collections).length > 0}
+		<Command.Group heading="Collections">
+			{#each okRows(groups.collections) as collection (collection.id)}
+				<Command.Item
+					disabled={isStale('collections')}
+					value={`collection:${collection.id}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={() => openCollection(collection)}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{collection.name}</span>
+						<p class="truncate text-xs text-muted-foreground">
+							{countLabel(collection.item_count)}
+						</p>
+					</div>
+				</Command.Item>
+			{/each}
+			{#if showSeeAllCollections}
+				<Command.Item
+					disabled={isStale('collections')}
+					value={SEE_ALL_COLLECTIONS_VALUE}
+					class="pointer-coarse:min-h-11"
+					onSelect={openAllCollections}
+				>
+					<Search class="size-4" />
+					<span class="flex-1">See all collections</span>
+					<ArrowRight class="size-4" />
+				</Command.Item>
+			{/if}
+		</Command.Group>
+	{/if}
+{/snippet}
+
+{#snippet itemTypesGroup()}
+	{#if showFailed('itemTypes')}
+		<Command.Group heading="Item types">{@render failedRow('itemTypes')}</Command.Group>
+	{:else if okRows(groups.itemTypes).length > 0}
+		<Command.Group heading="Item types">
+			{#each okRows(groups.itemTypes) as type (type.slug)}
+				<Command.Item
+					disabled={isStale('itemTypes')}
+					value={`type:${type.slug}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={() => openItemType(type.slug)}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{type.label}</span>
+						<p class="truncate text-xs text-muted-foreground">Item type</p>
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
+{#snippet settingsGroup()}
+	{#if showFailed('settings')}
+		<Command.Group heading="Settings">{@render failedRow('settings')}</Command.Group>
+	{:else if okRows(groups.settings).length > 0}
+		<Command.Group heading="Settings">
+			{#each okRows(groups.settings) as setting (setting.key)}
+				<Command.Item
+					disabled={isStale('settings')}
+					value={`setting:${setting.key}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={() => openSetting(setting)}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{setting.title}</span>
+						<p class="truncate text-xs text-muted-foreground">
+							Setting · {groupLabel(setting.group)}
+						</p>
+						{#if descriptionSnippet(setting.title, setting.description, query)}
+							<p class="truncate text-xs text-muted-foreground">
+								{descriptionSnippet(setting.title, setting.description, query)}
+							</p>
+						{/if}
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
+{#snippet tasksGroup()}
+	{#if showFailed('tasks')}
+		<Command.Group heading="Scheduled tasks">{@render failedRow('tasks')}</Command.Group>
+	{:else if okRows(groups.tasks).length > 0}
+		<Command.Group heading="Scheduled tasks">
+			{#each okRows(groups.tasks) as task (task.job_key)}
+				<Command.Item
+					disabled={isStale('tasks')}
+					value={`task:${task.job_key}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={() => openTask(task)}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{task.title}</span>
+						<p class="truncate text-xs text-muted-foreground">Scheduled task</p>
+						{#if descriptionSnippet(task.title, task.description, query)}
+							<p class="truncate text-xs text-muted-foreground">
+								{descriptionSnippet(task.title, task.description, query)}
+							</p>
+						{/if}
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
+{#snippet pagesGroup()}
+	{#if groups.pages.length > 0}
+		<Command.Group heading="Pages">
+			{#each groups.pages as page (page.path)}
+				<Command.Item
+					disabled={isStale('pages')}
+					value={`page:${page.path}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={() => openPage(page.path)}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{page.label}</span>
+						<p class="truncate text-xs text-muted-foreground">Page</p>
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
 {#snippet results()}
 	{#if view === 'hint'}
 		<p class="py-6 text-center text-sm text-muted-foreground" aria-hidden="true">
-			Type to search items, collections, item types and pages
+			{hint}
 		</p>
 	{:else if view === 'loading'}
 		<div class="flex justify-center py-6" aria-hidden="true">
@@ -356,102 +576,27 @@
 	{/if}
 	{#if view !== 'hint'}
 		<Command.List class={inline ? 'max-h-[60dvh]' : 'mt-2 max-h-[50dvh]'}>
-			{#if showFailed('items')}
-				<Command.Group heading="Items">{@render failedRow('items')}</Command.Group>
-			{:else if okRows(groups.items).length > 0}
-				<Command.Group heading="Items">
-					{#each okRows(groups.items) as item (item.id)}
-						{@const sub = subtitle(item)}
-						<Command.Item
-							disabled={isStale('items')}
-							value={`item:${item.id}`}
-							class="pointer-coarse:min-h-11"
-							onSelect={() => openItem(item)}
-						>
-							<div class="min-w-0 flex-1">
-								<div class="flex items-center gap-2">
-									<span class="truncate font-medium">{item.name}</span>
-									{#if exampleIds.has(item.id)}
-										<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
-									{/if}
-								</div>
-								{#if sub}
-									<p class="truncate text-xs text-muted-foreground">{sub}</p>
-								{/if}
-							</div>
-						</Command.Item>
-					{/each}
-				</Command.Group>
-			{/if}
-			{#if showFailed('collections')}
-				<Command.Group heading="Collections">{@render failedRow('collections')}</Command.Group>
-			{:else if okRows(groups.collections).length > 0}
-				<Command.Group heading="Collections">
-					{#each okRows(groups.collections) as collection (collection.id)}
-						<Command.Item
-							disabled={isStale('collections')}
-							value={`collection:${collection.id}`}
-							class="pointer-coarse:min-h-11"
-							onSelect={() => openCollection(collection)}
-						>
-							<div class="min-w-0 flex-1">
-								<span class="block truncate font-medium">{collection.name}</span>
-								<p class="truncate text-xs text-muted-foreground">
-									{countLabel(collection.item_count)}
-								</p>
-							</div>
-						</Command.Item>
-					{/each}
-					{#if showSeeAllCollections}
-						<Command.Item
-							disabled={isStale('collections')}
-							value={SEE_ALL_COLLECTIONS_VALUE}
-							class="pointer-coarse:min-h-11"
-							onSelect={openAllCollections}
-						>
-							<Search class="size-4" />
-							<span class="flex-1">See all collections</span>
-							<ArrowRight class="size-4" />
-						</Command.Item>
-					{/if}
-				</Command.Group>
-			{/if}
-			{#if showFailed('itemTypes')}
-				<Command.Group heading="Item types">{@render failedRow('itemTypes')}</Command.Group>
-			{:else if okRows(groups.itemTypes).length > 0}
-				<Command.Group heading="Item types">
-					{#each okRows(groups.itemTypes) as type (type.slug)}
-						<Command.Item
-							disabled={isStale('itemTypes')}
-							value={`type:${type.slug}`}
-							class="pointer-coarse:min-h-11"
-							onSelect={() => openItemType(type.slug)}
-						>
-							<div class="min-w-0 flex-1">
-								<span class="block truncate font-medium">{type.label}</span>
-								<p class="truncate text-xs text-muted-foreground">Item type</p>
-							</div>
-						</Command.Item>
-					{/each}
-				</Command.Group>
-			{/if}
-			{#if groups.pages.length > 0}
-				<Command.Group heading="Pages">
-					{#each groups.pages as page (page.path)}
-						<Command.Item
-							disabled={isStale('pages')}
-							value={`page:${page.path}`}
-							class="pointer-coarse:min-h-11"
-							onSelect={() => openPage(page.path)}
-						>
-							<div class="min-w-0 flex-1">
-								<span class="block truncate font-medium">{page.label}</span>
-								<p class="truncate text-xs text-muted-foreground">Page</p>
-							</div>
-						</Command.Item>
-					{/each}
-				</Command.Group>
-			{/if}
+			{#each layout.order as key (key)}
+				{#if key === 'items'}
+					{@render itemGroup('items', 'Items', otherItems)}
+				{:else if key === 'collectionItems'}
+					{@render itemGroup(
+						'collectionItems',
+						'In this collection',
+						okRows(groups.collectionItems)
+					)}
+				{:else if key === 'collections'}
+					{@render collectionsGroup()}
+				{:else if key === 'itemTypes'}
+					{@render itemTypesGroup()}
+				{:else if key === 'settings'}
+					{@render settingsGroup()}
+				{:else if key === 'tasks'}
+					{@render tasksGroup()}
+				{:else}
+					{@render pagesGroup()}
+				{/if}
+			{/each}
 			<Command.Item value={SEE_ALL_VALUE} class="pointer-coarse:min-h-11" onSelect={seeAll}>
 				<Search class="size-4" />
 				<span class="flex-1">See all results in Items</span>

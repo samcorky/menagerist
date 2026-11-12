@@ -9,7 +9,9 @@ import {
 	runStatusLabel,
 	runTone,
 	scheduleLabel,
-	startedByHand
+	startedByHand,
+	jobId,
+	jobKeyFromHash
 } from '$lib/scheduled-tasks';
 
 const job = (over: Partial<JobResponse> = {}): JobResponse => ({
@@ -165,5 +167,19 @@ describe('run progress text', () => {
 		expect(runProgressText({ status: 'running', progress: progress({ phases: [] }) })).toBeNull();
 		expect(runProgressText({ status: 'succeeded', progress: progress() })).toBeNull();
 		expect(runProgressText({ status: 'queued', progress: progress() })).toBeNull();
+	});
+});
+
+describe('job links', () => {
+	it('names a task row by its key and reads the key back from the fragment', () => {
+		expect(jobId('nightly_backup')).toBe('job-nightly_backup');
+		expect(jobKeyFromHash('#job-nightly_backup')).toBe('nightly_backup');
+		expect(jobKeyFromHash('job-a%20b')).toBe('a b');
+	});
+	it('ignores other fragments and bad escapes', () => {
+		expect(jobKeyFromHash('')).toBeNull();
+		expect(jobKeyFromHash('#job-')).toBeNull();
+		expect(jobKeyFromHash('#setting-a')).toBeNull();
+		expect(jobKeyFromHash('#job-%E0%A4%A')).toBeNull();
 	});
 });

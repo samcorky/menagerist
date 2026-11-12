@@ -476,3 +476,30 @@ test('after opening a result, typing in the same top-bar field searches again', 
 	await searchField(page).fill(second.name);
 	await expect(page.getByRole('option', { name: new RegExp(second.name) })).toBeVisible();
 });
+
+test('a setting is found, opened at its section and highlighted', async ({ page }) => {
+	await openWithSlash(page);
+	await input(page).fill('keep');
+	const row = popup(page).locator('[role="option"][data-value="setting:backup.keep_last"]');
+	await expect(row).toBeVisible();
+	await row.click();
+	await expect(page).toHaveURL(/\/admin\/settings\?section=backup#setting-backup\.keep_last$/);
+	await expect(page.locator('#setting-backup\\.keep_last')).toBeFocused();
+});
+
+test('a scheduled task is found and opened highlighted', async ({ page }) => {
+	await openWithSlash(page);
+	await input(page).fill('deleted items');
+	const row = popup(page).locator('[role="option"][data-value^="task:"]').first();
+	await expect(popup(page).getByRole('group', { name: 'Scheduled tasks' })).toBeVisible();
+	await row.click();
+	await expect(page).toHaveURL(/\/admin\/scheduled-tasks#job-/);
+	await expect(page.locator('[id^="job-"]:focus')).toHaveCount(1);
+});
+
+test('on the admin settings page, settings come before items', async ({ page }) => {
+	await openWithSlash(page, '/admin/settings');
+	await input(page).fill('backup');
+	const first = popup(page).getByRole('listbox').getByRole('option').first();
+	await expect(first).toHaveAttribute('data-value', /^setting:/);
+});
