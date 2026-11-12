@@ -2,6 +2,7 @@ name: Documentation
 description: Something in the docs is missing, unclear or wrong
 title: "[docs] "
 labels: [documentation, "area: docs"]
+type: Task
 body:
   - type: textarea
     id: where
