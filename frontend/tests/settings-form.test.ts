@@ -6,11 +6,15 @@ import {
 	coerce,
 	formProp,
 	groupLabel,
+	groupOfSetting,
 	groupSettings,
 	isChanged,
 	lockedNote,
+	pickSection,
 	restartNote,
 	schemaProperties,
+	settingId,
+	settingKeyFromHash,
 	sourceLabel,
 	staleNote,
 	updateBody
@@ -170,5 +174,52 @@ describe('update body', () => {
 		expect(updateBody('backup.schedule', '0 4 * * *')).toEqual({
 			values: { 'backup.schedule': '0 4 * * *' }
 		});
+	});
+});
+
+describe('sections', () => {
+	const groups = groupSettings([
+		setting({ key: 'backup.schedule' }),
+		setting({ key: 'media.max', group: 'media' }),
+		setting({ key: 'scheduler.keep', group: 'scheduler' })
+	]);
+
+	it('shows the section asked for', () => {
+		expect(pickSection(groups, 'media')).toBe('media');
+	});
+
+	it('falls back to the section holding a linked setting, then to the first', () => {
+		expect(pickSection(groups, null, 'scheduler')).toBe('scheduler');
+		expect(pickSection(groups, 'nope', 'scheduler')).toBe('scheduler');
+		expect(pickSection(groups, 'nope', 'also-nope')).toBe('backup');
+		expect(pickSection(groups, null)).toBe('backup');
+	});
+
+	it('prefers the asked-for section over the linked setting', () => {
+		expect(pickSection(groups, 'media', 'scheduler')).toBe('media');
+	});
+
+	it('gives an empty name when there are no settings', () => {
+		expect(pickSection([], 'media')).toBe('');
+	});
+
+	it('finds the group of a setting', () => {
+		const items = [setting({ key: 'a.b', group: 'a' })];
+		expect(groupOfSetting(items, 'a.b')).toBe('a');
+		expect(groupOfSetting(items, 'x')).toBeNull();
+		expect(groupOfSetting(items, null)).toBeNull();
+	});
+
+	it('round-trips a setting key through its element id and URL fragment', () => {
+		expect(settingId('backup.keep_last')).toBe('setting-backup.keep_last');
+		expect(settingKeyFromHash('#setting-backup.keep_last')).toBe('backup.keep_last');
+		expect(settingKeyFromHash('setting-a%20b')).toBe('a b');
+	});
+
+	it('ignores fragments that do not name a setting', () => {
+		expect(settingKeyFromHash('')).toBeNull();
+		expect(settingKeyFromHash('#top')).toBeNull();
+		expect(settingKeyFromHash('#setting-')).toBeNull();
+		expect(settingKeyFromHash('#setting-%E0%A4%A')).toBeNull();
 	});
 });

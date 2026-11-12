@@ -23,6 +23,25 @@ export function groupLabel(group: string): string {
 
 export type SettingGroup = { group: string; label: string; items: SettingResponse[] };
 
+/** The prefix of each setting's element id, which a link's `#` fragment points at. */
+const SETTING_ID_PREFIX = 'setting-';
+
+/** The element id of a setting's heading. */
+export function settingId(key: string): string {
+	return `${SETTING_ID_PREFIX}${key}`;
+}
+
+/** The setting a URL fragment (`#setting-<key>`) points at, or null for any other fragment. */
+export function settingKeyFromHash(hash: string): string | null {
+	const id = hash.startsWith('#') ? hash.slice(1) : hash;
+	if (!id.startsWith(SETTING_ID_PREFIX) || id.length === SETTING_ID_PREFIX.length) return null;
+	try {
+		return decodeURIComponent(id.slice(SETTING_ID_PREFIX.length));
+	} catch {
+		return null;
+	}
+}
+
 /** Settings grouped for display, in the order each group first appears. */
 export function groupSettings(items: SettingResponse[]): SettingGroup[] {
 	const groups = new Map<string, SettingGroup>();
@@ -163,4 +182,24 @@ export function updateBody(
 	value: SettingValue
 ): { values: Record<string, SettingValue> } {
 	return { values: { [key]: value } };
+}
+
+/** The group a setting belongs to, or null when no setting has that key. */
+export function groupOfSetting(items: SettingResponse[], key: string | null): string | null {
+	return items.find((item) => item.key === key)?.group ?? null;
+}
+
+/**
+ * The group to show: the one asked for, else the one holding the setting a link points at, else the
+ * first. An unknown name falls back rather than showing nothing; an empty list gives ''.
+ */
+export function pickSection(
+	groups: SettingGroup[],
+	requested: string | null,
+	settingGroup: string | null = null
+): string {
+	for (const candidate of [requested, settingGroup]) {
+		if (candidate !== null && groups.some((g) => g.group === candidate)) return candidate;
+	}
+	return groups[0]?.group ?? '';
 }

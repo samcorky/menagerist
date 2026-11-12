@@ -179,7 +179,7 @@ Removing a saved category field archives it and preserves its values. Restore it
 
 Use clear labels, useful explanations, sensible defaults and few required fields. Preserve input after validation failures. Validate at useful moments rather than every keystroke, with helpful copy.
 
-Heavy create and edit forms (a type with its fields, for example) open in a large dialog from a compact list, rather than expanding inline; on phones the dialog is a full-screen sheet. Closing an editor with unsaved changes asks "Discard changes?" first. Content that is grouped on a page (sections of presets, groups of settings, sections on Home) sits under a collapsible heading whose open state is remembered.
+Heavy create and edit forms (a type with its fields, for example) open in a large dialog from a compact list, rather than expanding inline; on phones the dialog is a full-screen sheet. Closing an editor with unsaved changes asks "Discard changes?" first. Content that is grouped on a page (sections of presets, sections on Home) sits under a collapsible heading whose open state is remembered. A long settings page (the instance settings) instead shows one section at a time, picked from a list beside the page (a select on phones) and named in the URL as `?section=`; a link to `#setting-<key>` opens the section holding that setting and highlights it.
 
 Fixed-choice value pickers default to **native `<select>`** (`ui/native-select`) for mobile and accessibility support. Exceptions:
 
