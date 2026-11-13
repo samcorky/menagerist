@@ -3,7 +3,7 @@
 // number of open layers, whatever order they open and close in: a dialog that closes as the next
 // opens must neither close the new one nor leave an extra entry behind.
 
-import { pushState } from '$app/navigation';
+import { pushState, replaceState } from '$app/navigation';
 import { navigating, page } from '$app/state';
 
 interface Layer {
@@ -17,6 +17,10 @@ let known = 0;
 let scheduled = false;
 let popping: Promise<void> | null = null;
 let serial = 0;
+// The layers' entries while a navigation that stays on the page runs: SvelteKit clears the page
+// state on `goto`, which must not read as Back.
+let keeping: string[] | null = null;
+let keepTimer: ReturnType<typeof setTimeout> | undefined;
 
 const entries = () => page.state.layers?.length ?? 0;
 
@@ -60,10 +64,32 @@ export function registerLayer(onclose: () => void): () => void {
 
 /** Close the top layers whose entries Back has removed. Call when the page state changes. */
 export function syncLayers(): void {
+	if (keeping) return;
 	const have = entries();
 	if (have >= known) return;
 	known = have;
 	while (stack.length > have) stack.pop()?.onclose();
+}
+
+/**
+ * Call before a navigation that stays on the same page (a `goto` rewriting the address, such as
+ * filters written to the query string). The open layers keep their entries through it.
+ */
+export function keepLayersThrough(): void {
+	const layers = page.state.layers;
+	if (!layers?.length) return;
+	keeping = layers;
+	clearTimeout(keepTimer);
+	// A navigation another handler cancels never finishes, so do not wait for it for ever.
+	keepTimer = setTimeout(restoreLayers, 1500);
+}
+
+/** Put the layers' state back once such a navigation has finished. */
+export function restoreLayers(): void {
+	clearTimeout(keepTimer);
+	const layers = keeping;
+	keeping = null;
+	if (layers && entries() < layers.length) replaceState('', { layers });
 }
 
 function schedule(): void {
@@ -94,6 +120,8 @@ async function reconcile(): Promise<void> {
 /** Test seam: forget every layer, as a fresh page load does. */
 export function resetLayers(): void {
 	stack.length = 0;
+	keeping = null;
+	clearTimeout(keepTimer);
 	known = 0;
 	scheduled = false;
 	popping = null;

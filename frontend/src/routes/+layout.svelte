@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { noteArrival, replaceNext } from '$lib/in-app-history.js';
-	import { popAllLayers } from '$lib/back-layers.js';
+	import { keepLayersThrough, popAllLayers, restoreLayers } from '$lib/back-layers.js';
 	import { onNavigate, beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import {
 		CirclePlus,
@@ -113,10 +113,16 @@
 		});
 	});
 
-	// A link or redirect taken from inside an open sheet first closes it by going back, then
-	// navigates: otherwise the sheet's history entry would stay between the two pages.
+	// Leaving the page from inside an open sheet (a link, a redirect) first closes it by going
+	// back, then navigates: otherwise the sheet's history entry would stay between the two pages.
+	// A navigation that stays on the page, such as filters written to the address, leaves the
+	// sheet open and keeps its entry.
 	beforeNavigate(({ cancel, to, type, willUnload }) => {
 		if (!to || willUnload || type === 'popstate' || !(page.state.layers?.length ?? 0)) return;
+		if (to.url.pathname === page.url.pathname) {
+			keepLayersThrough();
+			return;
+		}
 		cancel();
 		// The target is a URL the router already accepted.
 		void popAllLayers().then(() =>
@@ -134,6 +140,7 @@
 	});
 	afterNavigate(({ from, to, type, delta }) => {
 		noteArrival({ type, from, to, delta });
+		restoreLayers();
 		const el = document.getElementById('main-scroll');
 		if (!el || !to || type === 'enter') return;
 		if (type === 'popstate') {

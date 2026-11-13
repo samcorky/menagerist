@@ -11,14 +11,19 @@ vi.mock('$app/navigation', () => ({
 	pushState: (_url: string, state: { layers?: string[] }) => {
 		router.pushes += 1;
 		router.page.state = state;
+	},
+	replaceState: (_url: string, state: { layers?: string[] }) => {
+		router.page.state = state;
 	}
 }));
 
 import {
+	keepLayersThrough,
 	popAllLayers,
 	popLayer,
 	registerLayer,
 	resetLayers,
+	restoreLayers,
 	syncLayers
 } from '../src/lib/back-layers';
 
@@ -119,5 +124,29 @@ describe('back layers', () => {
 		await settle();
 		await done;
 		expect(router.page.state.layers ?? []).toHaveLength(0);
+	});
+
+	it('keeps an open layer through a navigation that clears the page state', async () => {
+		const closed = vi.fn();
+		registerLayer(closed);
+		await settle();
+
+		keepLayersThrough();
+		router.page.state = {}; // what `goto` does to the page state
+		syncLayers();
+		restoreLayers();
+		await settle();
+
+		expect(closed).not.toHaveBeenCalled();
+		expect(router.page.state.layers).toHaveLength(1);
+	});
+
+	it('restores the layers on its own if the navigation never finishes', async () => {
+		registerLayer(() => {});
+		await settle();
+		keepLayersThrough();
+		router.page.state = {};
+		await vi.advanceTimersByTimeAsync(2000);
+		expect(router.page.state.layers).toHaveLength(1);
 	});
 });
