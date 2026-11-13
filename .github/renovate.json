@@ -97,6 +97,12 @@
   },
   "packageRules": [
     {
+      "description": "filetype is a pretty static Python library that detects file types and is not updated often",
+      "matchDatasources": ["pep621"],
+      "matchPackageNames": ["filetype"],
+      "abandonmentThreshold": null
+    },
+    {
       "description": "Tell the two lock file maintenance pull requests apart (they share a title otherwise)",
       "matchUpdateTypes": [
         "lockFileMaintenance"
