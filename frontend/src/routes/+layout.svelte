@@ -188,7 +188,7 @@
 	const newActive = $derived(captureController.open);
 	const searchActive = $derived(searchPaletteController.open);
 	// Every page in the settings and administration area, from the one registry, so entries that
-	// live outside /settings (Status, Recently deleted) still light the tab up.
+	// live outside /settings (Library, Status) still light the tab up.
 	const settingsActive = $derived(isManageRoute(pathname));
 
 	$effect(() => {

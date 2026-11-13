@@ -13,15 +13,18 @@ const none: ManagePermissionCheck = () => false;
 const all: ManagePermissionCheck = () => true;
 const hrefs = (can: ManagePermissionCheck) =>
 	manageGroups(can).flatMap((group) => group.items.map((item) => item.href));
+// The administration entries: everything under /admin, plus the instance settings page.
+const adminHrefs = (can: ManagePermissionCheck) =>
+	hrefs(can).filter((href) => href.startsWith('/admin') || href === '/settings/server');
 
 describe('isManageRoute', () => {
 	it.each([
 		'/settings',
 		'/settings/account',
-		'/settings/item-types',
+		'/library/item-types',
 		'/admin',
 		'/admin/users',
-		'/recently-deleted',
+		'/library/recently-deleted',
 		'/status'
 	])('is true for %s', (path) => expect(isManageRoute(path)).toBe(true));
 
@@ -36,7 +39,7 @@ describe('isManageRoute', () => {
 	});
 
 	// The mobile tab bar highlights from this, and these two sit outside /settings.
-	it.each(['/status', '/recently-deleted'])('is true for %s, outside /settings', (path) =>
+	it.each(['/status', '/library/recently-deleted'])('is true for %s, outside /settings', (path) =>
 		expect(isManageRoute(path)).toBe(true)
 	);
 });
@@ -48,7 +51,7 @@ describe('hubTiles', () => {
 	it('lists the settings hub in sidebar order, with Administration last', () => {
 		expect(titles('settings', all)).toEqual([
 			'Item types',
-			'Relationship types',
+			'Connection types',
 			'Saved fields',
 			'Examples',
 			'Recently deleted',
@@ -104,32 +107,30 @@ describe('manageGroups', () => {
 		const groups = manageGroups(none);
 		expect(groups.map((g) => g.label)).toEqual(['Library', 'Account', 'System']);
 		expect(hrefs(none)).toEqual([
-			'/settings/item-types',
-			'/settings/relationships',
-			'/settings/saved-fields',
-			'/settings/examples',
-			'/recently-deleted',
+			'/library/item-types',
+			'/library/connection-types',
+			'/library/saved-fields',
+			'/library/examples',
+			'/library/recently-deleted',
 			'/settings/account',
 			'/status'
 		]);
 	});
 
 	it('shows admin sections only to accounts holding their permission', () => {
-		expect(hrefs(none).some((href) => href.startsWith('/admin'))).toBe(false);
-		expect(hrefs(all).filter((href) => href.startsWith('/admin'))).toEqual([
+		expect(adminHrefs(none)).toEqual([]);
+		expect(adminHrefs(all)).toEqual([
 			'/admin/users',
 			'/admin/devices',
 			'/admin/backups',
 			'/admin/scheduled-tasks',
-			'/admin/settings'
+			'/settings/server'
 		]);
 	});
 
 	it('checks each admin section against its own permission', () => {
 		const onlyBackups: ManagePermissionCheck = (p) => p === 'backup:archive:read';
-		expect(hrefs(onlyBackups).filter((href) => href.startsWith('/admin'))).toEqual([
-			'/admin/backups'
-		]);
+		expect(adminHrefs(onlyBackups)).toEqual(['/admin/backups']);
 	});
 });
 
@@ -140,7 +141,7 @@ describe('activeManageHref', () => {
 
 	it('ignores a trailing slash and deeper paths', () => {
 		expect(activeManageHref('/admin/users/', all)).toBe('/admin/users');
-		expect(activeManageHref('/settings/item-types/abc', all)).toBe('/settings/item-types');
+		expect(activeManageHref('/library/item-types/abc', all)).toBe('/library/item-types');
 	});
 
 	it('is undefined on the hub pages and for sections the account cannot see', () => {

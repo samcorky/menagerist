@@ -1437,3 +1437,16 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 - Parent types and subtypes are out of scope (#320).
 
 **Rationale:** sharing (Stage 2) depends on every piece of data having an owner, so types are settled first. Owner scoping matches items and keeps one access policy.
+
+## "Settings" means one thing (2026-11-13)
+
+**Decision:** the page routes are grouped by what they are, so `/settings` only holds actual settings. Anything a collector authors lives under `/library`: `/library/item-types`, `/library/connection-types`, `/library/saved-fields`, `/library/examples` and `/library/recently-deleted`. `/settings/account` is unchanged, and the instance configuration moves from `/admin/settings` to `/settings/server`. `/admin/users`, `/admin/devices`, `/admin/backups`, `/admin/scheduled-tasks` and `/status` keep their paths. The page and sidebar entry for relationship types are now called Connection types, to match the route and the vocabulary in design §24. API paths and `relationship` in the backend are unchanged.
+
+**Choices that are not obvious:**
+
+- A clean break, with no redirects. Menagerist is self-hosted and nothing outside the app links to these pages, so old bookmarks are the only cost, and a `reroute` hook would be a permanent table of dead paths. Old `?section=` links and `#setting-<key>` anchors move with the page.
+- The route prefix is `/library` because that is already the sidebar group's name, so one shipping label is reused instead of a new concept being added. "Types & fields" was considered as a section name and not needed.
+- Example packs and Recently deleted sit under `/library`, as they install, hold and restore library content, even though Examples is also a first-run affordance. The Settings hub still lists every entry as a tile.
+- `/status` stays top-level: it is read-only server information open to everyone, so `/admin/status` would suggest a permission it does not need, and `/settings/status` would bring back the double meaning. `isManageRoute()` reads the registry, so no path is special-cased.
+
+**Rationale:** the registry in `manage-nav.ts` already drives the sidebar, the hub tiles and the mobile tab bar, so the rename was an edit to its hrefs plus the route directories. The generated `RouteId` type makes a missed reference fail `poe typecheck-frontend`.

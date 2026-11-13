@@ -50,35 +50,35 @@ export const mainDestinations: ManageItem[] = [
 
 const LIBRARY: ManageItem[] = [
 	{
-		href: '/settings/item-types',
+		href: '/library/item-types',
 		label: 'Item types',
 		icon: Tag,
 		hub: 'settings',
 		description: 'Organise your items with types like "Film", "Person", or "Event".'
 	},
 	{
-		href: '/settings/relationships',
-		label: 'Relationship types',
+		href: '/library/connection-types',
+		label: 'Connection types',
 		icon: ArrowLeftRight,
 		hub: 'settings',
 		description: 'Define how items connect - "Directed by", "Signed by", "Part of".'
 	},
 	{
-		href: '/settings/saved-fields',
+		href: '/library/saved-fields',
 		label: 'Saved fields',
 		icon: Bookmark,
 		hub: 'settings',
 		description: 'Reuse a field or a list of choices across item types.'
 	},
 	{
-		href: '/settings/examples',
+		href: '/library/examples',
 		label: 'Examples',
 		icon: Sparkles,
 		hub: 'settings',
 		description: 'Explore Menagerist with ready-made example items.'
 	},
 	{
-		href: '/recently-deleted',
+		href: '/library/recently-deleted',
 		label: 'Recently deleted',
 		icon: Trash2,
 		hub: 'settings',
@@ -137,7 +137,7 @@ const SYSTEM: ManageItem[] = [
 		description: 'See what runs in the background and start a task now.'
 	},
 	{
-		href: '/admin/settings',
+		href: '/settings/server',
 		label: 'Admin settings',
 		icon: SlidersHorizontal,
 		permission: 'settings:instance:read',

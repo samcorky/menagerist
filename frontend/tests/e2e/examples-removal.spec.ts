@@ -16,7 +16,7 @@ test('removing a pack removes its items and item types', async ({ page }) => {
 	ownTypeLabels.push(ownType);
 	await createItemType(page, { label: ownType });
 
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	const typeCard = (text: string) =>
 		page.getByRole('listitem').filter({ has: page.getByText(text, { exact: true }) });
 	const exampleCard = typeCard('music-record');
@@ -35,7 +35,7 @@ test('removing a pack removes its items and item types', async ({ page }) => {
 	await expect(page.getByLabel('Examples', { exact: true })).toHaveCount(0);
 	await expect(page.getByText('Example', { exact: true })).toHaveCount(0);
 
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await expect(page.getByRole('heading', { name: 'Item types' })).toBeVisible();
 	await expect(page.getByText('music-record', { exact: true })).toHaveCount(0);
 	await expect(page.getByText(/^music-/)).toHaveCount(0);

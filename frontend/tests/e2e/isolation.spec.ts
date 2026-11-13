@@ -223,7 +223,7 @@ test('each user installs the same example pack and sees only their own copy', as
 		expect(idsB.filter((id) => idsA.includes(id))).toEqual([]);
 
 		// Each sees their own installation on the page, and A removing theirs leaves B's alone.
-		await b.page.goto('/settings/examples');
+		await b.page.goto('/library/examples');
 		await expect(b.page.getByRole('button', { name: /^Remove Recipes/ })).toBeVisible();
 
 		const removed = await a.request.delete(`/api/v1/examples/${pack}/installation`);
@@ -252,12 +252,12 @@ test('item types belong to their owner: only they see them, and only they can de
 
 	try {
 		// The owner sees the type and may delete it.
-		await a.page.goto('/settings/item-types');
+		await a.page.goto('/library/item-types');
 		await expect(a.page.getByText(label, { exact: true }).first()).toBeVisible();
 		await expect(a.page.getByRole('button', { name: 'Delete item type' }).first()).toBeVisible();
 
 		// Another member sees none of it, and the API treats it as missing.
-		await b.page.goto('/settings/item-types');
+		await b.page.goto('/library/item-types');
 		await expect(b.page.getByRole('heading', { name: 'Item types' }).first()).toBeVisible();
 		await expect(b.page.getByText(label, { exact: true })).toHaveCount(0);
 		expect((await b.request.get(`/api/v1/node-types/${made.id}`)).status()).toBe(404);

@@ -34,9 +34,9 @@ test('marks the current destination', async ({ page }) => {
 });
 
 test('switching sections keeps the sidebar', async ({ page }) => {
-	await page.goto('/settings/saved-fields');
+	await page.goto('/library/saved-fields');
 	await link(page, 'Item types').click();
-	await expect(page).toHaveURL(/\/settings\/item-types$/);
+	await expect(page).toHaveURL(/\/library\/item-types$/);
 	await expect(link(page, 'Item types')).toHaveAttribute('aria-current', 'page');
 });
 
@@ -298,7 +298,7 @@ test('the labels fade and the headings fold instead of switching abruptly', asyn
 const back = (page: Page) => page.getByRole('button', { name: 'Back', exact: true });
 
 test('a sidebar destination has no Back button while the sidebar is showing', async ({ page }) => {
-	for (const path of ['/settings/item-types', '/settings/account', '/recently-deleted']) {
+	for (const path of ['/library/item-types', '/settings/account', '/library/recently-deleted']) {
 		await page.goto(path);
 		await expect(sidebar(page)).toBeVisible();
 		await expect(back(page)).toHaveCount(0);
@@ -312,7 +312,7 @@ test('a drill-down page keeps its Back button beside the sidebar', async ({ page
 });
 
 test('the rail hides Back on a destination too', async ({ page }) => {
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await burger(page).click();
 	await expect.poll(async () => (await sidebar(page).boundingBox())?.width).toBeLessThan(64);
 	await expect(back(page)).toHaveCount(0);

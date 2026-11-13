@@ -185,7 +185,7 @@ for (const size of SIZES) {
 				'/collections',
 				`/items/${item.id}`,
 				`/collections/${collection.id}`,
-				'/settings/examples'
+				'/library/examples'
 			];
 			const offenders: string[] = [];
 			for (const route of routes) {
@@ -423,7 +423,7 @@ for (const size of SIZES) {
 			page,
 			request
 		}) => {
-			await page.goto('/settings/examples');
+			await page.goto('/library/examples');
 			const card = (title: string) =>
 				page.locator('[data-slot="card"]').filter({ has: page.getByText(title, { exact: true }) });
 
@@ -464,7 +464,7 @@ for (const size of SIZES) {
 		});
 
 		test('Examples controls are visible and tappable', async ({ page }) => {
-			await page.goto('/settings/examples');
+			await page.goto('/library/examples');
 			const add = page.getByRole('button', { name: /^Add Music/ });
 			await add.scrollIntoViewIfNeeded();
 			const a = await box(add);
@@ -501,16 +501,16 @@ for (const size of SIZES) {
 			const offenders = await wideRoutes(page, size.width, [
 				'/items/new',
 				'/explore',
-				'/recently-deleted',
+				'/library/recently-deleted',
 				'/status',
 				'/settings',
 				'/settings/account',
-				'/settings/item-types',
-				'/settings/relationships',
-				'/settings/saved-fields',
+				'/library/item-types',
+				'/library/connection-types',
+				'/library/saved-fields',
 				'/admin',
 				'/admin/users',
-				'/admin/settings',
+				'/settings/server',
 				'/admin/devices',
 				'/admin/backups',
 				'/admin/scheduled-tasks'
@@ -529,8 +529,8 @@ for (const size of SIZES) {
 				`/collections/${collection.id}`,
 				`/items/${item.id}`,
 				'/settings/account',
-				'/settings/saved-fields',
-				'/admin/settings'
+				'/library/saved-fields',
+				'/settings/server'
 			]) {
 				await page.goto(route);
 				await page.waitForLoadState('networkidle');

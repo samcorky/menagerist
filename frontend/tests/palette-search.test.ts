@@ -76,10 +76,10 @@ describe('PAGES', () => {
 			'/collections',
 			'/explore',
 			'/settings',
-			'/settings/item-types',
-			'/settings/relationships',
-			'/settings/saved-fields',
-			'/settings/examples',
+			'/library/item-types',
+			'/library/connection-types',
+			'/library/saved-fields',
+			'/library/examples',
 			'/status'
 		]);
 	});
@@ -129,7 +129,7 @@ describe('accent-insensitive matching', () => {
 describe('result links', () => {
 	it('points a setting at its section and anchor, and a task at its row', () => {
 		expect(settingPath({ key: 'backup.keep_last', group: 'backup' })).toBe(
-			'/admin/settings?section=backup#setting-backup.keep_last'
+			'/settings/server?section=backup#setting-backup.keep_last'
 		);
 		expect(taskPath({ job_key: 'nightly backup' })).toBe(
 			'/admin/scheduled-tasks#job-nightly backup'
@@ -152,15 +152,15 @@ describe('paletteLayout', () => {
 	});
 	it('puts what the person is looking at first and keeps every group', () => {
 		expect(first('/collections')).toBe('collections');
-		expect(first('/settings/item-types')).toBe('itemTypes');
+		expect(first('/library/item-types')).toBe('itemTypes');
 		expect(paletteLayout('/admin/scheduled-tasks').order.slice(0, 2)).toEqual([
 			'tasks',
 			'settings'
 		]);
-		expect(paletteLayout('/admin/settings').order.slice(0, 2)).toEqual(['settings', 'tasks']);
+		expect(paletteLayout('/settings/server').order.slice(0, 2)).toEqual(['settings', 'tasks']);
 		expect(first('/admin')).toBe('settings');
 		expect(first('/items/')).toBe('items');
-		expect(paletteLayout('/admin/settings').order).toHaveLength(6);
+		expect(paletteLayout('/settings/server').order).toHaveLength(6);
 	});
 	it('leads with the collection items on a collection page', () => {
 		const layout = paletteLayout('/collections/my%20films');
@@ -173,7 +173,7 @@ describe('paletteLayout', () => {
 		expect(paletteLayout('/').caps).toEqual(GROUP_CAPS);
 	});
 	it('gives only the leading group extra rows', () => {
-		const { caps } = paletteLayout('/admin/settings');
+		const { caps } = paletteLayout('/settings/server');
 		expect(caps.settings).toBe(GROUP_CAPS.settings + 3);
 		expect(caps.tasks).toBe(GROUP_CAPS.tasks);
 	});

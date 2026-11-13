@@ -210,7 +210,7 @@ test('choice field: input via the dropdown, options set in the schema editor, an
 	page
 }) => {
 	const typeLabel = uniqueName('Record');
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')
@@ -283,7 +283,7 @@ test('quantity field: input (value + unit) and view', async ({ page }) => {
 
 test('group (table) field: add a sub-field, input a row, and view', async ({ page }) => {
 	const typeLabel = uniqueName('Movie');
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')
@@ -378,7 +378,7 @@ test('multiple choice field: options set in the schema editor, tick several, and
 	page
 }) => {
 	const typeLabel = uniqueName('Release');
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')

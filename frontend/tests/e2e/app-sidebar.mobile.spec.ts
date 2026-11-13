@@ -46,6 +46,6 @@ test('the page behind the open drawer cannot scroll', async ({ page }) => {
 test('a sidebar destination shows Back on a phone, where the sidebar is hidden', async ({
 	page
 }) => {
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeVisible();
 });

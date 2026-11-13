@@ -139,7 +139,7 @@ test('arrow keys move between text cells in a table field, without breaking mid-
 	page
 }) => {
 	const typeLabel = uniqueName('Shortcut table type');
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const form = page
 		.locator('form')

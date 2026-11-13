@@ -142,7 +142,7 @@ test('a clashing item type slug gives a friendly error and creates nothing', asy
 }) => {
 	await createItemType(page, { label: 'Music Person' });
 
-	await page.goto('/settings/examples');
+	await page.goto('/library/examples');
 	await page.getByRole('button', { name: /^Add Music/ }).click();
 	await expect(page.getByText("Couldn't add these examples")).toBeVisible();
 	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
@@ -165,7 +165,7 @@ test('the empty-state link opens the examples page, and only shows with no items
 	if (Number(probe.headers()['total-count'] ?? '0') === 0) {
 		await page.goto('/');
 		await link.click();
-		await expect(page).toHaveURL(/\/settings\/examples$/);
+		await expect(page).toHaveURL(/\/library\/examples$/);
 		await expect(page.getByRole('heading', { name: 'Examples' })).toBeVisible();
 	}
 

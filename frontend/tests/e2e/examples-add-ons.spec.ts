@@ -27,7 +27,7 @@ test('an add-on needs its base pack, then adds games with covers, links and a co
 	page,
 	request
 }) => {
-	await page.goto('/settings/examples');
+	await page.goto('/library/examples');
 	const extras = packCard(page, 'Extra board games');
 	await expect(extras).toContainText('Needs Board games');
 	const add = extras.getByRole('button', { name: /^Add Extra board games/ });
@@ -70,7 +70,7 @@ test('a base pack cannot be removed while its add-on is installed, then both go'
 	const extra = await nodeNamed(request, 'Quillfeather Quarry');
 	expect(await coverOf(request, extra.id)).toBeTruthy();
 
-	await page.goto('/settings/examples');
+	await page.goto('/library/examples');
 	const base = packCard(page, 'Board games');
 	await expect(base.getByRole('button', { name: /^Remove Board games/ })).toBeDisabled();
 	await expect(base.getByText('Remove Extra board games first.')).toBeVisible();
@@ -95,7 +95,7 @@ test('a stale page shows the server message when a prerequisite is gone', async 
 	request
 }) => {
 	await installViaApiMany(request, ['games']);
-	await page.goto('/settings/examples');
+	await page.goto('/library/examples');
 	const extras = packCard(page, 'Extra board games');
 	const add = extras.getByRole('button', { name: /^Add Extra board games/ });
 	await expect(add).toBeEnabled();

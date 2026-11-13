@@ -111,7 +111,7 @@ describe('searchEverything', () => {
 	});
 
 	it('asks for as many as the largest group on this page needs', async () => {
-		await run('film', undefined, '/admin/settings').done;
+		await run('film', undefined, '/settings/server').done;
 		expect(searchApi).toHaveBeenCalledWith({ query: { q: 'film', limit: 7 } });
 	});
 

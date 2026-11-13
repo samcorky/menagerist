@@ -10,7 +10,7 @@ test('an administrator changes a setting, keeps it across a reload and resets it
 	page
 }) => {
 	await page.goto('/admin');
-	await page.locator('main a[href="/admin/settings"]').click();
+	await page.locator('main a[href="/settings/server"]').click();
 	await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
 
 	const card = page.getByRole('listitem').filter({
@@ -40,7 +40,7 @@ test('an administrator changes a setting, keeps it across a reload and resets it
 test('a value the rules refuse is explained next to the setting and nothing is saved', async ({
 	page
 }) => {
-	await page.goto('/admin/settings');
+	await page.goto('/settings/server');
 	const card = page.getByRole('listitem').filter({
 		has: page.getByRole('heading', { name: 'Backups to keep', exact: true })
 	});
@@ -55,7 +55,7 @@ test('a value the rules refuse is explained next to the setting and nothing is s
 });
 
 test('discarding an edit puts the saved value back without saving', async ({ page }) => {
-	await page.goto('/admin/settings');
+	await page.goto('/settings/server');
 	const card = page.getByRole('listitem').filter({
 		has: page.getByRole('heading', { name: 'Backups to keep', exact: true })
 	});
@@ -69,7 +69,7 @@ test('discarding an edit puts the saved value back without saving', async ({ pag
 });
 
 test('one section shows at a time and the section is in the link', async ({ page }) => {
-	await page.goto('/admin/settings');
+	await page.goto('/settings/server');
 	const section = page.getByRole('navigation', { name: 'Settings sections' });
 	await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible();
 	await expect(page.getByLabel('Backups to keep', { exact: true })).toBeVisible();
@@ -88,7 +88,7 @@ test('one section shows at a time and the section is in the link', async ({ page
 });
 
 test('a link to one setting opens its section and highlights it', async ({ page }) => {
-	await page.goto('/admin/settings#setting-backup.keep_last');
+	await page.goto('/settings/server#setting-backup.keep_last');
 	const heading = page.getByRole('heading', { name: 'Backups to keep', exact: true });
 	await expect(heading).toBeVisible();
 	await expect(heading).toBeFocused();
@@ -96,12 +96,12 @@ test('a link to one setting opens its section and highlights it', async ({ page 
 });
 
 test('an unknown section falls back to the first', async ({ page }) => {
-	await page.goto('/admin/settings?section=nope');
+	await page.goto('/settings/server?section=nope');
 	await expect(page.getByLabel('Backups to keep', { exact: true })).toBeVisible();
 });
 
 test('Save and Discard only appear while a value differs from the saved one', async ({ page }) => {
-	await page.goto('/admin/settings');
+	await page.goto('/settings/server');
 	const row = page.getByRole('listitem').filter({
 		has: page.getByRole('heading', { name: 'Backups to keep', exact: true })
 	});

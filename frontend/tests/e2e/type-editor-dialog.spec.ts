@@ -10,7 +10,7 @@ const row = (page: Page, text: string) => page.getByRole('listitem').filter({ ha
 
 test('New item type opens the editor in a dialog and creates the type', async ({ page }) => {
 	const label = uniqueName('Dialog type');
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'New item type' });
 	await expect(dialog).toBeVisible();
@@ -23,7 +23,7 @@ test('New item type opens the editor in a dialog and creates the type', async ({
 
 test('Edit opens the same editor with the type filled in', async ({ page, request }) => {
 	const type = await makeItemType(request, uniqueName('Edit me'));
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await row(page, type.label).getByRole('button', { name: 'Edit item type' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Edit item type' });
 	await expect(dialog.getByLabel('Name')).toHaveValue(type.label);
@@ -33,7 +33,7 @@ test('Edit opens the same editor with the type filled in', async ({ page, reques
 });
 
 test('Escape on an untouched editor closes it without asking', async ({ page }) => {
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'New item type' });
 	await expect(dialog).toBeVisible();
@@ -43,7 +43,7 @@ test('Escape on an untouched editor closes it without asking', async ({ page }) 
 });
 
 test('closing a changed editor asks before discarding', async ({ page }) => {
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'New item type' });
 	await dialog.getByLabel('Name').fill('Half written');
@@ -63,13 +63,13 @@ test('closing a changed editor asks before discarding', async ({ page }) => {
 
 test('New relationship type opens an editor in a dialog', async ({ page }) => {
 	const label = uniqueName('Dialog link');
-	await page.goto('/settings/relationships');
+	await page.goto('/library/connection-types');
 	await page.getByRole('button', { name: 'New relationship type', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'New relationship type' });
 	await expect(dialog).toBeVisible();
 	await dialog.getByLabel('Label', { exact: true }).fill(label);
 	await dialog.getByRole('button', { name: 'Add relationship type' }).click();
-	await expect(page.getByText('Relationship type created')).toBeVisible();
+	await expect(page.getByText('Connection type created')).toBeVisible();
 	await expect(dialog).toBeHidden();
 	await expect(row(page, label)).toBeVisible();
 	// Clean up the type this spec made.

@@ -57,7 +57,7 @@ Read only the feature section relevant to the task.
 
 ### Examples
 
-Settings > Examples (`src/routes/settings/examples/`) adds and removes the shipped example packs. Home links to it from the empty state and shows a dismissible line while examples are installed. The wording helpers (counts, removal messages, dismissal in `localStorage`) live in `src/lib/examples.ts` so they can be unit tested.
+Library > Examples (`src/routes/library/examples/`) adds and removes the shipped example packs. Home links to it from the empty state and shows a dismissible line while examples are installed. The wording helpers (counts, removal messages, dismissal in `localStorage`) live in `src/lib/examples.ts` so they can be unit tested.
 
 ### Collections
 

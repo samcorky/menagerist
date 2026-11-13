@@ -29,7 +29,7 @@ export async function createItemType(
 	page: Page,
 	options: { label: string; description?: string; fields?: FieldSpec[] }
 ): Promise<{ label: string }> {
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 
 	const form = page
