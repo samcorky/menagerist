@@ -97,9 +97,13 @@
   },
   "packageRules": [
     {
-      "description": "filetype is a pretty static Python library that detects file types and is not updated often",
-      "matchDatasources": ["pep621"],
-      "matchPackageNames": ["filetype"],
+      "description": "filetype is a small, finished file-signature library with no releases since 2022; exempt it from the abandonment warning. The manager is pep621; its datasource is pypi, which an earlier version of this rule had wrong",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchPackageNames": [
+        "filetype"
+      ],
       "abandonmentThreshold": null
     },
     {
