@@ -7,7 +7,7 @@ import pytest
 
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.modules.examples.adapters.platform.pack_parser import parse_index
-from app.modules.examples.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidPackError
 
 _ENTRY = {"id": "demo", "name": "Demo", "description": "A demo"}
 

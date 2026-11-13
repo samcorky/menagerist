@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from app.modules.examples.domain.errors import InvalidInstallationStateError
-from app.modules.examples.domain.installation import EntityKind, EntityRecord, Outcome
+from app.modules.examples.domain.installation import EntityRecord, Outcome
 from app.modules.examples.domain.removal import (
     KEEP_EDITED,
     KEEP_IN_USE,
@@ -13,6 +13,7 @@ from app.modules.examples.domain.removal import (
     Action,
     decide_removal,
 )
+from app.modules.transfer.domain.entity_kind import EntityKind
 
 
 def _record(outcome: Outcome = Outcome.OWNED) -> EntityRecord:

@@ -3,8 +3,9 @@ import pytest
 from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
-from app.modules.examples.domain.errors import InvalidPackError
-from app.modules.examples.domain.pack import ExamplePack, PackItem, PackItemType
+from app.modules.examples.domain.pack import ExamplePack
+from app.modules.transfer.domain.bundle import PackItem, PackItemType
+from app.modules.transfer.domain.errors import InvalidPackError
 
 
 def _pack(pack_id: str) -> ExamplePack:

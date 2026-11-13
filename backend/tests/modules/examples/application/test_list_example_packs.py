@@ -12,14 +12,13 @@ from app.modules.examples.application.list_example_packs import (
     ListExamplePacksQuery,
 )
 from app.modules.examples.domain.installation import Installation
-from app.modules.examples.domain.pack import (
-    ExamplePack,
+from app.modules.examples.domain.pack import ExamplePack, PackLink
+from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.transfer.domain.bundle import (
     PackItem,
     PackItemType,
-    PackLink,
     PackRelationshipType,
 )
-from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 

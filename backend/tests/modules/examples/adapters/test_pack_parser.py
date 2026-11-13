@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 
 from app.modules.examples.adapters.platform.pack_parser import parse_index, parse_pack
-from app.modules.examples.domain.errors import InvalidPackError
-from app.modules.examples.domain.pack import PackCover
+from app.modules.transfer.domain.bundle import PackCover
+from app.modules.transfer.domain.errors import InvalidPackError
 
 _INDEX: dict[str, Any] = {
     "format": "menagerist-examples-index",

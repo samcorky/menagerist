@@ -4,7 +4,7 @@ import uuid
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.bridges.example_targets import (
+from app.entrypoints.api.shared.bridges.transfer_targets import (
     CollectionPackTarget,
     GraphPackTarget,
     build_in_memory_collections_repos,
@@ -20,10 +20,10 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePack,
     UninstallExamplePackCommand,
 )
-from app.modules.examples.domain.installation import EntityKind
-from app.modules.examples.domain.pack import PackCollection, PackCover
-from app.modules.examples.ports.pack_targets import RemoveResult
 from app.modules.graph.domain.edge import Edge
+from app.modules.transfer.domain.bundle import PackCollection, PackCover
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.ports.targets import RemoveResult
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter

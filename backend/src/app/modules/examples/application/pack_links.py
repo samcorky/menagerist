@@ -3,15 +3,16 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.modules.examples.application.content_hash import content_hash
-from app.modules.examples.domain.installation import EntityKind, Installation
-from app.modules.examples.domain.pack import ExamplePack, PackConnection, split_ref
+from app.modules.transfer.domain.bundle import PackConnection, split_ref
+from app.modules.transfer.domain.entity_kind import EntityKind
 
 if TYPE_CHECKING:
     import uuid
     from collections.abc import Awaitable, Callable
 
-    from app.modules.examples.domain.pack import PackLink
-    from app.modules.examples.ports.pack_targets import GraphTarget
+    from app.modules.examples.domain.installation import Installation
+    from app.modules.examples.domain.pack import ExamplePack, PackLink
+    from app.modules.transfer.ports.targets import GraphTarget
 
 logger = structlog.get_logger()
 

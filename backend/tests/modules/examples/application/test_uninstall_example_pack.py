@@ -13,22 +13,19 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import PackNotInstalledError
-from app.modules.examples.domain.installation import (
-    EntityKind,
-    InstallationStatus,
-    Outcome,
-)
+from app.modules.examples.domain.installation import InstallationStatus, Outcome
 from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_IN_USE, KEEP_USER_DATA
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
-    from app.modules.examples.ports.pack_targets import RemoveResult
+    from app.modules.transfer.ports.targets import RemoveResult
     from tests.modules.examples.conftest import MakeWorld, World
 
 

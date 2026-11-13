@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.bridges import example_targets
+from app.entrypoints.api.shared.bridges import transfer_targets
 from app.entrypoints.api.shared.bridges.collection_definitions import (
     GraphDefinitionChecker,
 )
-from app.entrypoints.api.shared.bridges.example_targets import (
+from app.entrypoints.api.shared.bridges.transfer_targets import (
     CollectionPackTarget,
     GraphPackTarget,
     build_in_memory_collections_repos,
@@ -18,12 +18,12 @@ from app.entrypoints.api.shared.bridges.example_targets import (
 )
 from app.modules.collections.domain.collection import CollectionKind
 from app.modules.collections.domain.errors import InvalidDefinitionError
-from app.modules.examples.domain.installation import EntityKind
-from app.modules.examples.domain.pack import PackCollection
-from app.modules.examples.ports.pack_targets import RemoveResult
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_in_memory_graph_repos,
 )
+from app.modules.transfer.domain.bundle import PackCollection
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.ports.targets import RemoveResult
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
 
@@ -253,7 +253,7 @@ async def test_a_definition_the_collections_check_refuses_creates_nothing(
 
 async def test_the_install_checker_is_the_one_the_collection_routes_use() -> None:
     """The placeholder that refused every definition is gone; the real one is used."""
-    assert not hasattr(example_targets, "RejectingDefinitionChecker")
+    assert not hasattr(transfer_targets, "RejectingDefinitionChecker")
     repos = build_in_memory_graph_repos()
     stores = in_memory_collection_stores(build_in_memory_collections_repos(), repos)
     async with stores.checker() as checker:

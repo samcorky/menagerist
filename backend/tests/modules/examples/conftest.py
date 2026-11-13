@@ -9,10 +9,12 @@ import pytest
 
 from app.entrypoints.api.shared.bridges.example_targets import (
     CoverPackTarget,
+    in_memory_cover_stores,
+)
+from app.entrypoints.api.shared.bridges.transfer_targets import (
     GraphPackTarget,
     GraphStores,
     PresetPackTarget,
-    in_memory_cover_stores,
     in_memory_graph_stores,
     in_memory_preset_stores,
 )
@@ -25,17 +27,7 @@ from app.modules.examples.adapters.persistence.in_memory_installation_repository
 from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
-from app.modules.examples.domain.installation import EntityKind
-from app.modules.examples.domain.pack import (
-    ExamplePack,
-    PackCollection,
-    PackConnection,
-    PackItem,
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
-)
-from app.modules.examples.ports.pack_targets import Created, Inspection, RemoveResult
+from app.modules.examples.domain.pack import ExamplePack
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_in_memory_graph_repos,
@@ -61,6 +53,16 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
     InMemoryPresetRepository,
 )
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.transfer.domain.bundle import (
+    PackCollection,
+    PackConnection,
+    PackItem,
+    PackItemType,
+    PackPreset,
+    PackRelationshipType,
+)
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.ports.targets import Created, Inspection, RemoveResult
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 

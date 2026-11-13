@@ -8,14 +8,13 @@ from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
 from app.modules.examples.adapters.platform.pack_parser import parse_pack
-from app.modules.examples.domain.errors import InvalidPackError
-from app.modules.examples.domain.pack import (
-    ExamplePack,
+from app.modules.examples.domain.pack import ExamplePack, PackLink
+from app.modules.transfer.domain.bundle import (
     PackItem,
     PackItemType,
-    PackLink,
     PackRelationshipType,
 )
+from app.modules.transfer.domain.errors import InvalidPackError
 
 
 def _doc(version: int = 5, **extra: Any) -> dict[str, Any]:  # noqa: ANN401

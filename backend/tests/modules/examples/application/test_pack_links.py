@@ -17,15 +17,15 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePackCommand,
     UninstallResult,
 )
-from app.modules.examples.domain.installation import EntityKind, Installation, Outcome
-from app.modules.examples.domain.pack import (
-    ExamplePack,
+from app.modules.examples.domain.installation import Installation, Outcome
+from app.modules.examples.domain.pack import ExamplePack, PackLink
+from app.modules.examples.domain.removal import KEEP_EDITED
+from app.modules.transfer.domain.bundle import (
     PackItem,
     PackItemType,
-    PackLink,
     PackRelationshipType,
 )
-from app.modules.examples.domain.removal import KEEP_EDITED
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter

@@ -4,15 +4,16 @@ from typing import Any
 
 import pytest
 
-from app.modules.examples.domain.errors import InvalidPackError
-from app.modules.examples.domain.installation import EntityKind
 from app.modules.examples.domain.pack import (
-    COVER_STYLES,
     MAX_CONNECTIONS,
     MAX_ITEMS,
     MAX_PRESETS,
     MAX_TYPES,
     ExamplePack,
+    validate_catalogue,
+)
+from app.modules.transfer.domain.bundle import (
+    COVER_STYLES,
     PackCollection,
     PackConnection,
     PackCover,
@@ -23,8 +24,9 @@ from app.modules.examples.domain.pack import (
     preset_refs,
     resolve_preset_refs,
     split_ref,
-    validate_catalogue,
 )
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.errors import InvalidPackError
 
 _LIST = {"$preset": "grades"}
 _SCHEMA: dict[str, Any] = {

@@ -26,7 +26,6 @@ from app.modules.examples.adapters.covers.pillow_cover_renderer import (
     PillowCoverRenderer,
 )
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
-from app.modules.examples.ports.pack_targets import Created  # noqa: TC001
 from app.modules.media.adapters.api.dependencies import get_media_storage
 from app.modules.media.adapters.imaging.pillow_processor import PillowImageProcessor
 from app.modules.media.adapters.policy.content_type_attachment_policy import (
@@ -45,6 +44,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from fastapi import FastAPI
+
+    from app.modules.transfer.ports.targets import Created
 
 pytestmark = pytest.mark.integration
 

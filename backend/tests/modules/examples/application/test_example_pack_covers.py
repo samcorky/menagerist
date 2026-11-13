@@ -17,8 +17,7 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import InstallFailedError
-from app.modules.examples.domain.installation import EntityKind, Outcome
-from app.modules.examples.domain.pack import ExamplePack, PackCover, PackItem
+from app.modules.examples.domain.installation import Outcome
 from app.modules.examples.domain.removal import KEEP_USER_DATA
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.media_attachment import (
@@ -26,12 +25,15 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.modules.transfer.domain.bundle import PackCover, PackItem
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     import uuid
 
+    from app.modules.examples.domain.pack import ExamplePack
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
 
 

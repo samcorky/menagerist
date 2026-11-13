@@ -229,7 +229,7 @@ Pass values directly - `uuid.UUID` objects are serialised to strings automatical
 
 ## Example packs
 
-`modules/examples/` installs and removes optional example content (item types, connection types, items, connections and presets). It does not import `graph` or `presets`: it defines its own ports (`PresetTarget`, `GraphTarget`) and `entrypoints/api/shared/bridges/example_targets.py` supplies adapters that call the real use cases, the same pattern as `preset_usage.py` for cross-module reads. Install is an ordered list of steps with one commit per step and compensation on failure; removal keeps anything the user edited, connected or attached (rules in `docs/DECISIONS.md`).
+`modules/examples/` installs and removes optional example content (item types, connection types, items, connections and presets). It does not import `graph` or `presets`: it installs through the target ports (`PresetTarget`, `GraphTarget`, `CollectionTarget`) and the bundle types (`PackPreset`, `PackItemType` and so on) defined in `modules/transfer/`, and `entrypoints/api/shared/bridges/transfer_targets.py` supplies adapters that call the real use cases, the same pattern as `preset_usage.py` for cross-module reads. Only the cover target (`CoverTarget`, bridged by `example_targets.py`) stays in `examples`, because generated covers are example-specific. Install is an ordered list of steps with one commit per step and compensation on failure; removal keeps anything the user edited, connected or attached (rules in `docs/DECISIONS.md`).
 
 ### Writing an example pack
 

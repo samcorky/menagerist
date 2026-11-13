@@ -3,18 +3,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.examples.domain.errors import RequirementsNotMetError
-from app.modules.examples.domain.installation import (
-    EntityKind,
-    Installation,
-    InstallationStatus,
-)
+from app.modules.examples.domain.installation import Installation, InstallationStatus
+from app.modules.transfer.domain.entity_kind import EntityKind
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from app.modules.examples.domain.pack import ExamplePack
     from app.modules.examples.ports.pack_catalogue import PackCatalogue
-    from app.modules.examples.ports.pack_targets import GraphTarget
+    from app.modules.transfer.ports.targets import GraphTarget
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)

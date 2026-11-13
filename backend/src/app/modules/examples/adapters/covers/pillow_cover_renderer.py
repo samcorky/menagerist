@@ -6,7 +6,7 @@ from functools import cache
 from PIL import Image, ImageDraw, ImageFont
 from PIL.ImageFont import FreeTypeFont
 
-from app.modules.examples.domain.pack import COVER_STYLES
+from app.modules.transfer.domain.bundle import COVER_STYLES
 
 # Each colour has a contrast ratio of at least 3:1 against white.
 PALETTE: tuple[tuple[int, int, int], ...] = (

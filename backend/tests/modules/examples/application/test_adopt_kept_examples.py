@@ -16,11 +16,11 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import InstallFailedError, SlugClashError
-from app.modules.examples.domain.installation import EntityKind
-from app.modules.examples.domain.pack import PackCollection
 from app.modules.examples.domain.removal import KEEP_EDITED
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
+from app.modules.transfer.domain.bundle import PackCollection
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 

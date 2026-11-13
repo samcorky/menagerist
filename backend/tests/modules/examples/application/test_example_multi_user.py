@@ -29,9 +29,14 @@ from app.modules.examples.domain.errors import (
     RequirementsNotMetError,
     SlugClashError,
 )
-from app.modules.examples.domain.installation import EntityKind, Outcome
-from app.modules.examples.domain.pack import (
-    ExamplePack,
+from app.modules.examples.domain.installation import Outcome
+from app.modules.examples.domain.pack import ExamplePack
+from app.modules.examples.domain.removal import KEEP_IN_USE
+from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.node_type import NodeType
+from app.modules.media.domain.media_asset import MediaStatus
+from app.modules.transfer.domain.bundle import (
     PackCollection,
     PackConnection,
     PackCover,
@@ -39,11 +44,7 @@ from app.modules.examples.domain.pack import (
     PackItemType,
     PackRelationshipType,
 )
-from app.modules.examples.domain.removal import KEEP_IN_USE
-from app.modules.examples.ports.unit_of_work import ExampleRepos
-from app.modules.graph.domain.node import Node
-from app.modules.graph.domain.node_type import NodeType
-from app.modules.media.domain.media_asset import MediaStatus
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter

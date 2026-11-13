@@ -49,23 +49,25 @@ from app.entrypoints.api.shared.bridges.collection_members import (
     get_collection_members,
 )
 from app.entrypoints.api.shared.bridges.example_targets import (
-    CollectionPackTarget,
     CoverPackTarget,
-    GraphPackTarget,
-    PresetPackTarget,
-    build_in_memory_collections_repos,
-    get_collection_pack_target,
     get_cover_pack_target,
-    get_graph_pack_target,
-    get_preset_pack_target,
-    in_memory_collection_stores,
     in_memory_cover_stores,
-    in_memory_graph_stores,
-    in_memory_preset_stores,
 )
 from app.entrypoints.api.shared.bridges.item_companions import (
     ItemCompanionCopier,
     get_item_companions,
+)
+from app.entrypoints.api.shared.bridges.transfer_targets import (
+    CollectionPackTarget,
+    GraphPackTarget,
+    PresetPackTarget,
+    build_in_memory_collections_repos,
+    get_collection_pack_target,
+    get_graph_pack_target,
+    get_preset_pack_target,
+    in_memory_collection_stores,
+    in_memory_graph_stores,
+    in_memory_preset_stores,
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.collections.adapters.api.dependencies import (
@@ -89,13 +91,7 @@ from app.modules.examples.adapters.persistence.in_memory_installation_repository
 from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
-from app.modules.examples.domain.pack import (
-    ExamplePack,
-    PackConnection,
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
-)
+from app.modules.examples.domain.pack import ExamplePack
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
@@ -187,6 +183,12 @@ from app.modules.system.domain.readiness import (
     CheckObservation,
     CheckStatus,
     ReadinessReport,
+)
+from app.modules.transfer.domain.bundle import (
+    PackConnection,
+    PackItem,
+    PackItemType,
+    PackRelationshipType,
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
