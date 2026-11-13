@@ -7,9 +7,9 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.bridges.example_targets import (
+from app.entrypoints.api.shared.bridges.example_targets import get_cover_pack_target
+from app.entrypoints.api.shared.bridges.transfer_targets import (
     get_collection_pack_target,
-    get_cover_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )
@@ -20,16 +20,15 @@ from app.modules.examples.adapters.api.dependencies import (
     get_pack_catalogue,
 )
 from app.modules.examples.domain.installation import Installation
-from app.modules.examples.domain.pack import (
-    ExamplePack,
+from app.modules.examples.domain.pack import ExamplePack, PackLink
+from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.graph.domain.node_type import NodeType
+from app.modules.transfer.domain.bundle import (
     PackCollection,
     PackItem,
     PackItemType,
-    PackLink,
     PackRelationshipType,
 )
-from app.modules.examples.ports.unit_of_work import ExampleRepos
-from app.modules.graph.domain.node_type import NodeType
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 

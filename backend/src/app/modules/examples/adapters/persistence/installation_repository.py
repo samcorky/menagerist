@@ -6,12 +6,12 @@ from sqlalchemy import select
 
 from app.modules.examples.adapters.persistence.models import ExampleInstallationModel
 from app.modules.examples.domain.installation import (
-    EntityKind,
     EntityRecord,
     Installation,
     InstallationStatus,
     Outcome,
 )
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:

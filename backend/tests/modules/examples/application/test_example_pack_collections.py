@@ -15,17 +15,15 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import InstallFailedError
-from app.modules.examples.domain.installation import (
-    EntityKind,
-    InstallationStatus,
-    Outcome,
-)
-from app.modules.examples.domain.pack import ExamplePack, PackCollection
+from app.modules.examples.domain.installation import InstallationStatus, Outcome
 from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_USER_DATA
+from app.modules.transfer.domain.bundle import PackCollection
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
+    from app.modules.examples.domain.pack import ExamplePack
     from tests.modules.examples.conftest import (
         FakeCollection,
         MakeWorld,

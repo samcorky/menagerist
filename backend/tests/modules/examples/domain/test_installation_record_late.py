@@ -6,11 +6,11 @@ import pytest
 
 from app.modules.examples.domain.errors import InvalidInstallationStateError
 from app.modules.examples.domain.installation import (
-    EntityKind,
     Installation,
     InstallationStatus,
     Outcome,
 )
+from app.modules.transfer.domain.entity_kind import EntityKind
 
 
 def _installation(status: InstallationStatus) -> Installation:

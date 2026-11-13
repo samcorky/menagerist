@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from app.modules.examples.application.content_hash import content_hash
-from app.modules.examples.ports.pack_targets import RemoveResult
 from app.modules.graph.domain.node import Node
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.media_attachment import (
@@ -15,6 +14,7 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.modules.transfer.ports.targets import RemoveResult
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:

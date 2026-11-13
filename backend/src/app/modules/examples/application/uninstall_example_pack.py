@@ -15,28 +15,24 @@ from app.modules.examples.domain.errors import (
     PackNotInstalledError,
     RequiredByInstalledPackError,
 )
-from app.modules.examples.domain.installation import (
-    EntityKind,
-    EntityRecord,
-    Installation,
-    Outcome,
-)
+from app.modules.examples.domain.installation import EntityRecord, Installation, Outcome
 from app.modules.examples.domain.pack import PackCounts
 from app.modules.examples.domain.removal import KEEP_IN_USE
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
-from app.modules.examples.ports.pack_targets import (
+from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.ports.targets import (
     CollectionTarget,
-    CoverTarget,
     GraphTarget,
     PresetTarget,
     RemoveResult,
 )
-from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
+    from app.modules.examples.ports.cover_target import CoverTarget
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 

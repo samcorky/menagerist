@@ -5,12 +5,14 @@ from fastapi import Depends
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges.example_targets import (
-    CollectionPackTarget,
     CoverPackTarget,
+    get_cover_pack_target,
+)
+from app.entrypoints.api.shared.bridges.transfer_targets import (
+    CollectionPackTarget,
     GraphPackTarget,
     PresetPackTarget,
     get_collection_pack_target,
-    get_cover_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )

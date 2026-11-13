@@ -7,7 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from app.modules.examples.adapters.persistence.installation_repository import (
     SqlAlchemyInstallationRepository,
 )
-from app.modules.examples.domain.installation import EntityKind, Installation, Outcome
+from app.modules.examples.domain.installation import Installation, Outcome
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:

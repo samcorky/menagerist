@@ -28,7 +28,7 @@ from app.entrypoints.api.shared.bridges.collection_members import (
     CollectionsMembers,
     get_collection_members,
 )
-from app.entrypoints.api.shared.bridges.example_targets import (
+from app.entrypoints.api.shared.bridges.transfer_targets import (
     build_in_memory_collections_repos,
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor

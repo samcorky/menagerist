@@ -1,7 +1,7 @@
 import base64
 import hashlib
 
-from app.modules.examples.domain.pack import COVER_STYLES
+from app.modules.transfer.domain.bundle import COVER_STYLES
 
 # 1x1 PNG, used as the base so the output is always a valid image.
 _PNG = base64.b64decode(

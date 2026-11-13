@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Protocol
 
-from app.modules.examples.domain.installation import EntityKind  # noqa: TC001
-from app.modules.examples.domain.pack import (  # noqa: TC001
+from app.modules.transfer.domain.bundle import (  # noqa: TC001
     PackCollection,
     PackConnection,
     PackItem,
@@ -13,6 +12,7 @@ from app.modules.examples.domain.pack import (  # noqa: TC001
     PackPreset,
     PackRelationshipType,
 )
+from app.modules.transfer.domain.entity_kind import EntityKind  # noqa: TC001
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -143,31 +143,4 @@ class CollectionTarget(Protocol):
 
     async def remove(self, collection_id: uuid.UUID) -> RemoveResult:
         """Remove the collection, or report that it is already gone."""
-        ...
-
-
-class CoverTarget(Protocol):
-    """Creates, inspects and removes the generated covers of example items.
-
-    For a cover, `Created.content` and `Inspection.content` are
-    `{"style": ..., "name": ..., "sha256": ...}`; `sha256` is of the image's bytes,
-    or `None` once the image is no longer the item's cover. So a replaced image
-    reads as an edit. `Created.entity_id` identifies the cover itself, not the item.
-    `Inspection.has_user_data` and `still_in_use` stay false.
-    """
-
-    async def create(self, item_id: uuid.UUID, name: str, style: str) -> Created:
-        """Draw a cover for `name` in `style` and make it the item's cover."""
-        ...
-
-    async def inspect(self, cover_id: uuid.UUID) -> Inspection | None:
-        """Return the cover as it is now, or `None` if it is gone."""
-        ...
-
-    async def remove(self, cover_id: uuid.UUID) -> RemoveResult:
-        """Remove the cover and its stored files, or report that it is gone."""
-        ...
-
-    async def has_cover(self, item_id: uuid.UUID) -> bool:
-        """Whether the item already has a cover image (a pack's or the person's)."""
         ...

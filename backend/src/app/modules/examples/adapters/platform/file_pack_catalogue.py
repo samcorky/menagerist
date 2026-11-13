@@ -9,12 +9,12 @@ from app.modules.examples.adapters.platform.pack_parser import (
     parse_index,
     parse_pack,
 )
-from app.modules.examples.domain.errors import InvalidPackError
 from app.modules.examples.domain.pack import (
     ExamplePack,
     PackSummary,
     validate_catalogue,
 )
+from app.modules.transfer.domain.errors import InvalidPackError
 
 
 class FilePackCatalogue:

@@ -23,13 +23,14 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePack,
     UninstallExamplePackCommand,
 )
-from app.modules.examples.domain.pack import ExamplePack, preset_refs
+from app.modules.transfer.domain.bundle import preset_refs
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from app.modules.examples.domain.pack import ExamplePack
     from tests.modules.examples.conftest import MakeWorld, World
 
 _PACK_IDS = [

@@ -158,6 +158,19 @@ def test_examples_module_is_independent_of_other_modules() -> None:
         assert_passes(rule)
 
 
+def test_transfer_module_is_independent_of_other_modules() -> None:
+    """`transfer` holds the neutral bundle vocabulary and imports no other module."""
+    for other in ("graph", "presets", "collections", "media", "examples"):
+        rule = (
+            project_files(SRC_PATH)
+            .in_folder("*modules/transfer*")
+            .should_not()
+            .depend_on_files()
+            .in_folder(f"*modules/{other}*")
+        )
+        assert_passes(rule)
+
+
 def test_collections_module_is_independent_of_graph_and_presets() -> None:
     """`collections` reaches `graph` and `presets` only through its own ports."""
     for other in ("graph", "presets"):
@@ -189,6 +202,7 @@ def test_no_content_module_imports_identity() -> None:
         "graph",
         "presets",
         "examples",
+        "transfer",
         "collections",
         "media",
         "system",
@@ -223,7 +237,7 @@ def test_backup_module_is_independent_of_other_modules() -> None:
 
 def test_identity_module_is_independent_of_other_modules() -> None:
     """`identity` imports no other module; bridges live in `entrypoints/api/shared`."""
-    for other in ("graph", "presets", "examples", "collections", "media"):
+    for other in ("graph", "presets", "examples", "transfer", "collections", "media"):
         rule = (
             project_files(SRC_PATH)
             .in_folder("*modules/identity*")

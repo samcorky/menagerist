@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from app.modules.examples.domain.errors import InvalidInstallationStateError
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.mixins import Identifiable, Owned, Timestamped
 
 if TYPE_CHECKING:
@@ -18,18 +19,6 @@ class InstallationStatus(StrEnum):
     INSTALLED = "installed"
     REMOVED = "removed"
     FAILED = "failed"
-
-
-class EntityKind(StrEnum):
-    """What kind of entity an installation created."""
-
-    PRESET = "preset"
-    RELATIONSHIP_TYPE = "relationship_type"
-    ITEM_TYPE = "item_type"
-    ITEM = "item"
-    CONNECTION = "connection"
-    COLLECTION = "collection"
-    COVER = "cover"
 
 
 class Outcome(StrEnum):

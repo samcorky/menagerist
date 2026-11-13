@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from app.entrypoints.api.shared.bridges.example_targets import (
+from app.entrypoints.api.shared.bridges.transfer_targets import (
     CollectionPackTarget,
     build_in_memory_collections_repos,
     in_memory_collection_stores,
@@ -24,8 +24,8 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePack,
     UninstallExamplePackCommand,
 )
-from app.modules.examples.domain.pack import PackConnection
 from app.modules.graph.application.prepare_query import prepare_query
+from app.modules.transfer.domain.bundle import PackConnection
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 

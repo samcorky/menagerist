@@ -13,7 +13,7 @@ from app.modules.examples.adapters.covers.pillow_cover_renderer import (
     _colour_for,
     _glyph_for,
 )
-from app.modules.examples.domain.pack import COVER_STYLES
+from app.modules.transfer.domain.bundle import COVER_STYLES
 
 SIZES = {
     "sleeve": (512, 512),

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
-from app.entrypoints.api.shared.bridges.example_targets import (
+from app.entrypoints.api.shared.bridges.transfer_targets import (
     CollectionPackTarget,
     GraphPackTarget,
     PresetPackTarget,
@@ -13,12 +13,12 @@ from app.entrypoints.api.shared.bridges.example_targets import (
     in_memory_graph_stores,
     in_memory_preset_stores,
 )
-from app.modules.examples.domain.errors import InvalidPackError
-from app.modules.examples.domain.installation import EntityKind
-from app.modules.examples.ports.pack_targets import Created, RemoveResult
 from app.modules.graph.domain.edge import Edge
 from app.modules.media.domain.media_attachment import MediaAttachment
 from app.modules.presets.domain.preset import Preset
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.ports.targets import Created, RemoveResult
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 

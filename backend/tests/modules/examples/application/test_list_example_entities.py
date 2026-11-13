@@ -7,8 +7,9 @@ from app.modules.examples.application.list_example_entities import (
     ListExampleEntities,
     ListExampleEntitiesQuery,
 )
-from app.modules.examples.domain.installation import EntityKind, Installation, Outcome
+from app.modules.examples.domain.installation import Installation, Outcome
 from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 

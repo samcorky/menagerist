@@ -1450,3 +1450,16 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 - `/status` stays top-level: it is read-only server information open to everyone, so `/admin/status` would suggest a permission it does not need, and `/settings/status` would bring back the double meaning. `isManageRoute()` reads the registry, so no path is special-cased.
 
 **Rationale:** the registry in `manage-nav.ts` already drives the sidebar, the hub tiles and the mobile tab bar, so the rename was an edit to its hrefs plus the route directories. The generated `RouteId` type makes a missed reference fail `poe typecheck-frontend`.
+
+## A transfer module owns the targets (2026-11-13)
+
+**Decision:** the ports that create, inspect and remove content (`PresetTarget`, `GraphTarget`, `CollectionTarget`), the bundle types they take (`PackPreset`, `PackItemType`, `PackItem` and the rest), `EntityKind` and `InvalidPackError` live in `modules/transfer/`. `examples` depends on `transfer` and never the reverse; `transfer` imports no other module. The adapters stay in `entrypoints/api/shared/bridges/` (`transfer_targets.py`), because they drive other modules' use cases and modules may only meet there. The cover target stays in `examples` with its bridge (`example_targets.py`).
+
+**Choices that are not obvious:**
+
+- Behaviour-preserving move (#231a): names, the `example_installations` table, the `/examples` API and the permissions are unchanged. The `pack` to `bundle` and `installation` to `run` renames, and the move of the ledger and removal logic, wait for #231b so this change is only moves and imports.
+- The bundle types moved with the ports because the ports take them; leaving them in `examples` would have made `transfer` import `examples`. `EntityKind` moved for the same reason.
+- Targets are neutral about who installs. A caller that does not record a run in the example ledger (the planned preset and starter-type catalogue, #100) installs without the "Example" marker, which comes only from that ledger.
+- Whether the bundle format is public is still open (#230).
+
+**Rationale:** the example-pack installer is the only code that writes a whole bundle today, and later importers (#230, #238) and the catalogue need the same targets. Moving them first keeps those changes from untangling example-specific code.

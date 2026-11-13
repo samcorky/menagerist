@@ -2,14 +2,13 @@
 
 import pytest
 
-from app.modules.examples.domain.errors import InvalidPackError
-from app.modules.examples.domain.pack import (
-    ExamplePack,
+from app.modules.examples.domain.pack import ExamplePack, PackLink
+from app.modules.transfer.domain.bundle import (
     PackItem,
     PackItemType,
-    PackLink,
     PackRelationshipType,
 )
+from app.modules.transfer.domain.errors import InvalidPackError
 
 
 def _pack(*links: PackLink, requires: tuple[str, ...] = ()) -> ExamplePack:

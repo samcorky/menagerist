@@ -19,7 +19,6 @@ from app.modules.examples.domain.errors import (
     SlugClashError,
 )
 from app.modules.examples.domain.installation import (
-    EntityKind,
     EntityRecord,
     Installation,
     InstallationStatus,
@@ -27,13 +26,8 @@ from app.modules.examples.domain.installation import (
 )
 from app.modules.examples.domain.pack import ExamplePack, PackCounts
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
-from app.modules.examples.ports.pack_targets import (  # noqa: TC001
-    CollectionTarget,
-    CoverTarget,
-    GraphTarget,
-    PresetTarget,
-)
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -41,6 +35,12 @@ from app.shared_kernel.slug import slugify
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from app.modules.examples.ports.cover_target import CoverTarget
+    from app.modules.transfer.ports.targets import (
+        CollectionTarget,
+        GraphTarget,
+        PresetTarget,
+    )
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.content_filter import ContentFilter

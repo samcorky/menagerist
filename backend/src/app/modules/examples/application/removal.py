@@ -4,15 +4,14 @@ from typing import TYPE_CHECKING
 from app.modules.examples.application.content_hash import content_hash
 from app.modules.examples.domain.installation import (
     REMOVAL_ORDER,
-    EntityKind,
     EntityRecord,
     Installation,
     Outcome,
 )
 from app.modules.examples.domain.removal import KEEP_IN_USE, Action, decide_removal
-from app.modules.examples.ports.pack_targets import (
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.ports.targets import (
     CollectionTarget,
-    CoverTarget,
     GraphTarget,
     Inspection,
     PresetTarget,
@@ -21,6 +20,8 @@ from app.modules.examples.ports.pack_targets import (
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
+
+    from app.modules.examples.ports.cover_target import CoverTarget
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)

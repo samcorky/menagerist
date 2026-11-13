@@ -1,11 +1,6 @@
 from typing import TYPE_CHECKING
 
-from app.shared_kernel.errors import (
-    ConflictError,
-    InfrastructureError,
-    NotFoundError,
-    ValidationError,
-)
+from app.shared_kernel.errors import ConflictError, InfrastructureError, NotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -48,10 +43,6 @@ class RequiredByInstalledPackError(ConflictError):
         )
         super().__init__(f"Remove {listed} first.")
         self.names = tuple(names)
-
-
-class InvalidPackError(ValidationError):
-    """Raised when a pack file or its content is malformed."""
 
 
 class InvalidInstallationStateError(ConflictError):

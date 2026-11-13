@@ -24,20 +24,11 @@ from app.modules.examples.domain.errors import (
     RequirementsNotMetError,
 )
 from app.modules.examples.domain.installation import (
-    EntityKind,
     Installation,
     InstallationStatus,
     Outcome,
 )
-from app.modules.examples.domain.pack import (
-    ExamplePack,
-    PackCollection,
-    PackConnection,
-    PackCover,
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
-)
+from app.modules.examples.domain.pack import ExamplePack
 from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_USER_DATA
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import (
@@ -45,6 +36,15 @@ from app.modules.media.domain.media_attachment import (
     AttachmentTarget,
     MediaAttachment,
 )
+from app.modules.transfer.domain.bundle import (
+    PackCollection,
+    PackConnection,
+    PackCover,
+    PackItem,
+    PackItemType,
+    PackRelationshipType,
+)
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter

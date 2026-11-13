@@ -7,12 +7,12 @@ import pytest
 from app.modules.examples.domain.errors import InvalidInstallationStateError
 from app.modules.examples.domain.installation import (
     REMOVAL_ORDER,
-    EntityKind,
     Installation,
     InstallationStatus,
     Outcome,
     adoptable_records,
 )
+from app.modules.transfer.domain.entity_kind import EntityKind
 
 OWNER = uuid.UUID(int=0xA1)
 
