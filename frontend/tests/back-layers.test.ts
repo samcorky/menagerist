@@ -178,6 +178,31 @@ describe('back layers', () => {
 		]);
 	});
 
+	it('goes back past every entry that carries the layer, then puts the address back', async () => {
+		const unregister = registerLayer(() => {});
+		await settle();
+		// The first filter written adds a second entry that also carries the layer.
+		router.page.state = { layers: ['layer-1', 'layer-1'] };
+		router.page.url.href = 'http://localhost/items?f=x';
+		const backs = vi.fn();
+		vi.stubGlobal('history', {
+			back: () => {
+				backs();
+				goBack();
+				if (backs.mock.calls.length === 2) router.page.url.href = 'http://localhost/items';
+			}
+		});
+
+		unregister();
+		await settle();
+
+		expect(backs).toHaveBeenCalledTimes(2);
+		// The address returns as an entry of its own, as writing the first filter made one.
+		expect(router.gotos).toEqual([
+			['http://localhost/items?f=x', { replaceState: false, noScroll: true, keepFocus: true }]
+		]);
+	});
+
 	it('leaves the address alone when it was not rewritten', async () => {
 		const unregister = registerLayer(() => {});
 		await settle();

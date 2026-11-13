@@ -17,10 +17,6 @@ let known = 0;
 let scheduled = false;
 let popping: Promise<void> | null = null;
 let serial = 0;
-// The address each entry was opened on, so a closing layer can tell when the address was rewritten
-// while it was open (filters written to the query string). That rewrite lands on the layer's own
-// entry, which closing discards.
-const openedAt: string[] = [];
 // The layers' entries while a navigation that stays on the page runs: SvelteKit clears the page
 // state on `goto`, which must not read as Back.
 let keeping: string[] | null = null;
@@ -72,7 +68,6 @@ export function syncLayers(): void {
 	const have = entries();
 	if (have >= known) return;
 	known = have;
-	openedAt.length = Math.min(openedAt.length, have);
 	while (stack.length > have) stack.pop()?.onclose();
 }
 
@@ -112,37 +107,42 @@ async function reconcile(): Promise<void> {
 	if (navigating.to) return schedule();
 	const have = entries();
 	if (have > stack.length) {
-		known = have - 1;
-		const current = page.url.href;
-		const base = openedAt.pop();
-		await popLayer();
-		if (base !== undefined && base !== current) await keepAddress(base, current);
+		const wanted = page.url.href;
+		// Entries beyond the layer's own, added by navigations that stayed on the page.
+		const addedEntries = Math.max(0, have - stack.length - 1);
+		// A navigation that stays on the page while a layer is open (the first filter written)
+		// adds an entry that also carries the layer, so more than one may need to go.
+		for (let left = have; entries() > stack.length && left > 0; left--) {
+			known = entries() - 1;
+			await popLayer();
+			await routerIdle();
+		}
+		// Going back returned to the address the layer opened on; put back the one it ended with,
+		// as a replacement, so a filter applied inside the sheet survives the sheet closing.
+		// Writing the first filter adds an entry of its own, so the address goes back as one;
+		// later writes only replace it.
+		if (page.url.href !== wanted) {
+			// An address the router already accepted.
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			await goto(wanted, { replaceState: addedEntries === 0, noScroll: true, keepFocus: true });
+		}
 		schedule();
 	} else if (have < stack.length) {
-		openedAt.push(page.url.href);
 		pushState('', { layers: [...(page.state.layers ?? []), `layer-${++serial}`] });
 		known = have + 1;
 		schedule();
 	}
 }
 
-// Going back returned to the address the layer opened on; put back the one it ended with, as a
-// replacement, so a filter applied inside the sheet survives the sheet closing.
-async function keepAddress(base: string, wanted: string): Promise<void> {
-	for (let waited = 0; page.url.href !== base && waited < 1000; waited += 20) {
+async function routerIdle(): Promise<void> {
+	for (let waited = 0; navigating.to && waited < 1000; waited += 20) {
 		await new Promise((resolve) => setTimeout(resolve, 20));
-	}
-	if (page.url.href === base) {
-		// An address the router already accepted.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		await goto(wanted, { replaceState: true, noScroll: true, keepFocus: true });
 	}
 }
 
 /** Test seam: forget every layer, as a fresh page load does. */
 export function resetLayers(): void {
 	stack.length = 0;
-	openedAt.length = 0;
 	keeping = null;
 	clearTimeout(keepTimer);
 	known = 0;

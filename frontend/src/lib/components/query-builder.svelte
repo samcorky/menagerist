@@ -331,7 +331,8 @@
 		</div>
 	</div>
 {:else}
-	<ResponsiveDialog.Root bind:open>
+	<!-- Filters write the address themselves: one editing session is one history entry. -->
+	<ResponsiveDialog.Root bind:open backLayer={false}>
 		<ResponsiveDialog.Content
 			{title}
 			bind:ref={contentEl}
