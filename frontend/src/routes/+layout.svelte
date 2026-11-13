@@ -2,6 +2,8 @@
 	import './layout.css';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { noteArrival, replaceNext } from '$lib/in-app-history.js';
+	import { popAllLayers } from '$lib/back-layers.js';
 	import { onNavigate, beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import {
 		CirclePlus,
@@ -111,6 +113,18 @@
 		});
 	});
 
+	// A link or redirect taken from inside an open sheet first closes it by going back, then
+	// navigates: otherwise the sheet's history entry would stay between the two pages.
+	beforeNavigate(({ cancel, to, type, willUnload }) => {
+		if (!to || willUnload || type === 'popstate' || !(page.state.layers?.length ?? 0)) return;
+		cancel();
+		// The target is a URL the router already accepted.
+		void popAllLayers().then(() =>
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			goto(to.url)
+		);
+	});
+
 	// SvelteKit only manages window scroll; the app scrolls inside #main-scroll.
 	let cancelRestore: (() => void) | undefined;
 	beforeNavigate(({ from, type }) => {
@@ -118,7 +132,8 @@
 		const el = document.getElementById('main-scroll');
 		if (el && from && type !== 'leave') savePosition(from.url, el.scrollTop);
 	});
-	afterNavigate(({ from, to, type }) => {
+	afterNavigate(({ from, to, type, delta }) => {
+		noteArrival({ type, from, to, delta });
 		const el = document.getElementById('main-scroll');
 		if (!el || !to || type === 'enter') return;
 		if (type === 'popstate') {
@@ -168,6 +183,7 @@
 
 	$effect(() => {
 		if (auth.ready && decision.action === 'redirect') {
+			replaceNext();
 			// The guard builds same-origin paths; the app has no base path.
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			void goto(decision.to, { replaceState: true });

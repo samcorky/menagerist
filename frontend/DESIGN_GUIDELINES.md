@@ -290,6 +290,12 @@ For reduced motion use transitions of at most **100 ms** or opacity-only fades; 
 
 Prefer bottom sheets, full-screen dialogs/search where appropriate, sticky action bars and bottom navigation. Use swipes only where useful, avoid tiny dropdown targets and reduce typing/scrolling with suitable pickers and toggles. Layout rules are in §§4–5; native select guidance is in §15.
 
+- **Back closes the top layer.** The system Back gesture closes an open sheet, dialog or image viewer before it leaves the page, and closing one with its own button leaves no extra history entry. In-page "Back" goes to the previous page of the app, or to the parent page when the app was opened straight onto this one; it never leaves Menagerist.
+- **Detail pages put their main actions under the thumb.** On a phone, a sticky bar carries the page's actions (Duplicate and Edit; Cancel and Save while editing) instead of leaving them in a header that scrolls away.
+- **Pressed and dragged states.** Controls dim while pressed on touch screens, double-tap zoom is off on them, and pulling down at the top of the page does not reload the app mid-edit.
+- **Failed loads offer a retry**, which also runs when the connection returns. A session that the server ended says so on the sign-in page, and signing in returns to the page being used.
+- **Motion** eases only where it helps, and `prefers-reduced-motion` turns it off everywhere except spinners and skeletons.
+
 ## 24. Terminology Reference
 
 Authoritative for UI labels, copy, errors and empty states:

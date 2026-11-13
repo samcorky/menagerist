@@ -35,6 +35,14 @@ export default defineConfig({
 				replacement: fileURLToPath(new URL('./tests/mocks/lucide-svelte.ts', import.meta.url))
 			},
 			{
+				find: '$app/state',
+				replacement: fileURLToPath(new URL('./tests/mocks/app-state.ts', import.meta.url))
+			},
+			{
+				find: '$app/navigation',
+				replacement: fileURLToPath(new URL('./tests/mocks/app-navigation.ts', import.meta.url))
+			},
+			{
 				find: 'bits-ui',
 				replacement: fileURLToPath(new URL('./tests/mocks/bits-ui.ts', import.meta.url))
 			}

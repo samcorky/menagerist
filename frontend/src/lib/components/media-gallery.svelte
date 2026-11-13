@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BackLayer from '$lib/components/back-layer.svelte';
 	import { onDestroy } from 'svelte';
 	import {
 		X,
@@ -416,6 +417,7 @@
 <!-- Lightbox -->
 {#if lightboxAsset}
 	{@const asset = lightboxAsset}
+	<BackLayer onclose={() => (lightboxAsset = null)} />
 	<div
 		class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4"
 		role="dialog"

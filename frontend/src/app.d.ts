@@ -5,7 +5,10 @@ declare global {
 		// interface Error {}
 		// interface Locals {}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			/** Ids of the sheets and dialogs open on top of this history entry; see back-layer.svelte. */
+			layers?: string[];
+		}
 		// interface Platform {}
 	}
 }

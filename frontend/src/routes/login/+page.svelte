@@ -45,6 +45,13 @@
 	</div>
 
 	<form class="space-y-4" onsubmit={handleSubmit}>
+		{#if auth.sessionExpired && !error}
+			<Alert.Root data-testid="session-expired">
+				<Alert.Description>
+					Your session ended. Sign in again and you'll return to where you were.
+				</Alert.Description>
+			</Alert.Root>
+		{/if}
 		{#if error}
 			<Alert.Root variant="destructive">
 				<Alert.Description>{error}</Alert.Description>
