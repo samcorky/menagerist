@@ -562,3 +562,92 @@ def test_vitest_keeps_its_console_reporter_beside_junit(
 
     monkeypatch.delenv("JUNIT_XML_DIR")
     assert not any("junit" in arg for arg in poe_run._vitest("agent", ""))
+
+
+# --- stale API client guard --------------------------------------------------
+
+
+def _client_tree(tmp_path: Path, stamp: str | None) -> Path:
+    (tmp_path / "openapi.json").write_text('{"openapi": "3.1.0"}')
+    out = tmp_path / "frontend" / "src" / "lib" / "api" / "generated"
+    out.mkdir(parents=True)
+    if stamp is not None:
+        (out / poe_run.CLIENT_STAMP).write_text(stamp + "\n")
+    return tmp_path
+
+
+def _digest(tmp_path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256((tmp_path / "openapi.json").read_bytes()).hexdigest()
+
+
+def test_ensure_api_client_skips_a_current_client(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A stamp matching the schema means nothing is regenerated."""
+    root = _client_tree(tmp_path, None)
+    (root / "frontend/src/lib/api/generated" / poe_run.CLIENT_STAMP).write_text(
+        _digest(root)
+    )
+    monkeypatch.setattr(
+        poe_run.subprocess, "call", lambda *a, **k: pytest.fail("regenerated")
+    )
+    assert poe_run.ensure_api_client(root) is False
+
+
+def test_ensure_api_client_regenerates_a_stale_client(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A stamp that differs from the schema regenerates and says so."""
+    root = _client_tree(tmp_path, "old")
+    calls: list[list[str]] = []
+
+    def _call(argv: list[str], **_: object) -> int:
+        calls.append(argv)
+        return 0
+
+    monkeypatch.setattr(poe_run.subprocess, "call", _call)
+    assert poe_run.ensure_api_client(root) is True
+    assert calls[0][-2:] == ["run", "generate"]
+    assert "out of date" in capsys.readouterr().err
+    stamp = root / "frontend/src/lib/api/generated" / poe_run.CLIENT_STAMP
+    assert stamp.read_text().strip() == _digest(root)
+
+
+def test_ensure_api_client_regenerates_when_never_stamped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A client with no stamp (generated before the guard existed) is regenerated."""
+    root = _client_tree(tmp_path, None)
+    monkeypatch.setattr(poe_run.subprocess, "call", lambda *a, **k: 0)
+    assert poe_run.ensure_api_client(root) is True
+
+
+def test_ensure_api_client_stops_when_generation_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A failed generation exits with its code instead of running stale checks."""
+    root = _client_tree(tmp_path, "old")
+    monkeypatch.setattr(poe_run.subprocess, "call", lambda *a, **k: 3)
+    with pytest.raises(SystemExit) as exc:
+        poe_run.ensure_api_client(root)
+    assert exc.value.code == 3
+
+
+def test_ensure_api_client_ignores_a_missing_schema(tmp_path: Path) -> None:
+    """Without an openapi.json there is nothing to compare."""
+    assert poe_run.ensure_api_client(tmp_path) is False
+
+
+def test_main_guards_frontend_tasks_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Frontend tasks check the client first; backend tasks do not."""
+    seen: list[str] = []
+    monkeypatch.setattr(poe_run, "ensure_api_client", lambda: seen.append("x"))
+    monkeypatch.setattr(poe_run, "execute", lambda *a, **k: 0)
+    for task in ("lint-frontend", "test-backend"):
+        with pytest.raises(SystemExit):
+            poe_run.main(task)
+    assert seen == ["x"]

@@ -178,7 +178,7 @@ uv run menagerist data purge-deleted --dry-run               # show what would b
 
 ```sh
 poe sync                      # re-sync all deps, the e2e browser and the API client (run after pulling)
-poe generate-frontend-client  # regenerate the typed API client after a backend schema change
+poe generate-frontend-client  # regenerate the typed API client after a backend schema change (the frontend lint, typecheck and unit-test tasks also regenerate it by themselves when `openapi.json` has changed since it was built)
 poe migrate                   # apply Alembic migrations
 poe db-up / poe db-down       # start/stop the local Postgres container
 poe generate-settings-docs    # regenerate .env.example and docs/settings.md after changing a settings class
