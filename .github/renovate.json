@@ -97,7 +97,7 @@
   },
   "packageRules": [
     {
-      "description": "filetype is a pretty static Python library that detects file types and is not updated often"
+      "description": "filetype is a pretty static Python library that detects file types and is not updated often",
       "matchDatasources": ["pep621"],
       "matchPackageNames": ["filetype"],
       "abandonmentThreshold": null
