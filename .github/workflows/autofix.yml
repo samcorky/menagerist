@@ -82,10 +82,20 @@ jobs:
           path: ~/.cache/prek
           key: prek-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
+      - name: List the files to check
+        # The files `prek run --last-commit` would cover, without .github/renovate.json.
+        # Renovate writes its additions to that file with short arrays on one line,
+        # pretty-format-json expands them, and autofix.ci may not edit .github/, so the job
+        # would fail on every Renovate reconfigure pull request. The file is still
+        # validated in the last step.
+        run: |
+          git diff --name-only --diff-filter=d HEAD~1 HEAD \
+            | grep -vxF '.github/renovate.json' > "$RUNNER_TEMP/hook-files" || true
+
       - name: Apply hook fixes
         # A hook that rewrites a file exits non-zero; autofix.ci commits those
         # rewrites below.
-        run: uv run prek run --last-commit || true
+        run: xargs -d '\n' -r -a "$RUNNER_TEMP/hook-files" uv run prek run --files || true
 
       - name: Push fixes
         uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a # v1.3.4
@@ -93,4 +103,8 @@ jobs:
           commit-message: "${{ startsWith(github.head_ref, 'renovate/') && 'chore(deps): apply lockfile and hook fixes' || 'style: apply hook fixes' }}"
 
       - name: Check hooks
-        run: uv run prek run --last-commit
+        run: |
+          xargs -d '\n' -r -a "$RUNNER_TEMP/hook-files" uv run prek run --files
+          if git diff --name-only HEAD~1 HEAD | grep -qxF '.github/renovate.json'; then
+            uv run prek run renovate-config-validator --files .github/renovate.json
+          fi
