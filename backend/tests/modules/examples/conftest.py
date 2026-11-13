@@ -246,6 +246,9 @@ class World:
         return replace(
             self,
             actor=actor,
+            presets=PresetPackTarget(
+                in_memory_preset_stores(self.preset_repos, self.graph_repos), actor
+            ),
             graph=WorldGraphTarget(
                 in_memory_graph_stores(
                     self.graph_repos, self.media_repos, self.preset_repos
@@ -334,7 +337,9 @@ def _make_world(*packs: ExamplePack, actor: Actor = USER_A) -> World:
         installations=installations,
         catalogue=catalogue,
         uow=InMemoryUnitOfWork(ExampleRepos(installations=installations)),
-        presets=PresetPackTarget(in_memory_preset_stores(preset_repos, graph_repos)),
+        presets=PresetPackTarget(
+            in_memory_preset_stores(preset_repos, graph_repos), actor
+        ),
         graph=WorldGraphTarget(
             in_memory_graph_stores(graph_repos, media_repos, preset_repos),
             collections,

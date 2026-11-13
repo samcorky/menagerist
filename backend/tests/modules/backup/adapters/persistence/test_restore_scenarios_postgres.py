@@ -342,6 +342,10 @@ async def test_restore_refused_across_a_real_migration(
             rollback_engine = create_async_engine(rollback_url)
             try:
                 rollback_factory = async_sessionmaker(rollback_engine)
+                async with rollback_engine.begin() as connection:
+                    # Only the old release restores here and it ignores seeded
+                    # built-ins; current code counts every preset as content.
+                    await connection.execute(text("DELETE FROM presets"))
                 await RestoreBackup(
                     store,
                     SqlAlchemyDatabaseRestorer(rollback_factory),

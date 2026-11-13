@@ -123,3 +123,85 @@ async def test_reflected_user_transfer_keeps_other_accounts(
             assert await connection.scalar(text("SELECT count(*) FROM users")) == 3
     finally:
         await engine.dispose()
+
+
+async def test_presets_export_whole_and_import_without_reusing_donor_rows(
+    snapshot_database: str,
+) -> None:
+    """All of a person's live presets travel; the importer's copies are its own."""
+    engine = create_async_engine(snapshot_database)
+    factory = async_sessionmaker(engine)
+    owner, other, destination = uuid7(), uuid7(), uuid7()
+    used, unused, deleted, theirs = (uuid7() for _ in range(4))
+    try:
+        async with engine.begin() as connection:
+            for identifier, username in (
+                (owner, "owner"),
+                (other, "other"),
+                (destination, "destination"),
+            ):
+                await connection.execute(
+                    text("""INSERT INTO users
+                    (id, username, display_name, password_hash, role,
+                    password_expired, disabled, created_at, updated_at)
+                    VALUES (:id, :name, :name, 'hash', 'member',
+                    false, false, now(), now())"""),
+                    {"id": identifier, "name": username},
+                )
+            for identifier, user_id, label, gone in (
+                (used, owner, "Used", False),
+                (unused, owner, "Unused", False),
+                (deleted, owner, "Deleted", True),
+                (theirs, other, "Theirs", False),
+            ):
+                await connection.execute(
+                    text("""INSERT INTO presets
+                    (id, owner_id, kind, label, definition, version,
+                    created_at, updated_at, deleted_at)
+                    VALUES (:id, :owner, 'choice_list', :label,
+                    '{"options": ["a"]}', 1, now(), now(),
+                    CASE WHEN :gone THEN now() END)"""),
+                    {"id": identifier, "owner": user_id, "label": label, "gone": gone},
+                )
+        members = {
+            member.name: b"".join([chunk async for chunk in member.chunks])
+            async for member in SqlAlchemyUserDatabaseSnapshot(factory).export(
+                scope=ContentFilter.of(owner)
+            )
+        }
+        exported = {
+            json.loads(line)["id"]
+            for line in members["data/presets.ndjson"].splitlines()
+        }
+        assert exported == {str(used), str(unused)}
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM presets WHERE id IN (:a, :b)"),
+                {"a": used, "b": unused},
+            )
+            await connection.execute(
+                text("""INSERT INTO presets
+                (id, owner_id, kind, label, definition, version,
+                created_at, updated_at)
+                VALUES (:id, :owner, 'choice_list', 'Used',
+                '{"options": ["a"]}', 1, now(), now())"""),
+                {"id": uuid7(), "owner": other},
+            )
+        restorer = SqlAlchemyUserDatabaseRestorer(factory, BackupUserImportValidator())
+        await restorer.import_user(
+            InMemoryBackupReader(members).members(), new_owner_id=destination
+        )
+        async with engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text("SELECT id, owner_id, label FROM presets ORDER BY label")
+                )
+            ).all()
+        assert {(row.id, row.owner_id) for row in rows} >= {
+            (used, destination),
+            (unused, destination),
+        }
+        # The other person's identical "Used" list was not linked to.
+        assert sum(row.label == "Used" for row in rows) == 2
+    finally:
+        await engine.dispose()

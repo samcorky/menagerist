@@ -52,8 +52,8 @@ from app.modules.presets.application.list_presets import ListPresets, ListPreset
 from app.modules.presets.application.pack import PACK_FORMAT, PACK_VERSION
 from app.modules.presets.application.update_preset import UpdatePreset
 from app.modules.presets.domain.errors import (
-    BuiltinPresetError,
     InvalidPresetDefinitionError,
+    PresetInUseError,
     PresetNotFoundError,
 )
 from app.shared_kernel.actor import Actor
@@ -67,10 +67,6 @@ _NOT_FOUND = error_response(
 )
 _INVALID_DEFINITION = error_response(
     InvalidPresetDefinitionError, detail="a field preset needs a 'property' object"
-)
-_BUILTIN = error_response(
-    BuiltinPresetError,
-    detail="Preset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30 is built in and read-only",
 )
 
 
@@ -189,7 +185,6 @@ async def list_presets(
         **conditional_patch_responses(),
         **_NOT_FOUND,
         **_INVALID_DEFINITION,
-        **_BUILTIN,
     },
 )
 async def update_preset(
@@ -213,7 +208,13 @@ async def update_preset(
     "/{preset_id}",
     status_code=204,
     operation_id="delete_preset",
-    responses={**_NOT_FOUND, **_BUILTIN},
+    responses={
+        **_NOT_FOUND,
+        **error_response(
+            PresetInUseError,
+            detail="Used by Record, Book. Remove it from those types first.",
+        ),
+    },
 )
 async def delete_preset(
     preset_id: uuid.UUID,

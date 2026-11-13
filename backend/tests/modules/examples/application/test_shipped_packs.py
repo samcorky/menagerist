@@ -114,7 +114,11 @@ async def _live_counts(world: World) -> list[int]:
                 after=None, limit=_LIMIT, scope=everyone
             )
         ),
-        len(await world.preset_repos.presets.list(after=None, limit=_LIMIT)),
+        len(
+            await world.preset_repos.presets.list(
+                scope=ContentFilter.everyone(), after=None, limit=_LIMIT
+            )
+        ),
     ]
     counts.append(
         len(

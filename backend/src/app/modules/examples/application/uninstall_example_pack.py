@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
-from app.modules.examples.application.content_hash import content_hash
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.examples.application.removal import (
     KeptEntity,
@@ -15,20 +14,19 @@ from app.modules.examples.domain.errors import (
     PackNotInstalledError,
     RequiredByInstalledPackError,
 )
-from app.modules.examples.domain.installation import EntityRecord, Installation, Outcome
+from app.modules.examples.domain.installation import Installation, Outcome
 from app.modules.examples.domain.pack import PackCounts
-from app.modules.examples.domain.removal import KEEP_IN_USE
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.ports.targets import (
+
+# Needed at runtime: the CQRS signature test evaluates __init__ annotations.
+from app.modules.transfer.ports.targets import (  # noqa: TC001
     CollectionTarget,
     GraphTarget,
     PresetTarget,
-    RemoveResult,
 )
 from app.shared_kernel.access import Access, Content
-from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -62,9 +60,8 @@ class UninstallExamplePack(
 
     Also finishes an installation an earlier crash left unfinished.
 
-    Item and relationship types belong to the person who installed the pack, so
-    removal never touches anyone else's copy. Choice lists stay shared: while
-    another person's types use one it stays, and the last person out removes it.
+    Item and relationship types and choice lists belong to the person who
+    installed the pack, so removal never touches anyone else's copy.
 
     :raises PackNotInstalledError: there is nothing to remove.
     :raises RequiredByInstalledPackError: an installed add-on still needs the pack
@@ -124,9 +121,6 @@ class UninstallExamplePack(
         kept = [*link_kept, *kept]
         installation.mark_removed()
         await self._persist(installation)
-        await self._release_kept_presets(
-            installation, await self._pack_history(command.pack_id)
-        )
         logger.info("example pack removed", pack_id=command.pack_id, kept=len(kept))
         return UninstallResult(
             pack_id=command.pack_id,
@@ -159,47 +153,6 @@ class UninstallExamplePack(
                     persist=self._persist,
                 )
         return kept
-
-    async def _pack_history(self, pack_id: str) -> list[Installation]:
-        async with self._uow as repos:
-            # all-users check: choice lists are shared structure
-            return await repos.installations.list_for_pack(
-                pack_id, scope=ContentFilter.everyone()
-            )
-
-    async def _release_kept_presets(
-        self, finished: Installation, history: list[Installation]
-    ) -> None:
-        """Remove choice lists other people's removed installs left behind, if unused.
-
-        Choice lists are shared between people (types are not), so the last person
-        out also removes the ones earlier uninstalls left because someone's types
-        still used them. Only once no installation of the pack is active.
-        """
-        if any(i.is_active and i.id != finished.id for i in history):
-            return
-        for other in history:
-            if other.owner_id == finished.owner_id:
-                continue
-            for record in other.entities:
-                if (
-                    record.kind is EntityKind.PRESET
-                    and record.outcome is Outcome.KEPT
-                    and record.reason == KEEP_IN_USE
-                    and await self._release_preset(record)
-                ):
-                    other.settle_kept_as_removed(record.entity_id)
-                    await self._persist(other)
-
-    async def _release_preset(self, record: EntityRecord) -> bool:
-        """Remove the kept choice list if unedited and unused; whether it is gone."""
-        found = await self._presets.inspect(record.entity_id)
-        if found is None:
-            return True
-        if content_hash(found.content) != record.content_hash or found.still_in_use:
-            return False
-        result = await self._presets.remove(record.entity_id)
-        return result is not RemoveResult.REFUSED_IN_USE
 
     async def _persist(self, installation: Installation) -> None:
         async with self._uow as repos:

@@ -20,7 +20,6 @@ from app.modules.presets.application.update_preset import (
     UpdatePresetCommand,
 )
 from app.modules.presets.domain.errors import (
-    BuiltinPresetError,
     InvalidPresetDefinitionError,
     PresetNotFoundError,
 )
@@ -28,7 +27,11 @@ from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
+
+OWNER = uuid.uuid7()
+EVERYONE = ContentFilter.everyone()
 
 
 def _empty_repos() -> PresetRepos:
@@ -48,7 +51,7 @@ async def test_create_preset_persists_and_commits() -> None:
         SYSTEM_ACTOR,
     )
 
-    assert await repos.presets.get(preset.id) is preset
+    assert await repos.presets.get(preset.id, scope=EVERYONE) is preset
     assert uow.committed is True
 
 
@@ -63,13 +66,15 @@ async def test_create_preset_rejects_a_malformed_definition() -> None:
             SYSTEM_ACTOR,
         )
 
-    assert await repos.presets.list(after=None, limit=10) == []
+    assert await repos.presets.list(scope=EVERYONE, after=None, limit=10) == []
 
 
 async def test_get_preset_returns_it() -> None:
     """GetPreset returns the stored preset."""
     repos = _empty_repos()
-    preset = Preset.create(kind="field", label="Condition", definition={})
+    preset = Preset.create(
+        owner_id=OWNER, kind="field", label="Condition", definition={}
+    )
     await repos.presets.add(preset)
 
     result = await GetPreset(repos, InMemoryAccessGuard()).handle(
@@ -90,11 +95,15 @@ async def test_get_preset_raises_for_a_missing_id() -> None:
 async def test_list_presets_filters_by_kind_and_q() -> None:
     """ListPresets can filter by kind and by a label search."""
     repos = _empty_repos()
-    field = Preset.create(kind="field", label="Condition", definition={})
-    other_kind = Preset.create(
-        kind="choice_list", label="Condition list", definition={}
+    field = Preset.create(
+        owner_id=OWNER, kind="field", label="Condition", definition={}
     )
-    other_label = Preset.create(kind="field", label="Format", definition={})
+    other_kind = Preset.create(
+        owner_id=OWNER, kind="choice_list", label="Condition list", definition={}
+    )
+    other_label = Preset.create(
+        owner_id=OWNER, kind="field", label="Format", definition={}
+    )
     for preset in [field, other_kind, other_label]:
         await repos.presets.add(preset)
 
@@ -113,7 +122,10 @@ async def test_update_preset_bumps_version_only_when_definition_changes() -> Non
     """A label/description edit keeps version 1; changing the definition bumps it."""
     repos = _empty_repos()
     preset = Preset.create(
-        kind="field", label="Condition", definition={"property": {"type": "string"}}
+        owner_id=OWNER,
+        kind="field",
+        label="Condition",
+        definition={"property": {"type": "string"}},
     )
     await repos.presets.add(preset)
     uow = InMemoryUnitOfWork(repos)
@@ -138,7 +150,10 @@ async def test_update_preset_rejects_a_malformed_definition() -> None:
     """A malformed definition is rejected before saving."""
     repos = _empty_repos()
     preset = Preset.create(
-        kind="choice_list", label="Grades", definition={"options": ["A"]}
+        owner_id=OWNER,
+        kind="choice_list",
+        label="Grades",
+        definition={"options": ["A"]},
     )
     await repos.presets.add(preset)
 
@@ -157,22 +172,12 @@ async def test_update_preset_raises_for_a_missing_id() -> None:
         ).handle(UpdatePresetCommand(preset_id=uuid.uuid4(), label="X"), SYSTEM_ACTOR)
 
 
-async def test_update_preset_raises_for_a_builtin_preset() -> None:
-    """A built-in preset cannot be edited."""
-    repos = _empty_repos()
-    preset = Preset.create(kind="field", label="Condition", definition={}, builtin=True)
-    await repos.presets.add(preset)
-
-    with pytest.raises(BuiltinPresetError):
-        await UpdatePreset(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
-            UpdatePresetCommand(preset_id=preset.id, label="Renamed"), SYSTEM_ACTOR
-        )
-
-
 async def test_delete_preset_soft_deletes_and_commits() -> None:
     """DeletePreset marks the preset deleted and commits."""
     repos = _empty_repos()
-    preset = Preset.create(kind="field", label="Condition", definition={})
+    preset = Preset.create(
+        owner_id=OWNER, kind="field", label="Condition", definition={}
+    )
     await repos.presets.add(preset)
     uow = InMemoryUnitOfWork(repos)
 
@@ -180,7 +185,7 @@ async def test_delete_preset_soft_deletes_and_commits() -> None:
         DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR
     )
 
-    assert await repos.presets.get(preset.id) is None
+    assert await repos.presets.get(preset.id, scope=EVERYONE) is None
     assert uow.committed is True
 
 
@@ -190,17 +195,3 @@ async def test_delete_preset_raises_for_a_missing_id() -> None:
         await DeletePreset(
             InMemoryUnitOfWork(_empty_repos()), InMemoryAccessGuard()
         ).handle(DeletePresetCommand(preset_id=uuid.uuid4()), SYSTEM_ACTOR)
-
-
-async def test_delete_preset_raises_for_a_builtin_preset() -> None:
-    """A built-in preset cannot be deleted."""
-    repos = _empty_repos()
-    preset = Preset.create(kind="field", label="Condition", definition={}, builtin=True)
-    await repos.presets.add(preset)
-
-    with pytest.raises(BuiltinPresetError):
-        await DeletePreset(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
-            DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR
-        )
-
-    assert await repos.presets.get(preset.id) is preset

@@ -1,4 +1,4 @@
-"""Explicit user-transfer tables and vocabulary reference handling."""
+"""Explicit user-transfer tables and ownership stamping."""
 
 import json
 from typing import TYPE_CHECKING
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 OWNED_TABLES = frozenset(
     {
+        "presets",
         "node_types",
         "edge_types",
         "nodes",
@@ -22,7 +23,7 @@ OWNED_TABLES = frozenset(
 )
 # Content tables whose soft-deleted rows an export leaves out and an import skips.
 SOFT_DELETABLE = frozenset(
-    {"node_types", "edge_types", "nodes", "edges", "collections"}
+    {"presets", "node_types", "edge_types", "nodes", "edges", "collections"}
 )
 USER_TABLES = (
     "presets",
@@ -37,22 +38,7 @@ USER_TABLES = (
     "media_attachments",
     "node_favourites",
 )
-# Choice lists are the one shared vocabulary left: types belong to a person.
-VOCABULARY = frozenset({"presets"})
-ENTITY_TABLES = {"preset": "presets"}
 MAX_ROW_BYTES = 16 * 1024 * 1024
-
-
-def installation_vocabulary(records: object) -> dict[str, set[str]]:
-    """Keep shared structure still referenced by example installation records."""
-    result: dict[str, set[str]] = {name: set() for name in VOCABULARY}
-    if isinstance(records, list):
-        for record in records:
-            if isinstance(record, dict) and record.get("outcome") != "removed":
-                name = ENTITY_TABLES.get(str(record.get("kind")))
-                if name is not None:
-                    result[name].add(str(record.get("entity_id")))
-    return result
 
 
 _PARENTS = {
@@ -113,75 +99,14 @@ async def read_rows(chunks: AsyncIterator[bytes]) -> AsyncIterator[dict[str, obj
         raise CorruptBackupError("Unterminated user archive row.")
 
 
-def preset_ids(value: object) -> set[str]:
-    """Find choice-list references in schema metadata."""
-    result: set[str] = set()
-    if isinstance(value, dict):
-        metadata = value.get("x-menagerist")
-        if isinstance(metadata, dict) and isinstance(metadata.get("list"), str):
-            result.add(metadata["list"])
-        for child in value.values():
-            result.update(preset_ids(child))
-    elif isinstance(value, list):
-        for child in value:
-            result.update(preset_ids(child))
-    return result
-
-
-def remap_schema(value: object, remap: dict[str, str]) -> object:
-    """Rewrite only schema list references, retaining ordinary attribute values."""
-    if isinstance(value, list):
-        return [remap_schema(child, remap) for child in value]
-    if not isinstance(value, dict):
-        return value
-    result = {key: remap_schema(child, remap) for key, child in value.items()}
-    metadata = result.get("x-menagerist")
-    if isinstance(metadata, dict) and isinstance(metadata.get("list"), str):
-        metadata["list"] = remap.get(f"presets:{metadata['list']}", metadata["list"])
-    return result
-
-
-def _remap_entities(records: list[object], remap: dict[str, str]) -> list[object]:
-    entities: list[object] = []
-    for entity in records:
-        if isinstance(entity, dict):
-            entity = dict(entity)
-            table = ENTITY_TABLES.get(str(entity.get("kind")))
-            for key in ("id", "entity_id"):
-                if isinstance(entity.get(key), str):
-                    entity[key] = remap.get(f"{table}:{entity[key]}", entity[key])
-        entities.append(entity)
-    return entities
-
-
-def prepare_row(
-    name: str, row: dict[str, object], owner_id: UUID, remap: dict[str, str]
-) -> dict[str, object]:
-    """Stamp ownership and remap structural references after vocabulary reuse."""
+def prepare_row(name: str, row: dict[str, object], owner_id: UUID) -> dict[str, object]:
+    """Stamp ownership on owned rows and regenerate derived media fields."""
     row = dict(row)
     if name in OWNED_TABLES:
         row["owner_id"] = owner_id
     if name == "node_favourites":
         row["user_id"] = owner_id
-    for key in ("attributes_schema", "extra_schema", "definition"):
-        if key in row:
-            row[key] = remap_schema(row[key], remap)
-    records = row.get("entities")
-    if name == "example_installations" and isinstance(records, list):
-        row["entities"] = _remap_entities(records, remap)
     if name == "media_assets":
         row["has_thumbnail"] = False
         row["thumbnail_sha256"] = None
-    if name == "presets":
-        row["builtin"] = False
     return row
-
-
-def compatible(
-    name: str, incoming: dict[str, object], existing: dict[str, object]
-) -> bool:
-    """Only reuse a shared choice list with the same kind and definition."""
-    keys = ("kind", "definition")
-    return all(incoming.get(key) == existing.get(key) for key in keys) and (
-        incoming.get("deleted_at") is None
-    ) == (existing.get("deleted_at") is None)

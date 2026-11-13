@@ -15,11 +15,11 @@ from app.entrypoints.api.shared.bridges.transfer_targets import (
 )
 from app.modules.graph.domain.edge import Edge
 from app.modules.media.domain.media_attachment import MediaAttachment
-from app.modules.presets.domain.preset import Preset
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.errors import InvalidPackError
 from app.modules.transfer.ports.targets import Created, RemoveResult
 from app.shared_kernel.access_guard import InMemoryAccessGuard
+from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -386,20 +386,19 @@ async def test_an_item_type_still_used_by_an_item_is_kept(
     )
 
 
-async def test_a_builtin_preset_cannot_be_removed(make_world: MakeWorld) -> None:
-    """Built-in presets are refused removal."""
+async def test_another_persons_preset_is_invisible_to_the_target(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """The target acts as its person: someone else's preset is gone to it."""
     world = make_world()
-    preset = Preset.create(
-        kind="choice_list",
-        label="Built in",
-        definition={"options": ["A"]},
-        builtin=True,
-    )
-    await world.preset_repos.presets.add(preset)
+    (outcome,) = await world.presets.ensure(sample_pack().presets)
+    other = world.as_actor(
+        Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
+    ).presets
 
-    result = await world.presets.remove(preset.id)
-
-    assert result is RemoveResult.REFUSED_IN_USE
+    assert await other.inspect(outcome.entity_id) is None
+    assert await other.remove(outcome.entity_id) is RemoveResult.ALREADY_GONE
+    assert await world.presets.inspect(outcome.entity_id) is not None
 
 
 async def test_a_preset_inspection_has_no_flags(
@@ -492,10 +491,12 @@ async def test_targets_default_to_the_shared_guard_and_accept_another(
     )
     assert collections._access is custom
     presets = PresetPackTarget(
-        in_memory_preset_stores(world.preset_repos, world.graph_repos), access=custom
+        in_memory_preset_stores(world.preset_repos, world.graph_repos),
+        world.actor,
+        access=custom,
     )
     assert presets._access is custom
     default_presets = PresetPackTarget(
-        in_memory_preset_stores(world.preset_repos, world.graph_repos)
+        in_memory_preset_stores(world.preset_repos, world.graph_repos), world.actor
     )
     assert default_presets._access is get_access_guard()

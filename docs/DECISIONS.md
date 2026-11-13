@@ -1463,3 +1463,20 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 - Whether the bundle format is public is still open (#230).
 
 **Rationale:** the example-pack installer is the only code that writes a whole bundle today, and later importers (#230, #238) and the catalogue need the same targets. Moving them first keeps those changes from untangling example-specific code.
+
+## Presets belong to a person (2026-11-13)
+
+**Decision:** presets (choice lists, saved fields and field groups) are owned, like item and relationship types. Each has an `owner_id`, and a person sees and edits only their own. The built-in presets and the `builtin` flag are gone. The seed revision `e6f7a8b9c0d1` is left as it is, because revisions are immutable, and a new revision, `b8e2d4f6a1c3_owned_presets`, undoes its effect: it deletes every built-in that nothing references, and copies a referenced built-in once for each person who uses it, repointing that person's links. A fresh install therefore has no presets. Unreferenced user-made presets go to the earliest administrator, or stay ownerless until the first administrator claims existing data (`ClaimOrphanedPresets`). Choice-list links resolve only inside the acting person's own presets, and example packs installed by two people give each their own lists.
+
+Links are repointed wherever they live: item types, items' `extra_schema`, other presets' definitions (including a field's `x-menagerist.origin.preset`) and the preset ids recorded by example installations. Installation records for types and items whose stored content hash still matched keep matching after the rewrite, so a later uninstall does not read them as edited.
+
+**Choices that are not obvious:**
+
+- A referenced built-in is copied per user, not kept as a shared row. Nobody could edit a built-in, so copies lose nothing, and deleting one person's copy cannot affect another's types or items. This follows the migration for types (`f1a2b3c4d5e6_owned_types.py`).
+- An unreferenced built-in is deleted rather than given to anyone. Nobody could edit it and it can be installed again from the catalogue.
+- Per-user export includes all of a person's presets, not only the ones in use. Import never links to another person's preset. It keeps ids, so importing into a second account while the donor's rows still exist is refused, as for types.
+- The owner column stays nullable, as for types, so ownerless rows are claimed by the first administrator.
+- Sharing presets, or an administrator publishing them to everyone, is a later option. Nothing here blocks it.
+- This must ship in the same release as the planned catalogue (#100). On its own it leaves nobody with the old built-ins.
+
+**Rationale:** the ownership model for types ("Types belong to a person" above) applies to presets too, so every piece of collector content has one owner and one access policy. The install side of example packs and the planned catalogue use the neutral targets described in [A transfer module owns the targets](#a-transfer-module-owns-the-targets-2026-11-13). A clean install with nothing preinstalled is the intent, and people install what they want.

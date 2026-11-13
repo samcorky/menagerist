@@ -12,7 +12,7 @@ from app.modules.presets.domain.errors import (
 )
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class ExportPresetsQuery:
 class ExportPresets(QueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]]):
     """Fetch the presets to put in a pack, in the order requested."""
 
-    access: ClassVar[Access] = Requires(PresetPermission.PRESET_READ)
+    access: ClassVar[Access] = Content(PresetPermission.PRESET_READ)
 
     async def _handle(self, query: ExportPresetsQuery, actor: Actor) -> list[Preset]:
         """Return the presets for `query.ids`, or raise on the first missing one.
@@ -45,7 +45,7 @@ class ExportPresets(QueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]])
             )
         presets: list[Preset] = []
         for preset_id in query.ids:
-            preset = await self._repos.presets.get(preset_id)
+            preset = await self._repos.presets.get(preset_id, scope=self.scope(actor))
             if preset is None:
                 raise PresetNotFoundError(f"Preset {preset_id} not found")
             presets.append(preset)

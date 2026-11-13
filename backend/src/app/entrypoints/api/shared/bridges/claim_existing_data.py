@@ -38,6 +38,11 @@ from app.modules.media.application.claim_orphaned_media import (
     ClaimOrphanedMedia,
     ClaimOrphanedMediaCommand,
 )
+from app.modules.presets.adapters.persistence.unit_of_work import build_preset_repos
+from app.modules.presets.application.claim_orphaned_presets import (
+    ClaimOrphanedPresets,
+    ClaimOrphanedPresetsCommand,
+)
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.unit_of_work import AmbientUnitOfWork
 
@@ -50,10 +55,11 @@ if TYPE_CHECKING:
     from app.modules.examples.ports.unit_of_work import ExampleRepos
     from app.modules.graph.ports.unit_of_work import GraphRepos
     from app.modules.media.ports.unit_of_work import MediaRepos
+    from app.modules.presets.ports.unit_of_work import PresetRepos
 
 
 class ClaimExistingData:
-    """`ExistingDataClaim` over the graph, collections, media and examples modules."""
+    """`ExistingDataClaim` over the modules that own content."""
 
     def __init__(
         self,
@@ -62,12 +68,14 @@ class ClaimExistingData:
         collections: ClaimLegacyCollections,
         media: ClaimOrphanedMedia,
         installations: ClaimOrphanedInstallations,
+        presets: ClaimOrphanedPresets,
     ) -> None:
         self._types = types
         self._items = items
         self._collections = collections
         self._media = media
         self._installations = installations
+        self._presets = presets
 
     async def claim(self, owner_id: uuid.UUID) -> ClaimReport:
         """Make `owner_id` the owner of all unowned and legacy-owned content."""
@@ -86,6 +94,9 @@ class ClaimExistingData:
         examples = await self._installations.handle(
             ClaimOrphanedInstallationsCommand(owner_id=owner_id), SYSTEM_ACTOR
         )
+        presets = await self._presets.handle(
+            ClaimOrphanedPresetsCommand(owner_id=owner_id), SYSTEM_ACTOR
+        )
         return ClaimReport(
             counts={
                 "types": types.item_types + types.relationship_types,
@@ -94,6 +105,7 @@ class ClaimExistingData:
                 "collections": collections,
                 "files": files,
                 "examples": examples,
+                "presets": presets.claimed,
             }
         )
 
@@ -104,6 +116,7 @@ def build_claim_existing_data(
     collections: CollectionsRepos,
     media: MediaRepos,
     examples: ExampleRepos,
+    presets: PresetRepos,
 ) -> ClaimExistingData:
     """Wire the claim over ready repositories, which any storage may back.
 
@@ -115,6 +128,7 @@ def build_claim_existing_data(
         ClaimLegacyCollections(AmbientUnitOfWork(collections), get_access_guard()),
         ClaimOrphanedMedia(AmbientUnitOfWork(media), get_access_guard()),
         ClaimOrphanedInstallations(AmbientUnitOfWork(examples), get_access_guard()),
+        ClaimOrphanedPresets(AmbientUnitOfWork(presets), get_access_guard()),
     )
 
 
@@ -125,6 +139,7 @@ def build_sql_claim_existing_data(session: AsyncSession) -> ClaimExistingData:
         collections=build_collections_repos(session),
         media=build_media_repos(session),
         examples=build_example_repos(session),
+        presets=build_preset_repos(session),
     )
 
 

@@ -86,6 +86,13 @@ async def test_snapshot_reflects_old_schema_and_keeps_one_read_only_snapshot(
                 ),
                 {"id": uuid7()},
             )
+            await connection.execute(
+                text("""INSERT INTO presets
+                    (id, kind, label, definition, version, created_at, updated_at)
+                    VALUES (:id, 'choice_list', 'Grades', '{"options": ["a"]}',
+                    1, now(), now())"""),
+                {"id": uuid7()},
+            )
         assert await snapshot.schema_revision() == "old-schema"
         members = {}
         async for member in snapshot.export():
@@ -152,6 +159,14 @@ async def test_real_instance_archive_verifies_and_reports_tampered_members(
                      created_at, updated_at, deleted_at) VALUES
                     (:id, :owner_id, 'Archived item', '{}', '[]',
                      now(), now(), now())"""),
+                {"id": uuid7(), "owner_id": owner_id},
+            )
+            await session.execute(
+                text("""INSERT INTO presets
+                    (id, owner_id, kind, label, definition, version,
+                     created_at, updated_at)
+                    VALUES (:id, :owner_id, 'choice_list', 'Grades',
+                    '{"options": ["a"]}', 1, now(), now())"""),
                 {"id": uuid7(), "owner_id": owner_id},
             )
             repository = SqlAlchemyMediaAssetRepository(session)

@@ -118,9 +118,14 @@ class _GraphPresetUsage:
     async def types_using(self, preset_id: uuid.UUID) -> list[str]:
         """Return the labels of the live types that link to `preset_id`."""
         from app.entrypoints.api.shared.bridges.preset_usage import GraphPresetUsage
+        from app.shared_kernel.content_filter import ContentFilter
 
         async with self._uow as repos:
-            return await GraphPresetUsage(repos).types_using(preset_id)
+            # all-users: the retention purge runs as the system, and a preset is
+            # only safe to remove once no one's type links to it.
+            return await GraphPresetUsage(
+                repos, scope=ContentFilter.everyone()
+            ).types_using(preset_id)
 
 
 def build_purge_deleted_content_on(

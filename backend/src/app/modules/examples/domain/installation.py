@@ -160,15 +160,6 @@ class Installation(Identifiable, Owned, Timestamped):
                 return
         raise InvalidInstallationStateError(f"no owned entity {entity_id} to settle")
 
-    def settle_kept_as_removed(self, entity_id: uuid.UUID) -> None:
-        """Mark a kept entity as removed after someone else's cleanup took it."""
-        for index, record in enumerate(self.entities):
-            if record.entity_id == entity_id and record.outcome is Outcome.KEPT:
-                self.entities[index] = replace(record, outcome=Outcome.REMOVED)
-                self.touch()
-                return
-        raise InvalidInstallationStateError(f"no kept entity {entity_id} to settle")
-
     def mark_installed(self) -> None:
         """The install finished."""
         self._require(InstallationStatus.INSTALLING)

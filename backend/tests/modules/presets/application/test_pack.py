@@ -27,9 +27,14 @@ from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 _GRADES = {"options": ["Mint", "Good"]}
+
+
+OWNER = uuid.uuid7()
+EVERYONE = ContentFilter.everyone()
 
 
 def _item(**overrides: object) -> dict[str, object]:
@@ -48,7 +53,7 @@ def _importer(repos: PresetRepos) -> ImportPresets:
 
 
 async def test_import_creates_new_presets_with_fresh_ids() -> None:
-    """Imported items become new, non-built-in presets."""
+    """Imported items become new presets owned by the importer."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
     result = await _importer(repos).handle(
         ImportPresetsCommand(
@@ -58,9 +63,9 @@ async def test_import_creates_new_presets_with_fresh_ids() -> None:
     )
 
     assert (result.created, result.skipped) == (1, 0)
-    stored = await repos.presets.list(after=None, limit=10)
+    stored = await repos.presets.list(scope=EVERYONE, after=None, limit=10)
     assert len(stored) == 1
-    assert stored[0].builtin is False
+    assert stored[0].owner_id == SYSTEM_ACTOR.id
     assert stored[0].label == "Condition grades"
 
 
@@ -75,7 +80,7 @@ async def test_import_skips_content_already_present() -> None:
 
     assert (first.created, first.skipped) == (1, 1)
     assert (second.created, second.skipped) == (0, 2)
-    assert len(await repos.presets.list(after=None, limit=10)) == 1
+    assert len(await repos.presets.list(scope=EVERYONE, after=None, limit=10)) == 1
 
 
 async def test_import_rejects_the_whole_pack_when_one_item_is_bad() -> None:
@@ -89,7 +94,7 @@ async def test_import_rejects_the_whole_pack_when_one_item_is_bad() -> None:
 
     with pytest.raises(InvalidPresetDefinitionError):
         await _importer(repos).handle(command, SYSTEM_ACTOR)
-    assert await repos.presets.list(after=None, limit=10) == []
+    assert await repos.presets.list(scope=EVERYONE, after=None, limit=10) == []
 
 
 @pytest.mark.parametrize(
@@ -137,8 +142,12 @@ async def test_import_rejects_bad_items(override: dict[str, object]) -> None:
 async def test_export_returns_presets_in_requested_order() -> None:
     """Export returns the requested presets in the order asked for."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
-    first = Preset.create(kind="choice_list", label="A", definition=_GRADES)
-    second = Preset.create(kind="choice_list", label="B", definition=_GRADES)
+    first = Preset.create(
+        owner_id=OWNER, kind="choice_list", label="A", definition=_GRADES
+    )
+    second = Preset.create(
+        owner_id=OWNER, kind="choice_list", label="B", definition=_GRADES
+    )
     await repos.presets.add(first)
     await repos.presets.add(second)
 
@@ -185,7 +194,12 @@ async def test_import_detects_repeats_beyond_the_first_page() -> None:
     repos = PresetRepos(presets=InMemoryPresetRepository())
     for i in range(_PAGE_SIZE + 1):
         await repos.presets.add(
-            Preset.create(kind="choice_list", label=f"L{i}", definition=_GRADES)
+            Preset.create(
+                owner_id=SYSTEM_ACTOR.id,
+                kind="choice_list",
+                label=f"L{i}",
+                definition=_GRADES,
+            )
         )
     existing_label = f"L{_PAGE_SIZE}"
 
@@ -204,7 +218,9 @@ async def test_import_detects_repeats_beyond_the_first_page() -> None:
 async def test_import_reports_an_id_for_every_item_including_repeats() -> None:
     """Each item gets an id in pack order; repeats report the existing preset."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
-    existing = Preset.create(kind="choice_list", label="Grades", definition=_GRADES)
+    existing = Preset.create(
+        owner_id=SYSTEM_ACTOR.id, kind="choice_list", label="Grades", definition=_GRADES
+    )
     await repos.presets.add(existing)
 
     result = await _importer(repos).handle(
@@ -226,4 +242,4 @@ async def test_import_reports_an_id_for_every_item_including_repeats() -> None:
     assert result.items[1].created is True
     assert result.items[2].id == result.items[1].id
     assert result.items[2].created is False
-    assert await repos.presets.get(result.items[1].id) is not None
+    assert await repos.presets.get(result.items[1].id, scope=EVERYONE) is not None

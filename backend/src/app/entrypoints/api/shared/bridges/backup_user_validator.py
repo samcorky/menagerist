@@ -80,7 +80,7 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
 
 
 class BackupUserImportValidator:
-    """Check shared vocabulary and media values before importing untrusted rows."""
+    """Check preset, type and media values before importing untrusted rows."""
 
     async def validate(self, table: str, row: Mapping[str, object]) -> None:
         """Reject invalid domain values without invoking persistence use cases."""
@@ -90,6 +90,7 @@ class BackupUserImportValidator:
                 definition = _object(row, "definition")
                 check_definition(kind, definition)
                 Preset.create(
+                    owner_id=SYSTEM_ACTOR.id,
                     kind=kind,
                     label=label,
                     definition=definition,

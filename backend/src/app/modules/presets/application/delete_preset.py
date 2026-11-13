@@ -10,7 +10,7 @@ from app.modules.presets.domain.errors import PresetInUseError, PresetNotFoundEr
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.presets.ports.preset_usage import PresetUsage  # noqa: TC001
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -30,11 +30,10 @@ class DeletePresetCommand:
 class DeletePreset(CommandHandler[PresetUnitOfWork, DeletePresetCommand, None]):
     """Soft-delete an existing preset.
 
-    :raises BuiltinPresetError: a built-in preset cannot be deleted.
     :raises PresetInUseError: an item type still references the preset.
     """
 
-    access: ClassVar[Access] = Requires(PresetPermission.PRESET_WRITE)
+    access: ClassVar[Access] = Content(PresetPermission.PRESET_WRITE)
 
     def __init__(
         self,
@@ -48,7 +47,7 @@ class DeletePreset(CommandHandler[PresetUnitOfWork, DeletePresetCommand, None]):
     async def _handle(self, command: DeletePresetCommand, actor: Actor) -> None:
         """Soft-delete the preset identified by `command` and commit."""
         async with self._uow as repos:
-            preset = await repos.presets.get(command.preset_id)
+            preset = await repos.presets.get(command.preset_id, scope=self.scope(actor))
             if preset is None:
                 raise PresetNotFoundError(f"Preset {command.preset_id} not found")
 

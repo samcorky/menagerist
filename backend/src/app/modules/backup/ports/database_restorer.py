@@ -14,7 +14,7 @@ class DatabaseRestorer(Protocol):
         ...
 
     async def is_empty(self) -> bool:
-        """Check for instance content, ignoring builtin presets."""
+        """Check for instance content."""
         ...
 
     async def restore_instance(
