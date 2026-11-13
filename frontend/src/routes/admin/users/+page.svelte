@@ -3,7 +3,7 @@
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import { resolve } from '$app/paths';
 	import { Copy, Check, KeyRound, Laptop, LockOpen, Plus, Dices, Pencil, X } from '@lucide/svelte';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		createUser,
@@ -30,6 +30,8 @@
 	import { describeDevice, formatRelativeTime } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
@@ -50,7 +52,7 @@
 
 	let users = $state<UserResponse[]>([]);
 	let loading = $state(true);
-	let loadError = $state<string | null>(null);
+	let loadFailed = $state(false);
 	let rowBusy = $state<string | null>(null);
 	let rowError = $state<{ id: string; message: string } | null>(null);
 
@@ -87,16 +89,16 @@
 
 	async function load() {
 		loading = true;
-		loadError = null;
+		loadFailed = false;
 		try {
 			const result = await listUsers();
 			if (result.error || !result.data) {
-				loadError = networkAwareError(result).title;
+				loadFailed = true;
 			} else {
 				users = result.data;
 			}
 		} catch {
-			loadError = 'Could not load accounts.';
+			loadFailed = true;
 		}
 		loading = false;
 	}
@@ -104,6 +106,14 @@
 	$effect(() => {
 		if (canList) void load();
 		else loading = false;
+	});
+
+	// Coming back online, or Retry in the banner, reloads a list that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void load();
+		});
 	});
 
 	const canList = $derived(auth.can('identity:user:list'));
@@ -643,10 +653,8 @@
 					<Skeleton class="h-28 w-full rounded-xl" />
 				</div>
 			{/if}
-		{:else if loadError}
-			<Alert.Root variant="destructive">
-				<Alert.Description>{loadError}</Alert.Description>
-			</Alert.Root>
+		{:else if loadFailed}
+			<LoadFailed what="the accounts" onretry={() => void load()} />
 		{:else}
 			{#if wide.current}
 				<DataTable

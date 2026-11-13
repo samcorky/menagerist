@@ -10,6 +10,7 @@
 		type AdminSessionResponse,
 		type UserResponse
 	} from '$lib/api/client';
+	import { untrack } from 'svelte';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { describeDevice, formatRelativeTime } from '$lib/devices';
@@ -19,6 +20,8 @@
 	import BackButton from '$lib/components/back-button.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -33,7 +36,9 @@
 	let users = $state<UserResponse[]>([]);
 	let selectedUserId = $state<string>('');
 	let loading = $state(true);
-	let error = $state<string | null>(null);
+	let loadFailed = $state(false);
+	// The filter the shown rows were loaded for; rows for another user are never kept.
+	let shownUserId = '';
 	let revokingId = $state<string | null>(null);
 	let currentSessionId = $state<string | null>(null);
 
@@ -56,9 +61,14 @@
 		}
 	}
 
+	function refreshFailed() {
+		loadFailed = true;
+		if (shownUserId !== selectedUserId) sessions = [];
+	}
+
 	async function loadSessions() {
 		loading = true;
-		error = null;
+		loadFailed = false;
 		try {
 			const [res, ownRes] = await Promise.all([
 				listSessions({
@@ -70,12 +80,19 @@
 				currentSessionId = ownRes.data.find((s) => s.current)?.id ?? null;
 			}
 			if (res.error || !res.data) {
-				error = networkAwareError(res).title;
+				refreshFailed();
+				// A failed refresh keeps the list already shown; only an empty page shows LoadFailed.
+				if (sessions.length > 0) {
+					const { title, description } = networkAwareError(res);
+					toast.error(title, { description });
+				}
 			} else {
 				sessions = res.data;
+				shownUserId = selectedUserId;
 			}
 		} catch {
-			error = 'Could not load active devices.';
+			refreshFailed();
+			if (sessions.length > 0) toast.error("Couldn't refresh the active devices");
 		}
 		loading = false;
 	}
@@ -87,6 +104,14 @@
 		} else {
 			loading = false;
 		}
+	});
+
+	// Coming back online, or Retry in the banner, reloads a list that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void loadSessions();
+		});
 	});
 
 	function handleFilterChange(e: Event & { currentTarget: HTMLSelectElement }) {
@@ -152,17 +177,8 @@
 				Only administrators with session management permissions can access this page.
 			</Alert.Description>
 		</Alert.Root>
-	{:else if error}
-		<Alert.Root variant="destructive">
-			<Alert.Description>{error}</Alert.Description>
-		</Alert.Root>
-		<Button
-			variant="outline"
-			class="w-full sm:w-auto pointer-coarse:h-11"
-			onclick={() => void loadSessions()}
-		>
-			Retry
-		</Button>
+	{:else if loadFailed && sessions.length === 0}
+		<LoadFailed what="the active devices" onretry={() => void loadSessions()} />
 	{:else if loading}
 		<div class="space-y-3">
 			<Skeleton class="h-16 w-full rounded-xl" />

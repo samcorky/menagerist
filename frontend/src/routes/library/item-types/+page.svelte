@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
+	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		listNodes,
@@ -12,7 +13,7 @@
 		deleteNodeType,
 		type NodeTypeResponse
 	} from '$lib/api/client';
-	import { errorMessage } from '$lib/api/errors';
+	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { slugify } from '$lib/utils.js';
 	import { loadExampleIds } from '$lib/examples';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -22,6 +23,8 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import IconButton from '$lib/components/icon-button.svelte';
 	import TypeAppearanceFields from '$lib/components/type-appearance-fields.svelte';
 	import TypeEditorDialog from '$lib/components/type-editor-dialog.svelte';
@@ -36,6 +39,7 @@
 	let loading = $state(false);
 	let exampleTypeIds = $state<ReadonlySet<string>>(new Set());
 	let hasMore = $state(true);
+	let loadFailed = $state(false);
 
 	// One editor serves both creating (editingId null) and editing.
 	let editorOpen = $state(false);
@@ -53,9 +57,16 @@
 
 	async function fetchPage(after?: string) {
 		loading = true;
+		if (!after) loadFailed = false;
 		const result = await listNodeTypes({ query: { after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			toast.error("Couldn't load item types", { description: errorMessage(result.error) });
+			if (after) {
+				const { title, description } = networkAwareError(result);
+				toast.error(title, { description });
+			} else {
+				loadFailed = true;
+			}
+			hasMore = false;
 		} else {
 			categories = after ? [...categories, ...result.data] : result.data;
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -211,6 +222,14 @@
 		void fetchPage();
 		void loadExampleIds().then((ids) => (exampleTypeIds = ids.itemTypes));
 	});
+
+	// Coming back online, or Retry in the banner, reloads a list that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void fetchPage();
+		});
+	});
 </script>
 
 <svelte:head>
@@ -251,6 +270,8 @@
 				{/each}
 			</div>
 		</Shimmer>
+	{:else if loadFailed}
+		<LoadFailed what="your item types" onretry={() => void fetchPage()} />
 	{:else}
 		{#if shown.length > 0}
 			<ul class="divide-y rounded-xl border bg-card">
