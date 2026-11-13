@@ -28,7 +28,7 @@ describe('routeFor', () => {
 
 	it('asks the network first for page loads', () => {
 		expect(routeFor(get('/items', 'navigate'), ORIGIN, PRECACHED)).toBe('navigation');
-		expect(routeFor(get('/admin/settings', 'navigate'), ORIGIN, PRECACHED)).toBe('navigation');
+		expect(routeFor(get('/settings/server', 'navigate'), ORIGIN, PRECACHED)).toBe('navigation');
 	});
 
 	it('never touches the API, whatever asks for it', () => {

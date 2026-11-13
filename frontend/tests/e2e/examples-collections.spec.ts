@@ -152,7 +152,7 @@ test('reinstalling after keeping items adopts them instead of duplicating', asyn
 		(await (await request.get('/api/v1/nodes?limit=500')).json()) as { name: string }[];
 	expect((await list()).filter((n) => n.name === 'Lantern Harbour')).toHaveLength(1);
 
-	await page.goto('/settings/examples');
+	await page.goto('/library/examples');
 	await page.getByRole('button', { name: /^Add Board games/ }).click();
 	await expect(page.getByText('Examples added')).toBeVisible();
 	await expect(page.getByText(/you'd kept (was|were) already here/)).toBeVisible();

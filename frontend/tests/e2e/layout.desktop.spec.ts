@@ -57,7 +57,7 @@ test.describe('desktop top bar', () => {
 	});
 
 	test('a modal covers the top bar rather than sitting behind it', async ({ page }) => {
-		await page.goto('/settings/item-types');
+		await page.goto('/library/item-types');
 		await page.getByRole('button', { name: 'New item type', exact: true }).click();
 		await expect(page.getByRole('dialog', { name: 'New item type' })).toBeVisible();
 		// An open modal makes the page behind it unclickable, so hit-testing cannot show what is

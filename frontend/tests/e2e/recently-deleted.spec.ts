@@ -27,7 +27,7 @@ async function makeEdgeType(request: APIRequestContext, suffix: string) {
 }
 
 async function openRecentlyDeleted(page: Page, tab: 'Items' | 'Collections') {
-	await page.goto('/recently-deleted');
+	await page.goto('/library/recently-deleted');
 	await expect(page.getByRole('heading', { name: 'Recently deleted' })).toBeVisible();
 	await page.getByRole('button', { name: new RegExp(`^${tab}`) }).click();
 }

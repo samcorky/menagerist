@@ -220,7 +220,7 @@
 				Add your first item
 			</Button>
 			<a
-				href={resolve('/settings/examples')}
+				href={resolve('/library/examples')}
 				class="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
 			>
 				Or look around with some examples
@@ -234,7 +234,7 @@
 				<p>
 					You have example items. Remove them when you're ready.
 					<a
-						href={resolve('/settings/examples')}
+						href={resolve('/library/examples')}
 						class="font-medium underline-offset-2 hover:underline">Manage examples</a
 					>
 				</p>
@@ -440,7 +440,7 @@
 					<p class="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
 						None of your items has an item type yet.
 						<a
-							href={resolve('/settings/item-types')}
+							href={resolve('/library/item-types')}
 							class="font-medium underline-offset-2 hover:underline">Set up item types</a
 						>
 					</p>
@@ -507,7 +507,7 @@
 					more easily.
 				</p>
 				<a
-					href={resolve('/settings/item-types')}
+					href={resolve('/library/item-types')}
 					class="mt-3 inline-flex items-center gap-1 text-sm font-medium underline-offset-2 hover:underline"
 				>
 					Set up item types

@@ -44,7 +44,7 @@ export function exampleData() {
 }
 
 export async function install(page: Page, pack: RegExp) {
-	await page.goto('/settings/examples');
+	await page.goto('/library/examples');
 	await page.getByRole('button', { name: new RegExp(`^Add ${pack.source.slice(1)}`) }).click();
 	await expect(page.getByText('Examples added')).toBeVisible();
 	await expect(
@@ -57,7 +57,7 @@ export async function install(page: Page, pack: RegExp) {
  * assertions after it measure the UI rather than how long the server took under load.
  */
 export async function remove(page: Page, pack: RegExp) {
-	await page.goto('/settings/examples');
+	await page.goto('/library/examples');
 	await page.getByRole('button', { name: new RegExp(`^Remove ${pack.source.slice(1)}`) }).click();
 	const done = page.waitForResponse(
 		(res) => res.request().method() === 'DELETE' && /\/api\/v1\/examples\//.test(res.url()),

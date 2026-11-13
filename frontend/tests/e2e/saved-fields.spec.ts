@@ -11,7 +11,7 @@ async function showBuiltIns(page: Page) {
 }
 
 test('sections fold away and stay folded after a reload', async ({ page }) => {
-	await page.goto('/settings/saved-fields');
+	await page.goto('/library/saved-fields');
 	const lists = sectionToggle(page, /^Lists\b/);
 	await expect(lists).toHaveAttribute('aria-expanded', 'true');
 	await lists.click();
@@ -23,7 +23,7 @@ test('sections fold away and stay folded after a reload', async ({ page }) => {
 });
 
 test('Import and Export all live in the More menu', async ({ page }) => {
-	await page.goto('/settings/saved-fields');
+	await page.goto('/library/saved-fields');
 	await page.getByRole('button', { name: 'More actions', exact: true }).click();
 	await expect(page.getByRole('menuitem', { name: 'Import', exact: true })).toBeVisible();
 	await expect(page.getByRole('menuitem', { name: 'Export all', exact: true })).toBeVisible();
@@ -31,7 +31,7 @@ test('Import and Export all live in the More menu', async ({ page }) => {
 });
 
 test('each section has its own import and export icons', async ({ page }) => {
-	await page.goto('/settings/saved-fields');
+	await page.goto('/library/saved-fields');
 	for (const name of ['lists', 'fields', 'field groups']) {
 		await expect(page.getByRole('button', { name: `Import ${name}`, exact: true })).toBeVisible();
 		await expect(page.getByRole('button', { name: `Export ${name}`, exact: true })).toBeVisible();
@@ -39,7 +39,7 @@ test('each section has its own import and export icons', async ({ page }) => {
 });
 
 test('row actions keep their names, with Export and Copy in an overflow menu', async ({ page }) => {
-	await page.goto('/settings/saved-fields');
+	await page.goto('/library/saved-fields');
 	await showBuiltIns(page);
 	const row = page
 		.getByRole('listitem')
@@ -58,7 +58,7 @@ test('row actions keep their names, with Export and Copy in an overflow menu', a
 });
 
 test('Try it opens a live example under the row', async ({ page }) => {
-	await page.goto('/settings/saved-fields');
+	await page.goto('/library/saved-fields');
 	await showBuiltIns(page);
 	const tryIt = page.getByRole('button', { name: 'Try it' }).first();
 	await tryIt.click();

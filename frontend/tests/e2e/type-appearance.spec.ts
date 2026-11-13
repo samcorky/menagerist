@@ -15,7 +15,7 @@ const preview = (page: Page) =>
 		.locator('[data-slot="type-icon"]');
 
 async function openNew(page: Page) {
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	return page.getByRole('dialog', { name: 'New item type' });
 }
@@ -75,7 +75,7 @@ test('the dice button picks an icon and a colour, and a second press changes the
 test('an existing type can have its icon and colour cleared', async ({ page, request }) => {
 	const type = await makeItemType(request, uniqueName('Clearable'));
 	await request.patch(`/api/v1/node-types/${type.id}`, { data: { icon: 'music', colour: 'blue' } });
-	await page.goto('/settings/item-types');
+	await page.goto('/library/item-types');
 	await expect(marker(page, type.label)).toHaveAttribute('data-icon', 'music');
 
 	await row(page, type.label).getByRole('button', { name: 'Edit item type' }).click();

@@ -10,8 +10,8 @@ vi.mock('@lucide/svelte/icons/chevron-down', async () => ({
 import SettingsSectionNav from '$lib/components/settings-section-nav.svelte';
 
 const sections = [
-	{ key: 'backup', label: 'Backups', count: 3, href: '/admin/settings?section=backup' },
-	{ key: 'media', label: 'Media', count: 2, href: '/admin/settings?section=media' }
+	{ key: 'backup', label: 'Backups', count: 3, href: '/settings/server?section=backup' },
+	{ key: 'media', label: 'Media', count: 2, href: '/settings/server?section=media' }
 ];
 
 function html(props: Partial<ComponentProps<typeof SettingsSectionNav>> = {}): string {
@@ -24,7 +24,7 @@ describe('SettingsSectionNav', () => {
 	it('lists each section as a link with its count', () => {
 		const out = html();
 		expect(out).toContain('aria-label="Settings sections"');
-		expect(out).toContain('href="/admin/settings?section=backup"');
+		expect(out).toContain('href="/settings/server?section=backup"');
 		expect(out).toContain('>Backups</span>');
 		expect(out).toContain('>3</span>');
 	});
@@ -32,7 +32,7 @@ describe('SettingsSectionNav', () => {
 	it('marks only the active section as the current page', () => {
 		const out = html();
 		expect(out.match(/aria-current="page"/g)).toHaveLength(1);
-		expect(out).toMatch(/href="\/admin\/settings\?section=media"[^>]*aria-current="page"/);
+		expect(out).toMatch(/href="\/settings\/server\?section=media"[^>]*aria-current="page"/);
 	});
 
 	it('is a select with the active section chosen on a phone', () => {

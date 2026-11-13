@@ -26,10 +26,10 @@ export const PAGES: (PalettePage & { keywords: string[] })[] = [
 	{ label: 'Collections', path: '/collections', keywords: [] },
 	{ label: 'Explore', path: '/explore', keywords: [] },
 	{ label: 'Settings', path: '/settings', keywords: [] },
-	{ label: 'Item types', path: '/settings/item-types', keywords: [] },
-	{ label: 'Relationships', path: '/settings/relationships', keywords: ['connections'] },
-	{ label: 'Saved fields', path: '/settings/saved-fields', keywords: [] },
-	{ label: 'Examples', path: '/settings/examples', keywords: [] },
+	{ label: 'Item types', path: '/library/item-types', keywords: [] },
+	{ label: 'Relationships', path: '/library/connection-types', keywords: ['connections'] },
+	{ label: 'Saved fields', path: '/library/saved-fields', keywords: [] },
+	{ label: 'Examples', path: '/library/examples', keywords: [] },
 	{ label: 'Status', path: '/status', keywords: [] }
 ];
 
@@ -71,9 +71,9 @@ export type PaletteTask = { job_key: string };
 /** Where a setting lives: its section of the admin settings page, scrolled to the setting. */
 export function settingPath(
 	setting: Pick<PaletteSetting, 'key' | 'group'>
-): `/admin/settings?${string}#${string}` {
+): `/settings/server?${string}#${string}` {
 	const section = new URLSearchParams({ section: setting.group }).toString();
-	return `/admin/settings?${section}#${settingId(setting.key)}`;
+	return `/settings/server?${section}#${settingId(setting.key)}`;
 }
 
 /** Where a scheduled task is on the scheduled tasks page, highlighted. */
@@ -117,9 +117,10 @@ export function paletteLayout(pathname: string): PaletteLayout {
 		}
 		lead = ['collectionItems'];
 	} else if (path === '/collections') lead = ['collections'];
-	else if (path === '/settings/item-types') lead = ['itemTypes'];
+	else if (path === '/library/item-types') lead = ['itemTypes'];
 	else if (path === '/admin/scheduled-tasks') lead = ['tasks', 'settings'];
-	else if (path === '/admin' || path.startsWith('/admin/')) lead = ['settings', 'tasks'];
+	else if (path === '/admin' || path === '/settings/server' || path.startsWith('/admin/'))
+		lead = ['settings', 'tasks'];
 	else if (path === '/items') lead = ['items'];
 
 	const order = [...lead, ...DEFAULT_ORDER.filter((key) => !lead.includes(key))];

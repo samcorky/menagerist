@@ -128,7 +128,7 @@
 			} else {
 				relTypes = [result.data, ...relTypes];
 				editorOpen = false;
-				toast.success('Relationship type created');
+				toast.success('Connection type created');
 			}
 		}
 		saving = false;
@@ -155,7 +155,7 @@
 			}
 		}, 5000);
 
-		toast('Relationship type deleted', {
+		toast('Connection type deleted', {
 			action: {
 				label: 'Undo',
 				onClick: () => {
@@ -174,7 +174,7 @@
 </script>
 
 <svelte:head>
-	<title>Relationship types - Menagerist</title>
+	<title>Connection types - Menagerist</title>
 </svelte:head>
 
 <Page width="reading">
@@ -182,7 +182,7 @@
 
 	<div class="flex flex-wrap items-start justify-between gap-4">
 		<div>
-			<h1 class="font-heading text-3xl font-semibold tracking-tight">Relationship types</h1>
+			<h1 class="font-heading text-3xl font-semibold tracking-tight">Connection types</h1>
 			<p class="mt-1 text-muted-foreground">
 				Define how items connect - "Directed by", "Signed by", "Part of".
 			</p>

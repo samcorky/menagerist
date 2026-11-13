@@ -68,7 +68,7 @@
 			key: g.group,
 			label: g.label,
 			count: g.items.length,
-			href: `${resolve('/admin/settings')}?section=${encodeURIComponent(g.group)}`
+			href: `${resolve('/settings/server')}?section=${encodeURIComponent(g.group)}`
 		}))
 	);
 	let highlighted = $state<string | null>(null);
