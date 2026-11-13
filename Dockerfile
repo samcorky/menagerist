@@ -195,6 +195,8 @@ FROM frontend-deps AS frontend-generate
 # codegen in its own layer means source-only edits (the common case) skip
 # regenerating the API client entirely and reuse this layer from cache.
 COPY frontend/openapi-ts.config.ts ./
+# `npm run generate` also records which schema built the client.
+COPY frontend/scripts/stamp-api-client.mjs ./scripts/
 # The config reads ../openapi.json, which is /openapi.json from this stage's /app.
 COPY --from=backend-builder /out/openapi.json /openapi.json
 RUN npm run generate
