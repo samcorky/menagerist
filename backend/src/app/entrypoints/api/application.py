@@ -61,6 +61,7 @@ from app.modules.scheduling.adapters.api.router import router as scheduling_rout
 from app.modules.search.adapters.api.router import router as search_router
 from app.modules.settings.adapters.api.router import router as settings_router
 from app.modules.system.adapters.api.router import (
+    manifest_router as system_manifest_router,
     probes_router as system_probes_router,
     public_router as public_system_router,
     router as system_router,
@@ -168,6 +169,7 @@ def create_app() -> FastAPI:
     # Identity cannot import the other modules; this bridge supplies the claim.
     fastapi_app.dependency_overrides[get_existing_data_claim] = get_claim_existing_data
     fastapi_app.include_router(api_router)
+    fastapi_app.include_router(system_manifest_router)
     register_exception_handlers(fastapi_app)
     configure_openapi(fastapi_app)
 

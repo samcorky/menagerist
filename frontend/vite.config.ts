@@ -22,7 +22,9 @@ export default defineConfig({
 		// needs to know the backend's host/port.
 		proxy: {
 			// Overridden by the e2e suite so it can run beside a dev stack on :8000.
-			'/api': process.env.MENAGERIST_API_PROXY_TARGET ?? 'http://localhost:8000'
+			'/api': process.env.MENAGERIST_API_PROXY_TARGET ?? 'http://localhost:8000',
+			// Served by the backend so an instance can set its own identity.
+			'/manifest.webmanifest': process.env.MENAGERIST_API_PROXY_TARGET ?? 'http://localhost:8000'
 		}
 	},
 	optimizeDeps: {

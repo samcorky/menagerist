@@ -2,7 +2,7 @@ export type Theme = 'system' | 'light' | 'dark';
 
 /**
  * The page background in each theme, as the browser or installed app's title bar colour. These
- * match `--background` in layout.css; app.html and static/manifest.webmanifest repeat the light one.
+ * match `--background` in layout.css; app.html and the backend's web_app_manifest.py repeat the light one.
  */
 export const THEME_COLOURS = { light: '#ffffff', dark: '#0a0a0a' } as const;
 
