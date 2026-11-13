@@ -16,7 +16,7 @@
 		"lint": "prettier --check --cache --cache-strategy content . && eslint --cache --cache-strategy content .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write --cache --cache-strategy content .",
-		"generate": "openapi-ts",
+		"generate": "openapi-ts && node scripts/stamp-api-client.mjs",
 		"test": "vitest",
 		"test:e2e": "playwright test"
 	},

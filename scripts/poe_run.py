@@ -13,6 +13,7 @@ Logs (agent and verbose modes only) live in
 """
 
 import codecs
+import hashlib
 import os
 import re
 import shutil
@@ -633,11 +634,50 @@ PYTEST_SELECTORS: dict[str, tuple[list[str], bool]] = {
 }
 
 
+FRONTEND_TASKS = frozenset(
+    {"lint-frontend", "typecheck-frontend", "test-frontend", "test-frontend-coverage"}
+)
+CLIENT_STAMP = "schema.sha256"
+
+
+def ensure_api_client(root: Path = ROOT) -> bool:
+    """Regenerate the frontend API client when ``openapi.json`` has changed.
+
+    The client is gitignored, so after pulling a schema change it silently predates the
+    schema and the frontend checks fail with errors that look like real bugs. A hash of
+    the committed schema is recorded in the generated directory; a current client costs
+    one hash. Returns whether it regenerated. CI regenerates after ``sync-ci`` and so
+    finds the stamp current.
+    """
+    schema = root / "openapi.json"
+    out = root / "frontend" / "src" / "lib" / "api" / "generated"
+    if not schema.is_file():
+        return False
+    digest = hashlib.sha256(schema.read_bytes()).hexdigest()
+    stamp = out / CLIENT_STAMP
+    if stamp.is_file() and stamp.read_text().strip() == digest:
+        return False
+    print(
+        "API client is out of date with openapi.json; regenerating it...",
+        file=sys.stderr,
+        flush=True,
+    )
+    npm = shutil.which("npm") or "npm"
+    code = subprocess.call([npm, "run", "generate"], cwd=root / "frontend")
+    if code != 0:
+        sys.exit(code)
+    out.mkdir(parents=True, exist_ok=True)
+    stamp.write_text(digest + "\n")
+    return True
+
+
 def main(
     task: str, mode: str = "", workers: str = "", files: list[str] | None = None
 ) -> None:
     """Poe entry point: resolve the mode, run the task's tool, exit with its code."""
     tool = TOOLS[task]
+    if task in FRONTEND_TASKS:
+        ensure_api_client()
     if files and task in PYTEST_SELECTORS:
         selector, append = PYTEST_SELECTORS[task]
         tool = Tool(
