@@ -6,6 +6,7 @@ import {
 	ownedData,
 	removeExamplePacks,
 	searchButton,
+	settleHistory,
 	uniqueName
 } from './helpers';
 
@@ -273,6 +274,7 @@ for (const size of SIZES) {
 				await page.keyboard.press('Escape');
 				await expect(dialog).toBeHidden();
 				await expect(trigger).toBeFocused();
+				await settleHistory(page);
 			}
 
 			await page.goto('/collections');

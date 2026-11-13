@@ -171,6 +171,20 @@ export async function openSearch(page: Page): Promise<void> {
  * the app shell to hydrate first - this is a client-rendered SPA, so the
  * keydown listener isn't attached until Svelte has mounted.
  */
+/**
+ * Wait for the history entry a closed sheet or dialog gave back. Closing one goes back a step a
+ * moment later, and a full page load started in that moment (`page.goto`) is aborted by it. In
+ * the app the router handles every navigation, so only a script that reloads the page needs this.
+ */
+export async function settleHistory(page: Page): Promise<void> {
+	await page.evaluate(
+		() =>
+			new Promise<void>((done) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 150)))
+			)
+	);
+}
+
 export async function openQuickCapture(page: Page) {
 	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
 	// On a phone the bottom bar's "New" button opens it; on desktop the shortcut does.

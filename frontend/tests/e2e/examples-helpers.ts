@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page } from './fixtures';
-import { ownedData, removeExamplePacks } from './helpers';
+import { ownedData, removeExamplePacks, settleHistory } from './helpers';
 
 export const MUSIC = /^Music/;
 export const MOVIES = /^Movies/;
@@ -71,6 +71,8 @@ export async function remove(page: Page, pack: RegExp) {
 	const response = await done;
 	expect(response.ok(), `removing ${pack.source} answered ${response.status()}`).toBe(true);
 	if (process.env.E2E_TIMINGS) console.log(`REMOVE ${pack.source} ${Date.now() - started} ms`);
+	// The confirmation dialog gives its history entry back; do not reload under it.
+	await settleHistory(page);
 }
 
 export async function openItem(page: Page, name: string) {

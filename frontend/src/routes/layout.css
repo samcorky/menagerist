@@ -152,6 +152,18 @@
 	::view-transition-new(root) {
 		animation: none;
 	}
+
+	/* Popovers, menus, toasts and anything else that eases in. Spinners and skeletons stay
+	   animated: they say "working", which a still frame cannot. */
+	*:not(.animate-spin, .animate-pulse),
+	*:not(.animate-spin, .animate-pulse)::before,
+	*:not(.animate-spin, .animate-pulse)::after {
+		animation-duration: 0.01ms !important;
+		animation-delay: 0s !important;
+		transition-duration: 0.01ms !important;
+		transition-delay: 0s !important;
+		scroll-behavior: auto !important;
+	}
 }
 
 @layer base {
@@ -162,6 +174,11 @@
 		@apply bg-background text-foreground;
 	}
 	html {
+		/* Taps on the installed app should look pressed, not flash the browser's grey box. */
+		-webkit-tap-highlight-color: transparent;
+		/* The app scrolls inside #main-scroll; pulling down at the top must not reload the page
+		   under someone who is part-way through a form. */
+		overscroll-behavior: none;
 		@apply font-sans;
 		color-scheme: light;
 		font-size: 16px;
@@ -169,6 +186,31 @@
 	}
 	html.dark {
 		color-scheme: dark;
+	}
+	#main-scroll {
+		overscroll-behavior-y: contain;
+	}
+	/* No double-tap-to-zoom delay on controls. */
+	:where(
+		a[href],
+		button,
+		[role='button'],
+		[role='tab'],
+		[role='menuitem'],
+		summary,
+		label,
+		select
+	) {
+		touch-action: manipulation;
+	}
+	/* A finger covers what it presses, so the control itself has to show it was hit. */
+	@media (pointer: coarse) {
+		:where(a[href], button, [role='button'], [role='tab'], [role='menuitem'], summary):not(
+				:disabled,
+				[aria-disabled='true']
+			):active {
+			opacity: 0.7;
+		}
 	}
 	h1,
 	h2,

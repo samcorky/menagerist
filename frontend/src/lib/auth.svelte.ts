@@ -40,6 +40,8 @@ class AuthController {
 	loadFailed = $state(false);
 	/** Set by an explicit sign-out so the sign-in page does not ask to return here. */
 	leftOnPurpose = $state(false);
+	/** True when the server ended a live session (it timed out or was revoked), not the person. */
+	sessionExpired = $state(false);
 
 	signedIn = $derived(this.user !== null);
 	passwordExpired = $derived(this.user?.password_expired ?? false);
@@ -47,7 +49,10 @@ class AuthController {
 
 	constructor() {
 		registerAuthHandlers({
-			onUnauthenticated: () => this.clearSession(),
+			onUnauthenticated: () => {
+				this.sessionExpired = this.user !== null && !this.leftOnPurpose;
+				this.clearSession();
+			},
 			onSetupRequired: () => {
 				this.clearSession();
 				this.setupRequired = true;
@@ -199,6 +204,7 @@ class AuthController {
 		clearAllEtags();
 		resetAuthEvents();
 		this.leftOnPurpose = false;
+		this.sessionExpired = false;
 	}
 
 	private clearSession(): void {

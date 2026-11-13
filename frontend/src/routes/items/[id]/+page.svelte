@@ -39,6 +39,9 @@
 	import TagList from '$lib/components/tag-list.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { untrack } from 'svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
+	import LoadFailed from '$lib/components/load-failed.svelte';
 	import NotFound from '$lib/components/not-found.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
@@ -110,6 +113,7 @@
 	let wasEdited = $derived(node ? node.updated_at !== node.created_at : false);
 	let loading = $state(true);
 	let notFound = $state(false);
+	let loadFailed = $state(false);
 	let mode = $state<'read' | 'edit'>('read');
 	let editFormEl = $state<HTMLFormElement | null>(null);
 	let nameInputEl = $state<HTMLInputElement | null>(null);
@@ -161,9 +165,18 @@
 		)
 	);
 
+	// Coming back online, or Retry in the banner, reloads an item that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void load();
+		});
+	});
+
 	async function load() {
 		loading = true;
 		notFound = false;
+		loadFailed = false;
 		const [nodeResult, edgesResult, nodesResult, edgeTypesResult, nodeTypesResult] =
 			await Promise.all([
 				getNode({ path: { node_id: nodeId } }),
@@ -180,8 +193,7 @@
 		}
 
 		if (nodeResult.error || !nodeResult.data) {
-			const { title, description: desc } = networkAwareError(nodeResult);
-			toast.error(title, { description: desc });
+			loadFailed = true;
 			loading = false;
 			return;
 		}
@@ -614,6 +626,8 @@
 
 	{#if notFound}
 		<NotFound backHref={resolve('/items')} />
+	{:else if loadFailed}
+		<LoadFailed what="this item" onretry={() => void load()} />
 	{:else}
 		<Shimmer {loading}>
 			<!-- Cover on the left (sticky), details in the middle, a side panel from 1400px. -->
@@ -690,6 +704,7 @@
 											type="button"
 											variant="ghost"
 											size="icon"
+											class="max-md:hidden"
 											onclick={() => (duplicateOpen = true)}
 											aria-label="Duplicate"
 										>
@@ -699,6 +714,7 @@
 											type="button"
 											variant="ghost"
 											size="icon"
+											class="max-md:hidden"
 											onclick={() => (mode = 'edit')}
 											aria-label="Edit"
 										>
@@ -710,7 +726,12 @@
 						</Card.Header>
 						<Card.Content>
 							{#if mode === 'edit'}
-								<form class="space-y-4" bind:this={editFormEl} onsubmit={handleSave}>
+								<form
+									id="item-edit-form"
+									class="space-y-4"
+									bind:this={editFormEl}
+									onsubmit={handleSave}
+								>
 									<div class="space-y-2">
 										<ShimmerSlot {loading} class="h-4 w-12">
 											<Label for="name">Name</Label>
@@ -752,7 +773,7 @@
 												Delete
 											</Button>
 										{/if}
-										<div class="ml-auto flex items-center gap-2">
+										<div class="ml-auto flex items-center gap-2 max-md:hidden">
 											<Button type="button" variant="outline" onclick={handleCancelEdit}
 												>Cancel</Button
 											>
@@ -1128,6 +1149,48 @@
 				</div>
 			</div>
 		</Shimmer>
+
+		<!-- On a phone the header actions scroll away on a long item, so the actions that matter
+		     follow the thumb. The header and form buttons cover wider screens. -->
+		{#if !loading && node}
+			<div
+				data-testid="item-action-bar"
+				class="sticky bottom-2 z-30 mt-4 flex gap-2 rounded-2xl border bg-background/95 p-2 shadow-lg backdrop-blur md:hidden"
+			>
+				{#if mode === 'read'}
+					<Button
+						type="button"
+						variant="outline"
+						class="flex-1 pointer-coarse:h-11"
+						onclick={() => (duplicateOpen = true)}
+					>
+						<Copy class="size-4" />
+						Duplicate
+					</Button>
+					<Button type="button" class="flex-1 pointer-coarse:h-11" onclick={() => (mode = 'edit')}>
+						<Pencil class="size-4" />
+						Edit
+					</Button>
+				{:else}
+					<Button
+						type="button"
+						variant="outline"
+						class="flex-1 pointer-coarse:h-11"
+						onclick={handleCancelEdit}
+					>
+						Cancel
+					</Button>
+					<Button
+						type="submit"
+						form="item-edit-form"
+						class="flex-1 pointer-coarse:h-11"
+						disabled={saving}
+					>
+						{saving ? 'Saving…' : 'Save changes'}
+					</Button>
+				{/if}
+			</div>
+		{/if}
 	{/if}
 </Page>
 

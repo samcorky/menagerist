@@ -98,6 +98,8 @@
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import SurpriseButton from '$lib/components/surprise-button.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
+	import LoadFailed from '$lib/components/load-failed.svelte';
 	import NotFound from '$lib/components/not-found.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -588,6 +590,14 @@
 		void loadCollection(id);
 	});
 
+	// Coming back online, or Retry in the banner, reloads a collection that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed && collectionId) void loadCollection(collectionId);
+		});
+	});
+
 	async function fetchSmart(more = false) {
 		const current = collection;
 		if (!current) return;
@@ -954,10 +964,7 @@
 			backLabel="Back to Collections"
 		/>
 	{:else if loadFailed}
-		<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-			<p class="text-sm text-muted-foreground">Couldn't load this collection.</p>
-			<Button variant="outline" onclick={() => void loadCollection(collectionId)}>Try again</Button>
-		</div>
+		<LoadFailed what="this collection" onretry={() => void loadCollection(collectionId)} />
 	{:else}
 		{#if collection}
 			<div class="flex flex-wrap items-start justify-between gap-3">
