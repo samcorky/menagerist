@@ -14,6 +14,7 @@
 		Ellipsis
 	} from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
+	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -23,11 +24,13 @@
 		listPresets,
 		type PresetResponse
 	} from '$lib/api/client';
-	import { errorMessage } from '$lib/api/errors';
+	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
 	import IconButton from '$lib/components/icon-button.svelte';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import EditListDialog from '$lib/components/edit-list-dialog.svelte';
 	import PresetExample from '$lib/components/preset-example.svelte';
@@ -54,20 +57,30 @@
 	let fields = $state<PresetResponse[]>([]);
 	let fieldsLoading = $state(false);
 	let fieldsHasMore = $state(true);
+	let fieldsLoadFailed = $state(false);
 
 	let lists = $state<PresetResponse[]>([]);
 	let listsLoading = $state(false);
 	let listsHasMore = $state(true);
+	let listsLoadFailed = $state(false);
 
 	let fieldSets = $state<PresetResponse[]>([]);
 	let fieldSetsLoading = $state(false);
 	let fieldSetsHasMore = $state(true);
+	let fieldSetsLoadFailed = $state(false);
 
 	async function fetchFields(after?: string) {
 		fieldsLoading = true;
+		if (!after) fieldsLoadFailed = false;
 		const result = await listPresets({ query: { kind: 'field', after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			toast.error("Couldn't load saved fields", { description: errorMessage(result.error) });
+			if (after) {
+				const { title, description } = networkAwareError(result);
+				toast.error(title, { description });
+			} else {
+				fieldsLoadFailed = true;
+			}
+			fieldsHasMore = false;
 		} else {
 			fields = after ? [...fields, ...result.data] : result.data;
 			fieldsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -77,9 +90,16 @@
 
 	async function fetchLists(after?: string) {
 		listsLoading = true;
+		if (!after) listsLoadFailed = false;
 		const result = await listPresets({ query: { kind: 'choice_list', after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			toast.error("Couldn't load saved lists", { description: errorMessage(result.error) });
+			if (after) {
+				const { title, description } = networkAwareError(result);
+				toast.error(title, { description });
+			} else {
+				listsLoadFailed = true;
+			}
+			listsHasMore = false;
 		} else {
 			lists = after ? [...lists, ...result.data] : result.data;
 			listsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -89,9 +109,16 @@
 
 	async function fetchFieldSets(after?: string) {
 		fieldSetsLoading = true;
+		if (!after) fieldSetsLoadFailed = false;
 		const result = await listPresets({ query: { kind: 'field_set', after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			toast.error("Couldn't load saved field groups", { description: errorMessage(result.error) });
+			if (after) {
+				const { title, description } = networkAwareError(result);
+				toast.error(title, { description });
+			} else {
+				fieldSetsLoadFailed = true;
+			}
+			fieldSetsHasMore = false;
 		} else {
 			fieldSets = after ? [...fieldSets, ...result.data] : result.data;
 			fieldSetsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -403,6 +430,16 @@
 	$effect(() => {
 		void fetchFieldSets();
 	});
+
+	// Coming back online, or Retry in the banner, reloads any section that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (fieldsLoadFailed) void fetchFields();
+			if (listsLoadFailed) void fetchLists();
+			if (fieldSetsLoadFailed) void fetchFieldSets();
+		});
+	});
 </script>
 
 <svelte:head>
@@ -595,6 +632,8 @@
 					{/each}
 				</div>
 			</Shimmer>
+		{:else if fieldsLoadFailed}
+			<LoadFailed what="your saved fields" onretry={() => void fetchFields()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each fields as preset (preset.id)}
@@ -639,6 +678,8 @@
 					{/each}
 				</div>
 			</Shimmer>
+		{:else if listsLoadFailed}
+			<LoadFailed what="your saved lists" onretry={() => void fetchLists()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each lists as preset (preset.id)}
@@ -698,6 +739,8 @@
 					{/each}
 				</div>
 			</Shimmer>
+		{:else if fieldSetsLoadFailed}
+			<LoadFailed what="your saved field groups" onretry={() => void fetchFieldSets()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each fieldSets as preset (preset.id)}

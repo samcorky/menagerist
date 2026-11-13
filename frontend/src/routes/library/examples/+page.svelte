@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Check } from '@lucide/svelte';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		installExamplePack,
@@ -27,6 +27,8 @@
 	} from '$lib/examples';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
@@ -61,6 +63,14 @@
 
 	$effect(() => {
 		void load();
+	});
+
+	// Coming back online, or Retry in the banner, reloads a list that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void load();
+		});
 	});
 
 	async function refreshPacks() {
@@ -150,10 +160,7 @@
 			{/each}
 		</div>
 	{:else if !loading && loadFailed}
-		<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-			<p class="text-sm text-muted-foreground">Couldn't load the examples.</p>
-			<Button variant="outline" onclick={() => void load()}>Try again</Button>
-		</div>
+		<LoadFailed what="the examples" onretry={() => void load()} />
 	{:else if !loading && packs.length === 0}
 		<p class="text-sm text-muted-foreground">There are no examples available right now.</p>
 	{:else if !loading}
