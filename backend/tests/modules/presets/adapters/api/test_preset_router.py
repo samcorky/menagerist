@@ -18,11 +18,15 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
 from app.modules.presets.adapters.persistence.unit_of_work import (
     create_in_memory_preset_uow,
 )
-from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from fastapi import FastAPI
+
+
+OWNER = uuid.uuid7()
 
 
 class _NoUsage(GraphPresetUsage):
@@ -35,10 +39,10 @@ class _NoUsage(GraphPresetUsage):
         return []
 
 
-def _app_with_in_memory_presets() -> FastAPI:
-    """Build the app with the presets module wired to a fresh in-memory repository."""
+def _app_with_in_memory_presets(repos: PresetRepos | None = None) -> FastAPI:
+    """Build the app with the presets module wired to an in-memory repository."""
     app = create_app()
-    repos = PresetRepos(presets=InMemoryPresetRepository())
+    repos = repos or PresetRepos(presets=InMemoryPresetRepository())
     app.dependency_overrides[get_preset_uow] = lambda: create_in_memory_preset_uow(
         repos
     )
@@ -64,7 +68,7 @@ def test_create_get_list_and_404_round_trip() -> None:
     assert preset["kind"] == "field"
     assert preset["label"] == "Condition"
     assert preset["version"] == 1
-    assert preset["builtin"] is False
+    assert "builtin" not in preset
 
     get_response = client.get(f"/api/v1/presets/{preset['id']}")
     assert get_response.status_code == 200
@@ -141,28 +145,6 @@ def test_update_preset_bumps_version_and_returns_404_when_missing() -> None:
         f"/api/v1/presets/{uuid.uuid4()}", json={"label": "X"}
     )
     assert missing_response.status_code == 404
-
-
-async def test_update_preset_returns_409_for_a_builtin_preset() -> None:
-    """PATCH on a built-in preset is rejected with 409."""
-    repos = PresetRepos(presets=InMemoryPresetRepository())
-    builtin = Preset.create(
-        kind="field",
-        label="Country",
-        definition={"property": {"type": "string"}},
-        builtin=True,
-    )
-    await repos.presets.add(builtin)
-    app = create_app()
-    app.dependency_overrides[get_preset_uow] = lambda: create_in_memory_preset_uow(
-        repos
-    )
-    app.dependency_overrides[get_preset_repos] = lambda: repos
-    client = TestClient(app)
-
-    response = client.patch(f"/api/v1/presets/{builtin.id}", json={"label": "X"})
-
-    assert response.status_code == 409
 
 
 def test_delete_preset_then_get_and_list_no_longer_find_it() -> None:
@@ -252,3 +234,31 @@ def test_import_rejects_an_unknown_format() -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_presets_are_private_to_their_owner(as_user: Callable[..., None]) -> None:
+    """A second person cannot see, change, delete or export the first's preset."""
+    repos = PresetRepos(presets=InMemoryPresetRepository())
+    alice_app, bob_app = (_app_with_in_memory_presets(repos) for _ in range(2))
+    as_user(alice_app, uuid.uuid7())
+    as_user(bob_app, uuid.uuid7())
+    alice, bob = TestClient(alice_app), TestClient(bob_app)
+    created = alice.post(
+        "/api/v1/presets",
+        json={
+            "kind": "choice_list",
+            "label": "Grades",
+            "definition": {"options": ["Mint"]},
+        },
+    ).json()
+    url = f"/api/v1/presets/{created['id']}"
+
+    assert bob.get(url).status_code == 404
+    assert bob.get("/api/v1/presets").json() == []
+    assert bob.patch(url, json={"label": "X"}).status_code == 404
+    assert bob.delete(url).status_code == 404
+    assert (
+        bob.get("/api/v1/presets/export", params={"ids": created["id"]}).status_code
+        == 404
+    )
+    assert alice.get(url).json()["label"] == "Grades"

@@ -12,14 +12,9 @@ import {
 export const EXPORT_CHUNK = 200;
 const PAGE_SIZE = 50;
 
-/** The label given to a copy of a preset, e.g. "Condition grades (copy)". */
-export function copyLabel(label: string): string {
-	return `${label} (copy)`;
-}
-
-/** Whether a preset's options can be edited here: only copies and custom lists, never built-ins. */
+/** Whether a preset's options can be edited here: only choice lists have options. */
 export function canEditOptions(preset: PresetResponse): boolean {
-	return preset.kind === 'choice_list' && !preset.builtin;
+	return preset.kind === 'choice_list';
 }
 
 /** Read every live preset of every kind, following the Link header's next cursor. */
@@ -140,31 +135,4 @@ export function presetExampleSchema(preset: PresetResponse): AttributesSchema {
 	}
 
 	return { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object', properties };
-}
-
-const SHOW_BUILTINS_KEY = 'menagerist.presets.showBuiltins';
-
-/** Whether built-in presets are shown. Defaults to shown; a private window may refuse storage. */
-export function readShowBuiltins(): boolean {
-	try {
-		return localStorage.getItem(SHOW_BUILTINS_KEY) !== 'false';
-	} catch {
-		return true;
-	}
-}
-
-export function writeShowBuiltins(show: boolean): void {
-	try {
-		localStorage.setItem(SHOW_BUILTINS_KEY, String(show));
-	} catch {
-		// Storage unavailable: the choice applies to this page only.
-	}
-}
-
-/** Drop built-in presets when they are hidden. */
-export function visiblePresets<T extends { builtin: boolean }>(
-	presets: T[],
-	showBuiltins: boolean
-): T[] {
-	return showBuiltins ? presets : presets.filter((p) => !p.builtin);
 }

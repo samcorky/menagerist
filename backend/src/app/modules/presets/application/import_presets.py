@@ -13,7 +13,8 @@ from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -54,12 +55,12 @@ class ImportPresetsResult:
 class ImportPresets(
     CommandHandler[PresetUnitOfWork, ImportPresetsCommand, ImportPresetsResult]
 ):
-    """Import a pack, skipping any preset whose content already exists.
+    """Import a pack, skipping any preset whose content the person already has.
 
     The whole pack is checked before anything is stored, so one bad item rejects it all.
     """
 
-    access: ClassVar[Access] = Requires(PresetPermission.PRESET_WRITE)
+    access: ClassVar[Access] = Content(PresetPermission.PRESET_WRITE)
 
     async def _handle(
         self, command: ImportPresetsCommand, actor: Actor
@@ -71,7 +72,7 @@ class ImportPresets(
             check_definition(item["kind"], item["definition"])
 
         async with self._uow as repos:
-            seen = await _existing_hashes(repos.presets)
+            seen = await _existing_hashes(repos.presets, ContentFilter.of(actor.id))
             items: list[ImportedPreset] = []
             for item in command.items:
                 digest = content_hash(item["kind"], item["label"], item["definition"])
@@ -79,6 +80,7 @@ class ImportPresets(
                     items.append(ImportedPreset(id=seen[digest], created=False))
                     continue
                 preset = Preset.create(
+                    owner_id=actor.id,
                     kind=item["kind"],
                     label=item["label"],
                     description=item.get("description"),
@@ -95,12 +97,14 @@ class ImportPresets(
         return ImportPresetsResult(created=created, skipped=skipped, items=items)
 
 
-async def _existing_hashes(repos: PresetRepository) -> dict[str, uuid.UUID]:
-    """Map the content hash of every live preset to its id, a page at a time."""
+async def _existing_hashes(
+    repos: PresetRepository, scope: ContentFilter
+) -> dict[str, uuid.UUID]:
+    """Map the content hash of every live preset in `scope` to its id."""
     hashes: dict[str, uuid.UUID] = {}
     after: uuid.UUID | None = None
     while True:
-        page = await repos.list(after=after, limit=_PAGE_SIZE)
+        page = await repos.list(scope=scope, after=after, limit=_PAGE_SIZE)
         for preset in page:
             digest = content_hash(preset.kind, preset.label, preset.definition)
             hashes[digest] = preset.id

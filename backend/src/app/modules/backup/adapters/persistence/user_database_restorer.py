@@ -1,7 +1,6 @@
 """Atomic owner-stamped imports over reflected tables."""
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from sqlalchemy import insert, select, text
 from sqlalchemy.exc import IntegrityError
@@ -14,8 +13,6 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     OWNED_TABLES,
     SOFT_DELETABLE,
     USER_TABLES,
-    VOCABULARY,
-    compatible,
     import_table_name,
     prepare_row,
     read_rows,
@@ -29,6 +26,7 @@ from app.modules.backup.domain.errors import (
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from uuid import UUID
 
     from sqlalchemy import Table
     from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker
@@ -62,7 +60,6 @@ class SqlAlchemyUserDatabaseRestorer(SqlAlchemyDatabaseRestorer):
                 )
                 await connection.execute(text(f"LOCK TABLE {names} IN EXCLUSIVE MODE"))
                 await self._assert_empty(connection, tables, new_owner_id)
-                remap: dict[str, str] = {}
                 imported: dict[str, set[str]] = {name: set() for name in USER_TABLES}
                 seen: set[str] = set()
                 skipped: dict[str, set[str]] = {n: set() for n in SOFT_DELETABLE}
@@ -71,10 +68,10 @@ class SqlAlchemyUserDatabaseRestorer(SqlAlchemyDatabaseRestorer):
                     async for raw in read_rows(member.chunks):
                         if skip_row(name, raw, skipped):
                             continue
-                        row = prepare_row(name, raw, new_owner_id, remap)
+                        row = prepare_row(name, raw, new_owner_id)
                         await self._validator.validate(name, row)
                         _validate_references(name, row, imported)
-                        await self._insert_row(connection, tables[name], row, remap)
+                        await self._insert_row(connection, tables[name], row)
                         if "id" in row:
                             imported[name].add(str(row["id"]))
                 if seen != set(USER_TABLES):
@@ -95,50 +92,11 @@ class SqlAlchemyUserDatabaseRestorer(SqlAlchemyDatabaseRestorer):
                     "Import requires an account without existing content."
                 )
 
-    async def _insert_row(
-        self,
-        connection: AsyncConnection,
-        table: Table,
-        row: dict[str, object],
-        remap: dict[str, str],
-    ) -> None:
-        if table.name in VOCABULARY:
-            existing = await self._vocabulary(connection, table, row)
-            if existing is not None:
-                remap[f"{table.name}:{row['id']}"] = str(existing["id"])
-                return
-        decoded = decode_row(row, table)
-        await connection.execute(insert(table).values(**decoded))
-
     @staticmethod
-    async def _vocabulary(
+    async def _insert_row(
         connection: AsyncConnection, table: Table, row: dict[str, object]
-    ) -> dict[str, object] | None:
-        name = table.name
-        identifier = UUID(str(row["id"]))
-        by_id = (
-            (await connection.execute(select(table).where(table.c.id == identifier)))
-            .mappings()
-            .first()
-        )
-        query = select(table).where(
-            table.c.kind == row["kind"],
-            table.c.label == row["label"],
-            table.c.deleted_at.is_(None),
-        )
-        candidates = (await connection.execute(query)).mappings().all()
-        if by_id is not None:
-            if not compatible(name, row, dict(by_id)):
-                raise ImportCollisionError(
-                    "A vocabulary identifier conflicts with existing content."
-                )
-            return dict(by_id)
-        if row.get("deleted_at") is not None:
-            return None
-        for candidate in candidates:
-            if compatible(name, row, dict(candidate)):
-                return dict(candidate)
-        return None
+    ) -> None:
+        await connection.execute(insert(table).values(**decode_row(row, table)))
 
 
 def _validate_references(

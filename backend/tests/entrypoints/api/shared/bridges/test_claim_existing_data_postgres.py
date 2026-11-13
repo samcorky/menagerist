@@ -30,6 +30,8 @@ from app.modules.graph.domain.node_type import NodeType
 from app.modules.identity.adapters.api.dependencies import get_existing_data_claim
 from app.modules.media.adapters.persistence.unit_of_work import build_media_repos
 from app.modules.media.domain.media_asset import MediaAsset
+from app.modules.presets.adapters.persistence.unit_of_work import build_preset_repos
+from app.modules.presets.domain.preset import Preset
 from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.slug import Slug
 
@@ -57,6 +59,7 @@ TABLES = (
     "collections",
     "media_assets",
     "example_installations",
+    "presets",
 )
 Owners = dict[str, list[uuid.UUID | None]]
 
@@ -76,6 +79,7 @@ def _wipe(sync_url: str) -> None:
             "edge_types",
             "node_types",
             "example_installations",
+            "presets",
         ):
             connection.execute(sqlalchemy.text(f"DELETE FROM {table}"))
     engine.dispose()
@@ -163,6 +167,10 @@ async def _seed(session: AsyncSession) -> None:
         installation = Installation.start(pack, SYSTEM)
         installation.owner_id = owner
         await examples.installations.add(installation)
+    presets = build_preset_repos(session)
+    preset = Preset.create(owner_id=SYSTEM, kind="field", label="P", definition={})
+    preset.owner_id = None
+    await presets.presets.add(preset)
     await session.commit()
 
 
@@ -207,6 +215,7 @@ def test_setup_gives_every_pre_existing_row_to_the_admin(
         "collections": 2,
         "files": 2,
         "examples": 2,
+        "presets": 1,
     }
     admin = uuid.UUID(response.json()["user"]["id"])
     after = _owners(postgres_sync_url)
@@ -230,6 +239,7 @@ def test_setup_gives_every_pre_existing_row_to_the_admin(
     assert sorted(map(str, after["example_installations"])) == sorted(
         map(str, [admin, admin, STRANGER, STRANGER])
     )
+    assert sorted(map(str, after["presets"])) == [str(admin)]
     assert seeded.before["nodes"][0] is None
 
 

@@ -191,6 +191,7 @@ from app.modules.transfer.domain.bundle import (
     PackRelationshipType,
 )
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
@@ -201,7 +202,6 @@ if TYPE_CHECKING:
 
     from app.modules.collections.ports.unit_of_work import CollectionsRepos
     from app.modules.media.ports.unit_of_work import MediaRepos
-    from app.shared_kernel.content_filter import ContentFilter
 
 Route = tuple[str, str]
 
@@ -221,6 +221,8 @@ CANARIES = (
     "Alpha Smart",
     "poster-alpha.jpg",
     "Alpha script",
+    "Alpha genres",
+    "Rock",
 )
 
 
@@ -229,7 +231,7 @@ CANARIES = (
 PUBLIC = "public: no content, no session"
 OWN_SESSION = "acts on the caller's own session or account"
 VOCABULARY = "shared vocabulary: every member reads and edits item/relationship types"
-PRESETS = "shared presets: not owned content (decision 6)"
+EXPORT_BY_IDS = "needs an ids query; checked in the export test below"
 CREATES_OWN = "references no existing content; creates content owned by the caller"
 
 RECENTLY_DELETED = "own deleted rows only, empty in the seed; two-user router tests"
@@ -342,13 +344,9 @@ ALLOWED: dict[Route, str] = {
     ("GET", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
     ("POST", "/api/v1/edge-types"): VOCABULARY,
     ("PATCH", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
-    ("POST", "/api/v1/presets"): PRESETS,
-    ("GET", "/api/v1/presets"): PRESETS,
-    ("GET", "/api/v1/presets/export"): PRESETS,
-    ("POST", "/api/v1/presets/import"): PRESETS,
-    ("GET", "/api/v1/presets/{preset_id}"): PRESETS,
-    ("PATCH", "/api/v1/presets/{preset_id}"): PRESETS,
-    ("DELETE", "/api/v1/presets/{preset_id}"): PRESETS,
+    ("POST", "/api/v1/presets"): CREATES_OWN,
+    ("POST", "/api/v1/presets/import"): CREATES_OWN,
+    ("GET", "/api/v1/presets/export"): EXPORT_BY_IDS,
     ("POST", "/api/v1/nodes"): CREATES_OWN,
     ("POST", "/api/v1/collections"): CREATES_OWN,
     ("POST", "/api/v1/tokens"): CREATES_OWN,
@@ -375,6 +373,7 @@ class Seed:
     smart_slug: str
     asset: str
     staged: str
+    preset: str
     user: str
     token: str
 
@@ -389,6 +388,7 @@ PATH_PARAMS: dict[str, Callable[[Seed], str]] = {
     "asset_id": lambda s: s.asset,
     "user_id": lambda s: s.user,
     "token_id": lambda s: s.token,
+    "preset_id": lambda s: s.preset,
     "pack_id": lambda _: PACK_ID,
     "key": lambda _: "rating",
 }
@@ -452,6 +452,7 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
         "json": {"source_id": s.item, "target_ids": [s.item2], "type": "owns"}
     },
     "UpdateEdgeRequest": lambda s: {"json": {"attributes": {"k": "v"}}},
+    "UpdatePresetRequest": lambda s: {"json": {"label": "Stolen"}},
     "UpdateMediaRequest": lambda s: {"json": {"filename": "mine.jpg"}},
     "AttachMediaRequest": lambda s: {
         "json": {"target_type": "node", "target_id": s.item2}
@@ -668,6 +669,16 @@ class World:
                 image_processor=processor,
             )
 
+        def choice_source(
+            actor: Annotated[Actor, Depends(get_current_actor)],
+        ) -> PresetChoiceListSource:
+            return PresetChoiceListSource(presets, ContentFilter.of(actor.id))
+
+        def preset_target(
+            actor: Annotated[Actor, Depends(get_current_actor)],
+        ) -> PresetPackTarget:
+            return PresetPackTarget(in_memory_preset_stores(presets, graph), actor)
+
         o = self.app.dependency_overrides
         o[get_graph_uow] = lambda: create_in_memory_graph_uow(graph)
         o[get_graph_repos] = lambda: graph
@@ -688,7 +699,7 @@ class World:
         o[get_decoy_hash] = lambda: self.hasher.hash("decoy")
         # The bridges run over the same in-memory repositories.
         o[get_attach_target_access] = lambda: GraphAttachTargetAccess(graph)
-        o[get_choice_list_source] = lambda: PresetChoiceListSource(presets)
+        o[get_choice_list_source] = choice_source
         o[get_item_lookup] = lambda: GraphItemLookup(graph)
         o[get_collection_members] = lambda: CollectionsMembers(collections)
 
@@ -717,9 +728,7 @@ class World:
         o[get_get_health_ready_detail_use_case] = lambda: GetHealthReadyDetail(
             ready, get_access_guard()
         )
-        o[get_preset_pack_target] = lambda: PresetPackTarget(
-            in_memory_preset_stores(presets, graph)
-        )
+        o[get_preset_pack_target] = preset_target
         o[get_graph_pack_target] = graph_target
         o[get_collection_pack_target] = collection_target
         o[get_cover_pack_target] = cover_target
@@ -821,6 +830,16 @@ class World:
                 "/api/v1/media", files={"file": ("staged.jpg", TINY_JPEG, "image/jpeg")}
             )
         )
+        preset = _created(
+            a.post(
+                "/api/v1/presets",
+                json={
+                    "kind": "choice_list",
+                    "label": "Alpha genres",
+                    "definition": {"options": ["Rock"]},
+                },
+            )
+        )
         installed = a.put(f"/api/v1/examples/{PACK_ID}/installation")
         assert installed.status_code == 200, installed.text
         return Seed(
@@ -835,6 +854,7 @@ class World:
             smart_slug=smart["slug"],
             asset=asset["asset_id"],
             staged=staged["id"],
+            preset=preset["id"],
             user=str(user.id),
             token=str(token),
         )
@@ -1070,6 +1090,7 @@ def _fill(
 QUERY_OVERRIDES: dict[tuple[str, str], str] = {
     ("/api/v1/collections", "q"): "alpha",  # collections match on their name
     ("/api/v1/node-types/{node_type_id}/attributes/{key}/values", "q"): "R",
+    ("/api/v1/presets", "q"): "alpha",  # presets match on their label
 }
 
 
@@ -1169,6 +1190,8 @@ def _shape(response: Response) -> tuple[object, ...]:
 
 # Variants whose value cannot match anything of A's even for A, and why.
 EMPTY_FOR_A: dict[tuple[str, str], str] = {
+    ("/api/v1/presets", "query:kind"): "no preset has the kind 'manual'",
+    ("/api/v1/presets", "query:all"): "no preset has the kind 'manual'",
     ("/api/v1/search", "bare"): "blank text finds nothing",
     ("/api/v1/search", "query:limit"): "blank text finds nothing",
     ("/api/v1/search", "query:collection"): "blank text finds nothing",
@@ -1444,3 +1467,81 @@ def test_searching_with_a_foreign_collection_reads_like_an_unknown_one(
     assert [h["ref"] for h in owner.json()["results"] if h["in_collection"]] == [
         seed.item
     ]
+
+
+def _linking_schema(list_id: str) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "genre": {
+                "type": "string",
+                "x-menagerist": {"kind": "choice", "list": list_id},
+            }
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("route", "body"),
+    [
+        ("/api/v1/node-types", {"slug": "tape", "label": "Tape"}),
+        ("/api/v1/edge-types", {"slug": "tapes", "label": "Tapes"}),
+    ],
+    ids=["item-type", "relationship-type"],
+)
+def test_a_type_naming_another_persons_list_is_rejected_like_an_unknown_one(
+    route: str, body: dict[str, Any], world: World
+) -> None:
+    """B cannot link A's choice list; the refusal matches an id that never existed."""
+    seed = world.seed()
+    bob = world.act_as(BOB)
+
+    foreign = bob.post(
+        route, json={**body, "attributes_schema": _linking_schema(seed.preset)}
+    )
+    unknown = bob.post(
+        route, json={**body, "attributes_schema": _linking_schema(str(uuid.uuid7()))}
+    )
+    own = world.act_as(ALICE).post(
+        route, json={**body, "attributes_schema": _linking_schema(seed.preset)}
+    )
+
+    assert foreign.status_code == unknown.status_code == 400, foreign.text
+    assert _shape(foreign) == _shape(unknown)
+    assert "Rock" not in foreign.text
+    assert own.status_code == 201, own.text
+
+
+def test_an_item_naming_another_persons_list_gets_none_of_its_options(
+    world: World,
+) -> None:
+    """B's item schema linking A's list is left unconstrained, as for an unknown one."""
+    seed = world.seed()
+    bob = world.act_as(BOB)
+
+    def enum_for(list_id: str) -> object:
+        response = bob.post(
+            "/api/v1/nodes",
+            json={"name": "Mine", "extra_schema": _linking_schema(list_id)},
+        )
+        assert response.status_code == 201, response.text
+        assert "Rock" not in response.text
+        return response.json()["extra_schema"]["properties"]["genre"].get("enum")
+
+    assert enum_for(seed.preset) == enum_for(str(uuid.uuid7())) is None
+
+
+def test_user_b_cannot_export_user_as_preset(world: World) -> None:
+    """B's export of A's preset id reads like an unknown id; A's works."""
+    seed = world.seed()
+    bob = world.act_as(BOB)
+
+    foreign = bob.get("/api/v1/presets/export", params={"ids": seed.preset})
+    unknown = bob.get("/api/v1/presets/export", params={"ids": str(uuid.uuid7())})
+    own = world.act_as(ALICE).get("/api/v1/presets/export", params={"ids": seed.preset})
+
+    assert foreign.status_code == 404, foreign.text
+    assert _shape(foreign) == _shape(unknown)
+    assert "Alpha genres" not in foreign.text
+    assert own.status_code == 200, own.text
+    assert [i["label"] for i in own.json()["items"]] == ["Alpha genres"]

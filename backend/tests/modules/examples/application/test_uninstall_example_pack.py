@@ -91,7 +91,12 @@ async def _assert_empty(world: World) -> None:
         )
         == []
     )
-    assert await world.preset_repos.presets.list(after=None, limit=10) == []
+    assert (
+        await world.preset_repos.presets.list(
+            scope=ContentFilter.everyone(), after=None, limit=10
+        )
+        == []
+    )
 
 
 async def test_removes_everything_that_is_untouched(make_world: MakeWorld) -> None:
@@ -296,7 +301,11 @@ async def test_something_the_user_already_deleted_is_not_an_error(
 async def test_a_preset_another_type_uses_is_kept(make_world: MakeWorld) -> None:
     """A preset the user's own type refers to is kept."""
     world = await _installed(make_world)
-    preset = (await world.preset_repos.presets.list(after=None, limit=10))[0]
+    preset = (
+        await world.preset_repos.presets.list(
+            scope=ContentFilter.everyone(), after=None, limit=10
+        )
+    )[0]
     mine = NodeType.create(owner_id=world.actor.id, slug="mine", label="Mine")
     mine.attributes_schema = {
         "type": "object",

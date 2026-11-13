@@ -8,7 +8,7 @@ from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.domain.errors import PresetNotFoundError
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
@@ -27,11 +27,11 @@ class GetPresetQuery:
 class GetPreset(QueryHandler[PresetRepos, GetPresetQuery, Preset]):
     """Fetch a single preset by id."""
 
-    access: ClassVar[Access] = Requires(PresetPermission.PRESET_READ)
+    access: ClassVar[Access] = Content(PresetPermission.PRESET_READ)
 
     async def _handle(self, query: GetPresetQuery, actor: Actor) -> Preset:
         """Return the preset, or raise `PresetNotFoundError` if missing."""
-        preset = await self._repos.presets.get(query.preset_id)
+        preset = await self._repos.presets.get(query.preset_id, scope=self.scope(actor))
         if preset is None:
             raise PresetNotFoundError(f"Preset {query.preset_id} not found")
         logger.debug("preset fetched", preset_id=query.preset_id)

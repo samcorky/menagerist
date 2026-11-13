@@ -1,13 +1,17 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect, type APIRequestContext, type Page } from './fixtures';
+import { uniqueName } from './helpers';
 
 /** Saved fields: collapsible sections, one More menu for the page-level actions, icon row actions. */
 const sectionToggle = (page: Page, name: RegExp) => page.getByRole('button', { name });
 
-async function showBuiltIns(page: Page) {
-	await page.getByRole('button', { name: 'More actions', exact: true }).click();
-	const toggle = page.getByRole('menuitemcheckbox', { name: /Show built-in/ });
-	if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
-	else await page.keyboard.press('Escape');
+/** Saves a list of the person's own through the API and returns its id and unique label. */
+async function seedList(request: APIRequestContext) {
+	const label = uniqueName('Grades');
+	const res = await request.post('/api/v1/presets', {
+		data: { kind: 'choice_list', label, definition: { options: ['Mint', 'Good'] } }
+	});
+	expect(res.status(), await res.text()).toBe(201);
+	return { id: ((await res.json()) as { id: string }).id, label };
 }
 
 test('sections fold away and stay folded after a reload', async ({ page }) => {
@@ -27,7 +31,7 @@ test('Import and Export all live in the More menu', async ({ page }) => {
 	await page.getByRole('button', { name: 'More actions', exact: true }).click();
 	await expect(page.getByRole('menuitem', { name: 'Import', exact: true })).toBeVisible();
 	await expect(page.getByRole('menuitem', { name: 'Export all', exact: true })).toBeVisible();
-	await expect(page.getByRole('menuitemcheckbox', { name: /Show built-in/ })).toBeVisible();
+	await expect(page.getByRole('menuitemcheckbox')).toHaveCount(0);
 });
 
 test('each section has its own import and export icons', async ({ page }) => {
@@ -38,29 +42,35 @@ test('each section has its own import and export icons', async ({ page }) => {
 	}
 });
 
-test('row actions keep their names, with Export and Copy in an overflow menu', async ({ page }) => {
-	await page.goto('/library/saved-fields');
-	await showBuiltIns(page);
-	const row = page
-		.getByRole('listitem')
-		.filter({ has: page.getByRole('button', { name: 'Try it' }) });
-	await expect(row.first()).toBeVisible();
-	await expect(row.first().getByRole('button', { name: /^More actions for / })).toBeVisible();
-	await row
-		.first()
-		.getByRole('button', { name: /^More actions for / })
-		.click();
-	await expect(page.getByRole('menuitem', { name: 'Export', exact: true })).toBeVisible();
-	await expect(page.getByRole('menuitem', { name: 'Copy', exact: true })).toBeVisible();
-	await page.keyboard.press('Escape');
-	// Built-in rows cannot be deleted, and say why.
-	await expect(row.first().getByRole('button', { name: /^Delete / })).toBeDisabled();
+test('row actions keep their names, with Export and Copy in an overflow menu', async ({
+	page,
+	request
+}) => {
+	const list = await seedList(request);
+	try {
+		await page.goto('/library/saved-fields');
+		const row = page.getByRole('listitem').filter({ hasText: list.label });
+		await expect(row).toBeVisible();
+		await expect(row.getByText('Built-in')).toHaveCount(0);
+		await row.getByRole('button', { name: `More actions for ${list.label}` }).click();
+		await expect(page.getByRole('menuitem', { name: 'Export', exact: true })).toBeVisible();
+		await expect(page.getByRole('menuitem', { name: 'Copy', exact: true })).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(row.getByRole('button', { name: /^Delete / })).toBeEnabled();
+	} finally {
+		await request.delete(`/api/v1/presets/${list.id}`);
+	}
 });
 
-test('Try it opens a live example under the row', async ({ page }) => {
-	await page.goto('/library/saved-fields');
-	await showBuiltIns(page);
-	const tryIt = page.getByRole('button', { name: 'Try it' }).first();
-	await tryIt.click();
-	await expect(tryIt).toHaveAttribute('aria-expanded', 'true');
+test('Try it opens a live example under the row', async ({ page, request }) => {
+	const list = await seedList(request);
+	try {
+		await page.goto('/library/saved-fields');
+		const row = page.getByRole('listitem').filter({ hasText: list.label });
+		const tryIt = row.getByRole('button', { name: 'Try it' });
+		await tryIt.click();
+		await expect(tryIt).toHaveAttribute('aria-expanded', 'true');
+	} finally {
+		await request.delete(`/api/v1/presets/${list.id}`);
+	}
 });

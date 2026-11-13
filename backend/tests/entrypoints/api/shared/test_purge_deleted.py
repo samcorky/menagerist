@@ -108,7 +108,7 @@ class _World:
             PurgeExpiredPresets(
                 create_in_memory_preset_uow(self.presets),
                 guard,
-                GraphPresetUsage(self.graph),
+                GraphPresetUsage(self.graph, scope=EVERYONE),
             ),
         )
 
@@ -250,7 +250,9 @@ async def test_types_and_presets_follow_the_items_that_carried_them() -> None:
     kept_type = NodeType.create(owner_id=ALICE, slug="film", label="Film")
     kept_type.deleted_at = LONG_AGO
     await w.graph.node_types.add(kept_type)
-    preset = Preset.create(kind="choice_list", label="Genres", definition={})
+    preset = Preset.create(
+        owner_id=ALICE, kind="choice_list", label="Genres", definition={}
+    )
     preset.deleted_at = LONG_AGO
     await w.presets.presets.add(preset)
     # The expired item carries "book" and goes in the same run; a live one keeps "film".

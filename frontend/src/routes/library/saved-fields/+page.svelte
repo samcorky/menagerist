@@ -32,12 +32,10 @@
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import BackButton from '$lib/components/back-button.svelte';
-	import { Badge } from '$lib/components/ui/badge/index.js';
 	import EditListDialog from '$lib/components/edit-list-dialog.svelte';
 	import PresetExample from '$lib/components/preset-example.svelte';
 	import {
 		canEditOptions,
-		copyLabel,
 		downloadPack,
 		exportPack,
 		fetchAllPresets,
@@ -45,9 +43,6 @@
 		packKindMismatch,
 		parsePackText,
 		presetFilename,
-		readShowBuiltins,
-		visiblePresets,
-		writeShowBuiltins,
 		type PackSectionKind
 	} from '$lib/preset-packs';
 
@@ -73,16 +68,6 @@
 	let fieldSetsLoading = $state(false);
 	let fieldSetsHasMore = $state(true);
 	let fieldSetsLoadFailed = $state(false);
-
-	let showBuiltins = $state(readShowBuiltins());
-	const visibleFields = $derived(visiblePresets(fields, showBuiltins));
-	const visibleLists = $derived(visiblePresets(lists, showBuiltins));
-	const visibleFieldSets = $derived(visiblePresets(fieldSets, showBuiltins));
-
-	function setShowBuiltins(show: boolean) {
-		showBuiltins = show;
-		writeShowBuiltins(show);
-	}
 
 	async function fetchFields(after?: string) {
 		fieldsLoading = true;
@@ -325,10 +310,7 @@
 		if (sectionBusy) return;
 		sectionBusy = true;
 		try {
-			const presets = visiblePresets(
-				(await fetchAllPresets()).filter((p) => p.kind === kind),
-				showBuiltins
-			);
+			const presets = (await fetchAllPresets()).filter((p) => p.kind === kind);
 			if (presets.length === 0) {
 				toast('Nothing to export');
 				return;
@@ -401,7 +383,7 @@
 			const result = await createPreset({
 				body: {
 					kind: preset.kind,
-					label: copyLabel(preset.label),
+					label: `${preset.label} (copy)`,
 					description: preset.description ?? null,
 					definition: preset.definition
 				}
@@ -503,9 +485,6 @@
 			<div class="min-w-0 flex-1">
 				<div class="flex flex-wrap items-center gap-2">
 					<span class="truncate font-medium">{preset.label}</span>
-					{#if preset.builtin}
-						<Badge variant="secondary">Built-in</Badge>
-					{/if}
 					{#if meta}
 						<span class="text-xs text-muted-foreground">{meta}</span>
 					{/if}
@@ -573,8 +552,6 @@
 			<IconButton
 				labelOnTouch={false}
 				label={deleteLabel}
-				disabled={preset.builtin}
-				title={preset.builtin ? "Built-in items can't be deleted" : undefined}
 				onclick={() => handleDelete(preset, deleteKey)}
 			>
 				<Trash2 />
@@ -633,24 +610,11 @@
 					<Download class="size-4" />
 					Export all
 				</DropdownMenu.Item>
-				<DropdownMenu.Separator />
-				<DropdownMenu.CheckboxItem
-					class="pointer-coarse:min-h-11"
-					checked={showBuiltins}
-					onCheckedChange={(value) => setShowBuiltins(value)}
-				>
-					Show built-in fields, lists and groups
-				</DropdownMenu.CheckboxItem>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</div>
 
-	<CollapsibleSection
-		id="saved-fields-fields"
-		title="Fields"
-		count={visibleFields.length}
-		class="gap-3"
-	>
+	<CollapsibleSection id="saved-fields-fields" title="Fields" count={fields.length} class="gap-3">
 		{#snippet actions()}
 			{@render sectionActions('Fields', 'field')}
 		{/snippet}
@@ -672,19 +636,15 @@
 			<LoadFailed what="your saved fields" onretry={() => void fetchFields()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
-				{#each visibleFields as preset (preset.id)}
+				{#each fields as preset (preset.id)}
 					{@render presetRow(preset, 'fields', 'Delete field')}
 				{/each}
 			</ul>
 
-			{#if visibleFields.length === 0 && !fieldsLoading}
+			{#if fields.length === 0 && !fieldsLoading}
 				<div class="flex flex-col items-center gap-3 py-10 text-center">
 					<Bookmark class="size-10 text-muted-foreground/50" />
-					{#if fields.length > 0}
-						<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
-					{:else}
-						<p class="font-medium">No saved fields yet</p>
-					{/if}
+					<p class="font-medium">No saved fields yet</p>
 				</div>
 			{/if}
 		{/if}
@@ -700,12 +660,7 @@
 		{/if}
 	</CollapsibleSection>
 
-	<CollapsibleSection
-		id="saved-fields-lists"
-		title="Lists"
-		count={visibleLists.length}
-		class="gap-3"
-	>
+	<CollapsibleSection id="saved-fields-lists" title="Lists" count={lists.length} class="gap-3">
 		{#snippet actions()}
 			{@render sectionActions('Lists', 'choice_list')}
 		{/snippet}
@@ -727,7 +682,7 @@
 			<LoadFailed what="your saved lists" onretry={() => void fetchLists()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
-				{#each visibleLists as preset (preset.id)}
+				{#each lists as preset (preset.id)}
 					{@const optionCount = listOptionCount(preset)}
 					{@render presetRow(
 						preset,
@@ -742,14 +697,10 @@
 				{/each}
 			</ul>
 
-			{#if visibleLists.length === 0 && !listsLoading}
+			{#if lists.length === 0 && !listsLoading}
 				<div class="flex flex-col items-center gap-3 py-10 text-center">
 					<ListChecks class="size-10 text-muted-foreground/50" />
-					{#if lists.length > 0}
-						<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
-					{:else}
-						<p class="font-medium">No saved lists yet</p>
-					{/if}
+					<p class="font-medium">No saved lists yet</p>
 				</div>
 			{/if}
 		{/if}
@@ -768,7 +719,7 @@
 	<CollapsibleSection
 		id="saved-fields-field-groups"
 		title="Field groups"
-		count={visibleFieldSets.length}
+		count={fieldSets.length}
 		class="gap-3"
 	>
 		{#snippet actions()}
@@ -792,7 +743,7 @@
 			<LoadFailed what="your saved field groups" onretry={() => void fetchFieldSets()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
-				{#each visibleFieldSets as preset (preset.id)}
+				{#each fieldSets as preset (preset.id)}
 					{@const propertyCount = fieldSetPropertyCount(preset)}
 					{@render presetRow(
 						preset,
@@ -807,14 +758,10 @@
 				{/each}
 			</ul>
 
-			{#if visibleFieldSets.length === 0 && !fieldSetsLoading}
+			{#if fieldSets.length === 0 && !fieldSetsLoading}
 				<div class="flex flex-col items-center gap-3 py-10 text-center">
 					<Layers class="size-10 text-muted-foreground/50" />
-					{#if fieldSets.length > 0}
-						<p class="text-sm text-muted-foreground">Built-in items are hidden</p>
-					{:else}
-						<p class="font-medium">No saved field groups yet</p>
-					{/if}
+					<p class="font-medium">No saved field groups yet</p>
 				</div>
 			{/if}
 		{/if}

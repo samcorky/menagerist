@@ -28,8 +28,7 @@ const preset: Preset = {
 	label: 'Grades',
 	description: null,
 	definition: { options: ['Mint', 'Near mint', 'Good'] },
-	version: 4,
-	builtin: false
+	version: 4
 };
 
 describe('linking a choice field to a saved list', () => {

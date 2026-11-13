@@ -19,7 +19,6 @@ export type Preset = {
 	description: string | null;
 	definition: Record<string, unknown>;
 	version: number;
-	builtin: boolean;
 };
 
 /**

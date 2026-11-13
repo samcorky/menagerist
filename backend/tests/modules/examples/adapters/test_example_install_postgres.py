@@ -68,7 +68,7 @@ def _wipe(sync_url: str) -> None:
         ):
             connection.execute(sqlalchemy.text(f"DELETE FROM {table}"))
         connection.execute(sqlalchemy.text("DELETE FROM example_installations"))
-        connection.execute(sqlalchemy.text("DELETE FROM presets WHERE NOT builtin"))
+        connection.execute(sqlalchemy.text("DELETE FROM presets"))
     engine.dispose()
 
 

@@ -14187,23 +14187,6 @@
               }
             }
           },
-          "409": {
-            "description": "Returned when trying to update or delete a built-in preset.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "example": {
-                  "type": "about:blank",
-                  "title": "BuiltinPresetError",
-                  "status": 409,
-                  "detail": "Preset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30 is built in and read-only",
-                  "instance": "https://menagerist.example/api/v1/presets/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
-                }
-              }
-            }
-          },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
             "headers": {
@@ -14400,7 +14383,7 @@
             }
           },
           "409": {
-            "description": "Returned when trying to update or delete a built-in preset.",
+            "description": "Returned when deleting a preset that item types still reference.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14408,9 +14391,9 @@
                 },
                 "example": {
                   "type": "about:blank",
-                  "title": "BuiltinPresetError",
+                  "title": "PresetInUseError",
                   "status": 409,
-                  "detail": "Preset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30 is built in and read-only",
+                  "detail": "Used by Record, Book. Remove it from those types first.",
                   "instance": "https://menagerist.example/api/v1/presets/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
                 }
               }
@@ -27165,10 +27148,6 @@
             "type": "integer",
             "title": "Version"
           },
-          "builtin": {
-            "type": "boolean",
-            "title": "Builtin"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -27187,7 +27166,6 @@
           "label",
           "definition",
           "version",
-          "builtin",
           "created_at",
           "updated_at"
         ],
@@ -27195,7 +27173,6 @@
         "description": "A preset as returned by the API.",
         "examples": [
           {
-            "builtin": false,
             "created_at": "2026-08-23T10:14:44.465954Z",
             "definition": {
               "property": {

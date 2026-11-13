@@ -58,15 +58,12 @@ class SqlAlchemyDatabaseRestorer:
         for table in tables:
             if table_rule(table.name) is not TableRule.KEEP:
                 continue
-            query = select(table)
-            if table.name == "presets":
-                query = query.where(table.c.builtin.is_(False))
-            if await connection.scalar(select(query.exists())):
+            if await connection.scalar(select(select(table).exists())):
                 return False
         return True
 
     async def is_empty(self) -> bool:
-        """Ignore seeded builtin presets when checking for instance content."""
+        """Check whether any kept table holds instance content."""
         async with self._session_factory() as session:
             connection = await session.connection()
             return await self._is_empty(connection, await self._tables(connection))

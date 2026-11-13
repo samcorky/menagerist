@@ -96,7 +96,12 @@ async def _assert_nothing_left(world: World) -> None:
         )
         == []
     )
-    assert await world.preset_repos.presets.list(after=None, limit=10) == []
+    assert (
+        await world.preset_repos.presets.list(
+            scope=ContentFilter.everyone(), after=None, limit=10
+        )
+        == []
+    )
 
 
 async def test_install_creates_everything_and_records_it(
@@ -184,7 +189,12 @@ async def test_a_slug_clash_creates_nothing_and_names_the_slug(
         )
         is None
     )
-    assert await world.preset_repos.presets.list(after=None, limit=10) == []
+    assert (
+        await world.preset_repos.presets.list(
+            scope=ContentFilter.everyone(), after=None, limit=10
+        )
+        == []
+    )
     assert (
         await world.graph_repos.nodes.list(
             scope=ContentFilter.everyone(), after=None, limit=10
