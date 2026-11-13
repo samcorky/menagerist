@@ -95,7 +95,7 @@ async def test_restore_round_trip_and_clear_sessions(snapshot_database: str) -> 
     engine = create_async_engine(snapshot_database)
     try:
         restorer = SqlAlchemyDatabaseRestorer(async_sessionmaker(engine))
-        assert await restorer.is_empty()  # Seeded builtin presets are allowed.
+        assert await restorer.is_empty()
         revision = await restorer.schema_revision()
         await _seed(engine)
         assert not await restorer.is_empty()
@@ -356,4 +356,23 @@ async def test_first_run_restore_waits_for_setup(snapshot_database: str) -> None
         if task is not None and not task.done():
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+        await engine.dispose()
+
+
+async def test_owned_preset_counts_as_instance_content(snapshot_database: str) -> None:
+    """Presets are ordinary kept content now, with no seeded rows to ignore."""
+    engine = create_async_engine(snapshot_database)
+    try:
+        restorer = SqlAlchemyDatabaseRestorer(async_sessionmaker(engine))
+        assert await restorer.is_empty()
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("""INSERT INTO presets
+                (id, kind, label, definition, version, created_at, updated_at)
+                VALUES (:id, 'choice_list', 'Mine', '{"options": []}', 1,
+                now(), now())"""),
+                {"id": uuid7()},
+            )
+        assert not await restorer.is_empty()
+    finally:
         await engine.dispose()

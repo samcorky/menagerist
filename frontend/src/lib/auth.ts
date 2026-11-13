@@ -183,7 +183,8 @@ const CLAIM_WORDS: Record<string, [string, string]> = {
 	connections: ['connection', 'connections'],
 	collections: ['collection', 'collections'],
 	files: ['file', 'files'],
-	examples: ['example pack', 'example packs']
+	examples: ['example pack', 'example packs'],
+	presets: ['saved field', 'saved fields']
 };
 
 /** Plain-words parts such as "3 items", leaving out kinds with nothing claimed. */

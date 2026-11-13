@@ -155,7 +155,12 @@ async def test_a_failing_collection_step_rolls_everything_back(
         )
         == []
     )
-    assert await world.preset_repos.presets.list(after=None, limit=10) == []
+    assert (
+        await world.preset_repos.presets.list(
+            scope=ContentFilter.everyone(), after=None, limit=10
+        )
+        == []
+    )
     assert (
         await world.installations.get_active_for_pack(
             "demo", scope=ContentFilter.everyone()

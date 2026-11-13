@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
+from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.presets.adapters.persistence.unit_of_work import build_preset_repos
 from app.platform.database import get_session_factory
 
@@ -12,13 +14,19 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.presets.ports.unit_of_work import PresetRepos
+    from app.shared_kernel.actor import Actor
+    from app.shared_kernel.content_filter import ContentFilter
 
 
 class PresetChoiceListSource:
-    """Reads saved choice lists from the presets module for the graph module."""
+    """Reads saved choice lists from the presets module for the graph module.
 
-    def __init__(self, repos: PresetRepos) -> None:
+    Only lists inside `scope` resolve, so another person's list reads as unknown.
+    """
+
+    def __init__(self, repos: PresetRepos, scope: ContentFilter) -> None:
         self._repos = repos
+        self._scope = scope
 
     async def options(self, list_id: str) -> list[str] | None:
         """Return the options, or `None` if the list is missing or not a choice list."""
@@ -26,7 +34,7 @@ class PresetChoiceListSource:
             preset_id = uuid.UUID(list_id)
         except ValueError:
             return None
-        preset = await self._repos.presets.get(preset_id)
+        preset = await self._repos.presets.get(preset_id, scope=self._scope)
         if preset is None or preset.kind != "choice_list":
             return None
         options = preset.definition.get("options")
@@ -39,7 +47,10 @@ async def get_choice_list_source(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> AsyncIterator[PresetChoiceListSource]:
-    """Yield the choice list source, backed by a read session on the presets table."""
+    """Yield the signed-in person's choice list source, over a read session."""
     async with session_factory() as session:
-        yield PresetChoiceListSource(build_preset_repos(session))
+        yield PresetChoiceListSource(
+            build_preset_repos(session), get_access_guard().scope_for(actor)
+        )

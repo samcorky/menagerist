@@ -1,4 +1,4 @@
-"""Example packs install per person; shared types outlive the first uninstall."""
+"""Example packs install per person: types and choice lists included."""
 
 import uuid
 from dataclasses import replace
@@ -29,7 +29,6 @@ from app.modules.examples.domain.errors import (
     RequirementsNotMetError,
     SlugClashError,
 )
-from app.modules.examples.domain.installation import Outcome
 from app.modules.examples.domain.pack import ExamplePack
 from app.modules.examples.domain.removal import KEEP_IN_USE
 from app.modules.examples.ports.unit_of_work import ExampleRepos
@@ -54,6 +53,7 @@ USER_B = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
 USER_C = Actor(id=uuid.UUID(int=0xC3), roles=frozenset({"member"}))
 
 if TYPE_CHECKING:
+    from app.modules.presets.domain.preset import Preset
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
 
 
@@ -107,6 +107,11 @@ async def _type_slugs(world: World, owner: uuid.UUID | None = None) -> set[str]:
     return {str(t.slug) for t in types} | {str(t.slug) for t in edge_types}
 
 
+async def _lists(world: World, owner: uuid.UUID | None = None) -> list[Preset]:
+    scope = ContentFilter.everyone() if owner is None else ContentFilter.of(owner)
+    return await world.preset_repos.presets.list(scope=scope, after=None, limit=50)
+
+
 async def _assets_by_owner(world: World) -> list[uuid.UUID | None]:
     return [
         a.owner_id
@@ -153,6 +158,29 @@ async def test_each_person_gets_their_own_items_collections_covers_and_types(
         assert {t.owner_id for t in owned} == {person.id}
 
 
+async def test_each_person_gets_their_own_choice_list(
+    both: tuple[World, World],
+) -> None:
+    """The same pack installed as two people yields two lists, one each."""
+    a, b = both
+
+    await _install(a)
+    await _install(b)
+
+    (mine,) = await _lists(a, USER_A.id)
+    (theirs,) = await _lists(a, USER_B.id)
+    assert mine.id != theirs.id
+    assert (mine.owner_id, theirs.owner_id) == (USER_A.id, USER_B.id)
+    for person, expected in ((USER_A, mine), (USER_B, theirs)):
+        for node_type in await a.graph_repos.node_types.list(
+            after=None, limit=50, scope=ContentFilter.of(person.id)
+        ):
+            schema = node_type.attributes_schema or {}
+            for prop in schema.get("properties", {}).values():
+                link = prop.get("x-menagerist", {}).get("list")
+                assert link in (None, str(expected.id))
+
+
 async def test_removing_a_pack_leaves_the_other_persons_copy_alone(
     both: tuple[World, World],
 ) -> None:
@@ -164,10 +192,11 @@ async def test_removing_a_pack_leaves_the_other_persons_copy_alone(
     left = await _uninstall(a)
 
     assert (left.removed.items, left.removed.item_types) == (2, 3)
-    # Choice lists stay shared: B's types still use A's.
-    assert {(k.kind, k.ref, k.reason) for k in left.kept} == {
-        (EntityKind.PRESET, "grades", KEEP_IN_USE)
-    }
+    # A's choice list went with A's types; B's own list is untouched.
+    assert left.kept == ()
+    assert left.removed.presets == 1
+    assert await _lists(a, USER_A.id) == []
+    assert len(await _lists(a, USER_B.id)) == 1
     assert await _items(a, USER_A.id) == []
     assert len(await _items(b, USER_B.id)) == 2
     assert await _type_slugs(a, USER_A.id) == set()
@@ -177,7 +206,7 @@ async def test_removing_a_pack_leaves_the_other_persons_copy_alone(
 
     assert await _items(a) == []
     assert await _type_slugs(a) == set()
-    assert await a.preset_repos.presets.list(after=None, limit=10) == []
+    assert await _lists(a) == []
     assert await _assets_by_owner(a) == []
 
 
@@ -401,41 +430,3 @@ async def test_rows_reowned_to_the_installer_uninstall_cleanly(
     assert await _items(owner) == []
     assert await _assets_by_owner(owner) == []
     assert await _type_slugs(owner) == set()
-
-
-async def test_an_edited_kept_choice_list_is_left_when_the_last_person_leaves(
-    both: tuple[World, World],
-) -> None:
-    """The last person out does not remove a shared choice list someone edited."""
-    a, b = both
-    await _install(a)
-    await _install(b)
-    await _uninstall(a)
-    for preset in await a.preset_repos.presets.list(after=None, limit=10):
-        preset.label = "Edited"
-        await a.preset_repos.presets.save(preset)
-
-    await _uninstall(b)
-
-    assert [
-        p.label for p in await a.preset_repos.presets.list(after=None, limit=10)
-    ] == ["Edited"]
-
-
-async def test_a_kept_choice_list_that_is_already_gone_is_closed(
-    both: tuple[World, World],
-) -> None:
-    """A shared choice list deleted by hand needs no removal; its record is closed."""
-    a, b = both
-    await _install(a)
-    await _install(b)
-    await _uninstall(a)
-    for preset in await a.preset_repos.presets.list(after=None, limit=10):
-        await a.preset_repos.presets.purge(preset.id)
-
-    await _uninstall(b)
-
-    (old,) = await a.installations.list_for_pack(
-        "demo", scope=ContentFilter.of(USER_A.id)
-    )
-    assert all(r.outcome is Outcome.REMOVED for r in old.entities)

@@ -187,8 +187,12 @@ async def test_expired_types_and_presets_are_purged_unless_still_used(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """Unused pack leftovers go; a type an item carries and a linked preset stay."""
-    linked = Preset.create(kind="choice_list", label="Linked", definition={})
-    spare = Preset.create(kind="choice_list", label="Spare", definition={})
+    linked = Preset.create(
+        owner_id=ALICE, kind="choice_list", label="Linked", definition={}
+    )
+    spare = Preset.create(
+        owner_id=ALICE, kind="choice_list", label="Spare", definition={}
+    )
     linked.deleted_at = spare.deleted_at = LONG_AGO
     gone = NodeType.create(owner_id=ALICE, slug="gone", label="Gone")
     carried = NodeType.create(owner_id=ALICE, slug="carried", label="Carried")

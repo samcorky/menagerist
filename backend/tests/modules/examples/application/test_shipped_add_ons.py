@@ -85,7 +85,11 @@ async def _live(world: World) -> int:
                 after=None, limit=500, scope=everyone
             )
         )
-        + len(await world.preset_repos.presets.list(after=None, limit=500))
+        + len(
+            await world.preset_repos.presets.list(
+                scope=ContentFilter.everyone(), after=None, limit=500
+            )
+        )
     )
     items = await world.graph_repos.nodes.list(
         scope=ContentFilter.everyone(), after=None, limit=500

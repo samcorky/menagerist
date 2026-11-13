@@ -11,8 +11,6 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     OWNED_TABLES,
     SOFT_DELETABLE,
     USER_TABLES,
-    VOCABULARY,
-    compatible,
     import_table_name,
     prepare_row,
     read_rows,
@@ -33,7 +31,7 @@ if TYPE_CHECKING:
 
 
 class InMemoryUserDatabaseRestorer:
-    """First-class transactional user import with shared-vocabulary matching."""
+    """First-class transactional user import."""
 
     def __init__(
         self,
@@ -64,7 +62,6 @@ class InMemoryUserDatabaseRestorer:
                 "Import requires an account without existing content."
             )
         imported: dict[str, set[str]] = {name: set() for name in USER_TABLES}
-        remap: dict[str, str] = {}
         seen: set[str] = set()
         skipped: dict[str, set[str]] = {n: set() for n in SOFT_DELETABLE}
         async for member in members:
@@ -73,7 +70,7 @@ class InMemoryUserDatabaseRestorer:
             async for raw in read_rows(member.chunks):
                 if skip_row(name, raw, skipped):
                     continue
-                row = prepare_row(name, raw, new_owner_id, remap)
+                row = prepare_row(name, raw, new_owner_id)
                 await self._validator.validate(name, row)
                 _validate_references(name, row, imported)
                 existing = (
@@ -88,11 +85,6 @@ class InMemoryUserDatabaseRestorer:
                     if "id" in row
                     else None
                 )
-                if name in VOCABULARY and _reuse_vocabulary(
-                    name, row, rows, existing, remap
-                ):
-                    imported[name].add(str(row["id"]))
-                    continue
                 if existing is not None:
                     raise ImportCollisionError("Imported identifier already exists.")
                 rows.append(row)
@@ -101,33 +93,6 @@ class InMemoryUserDatabaseRestorer:
             raise CorruptBackupError("User archive is missing content tables.")
         self.tables.clear()
         self.tables.update(target)
-
-
-def _reuse_vocabulary(
-    name: str,
-    row: dict[str, object],
-    rows: list[dict[str, object]],
-    existing: dict[str, object] | None,
-    remap: dict[str, str],
-) -> bool:
-    if row.get("deleted_at") is not None and existing is None:
-        return False
-    candidates = [
-        item
-        for item in rows
-        if item.get("kind") == row.get("kind")
-        and item.get("label") == row.get("label")
-        and item.get("deleted_at") is None
-    ]
-    if existing is not None and not compatible(name, row, existing):
-        raise ImportCollisionError("Vocabulary identifier conflict.")
-    matched = existing or next(
-        (item for item in candidates if compatible(name, row, item)), None
-    )
-    if matched:
-        remap[f"{name}:{row['id']}"] = str(matched["id"])
-        return True
-    return False
 
 
 def _record_identifier(

@@ -87,6 +87,14 @@ from app.modules.media.ports.media_asset_repository import MediaAssetRepository
 from app.modules.media.ports.media_attachment_repository import (
     MediaAttachmentRepository,
 )
+from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
+    InMemoryPresetRepository,
+)
+from app.modules.presets.adapters.persistence.models import PresetModel
+from app.modules.presets.adapters.persistence.preset_repository import (
+    SqlAlchemyPresetRepository,
+)
+from app.modules.presets.ports.preset_repository import PresetRepository
 from app.modules.settings.adapters.persistence.models import SettingValueModel
 from app.platform.database import Base
 from app.platform.orm_mixins import OwnedMixin
@@ -161,6 +169,13 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
         "delete": "removes an attachment fetched through its asset's scope",
     },
     InstallationRepository: {"add": _ADD, "save": _SAVE, "claim_orphaned": _CLAIM},
+    PresetRepository: {
+        "add": _ADD,
+        "save": _SAVE,
+        "claim_orphaned": _CLAIM,
+        "purge": _PURGE,
+        "list_deleted_before": _RETENTION,
+    },
 }
 
 # Each port with its in-memory twin and its SQL (or bridge) implementation.
@@ -190,6 +205,7 @@ PORTS: list[tuple[type, tuple[type, ...]]] = [
         InstallationRepository,
         (InMemoryInstallationRepository, SqlAlchemyInstallationRepository),
     ),
+    (PresetRepository, (InMemoryPresetRepository, SqlAlchemyPresetRepository)),
 ]
 IMPLEMENTATIONS = [(port, impl) for port, impls in PORTS for impl in impls]
 
@@ -269,6 +285,7 @@ UNSCOPED_USE_CASES = {
     "ClaimLegacyCollections": "first-admin claim",
     "ClaimOrphanedMedia": "first-admin claim",
     "ClaimOrphanedInstallations": "first-admin claim",
+    "ClaimOrphanedPresets": "first-admin claim",
     # System-actor maintenance jobs, run from the media CLI: they sweep all content.
     "CleanupExpiredMedia": "system maintenance job",
     "RemoveStrayMediaFiles": "system maintenance job",
@@ -281,11 +298,12 @@ UNSCOPED_USE_CASES = {
     "PurgeExpiredNodes": "system retention purge",
     "PurgeExpiredCollections": "system retention purge",
     "PurgeExpiredTypes": "system retention purge of types, which hold no item content",
+    "PurgeExpiredPresets": "system retention purge of presets",
     "PurgeItemMemberships": "system purge",
     "PurgeAttachment": "system purge",
 }
 SAFE_STANCES = (Content, Requires)
-CONTENT_MODULES = ("graph", "collections", "media", "examples")
+CONTENT_MODULES = ("graph", "collections", "media", "examples", "presets")
 
 
 def _use_cases() -> dict[str, type]:
@@ -331,7 +349,13 @@ def test_exclusions_are_current() -> None:
 
 
 # Content models carry the owner column through the shared mixin.
-OWNED_MODELS = (NodeModel, EdgeModel, MediaAssetModel, ExampleInstallationModel)
+OWNED_MODELS = (
+    NodeModel,
+    EdgeModel,
+    MediaAssetModel,
+    ExampleInstallationModel,
+    PresetModel,
+)
 # `CollectionModel.owner_id` is NOT NULL (every collection has an owner from the
 # start), so it declares its own column instead of the nullable mixin.
 OWNER_COLUMN_WITHOUT_MIXIN = (CollectionModel,)

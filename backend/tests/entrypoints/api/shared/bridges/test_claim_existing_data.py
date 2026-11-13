@@ -2,6 +2,7 @@
 
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
 
@@ -45,6 +46,11 @@ from app.modules.media.adapters.persistence.in_memory_media_asset_repository imp
 )
 from app.modules.media.adapters.persistence.unit_of_work import make_in_memory_repos
 from app.modules.media.domain.media_asset import MediaAsset
+from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
+    InMemoryPresetRepository,
+)
+from app.modules.presets.domain.preset import Preset
+from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import Slug
 
@@ -66,6 +72,7 @@ class Stores:
     collections: InMemoryCollectionRepository
     assets: InMemoryMediaAssetRepository
     installations: InMemoryInstallationRepository
+    presets: InMemoryPresetRepository
     claim: ClaimExistingData
 
 
@@ -79,6 +86,7 @@ def stores() -> Stores:
     collections = InMemoryCollectionRepository()
     assets = InMemoryMediaAssetRepository()
     installations = InMemoryInstallationRepository()
+    presets = InMemoryPresetRepository()
     claim = build_claim_existing_data(
         graph=GraphRepos(
             nodes=nodes,
@@ -92,6 +100,7 @@ def stores() -> Stores:
         ),
         media=make_in_memory_repos(assets=assets),
         examples=ExampleRepos(installations=installations),
+        presets=PresetRepos(presets=presets),
     )
     return Stores(
         nodes=nodes,
@@ -101,6 +110,7 @@ def stores() -> Stores:
         collections=collections,
         assets=assets,
         installations=installations,
+        presets=presets,
         claim=claim,
     )
 
@@ -143,6 +153,14 @@ def _asset(owner: uuid.UUID | None) -> MediaAsset:
     return asset
 
 
+def _preset(owner: uuid.UUID | None) -> Preset:
+    preset = Preset.create(
+        owner_id=SYSTEM, kind="field", label="p", definition={"property": {"type": "a"}}
+    )
+    preset.owner_id = owner
+    return preset
+
+
 def _installation(owner: uuid.UUID | None, pack: str) -> Installation:
     installation = Installation.start(pack, SYSTEM)
     installation.owner_id = owner
@@ -150,7 +168,7 @@ def _installation(owner: uuid.UUID | None, pack: str) -> Installation:
 
 
 async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) -> None:
-    """NULL and system owners move to the admin in all four modules, with counts."""
+    """NULL and system owners move to the admin in every module, with counts."""
     nodes = [_node(None), _node(SYSTEM)]
     edges = [_edge(None), _edge(SYSTEM)]
     collections = [
@@ -159,22 +177,22 @@ async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) 
     ]
     assets = [_asset(None), _asset(SYSTEM)]
     installations = [_installation(None, "p1"), _installation(SYSTEM, "p2")]
+    presets = [_preset(None), _preset(SYSTEM)]
     item_types = [_item_type(None, "a"), _item_type(SYSTEM, "b")]
     relationship_types = [_relationship_type(SYSTEM, "c")]
-    for item_type in item_types:
-        await stores.node_types.add(item_type)
-    for relationship_type in relationship_types:
-        await stores.edge_types.add(relationship_type)
-    for node in nodes:
-        await stores.nodes.add(node)
-    for edge in edges:
-        await stores.edges.add(edge)
-    for collection in collections:
-        await stores.collections.add(collection)
-    for asset in assets:
-        await stores.assets.add(asset)
-    for installation in installations:
-        await stores.installations.add(installation)
+    repositories: list[tuple[Any, list[Any]]] = [
+        (stores.node_types, item_types),
+        (stores.edge_types, relationship_types),
+        (stores.nodes, nodes),
+        (stores.edges, edges),
+        (stores.collections, collections),
+        (stores.assets, assets),
+        (stores.installations, installations),
+        (stores.presets, presets),
+    ]
+    for repository, rows in repositories:
+        for row in rows:
+            await repository.add(row)
 
     report = await stores.claim.claim(ADMIN)
 
@@ -185,6 +203,7 @@ async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) 
         "collections": 2,
         "files": 2,
         "examples": 2,
+        "presets": 2,
     }
     owners = [
         *(t.owner_id for t in item_types),
@@ -194,6 +213,7 @@ async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) 
         *(c.owner_id for c in collections),
         *(a.owner_id for a in assets),
         *(i.owner_id for i in installations),
+        *(p.owner_id for p in presets),
     ]
     assert owners == [ADMIN] * len(owners)
 

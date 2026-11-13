@@ -3,9 +3,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from app.modules.presets.domain.errors import BuiltinPresetError
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.mixins import Identifiable, SoftDeletable
+from app.shared_kernel.mixins import Identifiable, Owned, SoftDeletable
 
 # `field` (a single field), `field_set` (a named group of fields, "field group" in
 # the UI) and `choice_list` (a reusable set of choice options).
@@ -13,15 +12,17 @@ VALID_KINDS = frozenset({"field", "field_set", "choice_list"})
 
 
 @dataclass(kw_only=True, eq=False)
-class Preset(Identifiable, SoftDeletable):
-    """A saved, reusable field definition - a saved field, field group or list."""
+class Preset(Identifiable, Owned, SoftDeletable):
+    """A saved, reusable field definition - a saved field, field group or list.
+
+    Owned by one person; nobody else sees or edits it.
+    """
 
     kind: str
     label: str
     description: str | None = None
     definition: dict[str, Any] = field(default_factory=dict)
     version: int = 1
-    builtin: bool = False
 
     def __post_init__(self) -> None:
         """Validate invariants after construction."""
@@ -34,22 +35,22 @@ class Preset(Identifiable, SoftDeletable):
     def create(
         cls,
         *,
+        owner_id: uuid.UUID,
         kind: str,
         label: str,
         description: str | None = None,
         definition: dict[str, Any],
-        builtin: bool = False,
     ) -> Preset:
         """Create a new preset, generating its id and timestamps."""
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
+            owner_id=owner_id,
             kind=kind,
             label=label,
             description=description,
             definition=definition,
             version=1,
-            builtin=builtin,
             created_at=now,
             updated_at=now,
         )
@@ -61,12 +62,7 @@ class Preset(Identifiable, SoftDeletable):
         description: str | None = None,
         definition: dict[str, Any] | None = None,
     ) -> None:
-        """Apply partial changes, bumping `version` when the definition changes.
-
-        :raises BuiltinPresetError: a built-in preset cannot be edited.
-        """
-        if self.builtin:
-            raise BuiltinPresetError(f"Preset {self.id} is built in and read-only")
+        """Apply partial changes, bumping `version` when the definition changes."""
         if label is not None:
             if label.strip() == "":
                 raise ValidationError("label must be provided")
@@ -77,12 +73,3 @@ class Preset(Identifiable, SoftDeletable):
             self.definition = definition
             self.version += 1
         self.touch()
-
-    def soft_delete(self) -> None:
-        """Mark this preset as deleted.
-
-        :raises BuiltinPresetError: a built-in preset cannot be deleted.
-        """
-        if self.builtin:
-            raise BuiltinPresetError(f"Preset {self.id} is built in and read-only")
-        super().soft_delete()

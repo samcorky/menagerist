@@ -7,6 +7,7 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
 )
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from app.modules.graph.ports.unit_of_work import GraphRepos
@@ -37,40 +38,29 @@ async def _repos() -> GraphRepos:
     return repos
 
 
-async def test_a_viewer_sees_their_own_labels_and_only_a_count_of_the_rest() -> None:
-    """Another person's type is counted, never named, in the in-use message."""
-    usage = GraphPresetUsage(await _repos(), viewer=ALICE)
+async def test_a_viewer_is_told_only_about_their_own_types() -> None:
+    """Another person's type is neither named nor counted."""
+    usage = GraphPresetUsage(await _repos(), scope=ContentFilter.of(ALICE))
 
-    labels = await usage.types_using(LIST_ID)
-
-    assert labels == ["Film", "2 types belonging to other people"]
-    assert not any("Secret" in label or "Hides" in label for label in labels)
+    assert await usage.types_using(LIST_ID) == ["Film"]
 
 
-async def test_a_single_foreign_type_reads_in_the_singular() -> None:
-    """One foreign type is described as one."""
-    repos = await _repos()
-    usage = GraphPresetUsage(repos, viewer=BOB)
+async def test_both_kinds_of_type_are_reported() -> None:
+    """Item types and relationship types of the viewer both count."""
+    usage = GraphPresetUsage(await _repos(), scope=ContentFilter.of(BOB))
 
-    assert await usage.types_using(LIST_ID) == [
-        "Secret Diaries",
-        "Hides",
-        "1 type belonging to another person",
-    ]
+    assert await usage.types_using(LIST_ID) == ["Secret Diaries", "Hides"]
 
 
 async def test_a_list_nobody_uses_has_no_usage() -> None:
     """Nothing links to an unknown list."""
-    assert (
-        await GraphPresetUsage(await _repos(), viewer=ALICE).types_using(
-            uuid.UUID(int=8)
-        )
-        == []
-    )
+    usage = GraphPresetUsage(await _repos(), scope=ContentFilter.of(ALICE))
+
+    assert await usage.types_using(uuid.UUID(int=8)) == []
 
 
-async def test_a_system_check_names_everything_for_the_retention_purge() -> None:
-    """With no viewer (the retention purge) any use at all is reported."""
-    labels = await GraphPresetUsage(await _repos()).types_using(LIST_ID)
+async def test_an_unrestricted_check_sees_every_owner_for_the_retention_purge() -> None:
+    """The purge asks with no restriction: any use at all is reported."""
+    usage = GraphPresetUsage(await _repos(), scope=ContentFilter.everyone())
 
-    assert len(labels) == 3
+    assert len(await usage.types_using(LIST_ID)) == 3

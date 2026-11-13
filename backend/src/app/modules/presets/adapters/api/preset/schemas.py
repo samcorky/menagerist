@@ -26,7 +26,6 @@ _PRESET_EXAMPLE: dict[str, Any] = {
         }
     },
     "version": 1,
-    "builtin": False,
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -101,7 +100,6 @@ class PresetResponse(BaseModel):
     description: str | None = Field(default=None)
     definition: dict[str, Any]
     version: int
-    builtin: bool
     created_at: datetime
     updated_at: datetime
 
@@ -115,7 +113,6 @@ class PresetResponse(BaseModel):
             description=preset.description,
             definition=preset.definition,
             version=preset.version,
-            builtin=preset.builtin,
             created_at=preset.created_at,
             updated_at=preset.updated_at,
         )

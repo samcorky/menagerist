@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	canEditOptions,
-	copyLabel,
 	packKindMismatch,
 	parsePackText,
 	presetExampleSchema,
-	visiblePresets,
 	presetFilename
 } from '../src/lib/preset-packs';
 
@@ -16,20 +14,12 @@ const preset = (overrides: Record<string, unknown>) =>
 		label: 'Condition grades',
 		definition: { options: ['Mint'] },
 		version: 1,
-		builtin: false,
 		...overrides
 	}) as never;
 
-describe('copyLabel', () => {
-	it('suffixes the label with (copy)', () => {
-		expect(copyLabel('Condition grades')).toBe('Condition grades (copy)');
-	});
-});
-
 describe('canEditOptions', () => {
-	it('allows editing a custom list but never a built-in one', () => {
+	it('allows editing a choice list', () => {
 		expect(canEditOptions(preset({}))).toBe(true);
-		expect(canEditOptions(preset({ builtin: true }))).toBe(false);
 	});
 
 	it('never offers options editing for fields or field groups', () => {
@@ -124,16 +114,5 @@ describe('presetExampleSchema', () => {
 			})
 		);
 		expect(schema.properties.rating).toEqual({ title: 'Rating', type: 'number' });
-	});
-});
-
-describe('built-in visibility', () => {
-	it('filters built-ins out only when hidden', () => {
-		const items = [
-			{ label: 'Custom', builtin: false },
-			{ label: 'Countries', builtin: true }
-		];
-		expect(visiblePresets(items, true)).toHaveLength(2);
-		expect(visiblePresets(items, false)).toEqual([{ label: 'Custom', builtin: false }]);
 	});
 });

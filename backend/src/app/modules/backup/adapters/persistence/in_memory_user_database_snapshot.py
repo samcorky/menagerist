@@ -5,9 +5,6 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     OWNED_TABLES,
     SOFT_DELETABLE,
     USER_TABLES,
-    VOCABULARY,
-    installation_vocabulary,
-    preset_ids,
 )
 from app.modules.backup.adapters.storage.in_memory_backup_reader import (
     InMemoryBackupReader,
@@ -22,7 +19,7 @@ if TYPE_CHECKING:
 
 
 class InMemoryUserDatabaseSnapshot:
-    """Owner-filtered content with only its referenced types and choice lists."""
+    """Owner-filtered content, soft-deleted rows left out."""
 
     def __init__(
         self, revision: str, tables: dict[str, list[dict[str, object]]]
@@ -72,21 +69,6 @@ class InMemoryUserDatabaseSnapshot:
             for row in self.tables.get("node_favourites", [])
             if str(row.get("user_id")) == str(scope.user_id)
             and str(row.get("node_id")) in nodes
-        ]
-        installation_refs: dict[str, set[str]] = {name: set() for name in VOCABULARY}
-        for row in selected["example_installations"]:
-            for name, ids in installation_vocabulary(row.get("entities")).items():
-                installation_refs[name].update(ids)
-        refs = set().union(
-            *(
-                preset_ids(row)
-                for name in ("node_types", "edge_types", "nodes")
-                for row in selected[name]
-            )
-        )
-        refs.update(installation_refs["presets"])
-        selected["presets"] = [
-            row for row in self.tables.get("presets", []) if str(row["id"]) in refs
         ]
         return InMemoryBackupReader(
             {

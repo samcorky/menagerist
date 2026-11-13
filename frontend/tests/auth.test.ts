@@ -205,6 +205,11 @@ describe('messages', () => {
 		]);
 		expect(describeClaimed({ items: 0 })).toEqual([]);
 	});
+
+	it('names claimed presets as saved fields', () => {
+		expect(describeClaimed({ presets: 1 })).toEqual(['1 saved field']);
+		expect(describeClaimed({ presets: 4 })).toEqual(['4 saved fields']);
+	});
 });
 
 describe('identity errors', () => {

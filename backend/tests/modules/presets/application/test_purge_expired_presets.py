@@ -1,7 +1,7 @@
 """The retention purge of soft-deleted presets."""
 
+import uuid
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -19,15 +19,17 @@ from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
-
-if TYPE_CHECKING:
-    import uuid
 
 NOW = datetime.now(UTC)
 CUTOFF = NOW - timedelta(days=30)
 LONG_AGO = NOW - timedelta(days=31)
 EVERYTHING = NOW + timedelta(days=1)
+
+
+OWNER = uuid.uuid7()
+EVERYONE = ContentFilter.everyone()
 
 
 class _Usage:
@@ -42,7 +44,9 @@ class _Usage:
 
 
 async def _preset(repos: PresetRepos, *, deleted_at: datetime | None) -> Preset:
-    preset = Preset.create(kind="choice_list", label="L", definition={"options": []})
+    preset = Preset.create(
+        owner_id=OWNER, kind="choice_list", label="L", definition={"options": []}
+    )
     preset.deleted_at = deleted_at
     await repos.presets.add(preset)
     return preset
@@ -70,7 +74,7 @@ async def test_expired_presets_are_purged_and_the_rest_kept() -> None:
     )
 
     assert result.presets == 1
-    assert await repos.presets.get(live.id) is live
+    assert await repos.presets.get(live.id, scope=EVERYONE) is live
     assert await repos.presets.list_deleted_before(EVERYTHING, after=None, limit=9) == [
         recent
     ]

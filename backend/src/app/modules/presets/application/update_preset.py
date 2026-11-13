@@ -9,7 +9,7 @@ from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.errors import PresetNotFoundError
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 
 if TYPE_CHECKING:
@@ -33,17 +33,14 @@ class UpdatePresetCommand:
 
 
 class UpdatePreset(CommandHandler[PresetUnitOfWork, UpdatePresetCommand, Preset]):
-    """Update an existing preset's editable fields.
+    """Update an existing preset's editable fields (its owner only)."""
 
-    :raises BuiltinPresetError: a built-in preset cannot be edited.
-    """
-
-    access: ClassVar[Access] = Requires(PresetPermission.PRESET_WRITE)
+    access: ClassVar[Access] = Content(PresetPermission.PRESET_WRITE)
 
     async def _handle(self, command: UpdatePresetCommand, actor: Actor) -> Preset:
         """Apply `command`'s changes to the preset and commit."""
         async with self._uow as repos:
-            preset = await repos.presets.get(command.preset_id)
+            preset = await repos.presets.get(command.preset_id, scope=self.scope(actor))
             if preset is None:
                 raise PresetNotFoundError(f"Preset {command.preset_id} not found")
 

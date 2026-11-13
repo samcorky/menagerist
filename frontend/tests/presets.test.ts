@@ -67,8 +67,7 @@ describe('listUpdateAvailable', () => {
 		label: 'Grades',
 		description: null,
 		definition: { options: ['Mint'] },
-		version: 2,
-		builtin: false
+		version: 2
 	};
 
 	it('is true when the preset has a newer version than the field recorded', () => {

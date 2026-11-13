@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 class UserDatabaseSnapshot(Protocol):
-    """A person's content and the shared vocabulary it requires."""
+    """A person's own live content, presets and types included."""
 
     async def schema_revision(self) -> str:
         """Return the source migration revision."""

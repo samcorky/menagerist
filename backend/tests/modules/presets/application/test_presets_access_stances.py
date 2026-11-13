@@ -8,13 +8,13 @@ from app.modules.presets.application.import_presets import ImportPresets
 from app.modules.presets.application.list_presets import ListPresets
 from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.application.update_preset import UpdatePreset
-from app.shared_kernel.access import Access, Requires
+from app.shared_kernel.access import Access, Content
 
 if TYPE_CHECKING:
     from app.shared_kernel.cqrs import UseCase
 
-READ = Requires(PresetPermission.PRESET_READ)
-WRITE = Requires(PresetPermission.PRESET_WRITE)
+READ = Content(PresetPermission.PRESET_READ)
+WRITE = Content(PresetPermission.PRESET_WRITE)
 
 STANCES: dict[type[UseCase[Any, Any]], Access] = {
     ExportPresets: READ,
@@ -27,6 +27,6 @@ STANCES: dict[type[UseCase[Any, Any]], Access] = {
 }
 
 
-def test_presets_need_the_preset_permissions() -> None:
-    """Presets are a shared catalogue, gated by the read and write permissions."""
+def test_presets_are_owned_content_gated_by_the_preset_permissions() -> None:
+    """Presets are a person's own content, gated by the read and write permissions."""
     assert {use_case: use_case.access for use_case in STANCES} == STANCES

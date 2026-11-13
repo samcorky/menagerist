@@ -1,5 +1,6 @@
+import json
 from typing import TYPE_CHECKING
-from uuid import uuid7
+from uuid import UUID, uuid7
 
 import pytest
 
@@ -16,7 +17,7 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     prepare_row,
     read_rows,
 )
-from app.modules.backup.domain.errors import CorruptBackupError
+from app.modules.backup.domain.errors import CorruptBackupError, ImportCollisionError
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -39,18 +40,60 @@ async def test_rows_reject_malformed_or_oversized_input(
         _ = [row async for row in read_rows(_chunks(data))]
 
 
-async def test_preset_reuse_remaps_only_structural_references() -> None:
-    """A reused list keeps type references valid without rewriting personal values."""
-    source, destination, preset, existing, item = (uuid7() for _ in range(5))
-    schema = {"properties": {"status": {"x-menagerist": {"list": str(preset)}}}}
+async def _export(
+    snapshot: InMemoryUserDatabaseSnapshot, owner: UUID
+) -> dict[str, bytes]:
+    return {
+        m.name: b"".join([c async for c in m.chunks])
+        async for m in snapshot.export(scope=ContentFilter.of(owner))
+    }
+
+
+async def test_export_includes_every_live_preset_of_the_owner() -> None:
+    """Unreferenced presets travel too; other people's and deleted ones do not."""
+    owner, other = uuid7(), uuid7()
+    mine, unused, gone, theirs = (uuid7() for _ in range(4))
+    base = {"kind": "choice_list", "definition": {"options": []}}
+    snapshot = InMemoryUserDatabaseSnapshot(
+        "rev",
+        {
+            "presets": [
+                dict(base, id=mine, owner_id=owner, label="A", deleted_at=None),
+                dict(base, id=unused, owner_id=owner, label="B", deleted_at=None),
+                dict(base, id=gone, owner_id=owner, label="C", deleted_at="then"),
+                dict(base, id=theirs, owner_id=other, label="D", deleted_at=None),
+            ],
+            "node_types": [
+                {
+                    "id": uuid7(),
+                    "owner_id": owner,
+                    "slug": "book",
+                    "attributes_schema": {"x-menagerist": {"list": str(mine)}},
+                }
+            ],
+        },
+    )
+    members = await _export(snapshot, owner)
+    exported = {
+        json.loads(x)["id"] for x in members["data/presets.ndjson"].splitlines()
+    }
+    assert exported == {str(mine), str(unused)}
+
+
+async def test_import_creates_new_preset_rows_and_never_reuses_another_owners() -> None:
+    """A destination list of the same kind and label stays apart from the import."""
+    source, destination, incoming, existing = (uuid7() for _ in range(4))
+    definition = {"options": [{"value": "a", "label": "A"}]}
+    schema = {"properties": {"state": {"x-menagerist": {"list": str(incoming)}}}}
     tables = {
         "presets": [
             {
-                "id": preset,
+                "id": incoming,
+                "owner_id": source,
                 "kind": "choice_list",
                 "label": "State",
-                "definition": {"options": []},
-                "builtin": True,
+                "definition": definition,
+                "deleted_at": None,
             }
         ],
         "node_types": [
@@ -59,51 +102,68 @@ async def test_preset_reuse_remaps_only_structural_references() -> None:
                 "owner_id": source,
                 "slug": "book",
                 "attributes_schema": schema,
-            }
-        ],
-        "nodes": [
-            {
-                "id": item,
-                "type": "book",
-                "owner_id": source,
-                "extra_schema": schema,
-                "attributes": {"literal": str(preset)},
+                "deleted_at": None,
             }
         ],
     }
-    restorer = InMemoryUserDatabaseRestorer(
-        "rev", {"presets": [dict(tables["presets"][0], id=existing)]}
-    )
-    snapshot = InMemoryUserDatabaseSnapshot("rev", tables)
+    other_people = {
+        "id": existing,
+        "owner_id": uuid7(),
+        "kind": "choice_list",
+        "label": "State",
+        "definition": definition,
+        "deleted_at": None,
+    }
+    restorer = InMemoryUserDatabaseRestorer("rev", {"presets": [other_people]})
     await restorer.import_user(
-        snapshot.export(scope=ContentFilter.of(source)), new_owner_id=destination
+        InMemoryUserDatabaseSnapshot("rev", tables).export(
+            scope=ContentFilter.of(source)
+        ),
+        new_owner_id=destination,
     )
-    assert len(restorer.tables["presets"]) == 1
-    assert restorer.tables["presets"][0]["builtin"] is True
-    assert str(existing) in str(restorer.tables["node_types"][0]["attributes_schema"])
-    assert str(existing) in str(restorer.tables["nodes"][0]["extra_schema"])
-    assert restorer.tables["nodes"][0]["attributes"] == {"literal": str(preset)}
+    rows = {str(row["id"]): row for row in restorer.tables["presets"]}
+    assert set(rows) == {str(existing), str(incoming)}
+    assert rows[str(incoming)]["owner_id"] == destination
+    assert rows[str(incoming)]["definition"] == definition
+    assert rows[str(existing)]["owner_id"] != destination
+    assert str(incoming) in str(restorer.tables["node_types"][0]["attributes_schema"])
 
 
-def test_import_normalises_derived_and_privileged_fields() -> None:
-    """New rows cannot gain builtin privileges and thumbnails are regenerated."""
+async def test_import_refuses_a_preset_id_held_by_another_owner() -> None:
+    """Ids are kept, so a clash is a collision rather than a silent link."""
+    source, incoming = uuid7(), uuid7()
+    row = {
+        "id": incoming,
+        "kind": "choice_list",
+        "label": "State",
+        "definition": {"options": []},
+        "deleted_at": None,
+    }
+    snapshot = InMemoryUserDatabaseSnapshot(
+        "rev", {"presets": [dict(row, owner_id=source)]}
+    )
+    restorer = InMemoryUserDatabaseRestorer(
+        "rev", {"presets": [dict(row, owner_id=uuid7())]}
+    )
+    with pytest.raises(ImportCollisionError):
+        await restorer.import_user(
+            snapshot.export(scope=ContentFilter.of(source)), new_owner_id=uuid7()
+        )
+
+
+def test_import_stamps_ownership_and_regenerates_derived_fields() -> None:
+    """Presets take the importer as owner; thumbnails are regenerated."""
     actor = uuid7()
-    assert prepare_row("presets", {"builtin": True}, actor, {})["builtin"] is False
+    preset = prepare_row("presets", {"owner_id": "someone-else"}, actor)
+    assert preset == {"owner_id": actor}
     media = prepare_row(
-        "media_assets", {"has_thumbnail": True, "thumbnail_sha256": "old"}, actor, {}
+        "media_assets", {"has_thumbnail": True, "thumbnail_sha256": "old"}, actor
     )
     assert media == {
         "has_thumbnail": False,
         "thumbnail_sha256": None,
         "owner_id": actor,
     }
-    remapped = prepare_row(
-        "example_installations",
-        {"entities": [{"kind": "preset", "id": "before"}, "literal"]},
-        actor,
-        {"presets:before": "after"},
-    )
-    assert remapped["entities"] == [{"kind": "preset", "id": "after"}, "literal"]
 
 
 async def test_validation_failure_keeps_target_empty() -> None:
@@ -119,45 +179,3 @@ async def test_validation_failure_keeps_target_empty() -> None:
             snapshot.export(scope=ContentFilter.of(source)), new_owner_id=uuid7()
         )
     assert restorer.tables == {}
-
-
-async def test_same_identifier_in_different_vocabulary_tables_is_remapped_safely() -> (
-    None
-):
-    """A type-id collision cannot redirect a schema's preset reference."""
-    owner, destination, incoming, saved_list, saved_type = (uuid7() for _ in range(5))
-    schema = {"properties": {"state": {"x-menagerist": {"list": str(incoming)}}}}
-    target_schema = {
-        "properties": {"state": {"x-menagerist": {"list": str(saved_list)}}}
-    }
-    tables = {
-        "presets": [
-            {
-                "id": incoming,
-                "kind": "choice_list",
-                "label": "State",
-                "definition": {"options": []},
-            }
-        ],
-        "node_types": [{"id": incoming, "slug": "book", "attributes_schema": schema}],
-        "nodes": [
-            {"id": uuid7(), "owner_id": owner, "type": "book", "extra_schema": schema}
-        ],
-    }
-    target = {
-        "presets": [dict(tables["presets"][0], id=saved_list)],
-        "node_types": [
-            dict(
-                tables["node_types"][0], id=saved_type, attributes_schema=target_schema
-            )
-        ],
-    }
-    restorer = InMemoryUserDatabaseRestorer("rev", target)
-    await restorer.import_user(
-        InMemoryUserDatabaseSnapshot("rev", tables).export(
-            scope=ContentFilter.of(owner)
-        ),
-        new_owner_id=destination,
-    )
-    assert str(saved_list) in str(restorer.tables["nodes"][0]["extra_schema"])
-    assert str(saved_type) not in str(restorer.tables["nodes"][0]["extra_schema"])

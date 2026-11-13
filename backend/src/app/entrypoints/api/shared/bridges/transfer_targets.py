@@ -106,11 +106,7 @@ from app.modules.presets.application.import_presets import (
     ImportPresetsCommand,
 )
 from app.modules.presets.application.pack import PACK_FORMAT, PACK_VERSION
-from app.modules.presets.domain.errors import (
-    BuiltinPresetError,
-    PresetInUseError,
-    PresetNotFoundError,
-)
+from app.modules.presets.domain.errors import PresetInUseError, PresetNotFoundError
 from app.modules.presets.domain.preset import Preset  # noqa: TC001
 from app.modules.presets.ports.preset_usage import PresetUsage
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
@@ -132,6 +128,7 @@ from app.modules.transfer.ports.targets import (
 )
 from app.platform.database import get_session_factory
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -162,7 +159,7 @@ class PresetStores:
 
     uow: Callable[[], PresetUnitOfWork]
     read: Callable[[], AbstractAsyncContextManager[PresetRepos]]
-    usage: Callable[[], AbstractAsyncContextManager[PresetUsage]]
+    usage: Callable[[ContentFilter], AbstractAsyncContextManager[PresetUsage]]
 
 
 @dataclass(kw_only=True)
@@ -172,7 +169,9 @@ class GraphStores:
     uow: Callable[[], GraphUnitOfWork]
     read: Callable[[], AbstractAsyncContextManager[GraphRepos]]
     media: Callable[[], AbstractAsyncContextManager[MediaRepos]]
-    choice_lists: Callable[[], AbstractAsyncContextManager[ChoiceListSource]]
+    choice_lists: Callable[
+        [ContentFilter], AbstractAsyncContextManager[ChoiceListSource]
+    ]
     collections: Callable[[], AbstractAsyncContextManager[CollectionsRepos]]
     collections_uow: Callable[[], CollectionsUnitOfWork]
 
@@ -206,8 +205,8 @@ def in_memory_preset_stores(
         yield preset_repos
 
     @asynccontextmanager
-    async def usage() -> AsyncIterator[PresetUsage]:
-        yield GraphPresetUsage(graph_repos)
+    async def usage(scope: ContentFilter) -> AsyncIterator[PresetUsage]:
+        yield GraphPresetUsage(graph_repos, scope=scope)
 
     return PresetStores(
         uow=lambda: create_in_memory_preset_uow(preset_repos), read=read, usage=usage
@@ -232,8 +231,8 @@ def in_memory_graph_stores(
         yield media_repos
 
     @asynccontextmanager
-    async def choice_lists() -> AsyncIterator[ChoiceListSource]:
-        yield PresetChoiceListSource(preset_repos)
+    async def choice_lists(scope: ContentFilter) -> AsyncIterator[ChoiceListSource]:
+        yield PresetChoiceListSource(preset_repos, scope)
 
     @asynccontextmanager
     async def collections() -> AsyncIterator[CollectionsRepos]:
@@ -285,9 +284,9 @@ def build_preset_stores(
             yield build_preset_repos(session)
 
     @asynccontextmanager
-    async def usage() -> AsyncIterator[PresetUsage]:
+    async def usage(scope: ContentFilter) -> AsyncIterator[PresetUsage]:
         async with session_factory() as session:
-            yield GraphPresetUsage(build_graph_repos(session))
+            yield GraphPresetUsage(build_graph_repos(session), scope=scope)
 
     return PresetStores(
         uow=lambda: create_preset_uow(session_factory), read=read, usage=usage
@@ -310,9 +309,9 @@ def build_graph_stores(
             yield build_media_repos(session)
 
     @asynccontextmanager
-    async def choice_lists() -> AsyncIterator[ChoiceListSource]:
+    async def choice_lists(scope: ContentFilter) -> AsyncIterator[ChoiceListSource]:
         async with session_factory() as session:
-            yield PresetChoiceListSource(build_preset_repos(session))
+            yield PresetChoiceListSource(build_preset_repos(session), scope)
 
     @asynccontextmanager
     async def collections() -> AsyncIterator[CollectionsRepos]:
@@ -454,14 +453,16 @@ def _resolved(
 class PresetPackTarget:
     """Implements `PresetTarget` with the presets use cases.
 
-    Presets are shared structure with no owner, so they run as the system actor.
+    Presets belong to a person, so every call runs as `actor` and sees only their own.
     """
 
     def __init__(
-        self, stores: PresetStores, *, access: AccessGuard | None = None
+        self, stores: PresetStores, actor: Actor, *, access: AccessGuard | None = None
     ) -> None:
         self._stores = stores
+        self._actor = actor
         self._access = access or get_access_guard()
+        self._scope = self._access.scope_for(actor)
 
     async def ensure(self, presets: Sequence[PackPreset]) -> list[PresetOutcome]:
         """Create each preset unless an identical one exists."""
@@ -481,7 +482,7 @@ class PresetPackTarget:
             ],
         )
         result = await ImportPresets(self._stores.uow(), self._access).handle(
-            command, SYSTEM_ACTOR
+            command, self._actor
         )
         # Built from the spec: the import stores these fields unchanged, and a
         # read-back failing here would leave committed presets unrecorded.
@@ -503,17 +504,17 @@ class PresetPackTarget:
     async def inspect(self, preset_id: uuid.UUID) -> Inspection | None:
         """Return the preset as it is now, or `None` if it is gone."""
         async with self._stores.read() as repos:
-            preset = await repos.presets.get(preset_id)
+            preset = await repos.presets.get(preset_id, scope=self._scope)
         return None if preset is None else Inspection(content=_preset_content(preset))
 
     async def remove(self, preset_id: uuid.UUID) -> RemoveResult:
-        """Remove the preset unless it is built in or an item type still uses it."""
-        async with self._stores.usage() as usage:
+        """Remove the preset unless an item type still uses it."""
+        async with self._stores.usage(self._scope) as usage:
             try:
                 await DeletePreset(self._stores.uow(), self._access, usage).handle(
-                    DeletePresetCommand(preset_id=preset_id), SYSTEM_ACTOR
+                    DeletePresetCommand(preset_id=preset_id), self._actor
                 )
-            except PresetInUseError, BuiltinPresetError:
+            except PresetInUseError:
                 return RemoveResult.REFUSED_IN_USE
             except PresetNotFoundError:
                 return RemoveResult.ALREADY_GONE
@@ -561,7 +562,7 @@ class GraphPackTarget:
             directional=spec.directional,
             attributes_schema=_resolved(spec.attributes_schema, presets),
         )
-        async with self._stores.choice_lists() as source:
+        async with self._stores.choice_lists(self._scope) as source:
             edge_type = await CreateEdgeType(
                 self._stores.uow(), self._access, source
             ).handle(command, self._actor)
@@ -579,7 +580,7 @@ class GraphPackTarget:
             icon=spec.icon,
             colour=spec.colour,
         )
-        async with self._stores.choice_lists() as source:
+        async with self._stores.choice_lists(self._scope) as source:
             node_type = await CreateNodeType(
                 self._stores.uow(), self._access, source
             ).handle(command, self._actor)
@@ -595,7 +596,7 @@ class GraphPackTarget:
             tags=list(spec.tags),
             extra_schema=spec.extra_schema,
         )
-        async with self._stores.choice_lists() as source:
+        async with self._stores.choice_lists(self._scope) as source:
             node = await CreateNode(self._stores.uow(), self._access, source).handle(
                 command, self._actor
             )
@@ -616,7 +617,7 @@ class GraphPackTarget:
             type=type_slug,
             attributes=spec.attributes,
         )
-        async with self._stores.choice_lists() as source:
+        async with self._stores.choice_lists(self._scope) as source:
             edge = await CreateEdge(self._stores.uow(), self._access, source).handle(
                 command, self._actor
             )
@@ -863,9 +864,10 @@ def get_preset_pack_target(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> PresetPackTarget:
-    """Return the preset target over Postgres."""
-    return PresetPackTarget(build_preset_stores(session_factory))
+    """Return the preset target over Postgres, acting as the signed-in person."""
+    return PresetPackTarget(build_preset_stores(session_factory), actor)
 
 
 def get_graph_pack_target(

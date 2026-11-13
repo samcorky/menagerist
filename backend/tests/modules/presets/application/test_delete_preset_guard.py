@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
@@ -12,7 +14,11 @@ from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
+
+OWNER = uuid.uuid7()
+EVERYONE = ContentFilter.everyone()
 
 
 class _Usage:
@@ -28,7 +34,7 @@ class _Usage:
 
 async def _store(repos: PresetRepos) -> Preset:
     preset = Preset.create(
-        kind="choice_list", label="Mine", definition={"options": ["a"]}
+        owner_id=OWNER, kind="choice_list", label="Mine", definition={"options": ["a"]}
     )
     await repos.presets.add(preset)
     return preset
@@ -45,7 +51,7 @@ async def test_delete_is_refused_while_a_type_uses_the_preset() -> None:
     with pytest.raises(PresetInUseError, match="Film, Book"):
         await use_case.handle(DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR)
 
-    assert await repos.presets.get(preset.id) is not None
+    assert await repos.presets.get(preset.id, scope=EVERYONE) is not None
 
 
 async def test_delete_proceeds_when_no_type_uses_the_preset() -> None:
@@ -58,4 +64,4 @@ async def test_delete_proceeds_when_no_type_uses_the_preset() -> None:
 
     await use_case.handle(DeletePresetCommand(preset_id=preset.id), SYSTEM_ACTOR)
 
-    assert await repos.presets.get(preset.id) is None
+    assert await repos.presets.get(preset.id, scope=EVERYONE) is None
