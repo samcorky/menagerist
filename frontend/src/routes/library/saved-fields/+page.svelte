@@ -572,8 +572,8 @@
 <Page width="reading" class="gap-6">
 	<BackButton peer fallback={resolve('/settings')} />
 
-	<div class="flex items-start justify-between gap-4">
-		<div>
+	<div class="flex flex-wrap items-start justify-between gap-4">
+		<div class="min-w-0 flex-1 basis-64">
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Saved fields</h1>
 			<p class="mt-1 text-muted-foreground">
 				Reuse a field or a list of choices across item types instead of rebuilding it each time.
