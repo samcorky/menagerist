@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, Permission, expand
 from app.modules.backup.application.permissions import BackupPermission
+from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.graph.application.permissions import GraphPermission
@@ -34,6 +35,8 @@ CONTENT_PERMISSIONS: frozenset[Permission] = frozenset(
         PresetPermission.PRESET_WRITE,
         ExamplePermission.PACK_READ,
         ExamplePermission.PACK_INSTALL,
+        CataloguePermission.ENTRY_READ,
+        CataloguePermission.ENTRY_INSTALL,
         BackupPermission.EXPORT_OWN_DATA,
         BackupPermission.IMPORT_OWN_DATA,
     }

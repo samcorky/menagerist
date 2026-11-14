@@ -500,3 +500,16 @@ async def test_targets_default_to_the_shared_guard_and_accept_another(
         in_memory_preset_stores(world.preset_repos, world.graph_repos), world.actor
     )
     assert default_presets._access is get_access_guard()
+
+
+async def test_existing_reports_which_presets_the_person_already_has(
+    make_world: MakeWorld, sample_pack: SamplePack
+) -> None:
+    """`existing` is a read: false before `ensure`, true after, nothing created."""
+    world = make_world()
+    presets = sample_pack().presets
+
+    assert await world.presets.existing(presets) == [False]
+    await world.presets.ensure(presets)
+    assert await world.presets.existing(presets) == [True]
+    assert await world.presets.existing([]) == []

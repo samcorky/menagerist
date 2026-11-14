@@ -2,6 +2,7 @@ import { errorMessage } from '$lib/api/errors';
 import { OFFLINE_MESSAGE } from '$lib/offline';
 import type {
 	BackupPermission,
+	CataloguePermission,
 	CollectionPermission,
 	ExamplePermission,
 	GraphPermission,
@@ -16,6 +17,7 @@ import type {
 /** Every permission the backend can report. */
 export type Permission =
 	| BackupPermission
+	| CataloguePermission
 	| CollectionPermission
 	| ExamplePermission
 	| GraphPermission

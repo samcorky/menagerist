@@ -109,6 +109,7 @@ EXPECTED_CONTENT: frozenset[str] = frozenset(
         "presets.GetPreset",
         "presets.ImportPresets",
         "presets.ListPresets",
+        "presets.MatchPresets",
         "presets.UpdatePreset",
         "backup.DeleteUserExport",
         "backup.ExportUserData",

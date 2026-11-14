@@ -2,6 +2,7 @@ from typing import Self
 
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, expand
 from app.modules.backup.application.permissions import BackupPermission
+from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.graph.application.permissions import GraphPermission
@@ -61,6 +62,7 @@ def test_the_real_catalogue_is_the_union_of_every_modules_enum() -> None:
     """The aggregate catalogue is the union of every module's enum."""
     assert (
         frozenset(BackupPermission)
+        | frozenset(CataloguePermission)
         | frozenset(CollectionPermission)
         | frozenset(ExamplePermission)
         | frozenset(GraphPermission)

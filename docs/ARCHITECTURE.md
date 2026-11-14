@@ -28,6 +28,7 @@ Hexagonal architecture (ports and adapters) with DDD, organised as vertical slic
 backend/src/app/
 ├── entrypoints/     # FastAPI app factory, composition root, CLI entrypoints
 ├── modules/         # one directory per bounded context
+│   ├── catalogue/   # shipped entries (saved lists, fields, field groups, starter types) a person installs as their own, through the transfer targets
 │   ├── collections/ # named lists of items (manual) and saved searches (smart) with their memberships
 │   ├── examples/    # optional example packs: install, remove, shipped pack files
 │   ├── graph/       # nodes, edges, node types, edge types

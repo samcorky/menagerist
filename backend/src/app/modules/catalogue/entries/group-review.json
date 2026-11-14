@@ -1,0 +1,39 @@
+{
+  "id": "group-review",
+  "title": "Review",
+  "description": "A rating and a written review.",
+  "section": "field_group",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field_set",
+        "label": "Review",
+        "description": null,
+        "definition": {
+          "section": "Review",
+          "properties": [
+            {
+              "title": "Rating",
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5,
+              "multipleOf": 1,
+              "x-menagerist": {
+                "kind": "rating"
+              }
+            },
+            {
+              "title": "Review",
+              "type": "string",
+              "x-menagerist": {
+                "kind": "longtext"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

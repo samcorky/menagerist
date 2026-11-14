@@ -1,0 +1,29 @@
+{
+  "id": "field-rating",
+  "title": "Rating",
+  "description": "A rating from 1 to 5.",
+  "section": "field",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field",
+        "label": "Rating",
+        "description": null,
+        "definition": {
+          "property": {
+            "title": "Rating",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "multipleOf": 1,
+            "x-menagerist": {
+              "kind": "rating"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

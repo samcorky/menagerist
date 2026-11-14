@@ -72,7 +72,7 @@ class ImportPresets(
             check_definition(item["kind"], item["definition"])
 
         async with self._uow as repos:
-            seen = await _existing_hashes(repos.presets, ContentFilter.of(actor.id))
+            seen = await existing_hashes(repos.presets, ContentFilter.of(actor.id))
             items: list[ImportedPreset] = []
             for item in command.items:
                 digest = content_hash(item["kind"], item["label"], item["definition"])
@@ -97,7 +97,7 @@ class ImportPresets(
         return ImportPresetsResult(created=created, skipped=skipped, items=items)
 
 
-async def _existing_hashes(
+async def existing_hashes(
     repos: PresetRepository, scope: ContentFilter
 ) -> dict[str, uuid.UUID]:
     """Map the content hash of every live preset in `scope` to its id."""

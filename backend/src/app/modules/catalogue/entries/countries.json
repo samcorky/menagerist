@@ -1,0 +1,9 @@
+{
+  "id": "countries",
+  "title": "Countries",
+  "description": "Every country, from the ISO list, to pick from.",
+  "section": "choice_list",
+  "presets": {
+    "generated": "iso-countries"
+  }
+}

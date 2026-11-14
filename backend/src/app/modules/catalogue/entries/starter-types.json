@@ -1,0 +1,68 @@
+{
+  "id": "starter-types",
+  "title": "Starter types",
+  "description": "Person, Place, Organisation, Event, Book and Note, with a few ways to relate them.",
+  "section": "starter_types",
+  "itemTypes": [
+    {
+      "slug": "person",
+      "label": "Person",
+      "description": "Someone you know or collect around."
+    },
+    {
+      "slug": "place",
+      "label": "Place",
+      "description": "A location."
+    },
+    {
+      "slug": "organisation",
+      "label": "Organisation",
+      "description": "A company, band, club or other group."
+    },
+    {
+      "slug": "event",
+      "label": "Event",
+      "description": "Something that happened or will happen."
+    },
+    {
+      "slug": "book",
+      "label": "Book",
+      "description": "A book or publication."
+    },
+    {
+      "slug": "note",
+      "label": "Note",
+      "description": "A free-form note."
+    }
+  ],
+  "relationshipTypes": [
+    {
+      "slug": "related-to",
+      "label": "Related to",
+      "reverseLabel": null,
+      "description": null,
+      "directional": false
+    },
+    {
+      "slug": "part-of",
+      "label": "Part of",
+      "reverseLabel": "Has part",
+      "description": null,
+      "directional": true
+    },
+    {
+      "slug": "located-in",
+      "label": "Located in",
+      "reverseLabel": "Contains",
+      "description": null,
+      "directional": true
+    },
+    {
+      "slug": "created-by",
+      "label": "Created by",
+      "reverseLabel": "Created",
+      "description": null,
+      "directional": true
+    }
+  ]
+}

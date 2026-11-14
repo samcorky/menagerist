@@ -6,6 +6,7 @@ import app.modules
 from app.entrypoints.api.shared.authorisation import MEMBER_PERMISSIONS
 from app.entrypoints.api.shared.permissions import ALL_PERMISSIONS, expand
 from app.modules.backup.application.permissions import BackupPermission
+from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.graph.application.permissions import GraphPermission
@@ -70,6 +71,7 @@ def test_write_permissions_imply_their_read_counterpart() -> None:
         (CollectionPermission.COLLECTION_WRITE, CollectionPermission.COLLECTION_READ),
         (PresetPermission.PRESET_WRITE, PresetPermission.PRESET_READ),
         (ExamplePermission.PACK_INSTALL, ExamplePermission.PACK_READ),
+        (CataloguePermission.ENTRY_INSTALL, CataloguePermission.ENTRY_READ),
     ]
     for write, read in pairs:
         assert write.implied() == {read}

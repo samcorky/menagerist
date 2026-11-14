@@ -1,0 +1,46 @@
+{
+  "id": "group-film-details",
+  "title": "Film details",
+  "description": "Director and runtime.",
+  "section": "field_group",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field_set",
+        "label": "Film details",
+        "description": null,
+        "definition": {
+          "section": "Film details",
+          "properties": [
+            {
+              "title": "Director",
+              "type": "string",
+              "x-menagerist": {
+                "kind": "text"
+              }
+            },
+            {
+              "title": "Runtime",
+              "type": "object",
+              "properties": {
+                "value": {
+                  "title": "Value",
+                  "type": "number"
+                },
+                "unit": {
+                  "title": "Unit",
+                  "type": "string"
+                }
+              },
+              "x-menagerist": {
+                "kind": "quantity"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

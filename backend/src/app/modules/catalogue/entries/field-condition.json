@@ -1,0 +1,35 @@
+{
+  "id": "field-condition",
+  "title": "Condition",
+  "description": "A condition grade picked from a list.",
+  "section": "field",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field",
+        "label": "Condition",
+        "description": null,
+        "definition": {
+          "property": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "Mint",
+              "Near Mint",
+              "Excellent",
+              "Very Good",
+              "Good",
+              "Fair",
+              "Poor"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

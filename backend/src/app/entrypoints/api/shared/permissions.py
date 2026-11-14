@@ -2,6 +2,7 @@ from itertools import chain
 from typing import TYPE_CHECKING
 
 from app.modules.backup.application.permissions import BackupPermission
+from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.graph.application.permissions import GraphPermission
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 
 Permission = (
     BackupPermission
+    | CataloguePermission
     | CollectionPermission
     | ExamplePermission
     | GraphPermission
@@ -33,6 +35,7 @@ Permission = (
 ALL_PERMISSIONS: frozenset[Permission] = frozenset(
     chain(
         BackupPermission,
+        CataloguePermission,
         CollectionPermission,
         ExamplePermission,
         GraphPermission,

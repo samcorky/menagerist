@@ -57,6 +57,10 @@ class PresetTarget(Protocol):
         """Create each preset unless an identical one exists; one outcome each."""
         ...
 
+    async def existing(self, presets: Sequence[PackPreset]) -> list[bool]:
+        """Say, in order, whether the person already has an identical preset."""
+        ...
+
     async def inspect(self, preset_id: uuid.UUID) -> Inspection | None:
         """Return the preset as it is now, or `None` if it is gone."""
         ...

@@ -46,6 +46,8 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "collections.RemoveItemFromCollection": "collections:collection:write",
     "collections.ResolveCollection": "collections:collection:read",
     "collections.UpdateCollection": "collections:collection:write",
+    "catalogue.InstallCatalogueEntry": "catalogue:entry:install",
+    "catalogue.ListCatalogueEntries": "catalogue:entry:read",
     "examples.InstallExamplePack": "examples:pack:install",
     "examples.ListExampleEntities": "examples:pack:read",
     "examples.ListExamplePacks": "examples:pack:read",
@@ -115,6 +117,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "presets.GetPreset": "presets:preset:read",
     "presets.ImportPresets": "presets:preset:write",
     "presets.ListPresets": "presets:preset:read",
+    "presets.MatchPresets": "presets:preset:read",
     "presets.UpdatePreset": "presets:preset:write",
     "scheduling.RunJobNow": "scheduling:job:run",
     "scheduling.ListJobs": "scheduling:job:read",
@@ -141,6 +144,8 @@ EXPECTED_CATALOGUE: frozenset[str] = frozenset(
         "backup:archive:restore",
         "backup:own_data:export",
         "backup:own_data:import",
+        "catalogue:entry:install",
+        "catalogue:entry:read",
         "collections:collection:purge",
         "collections:collection:read",
         "collections:collection:write",
@@ -214,4 +219,4 @@ def test_every_non_admin_permission_is_a_member_permission(name: str) -> None:
 def test_catalogue_is_pinned() -> None:
     """The permission catalogue (21 admin, 16 member) only changes deliberately."""
     assert {p.value for p in ALL_PERMISSIONS} == EXPECTED_CATALOGUE
-    assert len(EXPECTED_CATALOGUE) == 37
+    assert len(EXPECTED_CATALOGUE) == 39

@@ -1,0 +1,36 @@
+{
+  "id": "group-book-details",
+  "title": "Book details",
+  "description": "Author and page count.",
+  "section": "field_group",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field_set",
+        "label": "Book details",
+        "description": null,
+        "definition": {
+          "section": "Book details",
+          "properties": [
+            {
+              "title": "Author",
+              "type": "string",
+              "x-menagerist": {
+                "kind": "text"
+              }
+            },
+            {
+              "title": "Pages",
+              "type": "number",
+              "x-menagerist": {
+                "kind": "number"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

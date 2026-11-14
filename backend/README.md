@@ -163,6 +163,8 @@ Backend tests, migrations, and quality checks run as `poe` tasks from the worksp
 
 Scheduled housekeeping is a CLI command to run from cron: `menagerist media cleanup` (expired media) and `menagerist data purge-deleted [--older-than-days N] [--dry-run]` (retention purge of Recently deleted content; `MENAGERIST_RETENTION_DELETED_DAYS`, default 30, minimum 1). The purge is `PurgeExpiredNodes` and `PurgeExpiredTypes` (graph), `PurgeExpiredCollections` (collections) and `PurgeExpiredPresets` (presets), all `System` use cases that read every owner's rows by age through `list_deleted_before` / `count_deleted_before`, composed in `entrypoints/cli/purge_deleted.py` as `PurgeDeletedContent`; a future scheduler adapter calls the same use cases.
 
+A module's domain raises its own error types, subclassing the `shared_kernel.errors` bases. Do not borrow another module's error (for example transfer's `InvalidPackError` in the catalogue); where two modules need the same failure, each defines its own.
+
 ## Unit of work: a shared Protocol, not a per-module subclass
 
 `shared_kernel/unit_of_work.py` defines `UnitOfWork[TRepos]` as a `Protocol` - `__aenter__() -> TRepos`, `__aexit__`, `commit()` - satisfied structurally by two implementations written once and reused by every module:
@@ -232,6 +234,8 @@ Pass values directly - `uuid.UUID` objects are serialised to strings automatical
 `modules/examples/` installs and removes optional example content (item types, connection types, items, connections and presets). It does not import `graph` or `presets`: it installs through the target ports (`PresetTarget`, `GraphTarget`, `CollectionTarget`) and the bundle types (`PackPreset`, `PackItemType` and so on) defined in `modules/transfer/`, and `entrypoints/api/shared/bridges/transfer_targets.py` supplies adapters that call the real use cases, the same pattern as `preset_usage.py` for cross-module reads. Only the cover target (`CoverTarget`, bridged by `example_targets.py`) stays in `examples`, because generated covers are example-specific. Install is an ordered list of steps with one commit per step and compensation on failure; removal keeps anything the user edited, connected or attached (rules in `docs/DECISIONS.md`).
 
 ### Writing an example pack
+
+`modules/catalogue/` lists and installs the shipped catalogue of saved lists, fields, field groups and starter types. It imports only `transfer`: it installs as the signed-in person through `PresetTarget` and `GraphTarget` (the same bridges `examples` uses), owns no persistence and never writes to the example ledger. Entries are JSON files in `modules/catalogue/entries/`, one per entry, with the file name equal to the entry's `id`; `Countries` is generated from `shared/data/iso-data.json`. `tests/modules/catalogue/adapters/test_shipped_entries.py` checks every entry against the presets module's own validation.
 
 Packs are package data in `modules/examples/packs/`, read with `importlib.resources`. To add one:
 
