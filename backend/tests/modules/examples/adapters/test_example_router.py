@@ -19,10 +19,7 @@ from app.modules.examples.adapters.api.dependencies import (
     get_example_uow,
     get_pack_catalogue,
 )
-from app.modules.examples.adapters.api.example.schemas import (
-    InstallationStatus,
-    PlanAction,
-)
+from app.modules.examples.adapters.api.example.schemas import InstallationStatus
 from app.modules.examples.domain.pack import ExamplePack, PackLink
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node_type import NodeType
@@ -32,7 +29,6 @@ from app.modules.transfer.domain.bundle import (
     BundleItemType,
     BundleRelationshipType,
 )
-from app.modules.transfer.domain.plan import PlanAction as DomainPlanAction
 from app.modules.transfer.domain.run import Run, RunStatus
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -266,11 +262,6 @@ def test_plan_of_an_added_set_is_blocked_and_unknown_is_a_404(
     assert (body["ready"], body["entities"]) == (False, [])
     assert [b["code"] for b in body["blockers"]] == [refused["title"]]
     assert client.get("/api/v1/examples/nope/installation/plan").status_code == 404
-
-
-def test_plan_actions_in_the_api_match_the_domain() -> None:
-    """The API keeps its own enum (and schema name), with the domain's values."""
-    assert {a.value for a in PlanAction} == {a.value for a in DomainPlanAction}
 
 
 def test_openapi_documents_the_installation_status_values(

@@ -7,6 +7,9 @@ from app.modules.catalogue.application.list_catalogue_entries import (
     ListCatalogueEntries,
 )
 from app.modules.catalogue.application.permissions import CataloguePermission
+from app.modules.catalogue.application.plan_catalogue_entry_install import (
+    PlanCatalogueEntryInstall,
+)
 from app.shared_kernel.access import Access, Requires
 
 if TYPE_CHECKING:
@@ -15,6 +18,7 @@ if TYPE_CHECKING:
 STANCES: dict[type[UseCase[Any, Any]], Access] = {
     ListCatalogueEntries: Requires(CataloguePermission.ENTRY_READ),
     InstallCatalogueEntry: Requires(CataloguePermission.ENTRY_INSTALL),
+    PlanCatalogueEntryInstall: Requires(CataloguePermission.ENTRY_INSTALL),
 }
 
 
