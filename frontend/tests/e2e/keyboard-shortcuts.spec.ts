@@ -265,6 +265,9 @@ test('Back returns to the previous page after the search popup opened an item', 
 	await popup.getByPlaceholder('Search everything…').fill(name);
 	await popup.getByRole('option', { name: new RegExp(name) }).click();
 	await expect(page).toHaveURL(/\/items\/(?!new$)[^/]+$/);
+	// The address changes before the item page has rendered; a Back that lands in between
+	// (60ms after the click, faster than a person) is lost to the render still finishing.
+	await expect(page.getByRole('main').getByText(name).first()).toBeVisible();
 
 	await page.goBack();
 	await expect(page).toHaveURL(/\/settings$/);
