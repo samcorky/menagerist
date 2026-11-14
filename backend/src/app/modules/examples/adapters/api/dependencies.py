@@ -24,6 +24,9 @@ from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackC
 from app.modules.examples.application.install_example_pack import InstallExamplePack
 from app.modules.examples.application.list_example_entities import ListExampleEntities
 from app.modules.examples.application.list_example_packs import ListExamplePacks
+from app.modules.examples.application.plan_example_pack_install import (
+    PlanExamplePackInstall,
+)
 from app.modules.examples.application.uninstall_example_pack import UninstallExamplePack
 from app.modules.examples.ports.pack_catalogue import PackCatalogue
 from app.modules.examples.ports.unit_of_work import ExampleRepos, ExampleUnitOfWork
@@ -78,6 +81,20 @@ def get_list_example_entities_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListExampleEntities:
     return ListExampleEntities(repos, guard)
+
+
+def get_plan_example_pack_install_use_case(
+    repos: Annotated[ExampleRepos, Depends(get_example_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    catalogue: Annotated[PackCatalogue, Depends(get_pack_catalogue)],
+    presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
+    graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
+    collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
+    covers: Annotated[CoverPackTarget, Depends(get_cover_pack_target)],
+) -> PlanExamplePackInstall:
+    return PlanExamplePackInstall(
+        repos, guard, catalogue, presets, graph, collections, covers
+    )
 
 
 def get_install_example_pack_use_case(

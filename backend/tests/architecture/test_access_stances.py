@@ -135,6 +135,7 @@ EXPECTED_CONTENT: frozenset[str] = frozenset(
         "examples.InstallExamplePack",
         "examples.ListExampleEntities",
         "examples.ListExamplePacks",
+        "examples.PlanExamplePackInstall",
         "examples.UninstallExamplePack",
         "graph.CountEdgeTypeAttributeUsage",
         "graph.CountNodeTypeAttributeUsage",

@@ -505,6 +505,19 @@ def _no_installation(response: Response) -> str | None:
 SPECIAL[("PUT", "/api/v1/examples/{pack_id}/installation")] = _installed_for_b
 
 
+def _plan_ignores_a(response: Response) -> str | None:
+    """A's installed copy neither blocks B nor clashes with B's types."""
+    if response.status_code != 200:
+        return f"B planning the pack for B should work, got {response.status_code}"
+    body = response.json()
+    if not body["ready"] or any(e["action"] != "create" for e in body["entities"]):
+        return f"B's plan sees A's installation: {body}"
+    return None
+
+
+SPECIAL[("GET", "/api/v1/examples/{pack_id}/installation/plan")] = _plan_ignores_a
+
+
 def _catalogue_installed_for_b(response: Response) -> str | None:
     if response.status_code != 200:
         return f"B installing an entry for B should work, got {response.status_code}"

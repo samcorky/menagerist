@@ -7,6 +7,9 @@ from app.modules.examples.application.install_example_pack import InstallExample
 from app.modules.examples.application.list_example_entities import ListExampleEntities
 from app.modules.examples.application.list_example_packs import ListExamplePacks
 from app.modules.examples.application.permissions import ExamplePermission
+from app.modules.examples.application.plan_example_pack_install import (
+    PlanExamplePackInstall,
+)
 from app.modules.examples.application.uninstall_example_pack import UninstallExamplePack
 from app.shared_kernel.access import Access, Content, System
 
@@ -19,6 +22,7 @@ INSTALL = Content(ExamplePermission.PACK_INSTALL)
 STANCES: dict[type[UseCase[Any, Any]], Access] = {
     ListExampleEntities: READ,
     ListExamplePacks: READ,
+    PlanExamplePackInstall: INSTALL,
     InstallExamplePack: INSTALL,
     UninstallExamplePack: INSTALL,
 }
