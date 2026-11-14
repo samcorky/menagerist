@@ -14,6 +14,7 @@
 	// new name and create it in the same step.
 	let {
 		value = $bindable(null as string | null),
+		creating = $bindable(false),
 		nodeTypes = undefined,
 		allowClear = true,
 		disabled = false,
@@ -22,6 +23,11 @@
 		...restProps
 	}: {
 		value?: string | null;
+		/**
+		 * True while a type typed in here is being created. `value` is set only once it exists, so a
+		 * form must not save meanwhile or the item is saved without it.
+		 */
+		creating?: boolean;
 		/** The types to offer, if the page already has them; otherwise they are loaded. */
 		nodeTypes?: NodeTypeResponse[];
 		/** Offer "No item type". */
@@ -67,7 +73,10 @@
 	async function choose(next: string) {
 		const label = createdLabel(next);
 		if (label === null) return select(next === NONE_VALUE ? null : next);
-		const result = await createNodeType({ body: { slug: slugify(label), label } });
+		creating = true;
+		const result = await createNodeType({ body: { slug: slugify(label), label } }).finally(
+			() => (creating = false)
+		);
 		if (result.error || !result.data) {
 			toast.error("Couldn't create item type", { description: errorMessage(result.error) });
 			comboValue = value ?? NONE_VALUE;
@@ -95,7 +104,7 @@
 	{items}
 	{selectedItem}
 	{leading}
-	{disabled}
+	disabled={disabled || creating}
 	bind:value={comboValue}
 	onValueChange={choose}
 	onsearch={(text) => (query = text)}

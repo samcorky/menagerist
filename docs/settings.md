@@ -136,6 +136,7 @@ Which releases the instance looks for and how often.
 | `MENAGERIST_RELEASE_CHECK_ENABLED` | true or false | `true` | any | Whether this instance ever contacts github.com and ghcr.io to look for newer builds. Off turns off both the scheduled check and the Status page's Check now, and is set by the deployment, so an administrator cannot turn it back on from the interface. |
 | `MENAGERIST_RELEASE_CHANNEL` | text | `stable` | `stable`, `preview` | Releases to report: stable only, or preview, which also includes release candidates and other prereleases. Editable in the app's settings unless set here. |
 | `MENAGERIST_RELEASE_CHECK_SCHEDULE` | cron schedule | `20 5 * * *` | five fields; empty turns the job off | Cron expression for looking for a newer release in the instance timezone. Empty turns the scheduled check off; an administrator can still check from the Status page. Editable in the app's settings unless set here. |
+| `MENAGERIST_RELEASE_CHECK_ON_STARTUP` | true or false | `true` | any | Whether the app also looks for a newer release each time it starts, so the Status page is current after a deploy rather than waiting for the next scheduled check. Has no effect while update checks are off. |
 
 ## Retention
 

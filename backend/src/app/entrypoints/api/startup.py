@@ -15,6 +15,7 @@ from app.platform.config import INSTANCE_SETTINGS
 from app.platform.config.api import CORS_OPEN_HINT, get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
+from app.platform.config.release import get_release_settings
 from app.platform.database import get_session_factory
 from app.platform.storage_probe import hint, probe_directory, storage_directories
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -69,6 +70,27 @@ async def warn_if_cors_open() -> None:
         logger.warning(CORS_OPEN_HINT)
 
 
+def start_update_check() -> asyncio.Task[None] | None:
+    """Look for a newer release in the background, without delaying start-up.
+
+    The use case skips the request when the last attempt is recent, so restarts in
+    quick succession do not repeat it. A failure is only logged.
+    """
+    settings = get_release_settings()
+    if not (settings.check_enabled and settings.check_on_startup):
+        return None
+    return asyncio.create_task(_check_for_updates_quietly())
+
+
+async def _check_for_updates_quietly() -> None:
+    from app.modules.system.adapters.scheduling.jobs import check_for_updates
+
+    try:
+        await check_for_updates(SYSTEM_ACTOR)
+    except Exception:
+        logger.warning("startup update check failed", exc_info=True)
+
+
 def log_build_info() -> None:
     """Log which build is starting, so logs alone say what was running."""
     logger.info("starting", **load_app_info().log_fields())
@@ -97,4 +119,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await warn_if_storage_not_writable()
     await warn_if_cors_open()
     await warn_if_no_administrator()
+    update_check = start_update_check()
     yield
+    if update_check is not None:
+        update_check.cancel()
