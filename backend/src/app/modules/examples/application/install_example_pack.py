@@ -4,42 +4,30 @@ from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 import structlog
 
-from app.modules.examples.application.external_refs import (
-    ResolvedRefs,
-    resolve_external_refs,
+from app.modules.examples.application.install_plan import (
+    Adoption,
+    InstallPlan,
+    plan_install,
 )
 from app.modules.examples.application.pack_links import apply_links
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.examples.application.reported_kept import reported_kept
-from app.modules.examples.domain.errors import (
-    InstallFailedError,
-    PackAlreadyInstalledError,
-    PackNotFoundError,
-    SlugClashError,
-)
+from app.modules.examples.domain.errors import InstallFailedError, PackNotFoundError
 from app.modules.examples.domain.pack import ExamplePack, PackCounts
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
 from app.modules.transfer.application.content_hash import content_hash
-from app.modules.transfer.application.removal import (
-    RemovalTargets,
-    inspect_record,
-    settle_run,
-)
+from app.modules.transfer.application.removal import RemovalTargets, settle_run
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.domain.run import (
-    EntityRecord,
-    Run,
-    RunStatus,
-    adoptable_records,
-)
+from app.modules.transfer.domain.plan import PlanAction
+from app.modules.transfer.domain.run import Run, RunStatus
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
-from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from app.modules.examples.application.external_refs import ResolvedRefs
     from app.modules.examples.ports.cover_target import CoverTarget
     from app.modules.transfer.ports.targets import (
         CollectionTarget,
@@ -70,37 +58,35 @@ class InstallResult:
     linked: int = 0
 
 
-_Key = tuple[EntityKind, str]
-
-
-@dataclass(kw_only=True, frozen=True, eq=False)
-class _Adoption:
-    """An entity a pack kept earlier that is still live, and as it is now."""
-
-    record: EntityRecord
-    content: dict[str, Any]
-
-
 @dataclass(kw_only=True)
 class _Run:
     """State shared by the install steps."""
 
     pack: ExamplePack
+    plan: InstallPlan
     installation: Run
     preset_ids: dict[str, uuid.UUID] = field(default_factory=dict)
     type_slugs: dict[str, str] = field(default_factory=dict)
     relationship_slugs: dict[str, str] = field(default_factory=dict)
-    cover_styles: dict[str, str] = field(default_factory=dict)
     item_ids: dict[str, uuid.UUID] = field(default_factory=dict)
     item_names: dict[str, str] = field(default_factory=dict)
-    adoptions: dict[_Key, _Adoption] = field(default_factory=dict)
-    adopted: set[_Key] = field(default_factory=set)
+    adopted: set[tuple[EntityKind, str]] = field(default_factory=set)
+
+    def adoption(self, kind: EntityKind, ref: str) -> Adoption | None:
+        """The kept entity the plan takes back for `kind` and `ref`, if any."""
+        if self.plan.action(kind, ref) is not PlanAction.UNCHANGED:
+            return None
+        return self.plan.adoptions.get((kind, ref))
 
 
 class InstallExamplePack(
     CommandHandler[ExampleUnitOfWork, InstallExamplePackCommand, InstallResult]
 ):
-    """Install a pack as ordered steps, recording every entity as it is made.
+    """Plan the install, apply the plan as ordered steps, then settle the run.
+
+    The plan (`plan_install`, also the dry run) checks everything before the first
+    write. Applying records every entity as it is made, so a failure part-way can be
+    undone; settling marks the run installed and makes its links.
 
     Entities an earlier removal kept (edited, in use, or holding the user's data)
     and that are still live are adopted rather than created again. They are
@@ -154,40 +140,55 @@ class InstallExamplePack(
         if pack is None:
             raise PackNotFoundError(f"Example pack '{command.pack_id}' not found")
         scope = self.scope(actor)
-        await self._check_not_installed(pack, scope)
-        external = await self._resolve_external(pack, scope, actor.id)
-        cover_styles = await self._cover_styles(pack)
-        adoptions = await self._find_adoptions(pack, cover_styles, scope)
-        await self._check_slugs(pack, adoptions)
+        async with self._uow as repos:
+            plan = await plan_install(
+                pack,
+                runs=repos.runs,
+                scope=scope,
+                catalogue=self._catalogue,
+                targets=self._targets,
+                covers=self._covers,
+            )
+        if plan.errors:
+            raise plan.errors[0]
+        run = await self._apply(plan, actor)
+        return await self._settle(run, scope)
 
-        installation = Run.start(pack.id, actor.id)
+    async def _apply(self, plan: InstallPlan, actor: Actor) -> _Run:
+        """Create or take back each entity as the plan says, recording each one."""
+        installation = Run.start(plan.pack.id, actor.id)
         await self._persist(installation, new=True)
-        run = _Run(
-            pack=pack,
-            installation=installation,
-            adoptions=adoptions,
-            cover_styles=cover_styles,
-        )
-        _seed_external(run, external)
+        run = _Run(pack=plan.pack, plan=plan, installation=installation)
+        _seed_external(run, plan.external)
         try:
-            await self._run_steps(run)
+            await self._install_presets(run)
+            await self._install_relationship_types(run)
+            await self._install_item_types(run)
+            await self._install_items(run)
+            await self._install_connections(run)
+            await self._install_collections(run)
+            await self._install_covers(run)
         except Exception as exc:
             await self._roll_back(installation, exc)
+        return run
 
+    async def _settle(self, run: _Run, scope: ContentFilter) -> InstallResult:
+        """Mark the run installed, make its links and report what it did."""
+        installation = run.installation
         installation.mark_installed()
         await self._persist(installation)
         created = _counts(
             r.kind for r in installation.entities if (r.kind, r.ref) not in run.adopted
         )
-        linked = await self._apply_links(pack, installation, scope)
+        linked = await self._apply_links(run.pack, installation, scope)
         logger.info(
             "example pack installed",
-            pack_id=pack.id,
+            pack_id=run.pack.id,
             entities=len(installation.entities),
             linked=linked,
         )
         return InstallResult(
-            pack_id=pack.id,
+            pack_id=run.pack.id,
             created=created,
             adopted=_counts(kind for kind, _ in run.adopted),
             linked=linked,
@@ -224,98 +225,6 @@ class InstallExamplePack(
                 )
         return linked
 
-    async def _check_not_installed(
-        self, pack: ExamplePack, scope: ContentFilter
-    ) -> None:
-        async with self._uow as repos:
-            active = await repos.runs.get_active_for_bundle(pack.id, scope=scope)
-        if active is not None:
-            raise PackAlreadyInstalledError(
-                f"'{pack.id}' is already installed, or an earlier install did not "
-                + "finish. Remove it first."
-            )
-
-    async def _resolve_external(
-        self, pack: ExamplePack, scope: ContentFilter, actor_id: uuid.UUID
-    ) -> ResolvedRefs:
-        """Resolve the add-on's references to required packs, before anything exists.
-
-        Only the installer's own installations count.
-        """
-        if not pack.requires:
-            return {}
-        async with self._uow as repos:
-            active = await repos.runs.list_active(scope=scope)
-        return await resolve_external_refs(pack, active, self._graph, self._catalogue)
-
-    async def _cover_styles(self, pack: ExamplePack) -> dict[str, str]:
-        """Return cover styles by item type ref, including required packs' types."""
-        styles = _own_cover_styles(pack)
-        for required in pack.requires:
-            # The catalogue validates that every required pack exists.
-            base = cast("ExamplePack", await self._catalogue.get(required))
-            styles |= {
-                f"{required}:{ref}": style
-                for ref, style in _own_cover_styles(base).items()
-            }
-        return styles
-
-    async def _find_adoptions(
-        self, pack: ExamplePack, cover_styles: dict[str, str], scope: ContentFilter
-    ) -> dict[_Key, _Adoption]:
-        """Return what the installer's earlier installs kept that still fits."""
-        async with self._uow as repos:
-            history = await repos.runs.list_for_bundle(pack.id, scope=scope)
-        kept = adoptable_records(history)
-        slugs: dict[_Key, str | None] = {
-            (EntityKind.RELATIONSHIP_TYPE, r.ref): slugify(r.slug)
-            for r in pack.relationship_types
-        }
-        slugs |= {(EntityKind.ITEM_TYPE, t.ref): t.slug for t in pack.item_types}
-        slugs |= {(EntityKind.ITEM, i.ref): None for i in pack.items}
-        slugs |= {
-            (EntityKind.CONNECTION, f"connection-{n}"): None
-            for n in range(len(pack.connections))
-        }
-        slugs |= {(EntityKind.COLLECTION, c.ref): None for c in pack.collections}
-        slugs |= {(EntityKind.COVER, ref): None for ref in _covered(pack, cover_styles)}
-
-        adoptions: dict[_Key, _Adoption] = {}
-        for key, expected_slug in slugs.items():
-            record = kept.get(key)
-            if record is None:
-                continue
-            inspection = await inspect_record(
-                record,
-                self._targets,
-            )
-            if inspection is None:
-                continue
-            if (
-                expected_slug is not None
-                and inspection.content["slug"] != expected_slug
-            ):
-                continue
-            adoptions[key] = _Adoption(record=record, content=inspection.content)
-        return adoptions
-
-    async def _check_slugs(
-        self, pack: ExamplePack, adoptions: dict[_Key, _Adoption]
-    ) -> None:
-        """Refuse a type slug the installer already holds, unless the pack kept it."""
-        types = [
-            (EntityKind.ITEM_TYPE, spec.ref, spec.slug, "an item type")
-            for spec in pack.item_types
-        ] + [
-            (EntityKind.RELATIONSHIP_TYPE, rel.ref, rel.slug, "a relationship type")
-            for rel in pack.relationship_types
-        ]
-        for kind, ref, slug, noun in types:
-            if (kind, ref) in adoptions:
-                continue
-            if await self._graph.slug_taken(kind, slug):
-                raise SlugClashError(kind=noun, slug=slug)
-
     async def _persist(self, installation: Run, *, new: bool = False) -> None:
         async with self._uow as repos:
             if new:
@@ -323,15 +232,6 @@ class InstallExamplePack(
             else:
                 await repos.runs.save(installation)
             await self._uow.commit()
-
-    async def _run_steps(self, run: _Run) -> None:
-        await self._install_presets(run)
-        await self._install_relationship_types(run)
-        await self._install_item_types(run)
-        await self._install_items(run)
-        await self._install_connections(run)
-        await self._install_collections(run)
-        await self._install_covers(run)
 
     async def _record(
         self,
@@ -345,9 +245,7 @@ class InstallExamplePack(
         run.installation.record(kind, ref, label, entity_id, content_hash(content))
         await self._persist(run.installation)
 
-    async def _adopt(
-        self, run: _Run, adoption: _Adoption, ref: str, label: str
-    ) -> None:
+    async def _adopt(self, run: _Run, adoption: Adoption, ref: str, label: str) -> None:
         """Record a kept entity as the new install's own, with its original hash."""
         record = adoption.record
         run.installation.record(
@@ -373,7 +271,7 @@ class InstallExamplePack(
 
     async def _install_relationship_types(self, run: _Run) -> None:
         for spec in run.pack.relationship_types:
-            adoption = run.adoptions.get((EntityKind.RELATIONSHIP_TYPE, spec.ref))
+            adoption = run.adoption(EntityKind.RELATIONSHIP_TYPE, spec.ref)
             if adoption is not None:
                 await self._adopt(run, adoption, spec.ref, spec.label)
                 continue
@@ -390,7 +288,7 @@ class InstallExamplePack(
     async def _install_item_types(self, run: _Run) -> None:
         for spec in run.pack.item_types:
             run.type_slugs[spec.ref] = spec.slug
-            adoption = run.adoptions.get((EntityKind.ITEM_TYPE, spec.ref))
+            adoption = run.adoption(EntityKind.ITEM_TYPE, spec.ref)
             if adoption is not None:
                 await self._adopt(run, adoption, spec.ref, spec.label)
                 continue
@@ -406,7 +304,7 @@ class InstallExamplePack(
 
     async def _install_items(self, run: _Run) -> None:
         for spec in run.pack.items:
-            adoption = run.adoptions.get((EntityKind.ITEM, spec.ref))
+            adoption = run.adoption(EntityKind.ITEM, spec.ref)
             if adoption is not None:
                 run.item_ids[spec.ref] = adoption.record.entity_id
                 run.item_names[spec.ref] = adoption.content["name"]
@@ -436,12 +334,9 @@ class InstallExamplePack(
             source = run.item_names[spec.source_ref]
             target = run.item_names[spec.target_ref]
             ref = f"connection-{n}"
-            adoption = run.adoptions.get((EntityKind.CONNECTION, ref))
-            # Only if it still joins the items this run uses.
-            if adoption is not None and (
-                adoption.content["source_id"] == str(source_id)
-                and adoption.content["target_id"] == str(target_id)
-            ):
+            # The plan takes it back only if it still joins the same items.
+            adoption = run.adoption(EntityKind.CONNECTION, ref)
+            if adoption is not None:
                 await self._adopt(run, adoption, ref, f"{source} to {target}")
                 continue
             created = await self._graph.create_connection(
@@ -467,7 +362,7 @@ class InstallExamplePack(
                     f"Collection '{spec.name}' names items that were not created: "
                     + ", ".join(missing)
                 )
-            adoption = run.adoptions.get((EntityKind.COLLECTION, spec.ref))
+            adoption = run.adoption(EntityKind.COLLECTION, spec.ref)
             if adoption is not None:
                 await self._adopt(run, adoption, spec.ref, spec.name)
                 continue
@@ -487,23 +382,18 @@ class InstallExamplePack(
         """Give every item whose type declares a cover style its cover.
 
         Last, so a failure in any earlier step happens before any image is
-        written. A kept cover comes back only with its adopted item, and an
-        adopted item that already has a cover of the person's own gets none.
+        written. The plan leaves out an adopted item that has a cover of the
+        person's own, which is never replaced.
         """
-        styles = run.cover_styles
         for spec in run.pack.items:
-            style = styles.get(spec.type_ref)
-            if style is None:
+            if run.plan.action(EntityKind.COVER, spec.ref) is None:
                 continue
             name = run.item_names[spec.ref]
-            was_adopted = (EntityKind.ITEM, spec.ref) in run.adopted
-            adoption = run.adoptions.get((EntityKind.COVER, spec.ref))
-            if adoption is not None and was_adopted:
+            adoption = run.adoption(EntityKind.COVER, spec.ref)
+            if adoption is not None:
                 await self._adopt(run, adoption, spec.ref, name)
                 continue
-            # The person's own cover is never replaced.
-            if was_adopted and await self._covers.has_cover(run.item_ids[spec.ref]):
-                continue
+            style = run.plan.cover_styles[spec.type_ref]
             created = await self._covers.create(run.item_ids[spec.ref], name, style)
             await self._record(
                 run,
@@ -556,16 +446,6 @@ def _seed_external(run: _Run, external: ResolvedRefs) -> None:
         else:
             run.item_ids[key] = found.entity_id
             run.item_names[key] = cast("str", found.name)
-
-
-def _own_cover_styles(pack: ExamplePack) -> dict[str, str]:
-    """Return the cover style of each item type (by ref) that declares one."""
-    return {t.ref: t.cover.style for t in pack.item_types if t.cover is not None}
-
-
-def _covered(pack: ExamplePack, styles: dict[str, str]) -> list[str]:
-    """Return the refs of the items that get a cover."""
-    return [i.ref for i in pack.items if i.type_ref in styles]
 
 
 def installation_counts(installation: Run) -> PackCounts:

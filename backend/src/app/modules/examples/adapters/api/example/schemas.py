@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.modules.examples.application.uninstall_example_pack import UninstallResult
     from app.modules.examples.domain.pack import PackCounts, PackSummary
     from app.modules.transfer.application.removal import KeptEntity
+    from app.modules.transfer.domain.plan import Plan
 
 _COUNTS_EXAMPLE: dict[str, Any] = {
     "presets": 1,
@@ -213,6 +214,119 @@ class InstallResultResponse(BaseModel):
             created=PackCountsResponse.from_domain(result.created),
             adopted=PackCountsResponse.from_domain(result.adopted),
             linked=result.linked,
+        )
+
+
+class PlanAction(StrEnum):
+    """What adding a set would do with one of its entities."""
+
+    CREATE = "create"
+    UNCHANGED = "unchanged"
+    CONFLICT = "conflict"
+
+
+class PlannedEntityResponse(BaseModel):
+    """One entity of an example set and what adding the set would do with it."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "kind": "item_type",
+                    "ref": "album",
+                    "label": "Album",
+                    "action": "conflict",
+                    "reason": "You already have an item type called 'album'. "
+                    + "Rename or remove it, then try again.",
+                }
+            ]
+        }
+    )
+
+    kind: str = Field(
+        description="What sort of thing it is, such as `item_type` or `item`."
+    )
+    ref: str = Field(description="The entity's id within the set.")
+    label: str = Field(description="Its name, as it would be shown.")
+    action: PlanAction
+    reason: str | None = Field(
+        default=None, description="Why it is unchanged or conflicts."
+    )
+
+
+class PlanBlockerResponse(BaseModel):
+    """Something that stops the whole set being added."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"code": "RequirementsNotMetError", "reason": "Add Vinyl first."}
+            ]
+        }
+    )
+
+    code: str = Field(
+        description="The problem `title` adding the set would return for it."
+    )
+    reason: str = Field(description="The problem `detail` adding would return.")
+
+
+PLAN_EXAMPLE: dict[str, Any] = {
+    "pack_id": "vinyl",
+    "ready": True,
+    "blockers": [],
+    "entities": [
+        {
+            "kind": "item_type",
+            "ref": "album",
+            "label": "Album",
+            "action": "create",
+            "reason": None,
+        },
+        {
+            "kind": "item",
+            "ref": "blue",
+            "label": "Blue",
+            "action": "unchanged",
+            "reason": "Kept from an earlier install, and taken back as it is.",
+        },
+    ],
+}
+
+
+class InstallPlanResponse(BaseModel):
+    """What adding an example set would do, worked out without changing anything."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [PLAN_EXAMPLE]})
+
+    pack_id: str = Field(description="The example set planned.")
+    ready: bool = Field(description="Whether adding the set would go ahead.")
+    blockers: list[PlanBlockerResponse] = Field(
+        description="Problems with the whole set that stop it being added."
+    )
+    entities: list[PlannedEntityResponse] = Field(
+        description="Every entity of the set, in the order adding makes them."
+    )
+
+    @classmethod
+    def from_domain(cls, plan: Plan) -> InstallPlanResponse:
+        """Build from the plan's report."""
+        return cls(
+            pack_id=plan.bundle_id,
+            ready=plan.ready,
+            blockers=[
+                PlanBlockerResponse(code=b.code, reason=b.reason) for b in plan.blockers
+            ],
+            entities=[
+                PlannedEntityResponse(
+                    kind=e.kind.value,
+                    ref=e.ref,
+                    label=e.label,
+                    action=PlanAction(e.action.value),
+                    reason=e.reason,
+                )
+                for e in plan.entities
+            ],
         )
 
 

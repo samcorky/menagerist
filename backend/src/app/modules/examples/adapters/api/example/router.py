@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -9,11 +9,14 @@ from app.modules.examples.adapters.api.dependencies import (
     get_install_example_pack_use_case,
     get_list_example_entities_use_case,
     get_list_example_packs_use_case,
+    get_plan_example_pack_install_use_case,
     get_uninstall_example_pack_use_case,
 )
 from app.modules.examples.adapters.api.example.schemas import (
+    PLAN_EXAMPLE,
     ExampleEntitiesResponse,
     ExamplePackResponse,
+    InstallPlanResponse,
     InstallResultResponse,
     UninstallResultResponse,
 )
@@ -28,6 +31,10 @@ from app.modules.examples.application.list_example_entities import (
 from app.modules.examples.application.list_example_packs import (
     ListExamplePacks,
     ListExamplePacksQuery,
+)
+from app.modules.examples.application.plan_example_pack_install import (
+    PlanExamplePackInstall,
+    PlanExamplePackInstallQuery,
 )
 from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePack,
@@ -83,6 +90,38 @@ async def list_example_entities(
     """List the items, item types and collections that added example sets own."""
     entities = await use_case.handle(ListExampleEntitiesQuery(), actor)
     return ExampleEntitiesResponse.from_domain(entities)
+
+
+@router.get(
+    "/{pack_id}/installation/plan",
+    response_model=InstallPlanResponse,
+    operation_id="plan_example_pack_install",
+    responses={
+        200: {"content": {"application/json": {"example": PLAN_EXAMPLE}}},
+        **_NOT_FOUND,
+    },
+)
+async def plan_example_pack_install(
+    pack_id: Annotated[
+        str, Path(description="The example set's id.", examples=["vinyl"])
+    ],
+    use_case: Annotated[
+        PlanExamplePackInstall, Depends(get_plan_example_pack_install_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> InstallPlanResponse:
+    """See what adding an example set would do, without changing anything.
+
+    Each entity is listed with what adding would do with it: `create` it, or leave
+    it `unchanged` (something an earlier removal kept, taken back as it is, or a
+    saved list you already have the same). A `conflict` entity, such as an item type
+    whose name you already use, stops the set being added; so does any `blockers`
+    entry, such as the set already being added or a set it needs not being added
+    yet. `ready` is true when neither is present, and adding then does what this
+    lists. A set that is already added lists no entities.
+    """
+    plan = await use_case.handle(PlanExamplePackInstallQuery(pack_id=pack_id), actor)
+    return InstallPlanResponse.from_domain(plan)
 
 
 @router.put(

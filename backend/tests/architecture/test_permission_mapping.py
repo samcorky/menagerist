@@ -51,6 +51,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "examples.InstallExamplePack": "examples:pack:install",
     "examples.ListExampleEntities": "examples:pack:read",
     "examples.ListExamplePacks": "examples:pack:read",
+    "examples.PlanExamplePackInstall": "examples:pack:install",
     "examples.UninstallExamplePack": "examples:pack:install",
     "graph.CountEdgeTypeAttributeUsage": "graph:item:read",
     "graph.CountNodeTypeAttributeUsage": "graph:item:read",
