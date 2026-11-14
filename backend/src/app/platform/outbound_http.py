@@ -18,9 +18,9 @@ library never reads the environment itself.
 A host the administrator lists in `MENAGERIST_HTTP_TRUSTED_HOSTS` may resolve to a
 private (RFC 1918 or unique local) address, but only for a caller that says the
 destination was admin-configured. Every address it resolves to must be allowed, the
-connection is still pinned, each redirect hop is judged afresh, and a request that
-used the allowance is logged. Loopback, link-local and the other floor ranges are
-refused regardless.
+connection is still pinned, the allowance does not follow a redirect to another host,
+and a request that used the allowance is logged. Loopback, link-local and the other
+floor ranges are refused regardless.
 
 A whole request, redirects included, must finish within a total deadline. Each address
 a name resolves to is tried in order, and refusals and failures are logged at warning
@@ -242,10 +242,19 @@ class HttpxOutboundHttp:
     ) -> OutboundResponse:
         """Follow redirects by hand inside one deadline, logging what fails."""
         failure = OutboundFailure.TOO_MANY_REDIRECTS
+        # The allowance belongs to the host the administrator configured. A redirect
+        # to any other host, trusted or not, is held to the public-only rules, so a
+        # third-party service cannot steer a request onto the trusted network.
+        configured_host = target.host
         try:
             async with asyncio.timeout(self._settings.total_timeout_seconds):
                 for _ in range(MAX_REDIRECTS + 1):
-                    response = await self._hop(target, sent, limit, admin_configured)
+                    response = await self._hop(
+                        target,
+                        sent,
+                        limit,
+                        admin_configured and target.host == configured_host,
+                    )
                     logger.debug(
                         "outbound_hop_completed",
                         scheme=target.scheme,

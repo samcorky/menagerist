@@ -173,6 +173,46 @@ async def test_a_redirect_off_the_trusted_host_is_judged_afresh() -> None:
     )
 
 
+async def test_a_public_configured_host_cannot_redirect_onto_a_trusted_one() -> None:
+    """A third-party service cannot steer a request onto the trusted network."""
+    seen: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        """Redirect from the public provider to the trusted LAN host."""
+        seen.append(request.headers["host"])
+        return httpx2.Response(302, headers={"location": "https://ollama/api"})
+
+    outbound = client(
+        "ollama",
+        {"ollama": ["10.0.0.5"]},
+        handler=httpx2.MockTransport(handler),
+    )
+
+    assert (
+        await failure_of(outbound.get("https://example.com/", admin_configured=True))
+        is OutboundFailure.BLOCKED_ADDRESS
+    )
+    assert seen == ["example.com"]
+
+
+async def test_a_trusted_host_may_redirect_within_itself() -> None:
+    """The allowance still holds for further paths on the configured host."""
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        """Redirect once on the same host, then answer."""
+        if request.url.path == "/old":
+            return httpx2.Response(302, headers={"location": "/new"})
+        return httpx2.Response(200, content=b"moved")
+
+    outbound = client(
+        "ollama", {"ollama": ["10.0.0.5"]}, handler=httpx2.MockTransport(handler)
+    )
+
+    response = await outbound.get("http://ollama/old", admin_configured=True)
+
+    assert response.body == b"moved"
+
+
 async def test_a_trusted_name_that_resolves_publicly_is_not_logged_as_used() -> None:
     """The log only records requests that really used the allowance."""
     outbound = client("example.com", {})
