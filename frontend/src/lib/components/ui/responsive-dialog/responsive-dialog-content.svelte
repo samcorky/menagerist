@@ -102,7 +102,11 @@
 		setTimeout(
 			() => {
 				closeButton?.click();
-				queueMicrotask(springBack);
+				// Wait for the dialog to settle: resetting at once would flash a closing sheet
+				// back into place. Only a sheet that is still open (the discard prompt) returns.
+				setTimeout(() => {
+					if (sheet.isConnected && sheet.dataset.state === 'open') springBack();
+				}, 50);
 			},
 			reduced ? 0 : SLIDE_OUT_MS
 		);
