@@ -5,9 +5,9 @@ from enum import StrEnum
 
 from app.modules.catalogue.domain.errors import InvalidEntryError
 from app.modules.transfer.domain.bundle import (
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
 )
 
 
@@ -28,9 +28,9 @@ class CatalogueEntry:
     title: str
     description: str
     section: EntrySection
-    presets: tuple[PackPreset, ...] = ()
-    item_types: tuple[PackItemType, ...] = ()
-    relationship_types: tuple[PackRelationshipType, ...] = ()
+    presets: tuple[BundlePreset, ...] = ()
+    item_types: tuple[BundleItemType, ...] = ()
+    relationship_types: tuple[BundleRelationshipType, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject an empty entry, or one that mixes presets with types."""

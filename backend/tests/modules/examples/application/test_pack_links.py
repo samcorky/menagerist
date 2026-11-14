@@ -17,15 +17,15 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePackCommand,
     UninstallResult,
 )
-from app.modules.examples.domain.installation import Installation, Outcome
 from app.modules.examples.domain.pack import ExamplePack, PackLink
-from app.modules.examples.domain.removal import KEEP_EDITED
 from app.modules.transfer.domain.bundle import (
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
+    BundleItem,
+    BundleItemType,
+    BundleRelationshipType,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_EDITED
+from app.modules.transfer.domain.run import Outcome, Run
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -41,16 +41,18 @@ def _side(pack_id: str, *links: PackLink) -> ExamplePack:
     return ExamplePack(
         id=pack_id,
         relationship_types=(
-            PackRelationshipType(
+            BundleRelationshipType(
                 ref="tie", slug=f"{pack_id}-tie", label="Tie", reverse_label="Tied"
             ),
         ),
         item_types=(
-            PackItemType(ref="thing", slug=f"{pack_id}-thing", label=f"{title} thing"),
+            BundleItemType(
+                ref="thing", slug=f"{pack_id}-thing", label=f"{title} thing"
+            ),
         ),
         items=(
-            PackItem(ref="a", type_ref="thing", name=f"{title} A"),
-            PackItem(ref="b", type_ref="thing", name=f"{title} B"),
+            BundleItem(ref="a", type_ref="thing", name=f"{title} A"),
+            BundleItem(ref="b", type_ref="thing", name=f"{title} B"),
         ),
         links=links,
     )
@@ -89,8 +91,8 @@ async def _pairs(world: World) -> set[tuple[str, str]]:
     return {(names[e.source_id], names[e.target_id]) for e in edges}
 
 
-async def _installation(world: World, pack_id: str) -> Installation:
-    found = await world.installations.get_active_for_pack(
+async def _installation(world: World, pack_id: str) -> Run:
+    found = await world.runs.get_active_for_bundle(
         pack_id, scope=ContentFilter.everyone()
     )
     assert found is not None
@@ -333,8 +335,8 @@ async def test_applying_the_same_links_twice_makes_them_once(
     music = await world.catalogue.get("music")
     assert music is not None
 
-    async def save(installation: Installation) -> None:
-        await world.installations.save(installation)
+    async def save(installation: Run) -> None:
+        await world.runs.save(installation)
 
     again = await apply_links(
         declaring_pack=music,
@@ -358,7 +360,7 @@ async def test_an_item_the_installation_does_not_own_skips_the_link(
     movies.entities = [
         r for r in movies.entities if not (r.kind is EntityKind.ITEM and r.ref == "a")
     ]
-    await world.installations.save(movies)
+    await world.runs.save(movies)
 
     result = await _install(world, "music")
 

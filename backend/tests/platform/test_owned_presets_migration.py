@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 
-from app.modules.examples.application.content_hash import content_hash
+from app.modules.transfer.application.content_hash import content_hash
 from app.platform import alembic_runner
 from app.platform.config import get_database_settings
 

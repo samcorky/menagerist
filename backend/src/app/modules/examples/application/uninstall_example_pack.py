@@ -4,21 +4,23 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.examples.application.permissions import ExamplePermission
-from app.modules.examples.application.removal import (
-    KeptEntity,
-    settle_installation,
-    settle_records,
-)
+from app.modules.examples.application.reported_kept import reported_kept
 from app.modules.examples.application.required_by import dependants_by_pack
 from app.modules.examples.domain.errors import (
     PackNotInstalledError,
     RequiredByInstalledPackError,
 )
-from app.modules.examples.domain.installation import Installation, Outcome
 from app.modules.examples.domain.pack import PackCounts
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
+from app.modules.transfer.application.removal import (
+    KeptEntity,
+    RemovalTargets,
+    settle_records,
+    settle_run,
+)
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.run import Outcome, Run
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.modules.transfer.ports.targets import (  # noqa: TC001
@@ -86,6 +88,12 @@ class UninstallExamplePack(
         self._graph = graph
         self._collections = collections
         self._covers = covers
+        self._targets = RemovalTargets(
+            presets=presets,
+            graph=graph,
+            collections=collections,
+            others={EntityKind.COVER: covers},
+        )
 
     async def _handle(
         self,
@@ -95,14 +103,14 @@ class UninstallExamplePack(
         """Settle every owned entity, then close the installation."""
         scope = self.scope(actor)
         async with self._uow as repos:
-            installation = await repos.installations.get_active_for_pack(
+            installation = await repos.runs.get_active_for_bundle(
                 command.pack_id, scope=scope
             )
-            active = await repos.installations.list_active(scope=scope)
+            active = await repos.runs.list_active(scope=scope)
         if installation is None:
             raise PackNotInstalledError(f"'{command.pack_id}' is not installed")
         dependants = dependants_by_pack(
-            await self._catalogue.list_packs(), {i.pack_id for i in active}
+            await self._catalogue.list_packs(), {i.bundle_id for i in active}
         ).get(command.pack_id, [])
         if dependants:
             raise RequiredByInstalledPackError(names=[d.name for d in dependants])
@@ -110,13 +118,8 @@ class UninstallExamplePack(
         link_kept = await self._settle_incoming_links(
             command.pack_id, installation, active
         )
-        kept = await settle_installation(
-            installation,
-            presets=self._presets,
-            graph=self._graph,
-            collections=self._collections,
-            covers=self._covers,
-            persist=self._persist,
+        kept = reported_kept(
+            await settle_run(installation, self._targets, persist=self._persist)
         )
         kept = [*link_kept, *kept]
         installation.mark_removed()
@@ -129,7 +132,7 @@ class UninstallExamplePack(
         )
 
     async def _settle_incoming_links(
-        self, pack_id: str, removing: Installation, active: list[Installation]
+        self, pack_id: str, removing: Run, active: list[Run]
     ) -> list[KeptEntity]:
         """Settle links other packs hold with `pack_id`, before its items go."""
         prefix = f"link:{pack_id}:"
@@ -146,21 +149,18 @@ class UninstallExamplePack(
                 kept += await settle_records(
                     other,
                     records,
-                    presets=self._presets,
-                    graph=self._graph,
-                    collections=self._collections,
-                    covers=self._covers,
+                    self._targets,
                     persist=self._persist,
                 )
         return kept
 
-    async def _persist(self, installation: Installation) -> None:
+    async def _persist(self, installation: Run) -> None:
         async with self._uow as repos:
-            await repos.installations.save(installation)
+            await repos.runs.save(installation)
             await self._uow.commit()
 
 
-def _removed_counts(installation: Installation) -> PackCounts:
+def _removed_counts(installation: Run) -> PackCounts:
     def count(kind: EntityKind) -> int:
         return sum(
             1

@@ -21,7 +21,6 @@ from app.modules.collections.adapters.persistence.unit_of_work import (
 )
 from app.modules.collections.domain.collection import Collection
 from app.modules.examples.adapters.persistence.unit_of_work import build_example_repos
-from app.modules.examples.domain.installation import Installation
 from app.modules.graph.adapters.persistence.unit_of_work import build_graph_repos
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
@@ -32,6 +31,7 @@ from app.modules.media.adapters.persistence.unit_of_work import build_media_repo
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.presets.adapters.persistence.unit_of_work import build_preset_repos
 from app.modules.presets.domain.preset import Preset
+from app.modules.transfer.domain.run import Run
 from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.slug import Slug
 
@@ -164,9 +164,9 @@ async def _seed(session: AsyncSession) -> None:
     examples = build_example_repos(session)
     packs = (("p1", None), ("p2", SYSTEM), ("p3", STRANGER), ("p4", STRANGER))
     for pack, owner in packs:
-        installation = Installation.start(pack, SYSTEM)
+        installation = Run.start(pack, SYSTEM)
         installation.owner_id = owner
-        await examples.installations.add(installation)
+        await examples.runs.add(installation)
     presets = build_preset_repos(session)
     preset = Preset.create(owner_id=SYSTEM, kind="field", label="P", definition={})
     preset.owner_id = None

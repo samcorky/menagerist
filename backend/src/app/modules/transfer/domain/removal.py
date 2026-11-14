@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
-from app.modules.examples.domain.errors import InvalidInstallationStateError
-from app.modules.examples.domain.installation import EntityRecord, Outcome
+from app.modules.transfer.domain.errors import InvalidRunStateError
+from app.modules.transfer.domain.run import EntityRecord, Outcome
 
 KEEP_EDITED = "edited"
 KEEP_USER_DATA = "has your connections, files or collections"
@@ -39,7 +39,7 @@ def decide_removal(
     use.
     """
     if record.outcome is not Outcome.OWNED:
-        raise InvalidInstallationStateError("only owned entities are decided")
+        raise InvalidRunStateError("only owned entities are decided")
     if current_hash is None:
         return RemovalDecision(action=Action.ALREADY_GONE)
     if current_hash != record.content_hash:

@@ -21,7 +21,7 @@ from app.modules.collections.domain.errors import InvalidDefinitionError
 from app.modules.graph.adapters.persistence.unit_of_work import (
     build_in_memory_graph_repos,
 )
-from app.modules.transfer.domain.bundle import PackCollection
+from app.modules.transfer.domain.bundle import BundleCollection
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.ports.targets import RemoveResult
 from app.shared_kernel.content_filter import ContentFilter
@@ -53,7 +53,7 @@ class Rig:
         self.ada = ada
 
 
-_SPEC = PackCollection(ref="c", name="Both", description="Two", item_refs=("a", "b"))
+_SPEC = BundleCollection(ref="c", name="Both", description="Two", item_refs=("a", "b"))
 
 
 async def _rig(make_world: MakeWorld, sample_pack: SamplePack) -> Rig:
@@ -198,7 +198,7 @@ async def test_the_graph_target_rejects_kinds_it_does_not_handle(
         await rig.graph.remove(kind, uuid.uuid7())
 
 
-_SMART = PackCollection(
+_SMART = BundleCollection(
     ref="s",
     name="Records",
     definition={
@@ -238,7 +238,9 @@ async def test_a_definition_the_collections_check_refuses_creates_nothing(
 ) -> None:
     """The install path validates as `POST /collection` does."""
     rig = await _rig(make_world, sample_pack)
-    bad = PackCollection(ref="s", name="Bad", definition={"v": 1, "where": {"op": "x"}})
+    bad = BundleCollection(
+        ref="s", name="Bad", definition={"v": 1, "where": {"op": "x"}}
+    )
 
     with pytest.raises(InvalidDefinitionError):
         await rig.target.create_collection(bad, item_ids=[])

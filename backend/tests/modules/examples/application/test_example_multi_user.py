@@ -30,20 +30,20 @@ from app.modules.examples.domain.errors import (
     SlugClashError,
 )
 from app.modules.examples.domain.pack import ExamplePack
-from app.modules.examples.domain.removal import KEEP_IN_USE
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.transfer.domain.bundle import (
-    PackCollection,
-    PackConnection,
-    PackCover,
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleCover,
+    BundleItem,
+    BundleItemType,
+    BundleRelationshipType,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_IN_USE
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -61,11 +61,13 @@ def _pack(sample_pack_factory: SamplePack) -> ExamplePack:
     """The sample pack with a cover, a collection and a type no item uses."""
     pack = sample_pack_factory("demo")
     record, person = pack.item_types
-    spare = PackItemType(ref="spare", slug="demo-spare", label="Spare")
+    spare = BundleItemType(ref="spare", slug="demo-spare", label="Spare")
     return replace(
         pack,
-        item_types=(replace(record, cover=PackCover(style="sleeve")), person, spare),
-        collections=(PackCollection(ref="duo", name="Duo", item_refs=("blue", "ada")),),
+        item_types=(replace(record, cover=BundleCover(style="sleeve")), person, spare),
+        collections=(
+            BundleCollection(ref="duo", name="Duo", item_refs=("blue", "ada")),
+        ),
     )
 
 
@@ -236,13 +238,13 @@ async def test_people_cannot_see_each_others_installations_or_entities(
     await _install(a)
 
     listed = await ListExamplePacks(
-        ExampleRepos(installations=b.installations), InMemoryAccessGuard(), b.catalogue
+        ExampleRepos(runs=b.runs), InMemoryAccessGuard(), b.catalogue
     ).handle(ListExamplePacksQuery(), USER_B)
     entities = await ListExampleEntities(
-        ExampleRepos(installations=b.installations), InMemoryAccessGuard()
+        ExampleRepos(runs=b.runs), InMemoryAccessGuard()
     ).handle(ListExampleEntitiesQuery(), USER_B)
     own = await ListExampleEntities(
-        ExampleRepos(installations=a.installations), InMemoryAccessGuard()
+        ExampleRepos(runs=a.runs), InMemoryAccessGuard()
     ).handle(ListExampleEntitiesQuery(), USER_A)
 
     assert [s.installation for s in listed] == [None]
@@ -281,8 +283,8 @@ async def test_a_clash_with_another_packs_type_is_still_a_conflict(
     other = replace(
         sample_pack("other"),
         item_types=(
-            PackItemType(ref="record", slug="demo-record", label="Clashing"),
-            PackItemType(ref="person", slug="other-person", label="Person"),
+            BundleItemType(ref="record", slug="demo-record", label="Clashing"),
+            BundleItemType(ref="person", slug="other-person", label="Person"),
         ),
         items=(),
         connections=(),
@@ -298,23 +300,25 @@ def _games_and_extras() -> tuple[ExamplePack, ExamplePack]:
     games = ExamplePack(
         id="games",
         relationship_types=(
-            PackRelationshipType(
+            BundleRelationshipType(
                 ref="link", slug="games-link", label="Link", reverse_label="Back"
             ),
         ),
-        item_types=(PackItemType(ref="thing", slug="games-thing", label="Thing"),),
+        item_types=(BundleItemType(ref="thing", slug="games-thing", label="Thing"),),
         items=(
-            PackItem(ref="a", type_ref="thing", name="Game A"),
-            PackItem(ref="b", type_ref="thing", name="Game B"),
+            BundleItem(ref="a", type_ref="thing", name="Game A"),
+            BundleItem(ref="b", type_ref="thing", name="Game B"),
         ),
     )
     extras = ExamplePack(
         id="extras",
         requires=("games",),
-        item_types=(PackItemType(ref="extra", slug="extras-extra", label="Extra"),),
-        items=(PackItem(ref="x", type_ref="extra", name="Extra X"),),
+        item_types=(BundleItemType(ref="extra", slug="extras-extra", label="Extra"),),
+        items=(BundleItem(ref="x", type_ref="extra", name="Extra X"),),
         connections=(
-            PackConnection(source_ref="x", target_ref="games:a", type_ref="games:link"),
+            BundleConnection(
+                source_ref="x", target_ref="games:a", type_ref="games:link"
+            ),
         ),
     )
     return games, extras
@@ -416,11 +420,9 @@ async def test_rows_reowned_to_the_installer_uninstall_cleanly(
     ):
         edge_type.owner_id = USER_A.id
         await system.graph_repos.edge_types.save(edge_type)
-    for installation in await system.installations.list_active(
-        scope=ContentFilter.everyone()
-    ):
+    for installation in await system.runs.list_active(scope=ContentFilter.everyone()):
         installation.owner_id = USER_A.id
-        await system.installations.save(installation)
+        await system.runs.save(installation)
     owner = system.as_actor(USER_A)
 
     result = await _uninstall(owner)

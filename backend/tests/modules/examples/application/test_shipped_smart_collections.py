@@ -25,7 +25,7 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePackCommand,
 )
 from app.modules.graph.application.prepare_query import prepare_query
-from app.modules.transfer.domain.bundle import PackConnection
+from app.modules.transfer.domain.bundle import BundleConnection
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -138,7 +138,7 @@ async def test_still_to_try_follows_the_data(make_world: MakeWorld) -> None:
     }
     night = items["Autumn game night"]
     await rig.world.graph.create_connection(
-        PackConnection(source_ref="g", target_ref="n", type_ref="played-at"),
+        BundleConnection(source_ref="g", target_ref="n", type_ref="played-at"),
         source_id=items["Thornfield Heist"],
         target_id=night,
         type_slug="games-played-at",

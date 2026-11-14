@@ -16,11 +16,11 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import InstallFailedError, SlugClashError
-from app.modules.examples.domain.removal import KEEP_EDITED
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
-from app.modules.transfer.domain.bundle import PackCollection
+from app.modules.transfer.domain.bundle import BundleCollection
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_EDITED
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -116,7 +116,7 @@ async def test_adopted_entities_are_recorded_as_owned_by_the_new_install(
 
     await _install(world)
 
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
@@ -204,9 +204,7 @@ async def test_a_clash_with_something_that_is_not_a_kept_example_still_conflicts
         await _install(world)
 
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -241,9 +239,7 @@ async def test_a_failed_install_keeps_the_edited_things_it_adopted(
     assert await _names(world) == ["Mine now"]
     assert "demo-record" in await _slugs(world)
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -302,8 +298,8 @@ async def test_collections_are_adopted_as_the_user_has_them(
     make_world: MakeWorld, sample_pack: SamplePack
 ) -> None:
     """A kept collection is reused untouched; an untouched one is created again."""
-    all_ = PackCollection(ref="all", name="Everything", item_refs=("ada", "blue"))
-    solo = PackCollection(ref="solo", name="Just Blue", item_refs=("blue",))
+    all_ = BundleCollection(ref="all", name="Everything", item_refs=("ada", "blue"))
+    solo = BundleCollection(ref="solo", name="Just Blue", item_refs=("blue",))
     world = make_world(replace(sample_pack(), collections=(all_, solo)))
     await _install(world)
     everything = next(

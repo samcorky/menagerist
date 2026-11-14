@@ -4,16 +4,16 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from app.modules.examples.domain.errors import InvalidInstallationStateError
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.errors import InvalidRunStateError
 from app.shared_kernel.mixins import Identifiable, Owned, Timestamped
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-class InstallationStatus(StrEnum):
-    """Where an installation is in its life."""
+class RunStatus(StrEnum):
+    """Where a run is in its life. The values are stored, so they keep their names."""
 
     INSTALLING = "installing"
     INSTALLED = "installed"
@@ -43,7 +43,7 @@ REMOVAL_ORDER = (
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class EntityRecord:
-    """One entity an installation created."""
+    """One entity a run created."""
 
     kind: EntityKind
     ref: str
@@ -55,38 +55,42 @@ class EntityRecord:
 
 
 @dataclass(kw_only=True, eq=False)
-class Installation(Identifiable, Owned, Timestamped):
-    """The record of one pack being installed, and what became of its entities."""
+class Run(Identifiable, Owned, Timestamped):
+    """The record of one bundle being installed, and what became of its entities.
 
-    pack_id: str
-    status: InstallationStatus
+    The ledger a bundle's removal works from: each entity it created, with the hash
+    of its content as created, and whether the bundle still owns it.
+    """
+
+    bundle_id: str
+    status: RunStatus
     entities: list[EntityRecord] = field(default_factory=list)
     installed_at: datetime | None = None
     removed_at: datetime | None = None
 
     @classmethod
-    def start(cls, pack_id: str, owner_id: uuid.UUID) -> Installation:
-        """Begin `owner_id`'s installation, generating its id and timestamps."""
+    def start(cls, bundle_id: str, owner_id: uuid.UUID) -> Run:
+        """Begin `owner_id`'s run of `bundle_id`, generating its id and timestamps."""
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
             owner_id=owner_id,
-            pack_id=pack_id,
-            status=InstallationStatus.INSTALLING,
+            bundle_id=bundle_id,
+            status=RunStatus.INSTALLING,
             created_at=now,
             updated_at=now,
         )
 
     @property
     def is_active(self) -> bool:
-        """Whether this installation blocks a new install of the same pack."""
+        """Whether this run blocks a new install of the same bundle."""
         return self.status in (
-            InstallationStatus.INSTALLING,
-            InstallationStatus.INSTALLED,
+            RunStatus.INSTALLING,
+            RunStatus.INSTALLED,
         )
 
     def owned(self, kind: EntityKind | None = None) -> list[EntityRecord]:
-        """Return the entities still owned by the pack, optionally of one kind."""
+        """Return the entities still owned by the bundle, optionally of one kind."""
         return [
             r
             for r in self.entities
@@ -101,8 +105,8 @@ class Installation(Identifiable, Owned, Timestamped):
         entity_id: uuid.UUID,
         content_hash: str,
     ) -> None:
-        """Record an entity the pack just created."""
-        self._require(InstallationStatus.INSTALLING)
+        """Record an entity the bundle just created."""
+        self._require(RunStatus.INSTALLING)
         self._append(kind, ref, label, entity_id, content_hash)
 
     def record_late(
@@ -118,7 +122,7 @@ class Installation(Identifiable, Owned, Timestamped):
         A settled record of the same `ref` (the link was removed or kept earlier) is
         replaced, so one logical link never counts twice.
         """
-        self._require(InstallationStatus.INSTALLING, InstallationStatus.INSTALLED)
+        self._require(RunStatus.INSTALLING, RunStatus.INSTALLED)
         self.entities = [
             r
             for r in self.entities
@@ -148,9 +152,9 @@ class Installation(Identifiable, Owned, Timestamped):
     def settle(
         self, entity_id: uuid.UUID, outcome: Outcome, reason: str | None = None
     ) -> None:
-        """Mark an owned entity as removed, or kept (and so no longer the pack's)."""
+        """Mark an owned entity as removed, or kept (and so no longer the bundle's)."""
         if outcome is Outcome.OWNED:
-            raise InvalidInstallationStateError(
+            raise InvalidRunStateError(
                 "an entity can only be settled as removed or kept"
             )
         for index, record in enumerate(self.entities):
@@ -158,52 +162,52 @@ class Installation(Identifiable, Owned, Timestamped):
                 self.entities[index] = replace(record, outcome=outcome, reason=reason)
                 self.touch()
                 return
-        raise InvalidInstallationStateError(f"no owned entity {entity_id} to settle")
+        raise InvalidRunStateError(f"no owned entity {entity_id} to settle")
 
     def mark_installed(self) -> None:
         """The install finished."""
-        self._require(InstallationStatus.INSTALLING)
-        self.status = InstallationStatus.INSTALLED
+        self._require(RunStatus.INSTALLING)
+        self.status = RunStatus.INSTALLED
         self.installed_at = datetime.now(UTC)
         self.touch()
 
     def mark_failed(self) -> None:
         """The install failed and everything it created has been dealt with."""
-        self._require(InstallationStatus.INSTALLING)
+        self._require(RunStatus.INSTALLING)
         self._require_nothing_owned()
-        self.status = InstallationStatus.FAILED
+        self.status = RunStatus.FAILED
         self.touch()
 
     def mark_removed(self) -> None:
-        """The pack was removed and everything it created has been dealt with."""
-        self._require(InstallationStatus.INSTALLING, InstallationStatus.INSTALLED)
+        """The bundle was removed and everything it created has been dealt with."""
+        self._require(RunStatus.INSTALLING, RunStatus.INSTALLED)
         self._require_nothing_owned()
-        self.status = InstallationStatus.REMOVED
+        self.status = RunStatus.REMOVED
         self.removed_at = datetime.now(UTC)
         self.touch()
 
-    def _require(self, *allowed: InstallationStatus) -> None:
+    def _require(self, *allowed: RunStatus) -> None:
         if self.status not in allowed:
-            raise InvalidInstallationStateError(
-                f"installation is {self.status}, which does not allow this"
+            raise InvalidRunStateError(
+                f"run is {self.status}, which does not allow this"
             )
 
     def _require_nothing_owned(self) -> None:
         if self.owned():
-            raise InvalidInstallationStateError("the pack still owns entities")
+            raise InvalidRunStateError("the bundle still owns entities")
 
 
 def adoptable_records(
-    installations: Sequence[Installation],
+    runs: Sequence[Run],
 ) -> dict[tuple[EntityKind, str], EntityRecord]:
-    """Return the entities a pack left behind and may take back, by (kind, ref).
+    """Return the entities a bundle left behind and may take back, by (kind, ref).
 
-    `installations` must be newest first. For each (kind, ref) the newest record
+    `runs` must be newest first. For each (kind, ref) the newest record
     decides: it is adoptable only if it was kept, so a later removal or a later
     owned record supersedes older kept ones.
     """
     newest: dict[tuple[EntityKind, str], EntityRecord] = {}
-    for installation in installations:
-        for record in installation.entities:
+    for run in runs:
+        for record in run.entities:
             newest.setdefault((record.kind, record.ref), record)
     return {key: r for key, r in newest.items() if r.outcome is Outcome.KEPT}

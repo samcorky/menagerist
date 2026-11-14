@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.modules.examples.ports.installation_repository import InstallationRepository
+from app.modules.transfer.ports.run_repository import RunRepository
 from app.shared_kernel.unit_of_work import UnitOfWork
 
 
@@ -8,7 +8,7 @@ from app.shared_kernel.unit_of_work import UnitOfWork
 class ExampleRepos:
     """The examples module's repository bundle."""
 
-    installations: InstallationRepository
+    runs: RunRepository
 
 
 ExampleUnitOfWork = UnitOfWork[ExampleRepos]

@@ -21,9 +21,6 @@ from app.entrypoints.api.shared.bridges.transfer_targets import (
 from app.modules.examples.adapters.covers.in_memory_cover_renderer import (
     InMemoryCoverRenderer,
 )
-from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
-    InMemoryInstallationRepository,
-)
 from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
@@ -53,13 +50,16 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
     InMemoryPresetRepository,
 )
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.transfer.adapters.persistence.in_memory_run_repository import (
+    InMemoryRunRepository,
+)
 from app.modules.transfer.domain.bundle import (
-    PackCollection,
-    PackConnection,
-    PackItem,
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleItem,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.ports.targets import Created, Inspection, RemoveResult
@@ -98,7 +98,7 @@ class InMemoryCollectionTarget:
 
     def __init__(self) -> None:
         self.collections: dict[uuid.UUID, FakeCollection] = {}
-        self.create_calls: list[tuple[PackCollection, list[uuid.UUID]]] = []
+        self.create_calls: list[tuple[BundleCollection, list[uuid.UUID]]] = []
         self.events: list[str] = []  # removal calls, shared with the graph target
         self.fail_on_call: int | None = None  # make this create_collection call fail
 
@@ -115,7 +115,7 @@ class InMemoryCollectionTarget:
         return coll.id
 
     async def create_collection(
-        self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
+        self, spec: BundleCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Store a collection with `item_ids` as members."""
         self.create_calls.append((spec, list(item_ids)))
@@ -231,7 +231,7 @@ class World:
     graph_repos: GraphRepos
     preset_repos: PresetRepos
     media_repos: MediaRepos
-    installations: InMemoryInstallationRepository
+    runs: InMemoryRunRepository
     catalogue: InMemoryPackCatalogue
     uow: InMemoryUnitOfWork[ExampleRepos]
     presets: PresetPackTarget
@@ -275,7 +275,7 @@ def _sample_pack(pack_id: str = "demo") -> ExamplePack:
     return ExamplePack(
         id=pack_id,
         presets=(
-            PackPreset(
+            BundlePreset(
                 ref="grades",
                 kind="choice_list",
                 label=f"{pack_id} grades",
@@ -283,7 +283,7 @@ def _sample_pack(pack_id: str = "demo") -> ExamplePack:
             ),
         ),
         relationship_types=(
-            PackRelationshipType(
+            BundleRelationshipType(
                 ref="signed-by",
                 slug=f"{pack_id}-signed-by",
                 label="Signed by",
@@ -291,26 +291,26 @@ def _sample_pack(pack_id: str = "demo") -> ExamplePack:
             ),
         ),
         item_types=(
-            PackItemType(
+            BundleItemType(
                 ref="record",
                 slug=f"{pack_id}-record",
                 label="Record",
                 attributes_schema=_RECORD_SCHEMA,
             ),
-            PackItemType(ref="person", slug=f"{pack_id}-person", label="Person"),
+            BundleItemType(ref="person", slug=f"{pack_id}-person", label="Person"),
         ),
         items=(
-            PackItem(
+            BundleItem(
                 ref="blue",
                 type_ref="record",
                 name="Blue",
                 attributes={"condition": "Mint"},
                 tags=("jazz",),
             ),
-            PackItem(ref="ada", type_ref="person", name="Ada"),
+            BundleItem(ref="ada", type_ref="person", name="Ada"),
         ),
         connections=(
-            PackConnection(source_ref="blue", target_ref="ada", type_ref="signed-by"),
+            BundleConnection(source_ref="blue", target_ref="ada", type_ref="signed-by"),
         ),
     )
 
@@ -324,7 +324,7 @@ def _make_world(*packs: ExamplePack, actor: Actor = USER_A) -> World:
         assets=media_assets,
         attachments=InMemoryMediaAttachmentRepository(media_assets),
     )
-    installations = InMemoryInstallationRepository()
+    installations = InMemoryRunRepository()
     catalogue = InMemoryPackCatalogue()
     for pack in packs or (_sample_pack(),):
         catalogue.add(pack, name=pack.id.title(), description=f"{pack.id} examples")
@@ -334,9 +334,9 @@ def _make_world(*packs: ExamplePack, actor: Actor = USER_A) -> World:
         graph_repos=graph_repos,
         preset_repos=preset_repos,
         media_repos=media_repos,
-        installations=installations,
+        runs=installations,
         catalogue=catalogue,
-        uow=InMemoryUnitOfWork(ExampleRepos(installations=installations)),
+        uow=InMemoryUnitOfWork(ExampleRepos(runs=installations)),
         presets=PresetPackTarget(
             in_memory_preset_stores(preset_repos, graph_repos), actor
         ),

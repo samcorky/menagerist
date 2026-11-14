@@ -5,12 +5,12 @@ from enum import Enum
 from typing import Any, Protocol
 
 from app.modules.transfer.domain.bundle import (  # noqa: TC001
-    PackCollection,
-    PackConnection,
-    PackItem,
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleItem,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind  # noqa: TC001
 
@@ -50,14 +50,30 @@ class RemoveResult(Enum):
     REFUSED_IN_USE = "refused_in_use"
 
 
+class EntityTarget(Protocol):
+    """Inspects and removes entities of one kind by id, for removing a bundle.
+
+    `PresetTarget` and `CollectionTarget` have this shape; a caller passes others
+    (an example's generated covers) by kind.
+    """
+
+    async def inspect(self, entity_id: uuid.UUID, /) -> Inspection | None:
+        """Return the entity as it is now, or `None` if it is gone."""
+        ...
+
+    async def remove(self, entity_id: uuid.UUID, /) -> RemoveResult:
+        """Remove the entity, or report that it is gone or still in use."""
+        ...
+
+
 class PresetTarget(Protocol):
     """Creates, inspects and removes presets, owned by another module."""
 
-    async def ensure(self, presets: Sequence[PackPreset]) -> list[PresetOutcome]:
+    async def ensure(self, presets: Sequence[BundlePreset]) -> list[PresetOutcome]:
         """Create each preset unless an identical one exists; one outcome each."""
         ...
 
-    async def existing(self, presets: Sequence[PackPreset]) -> list[bool]:
+    async def existing(self, presets: Sequence[BundlePreset]) -> list[bool]:
         """Say, in order, whether the person already has an identical preset."""
         ...
 
@@ -78,24 +94,24 @@ class GraphTarget(Protocol):
         ...
 
     async def create_relationship_type(
-        self, spec: PackRelationshipType, presets: Mapping[str, uuid.UUID]
+        self, spec: BundleRelationshipType, presets: Mapping[str, uuid.UUID]
     ) -> Created:
         """Create the relationship type, resolving `$preset` markers with `presets`."""
         ...
 
     async def create_item_type(
-        self, spec: PackItemType, presets: Mapping[str, uuid.UUID]
+        self, spec: BundleItemType, presets: Mapping[str, uuid.UUID]
     ) -> Created:
         """Create the item type, resolving `$preset` markers with `presets`."""
         ...
 
-    async def create_item(self, spec: PackItem, *, type_slug: str) -> Created:
+    async def create_item(self, spec: BundleItem, *, type_slug: str) -> Created:
         """Create the item under the item type `type_slug`."""
         ...
 
     async def create_connection(
         self,
-        spec: PackConnection,
+        spec: BundleConnection,
         *,
         source_id: uuid.UUID,
         target_id: uuid.UUID,
@@ -133,7 +149,7 @@ class CollectionTarget(Protocol):
     """
 
     async def create_collection(
-        self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
+        self, spec: BundleCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Create the collection holding the created items `item_ids`, in order.
 

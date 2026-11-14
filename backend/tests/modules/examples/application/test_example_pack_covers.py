@@ -17,16 +17,16 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import InstallFailedError
-from app.modules.examples.domain.installation import Outcome
-from app.modules.examples.domain.removal import KEEP_USER_DATA
 from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
 from app.modules.media.domain.media_attachment import (
     AttachmentKey,
     AttachmentTarget,
     MediaAttachment,
 )
-from app.modules.transfer.domain.bundle import PackCover, PackItem
+from app.modules.transfer.domain.bundle import BundleCover, BundleItem
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_USER_DATA
+from app.modules.transfer.domain.run import Outcome
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -40,10 +40,10 @@ if TYPE_CHECKING:
 def _pack(sample_pack: SamplePack, *, extra: bool = False) -> ExamplePack:
     """Return the sample pack with covers on records, and optionally a second one."""
     pack = sample_pack()
-    types = (replace(pack.item_types[0], cover=PackCover(style="sleeve")),)
+    types = (replace(pack.item_types[0], cover=BundleCover(style="sleeve")),)
     items = pack.items
     if extra:
-        items = (*items, PackItem(ref="red", type_ref="record", name="Red"))
+        items = (*items, BundleItem(ref="red", type_ref="record", name="Red"))
     return replace(pack, item_types=(*types, pack.item_types[1]), items=items)
 
 
@@ -143,7 +143,7 @@ async def test_a_cover_is_recorded_as_owned_against_its_item(
 
     await _install(world)
 
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
@@ -233,9 +233,7 @@ async def test_a_replaced_cover_is_recorded_as_kept_edited(
 
     await _uninstall(world)
 
-    [history] = await world.installations.list_for_pack(
-        "demo", scope=ContentFilter.everyone()
-    )
+    [history] = await world.runs.list_for_bundle("demo", scope=ContentFilter.everyone())
     [cover] = [r for r in history.entities if r.kind is EntityKind.COVER]
     assert (cover.outcome, cover.reason) == (Outcome.KEPT, "edited")
     assert world.covers.removed == []  # kept, so never asked to remove
@@ -262,9 +260,7 @@ async def test_a_failure_part_way_removes_the_covers_already_attached(
     )
     assert world.uow.committed is True
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -276,7 +272,7 @@ async def test_reinstall_readopts_a_kept_cover_without_a_second_one(
     world = make_world(_pack(sample_pack))
     await _install(world)
     [original] = await _attachments(world, "Blue")
-    first = await world.installations.get_active_for_pack(
+    first = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert first is not None
@@ -289,7 +285,7 @@ async def test_reinstall_readopts_a_kept_cover_without_a_second_one(
     assert (result.adopted.items, result.created.items) == (1, 1)
     assert len(world.covers.create_calls) == 1  # none drawn on the reinstall
     assert len(await _attachments(world, "Blue")) == 2
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
@@ -340,7 +336,7 @@ async def test_a_kept_cover_is_not_adopted_without_its_item(
 
     assert result.adopted.items == 0
     assert len(world.covers.create_calls) == 2
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
@@ -382,7 +378,7 @@ async def test_reinstall_never_replaces_a_cover_the_person_set_after_deleting_ou
 
     assert len(world.covers.create_calls) == 1
     assert await _covers_of(world, "Blue") == [theirs]
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None

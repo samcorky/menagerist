@@ -14,7 +14,7 @@ from app.modules.examples.domain.pack import (
     PackSummary,
     validate_catalogue,
 )
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 
 class FilePackCatalogue:
@@ -40,7 +40,7 @@ class FilePackCatalogue:
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError, RecursionError) as exc:
-            raise InvalidPackError(f"cannot read {name}: {exc}") from exc
+            raise InvalidBundleError(f"cannot read {name}: {exc}") from exc
 
     def _entries(self) -> list[IndexEntry]:
         if self._index is None:
@@ -52,10 +52,10 @@ class FilePackCatalogue:
             name = f"{pack_id}.json"
             resolved = (self._dir() / name).resolve()
             if not PACK_ID.match(pack_id) or resolved.parent != self._dir().resolve():
-                raise InvalidPackError(f"{name} is outside the examples directory")
+                raise InvalidBundleError(f"{name} is outside the examples directory")
             pack = parse_pack(self._read(name))
             if pack.id != pack_id:
-                raise InvalidPackError(f"{pack_id}.json declares id '{pack.id}'")
+                raise InvalidBundleError(f"{pack_id}.json declares id '{pack.id}'")
             self._packs[pack_id] = pack
         return self._packs[pack_id]
 

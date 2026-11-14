@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 
 from app.modules.examples.adapters.platform.pack_parser import parse_index, parse_pack
-from app.modules.transfer.domain.bundle import PackCover
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.bundle import BundleCover
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 _INDEX: dict[str, Any] = {
     "format": "menagerist-examples-index",
@@ -78,8 +78,8 @@ _BAD: list[tuple[list[str | int], object]] = [
 def test_a_malformed_pack_is_an_invalid_pack_error(
     pack_data: dict[str, Any], path: list[str | int], value: object
 ) -> None:
-    """Bad values, unknown keys and wrong types raise `InvalidPackError`."""
-    with pytest.raises(InvalidPackError):
+    """Bad values, unknown keys and wrong types raise `InvalidBundleError`."""
+    with pytest.raises(InvalidBundleError):
         parse_pack(_mutated(pack_data, path, value))
 
 
@@ -98,18 +98,18 @@ def test_a_malformed_pack_is_an_invalid_pack_error(
 def test_a_missing_key_is_an_invalid_pack_error(
     pack_data: dict[str, Any], section: str | None, key: str
 ) -> None:
-    """A missing required key raises `InvalidPackError`."""
+    """A missing required key raises `InvalidBundleError`."""
     target = pack_data if section is None else pack_data[section][0]
     del target[key]
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(pack_data)
 
 
 @pytest.mark.parametrize("data", [[], "x", None, 3])
 def test_a_non_object_root_is_an_invalid_pack_error(data: object) -> None:
-    """A root that is not an object raises `InvalidPackError`."""
-    with pytest.raises(InvalidPackError):
+    """A root that is not an object raises `InvalidBundleError`."""
+    with pytest.raises(InvalidBundleError):
         parse_pack(data)
 
 
@@ -136,8 +136,8 @@ def test_parses_an_index() -> None:
     ],
 )
 def test_a_malformed_index_is_an_invalid_pack_error(data: object) -> None:
-    """A malformed index raises `InvalidPackError`."""
-    with pytest.raises(InvalidPackError):
+    """A malformed index raises `InvalidBundleError`."""
+    with pytest.raises(InvalidBundleError):
         parse_index(data)
 
 
@@ -146,7 +146,7 @@ def test_an_index_id_that_is_not_a_valid_pack_id_is_rejected(pack_id: str) -> No
     """Index ids become file names, so unsafe ones are rejected."""
     packs = [{"id": pack_id, "name": "n", "description": "d"}]
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_index({**_INDEX, "packs": packs})
 
 
@@ -154,7 +154,7 @@ def test_a_duplicate_index_id_is_rejected() -> None:
     """The same id cannot be listed twice."""
     entry = {"id": "demo", "name": "n", "description": "d"}
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_index({**_INDEX, "packs": [entry, entry]})
 
 
@@ -163,9 +163,9 @@ def test_a_version_that_is_not_the_integer_one_is_rejected(
     pack_data: dict[str, Any], version: object
 ) -> None:
     """`true` and `1.0` equal 1 in Python but are not the integer version."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_index({**_INDEX, "version": version})
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack({**pack_data, "version": version})
 
 
@@ -215,7 +215,7 @@ def test_collections_on_a_v1_pack_are_rejected(pack_data: dict[str, Any]) -> Non
     """The `collections` section needs version 2."""
     data = {**_v2_with_collections(pack_data), "version": 1}
 
-    with pytest.raises(InvalidPackError, match="collections"):
+    with pytest.raises(InvalidBundleError, match="collections"):
         parse_pack(data)
 
 
@@ -242,7 +242,7 @@ def test_a_malformed_collection_is_an_invalid_pack_error(
     pack_data: dict[str, Any], path: list[str | int], value: object
 ) -> None:
     """Bad collection keys, types, names, members and refs are rejected."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(_mutated(_v2_with_collections(pack_data), path, value))
 
 
@@ -254,7 +254,7 @@ def test_a_collection_missing_a_key_is_an_invalid_pack_error(
     data = _v2_with_collections(pack_data)
     del data["collections"][0][key]
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(data)
 
 
@@ -265,7 +265,7 @@ def test_a_v3_pack_parses_item_type_covers(pack_data: dict[str, Any]) -> None:
 
     pack = parse_pack(pack_data)
 
-    assert isinstance(pack.item_types[0].cover, PackCover)
+    assert isinstance(pack.item_types[0].cover, BundleCover)
     assert pack.item_types[0].cover.style == "poster"
     assert asdict(pack.counts) == {
         "presets": 1,
@@ -304,7 +304,7 @@ def test_a_non_string_icon_or_colour_is_rejected(
     """The icon and colour must be strings."""
     pack_data["item_types"][0][key] = 5
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(pack_data)
 
 
@@ -346,7 +346,7 @@ def test_a_malformed_cover_is_an_invalid_pack_error(
     pack_data["version"] = 3
     pack_data["item_types"][0]["cover"] = cover
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(pack_data)
 
 
@@ -370,7 +370,7 @@ def test_an_unknown_cover_style_names_its_item_type(
     """The error says which item type has the bad style."""
     pack_data["item_types"][0]["cover"] = {"style": "hologram"}
 
-    with pytest.raises(InvalidPackError, match="'thing'"):
+    with pytest.raises(InvalidBundleError, match="'thing'"):
         parse_pack(pack_data)
 
 
@@ -408,7 +408,7 @@ def test_requires_may_be_empty_or_absent_on_v4(pack_data: dict[str, Any]) -> Non
 @pytest.mark.parametrize("version", [1, 2, 3])
 def test_requires_below_v4_is_rejected(pack_data: dict[str, Any], version: int) -> None:
     """Older versions do not know `requires`."""
-    with pytest.raises(InvalidPackError, match="requires"):
+    with pytest.raises(InvalidBundleError, match="requires"):
         parse_pack({**pack_data, "version": version, "requires": ["base"]})
 
 
@@ -428,7 +428,7 @@ def test_a_malformed_requires_is_rejected(
     pack_data: dict[str, Any], requires: object, message: str
 ) -> None:
     """Non-list, non-string, duplicate, self and malformed ids fail."""
-    with pytest.raises(InvalidPackError, match=message):
+    with pytest.raises(InvalidBundleError, match=message):
         parse_pack(_v4(pack_data, requires=requires))
 
 
@@ -444,7 +444,7 @@ def test_an_unrequired_prefix_in_a_connection_is_rejected(
     pack_data: dict[str, Any], path: list[str | int], ref: str
 ) -> None:
     """Connection ends and type need their pack in requires."""
-    with pytest.raises(InvalidPackError, match=ref):
+    with pytest.raises(InvalidBundleError, match=ref):
         parse_pack(_mutated(_v4(pack_data), path, ref))
 
 
@@ -453,7 +453,7 @@ def test_an_unrequired_prefix_in_a_collection_is_rejected(
 ) -> None:
     """A collection item needs its pack in requires."""
     data = _v4(pack_data, collections=[{"ref": "c", "name": "C", "items": ["other:a"]}])
-    with pytest.raises(InvalidPackError, match="other:a"):
+    with pytest.raises(InvalidBundleError, match="other:a"):
         parse_pack(data)
 
 
@@ -461,31 +461,31 @@ def test_a_trailing_newline_is_rejected_in_refs_and_pack_ids(
     pack_data: dict[str, Any],
 ) -> None:
     """`$` would accept a trailing newline; matching must be strict."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack({**pack_data, "id": "demo\n"})
     pack_data["items"][0]["ref"] = "a\n"
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(pack_data)
 
 
 def test_a_prefix_not_in_requires_names_the_ref(pack_data: dict[str, Any]) -> None:
     """A cross-pack ref needs its pack in `requires`."""
     pack_data["items"][0]["type"] = "base:thing"
-    with pytest.raises(InvalidPackError, match="base:thing"):
+    with pytest.raises(InvalidBundleError, match="base:thing"):
         parse_pack(_v4(pack_data))
 
 
 def test_a_prefixed_own_definition_is_rejected(pack_data: dict[str, Any]) -> None:
     """A colon in a pack's own ref is a parse error."""
     pack_data["items"][0]["ref"] = "base:a"
-    with pytest.raises(InvalidPackError, match="base:a"):
+    with pytest.raises(InvalidBundleError, match="base:a"):
         parse_pack(_v4(pack_data, requires=["base"]))
 
 
 def test_a_ref_with_two_colons_is_rejected(pack_data: dict[str, Any]) -> None:
     """Exactly one colon is allowed."""
     pack_data["items"][0]["type"] = "base:x:y"
-    with pytest.raises(InvalidPackError, match="exactly one colon"):
+    with pytest.raises(InvalidBundleError, match="exactly one colon"):
         parse_pack(_v4(pack_data, requires=["base"]))
 
 
@@ -532,7 +532,7 @@ def test_a_definition_before_v6_is_rejected(pack_data: dict[str, Any]) -> None:
     data = _v6_with_definition(pack_data)
     data["version"] = 5
 
-    with pytest.raises(InvalidPackError, match="definition"):
+    with pytest.raises(InvalidBundleError, match="definition"):
         parse_pack(data)
 
 
@@ -540,7 +540,7 @@ def test_a_collection_with_items_and_a_definition_is_rejected(
     pack_data: dict[str, Any],
 ) -> None:
     """One or the other, never both."""
-    with pytest.raises(InvalidPackError, match="both items and a definition"):
+    with pytest.raises(InvalidBundleError, match="both items and a definition"):
         parse_pack(_v6_with_definition(pack_data, items=["a"]))
 
 
@@ -549,7 +549,7 @@ def test_a_collection_with_neither_is_rejected(pack_data: dict[str, Any]) -> Non
     data = _v6_with_definition(pack_data)
     del data["collections"][0]["definition"]
 
-    with pytest.raises(InvalidPackError, match="no items or definition"):
+    with pytest.raises(InvalidBundleError, match="no items or definition"):
         parse_pack(data)
 
 
@@ -558,7 +558,7 @@ def test_a_non_object_definition_is_rejected(
     pack_data: dict[str, Any], definition: object
 ) -> None:
     """The definition must be an object."""
-    with pytest.raises(InvalidPackError, match="definition"):
+    with pytest.raises(InvalidBundleError, match="definition"):
         parse_pack(_v6_with_definition(pack_data, definition=definition))
 
 
@@ -578,7 +578,7 @@ def test_a_collection_condition_is_rejected_with_its_path(
     }
 
     with pytest.raises(
-        InvalidPackError,
+        InvalidBundleError,
         match=r"'smart' definition at 'where\.children\[1\]\.children\[0\]': "
         + "a collection condition",
     ):
@@ -606,7 +606,8 @@ def test_a_connection_to_one_item_is_rejected_with_its_path(
     }
 
     with pytest.raises(
-        InvalidPackError, match=r"where\.children\[0\]\.where\.children\[0\].*one item"
+        InvalidBundleError,
+        match=r"where\.children\[0\]\.where\.children\[0\].*one item",
     ):
         parse_pack(_v6_with_definition(pack_data, definition=rule))
 

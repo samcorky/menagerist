@@ -14,19 +14,19 @@ from app.modules.examples.domain.pack import (
 )
 from app.modules.transfer.domain.bundle import (
     COVER_STYLES,
-    PackCollection,
-    PackConnection,
-    PackCover,
-    PackItem,
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleCover,
+    BundleItem,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
     preset_refs,
     resolve_preset_refs,
     split_ref,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 _LIST = {"$preset": "grades"}
 _SCHEMA: dict[str, Any] = {
@@ -44,7 +44,7 @@ def _pack(**overrides: object) -> ExamplePack:
     base: dict[str, object] = {
         "id": "demo",
         "presets": (
-            PackPreset(
+            BundlePreset(
                 ref="grades",
                 kind="choice_list",
                 label="Grades",
@@ -52,23 +52,25 @@ def _pack(**overrides: object) -> ExamplePack:
             ),
         ),
         "relationship_types": (
-            PackRelationshipType(ref="signed-by", slug="signed-by", label="Signed by"),
+            BundleRelationshipType(
+                ref="signed-by", slug="signed-by", label="Signed by"
+            ),
         ),
         "item_types": (
-            PackItemType(
+            BundleItemType(
                 ref="record",
                 slug="record",
                 label="Record",
                 attributes_schema=_SCHEMA,
             ),
-            PackItemType(ref="person", slug="person", label="Person"),
+            BundleItemType(ref="person", slug="person", label="Person"),
         ),
         "items": (
-            PackItem(ref="a", type_ref="record", name="A"),
-            PackItem(ref="b", type_ref="person", name="B"),
+            BundleItem(ref="a", type_ref="record", name="A"),
+            BundleItem(ref="b", type_ref="person", name="B"),
         ),
         "connections": (
-            PackConnection(source_ref="a", target_ref="b", type_ref="signed-by"),
+            BundleConnection(source_ref="a", target_ref="b", type_ref="signed-by"),
         ),
     }
     base.update(overrides)
@@ -88,40 +90,42 @@ def test_a_valid_pack_reports_its_counts() -> None:
         {"id": "Bad Id"},
         {
             "items": (
-                PackItem(ref="a", type_ref="record", name="A"),
-                PackItem(ref="a", type_ref="person", name="Dup"),
+                BundleItem(ref="a", type_ref="record", name="A"),
+                BundleItem(ref="a", type_ref="person", name="Dup"),
             )
         },
-        {"items": (PackItem(ref="a", type_ref="nope", name="A"),)},
+        {"items": (BundleItem(ref="a", type_ref="nope", name="A"),)},
         {
             "connections": (
-                PackConnection(source_ref="a", target_ref="zz", type_ref="signed-by"),
-            )
-        },
-        {
-            "connections": (
-                PackConnection(source_ref="a", target_ref="b", type_ref="nope"),
+                BundleConnection(source_ref="a", target_ref="zz", type_ref="signed-by"),
             )
         },
         {
             "connections": (
-                PackConnection(source_ref="a", target_ref="a", type_ref="signed-by"),
+                BundleConnection(source_ref="a", target_ref="b", type_ref="nope"),
+            )
+        },
+        {
+            "connections": (
+                BundleConnection(source_ref="a", target_ref="a", type_ref="signed-by"),
             )
         },
         {
             "item_types": (
-                PackItemType(ref="record", slug="Record Type", label="Record"),
+                BundleItemType(ref="record", slug="Record Type", label="Record"),
             )
         },
         {
             "item_types": (
-                PackItemType(ref="record", slug="record", label="R"),
-                PackItemType(ref="person", slug="record", label="P"),
+                BundleItemType(ref="record", slug="record", label="R"),
+                BundleItemType(ref="person", slug="record", label="P"),
             )
         },
         {
-            "presets": (PackPreset(ref="Bad Ref", kind="choice_list", label="Grades"),),
-            "item_types": (PackItemType(ref="person", slug="person", label="P"),),
+            "presets": (
+                BundlePreset(ref="Bad Ref", kind="choice_list", label="Grades"),
+            ),
+            "item_types": (BundleItemType(ref="person", slug="person", label="P"),),
             "items": (),
             "connections": (),
         },
@@ -130,7 +134,7 @@ def test_a_valid_pack_reports_its_counts() -> None:
 )
 def test_an_invalid_pack_is_rejected(overrides: dict[str, object]) -> None:
     """Each broken reference, slug or id is rejected on construction."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         _pack(**overrides)
 
 
@@ -139,7 +143,7 @@ def _sized(field: str, count: int) -> dict[str, object]:
     if field == "presets":
         return {
             "presets": tuple(
-                PackPreset(
+                BundlePreset(
                     ref=f"p{n}",
                     kind="choice_list",
                     label=f"P{n}",
@@ -147,14 +151,14 @@ def _sized(field: str, count: int) -> dict[str, object]:
                 )
                 for n in range(count)
             ),
-            "item_types": (PackItemType(ref="person", slug="person", label="P"),),
-            "items": (PackItem(ref="a", type_ref="person", name="A"),),
+            "item_types": (BundleItemType(ref="person", slug="person", label="P"),),
+            "items": (BundleItem(ref="a", type_ref="person", name="A"),),
             "connections": (),
         }
     if field == "relationship_types":
         return {
             "relationship_types": tuple(
-                PackRelationshipType(ref=f"r{n}", slug=f"r{n}", label="R")
+                BundleRelationshipType(ref=f"r{n}", slug=f"r{n}", label="R")
                 for n in range(count)
             ),
             "connections": (),
@@ -162,24 +166,25 @@ def _sized(field: str, count: int) -> dict[str, object]:
     if field == "item_types":
         return {
             "item_types": tuple(
-                PackItemType(ref=f"t{n}", slug=f"t{n}", label="T") for n in range(count)
+                BundleItemType(ref=f"t{n}", slug=f"t{n}", label="T")
+                for n in range(count)
             ),
             "items": tuple(
-                PackItem(ref=f"i{n}", type_ref="t0", name="I") for n in range(2)
+                BundleItem(ref=f"i{n}", type_ref="t0", name="I") for n in range(2)
             ),
             "connections": (),
         }
     if field == "items":
         return {
             "items": tuple(
-                PackItem(ref=f"i{n}", type_ref="person", name=str(n))
+                BundleItem(ref=f"i{n}", type_ref="person", name=str(n))
                 for n in range(count)
             ),
             "connections": (),
         }
     return {
         "connections": tuple(
-            PackConnection(source_ref="a", target_ref="b", type_ref="signed-by")
+            BundleConnection(source_ref="a", target_ref="b", type_ref="signed-by")
             for _ in range(count)
         )
     }
@@ -200,7 +205,7 @@ def test_each_limit_accepts_exactly_the_maximum_and_rejects_one_over(
 ) -> None:
     """A pack at a limit is valid; one entry over it is rejected."""
     assert _pack(**_sized(field, limit)) is not None
-    with pytest.raises(InvalidPackError, match="at most"):
+    with pytest.raises(InvalidBundleError, match="at most"):
         _pack(**_sized(field, limit + 1))
 
 
@@ -220,7 +225,7 @@ def test_resolve_preset_refs_swaps_markers_for_ids() -> None:
 
 def test_resolve_preset_refs_rejects_an_unknown_marker() -> None:
     """A marker with no matching id is rejected."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         resolve_preset_refs(_SCHEMA, {})
 
 
@@ -233,7 +238,7 @@ def test_resolve_preset_refs_resolves_markers_inside_lists() -> None:
 def test_a_pack_counts_its_collections() -> None:
     """Collections are counted; a pack without them counts zero."""
     pack = _pack(
-        collections=(PackCollection(ref="both", name="Both", item_refs=("a", "b")),)
+        collections=(BundleCollection(ref="both", name="Both", item_refs=("a", "b")),)
     )
 
     assert pack.counts.collections == 1
@@ -242,25 +247,25 @@ def test_a_pack_counts_its_collections() -> None:
 
 def test_a_smart_collection_is_counted_and_needs_no_items() -> None:
     """A definition stands in for items; both or neither is refused."""
-    smart = PackCollection(ref="s", name="S", definition={"v": 1})
+    smart = BundleCollection(ref="s", name="S", definition={"v": 1})
 
     assert _pack(collections=(smart,)).counts.collections == 1
-    with pytest.raises(InvalidPackError, match="both items and a definition"):
+    with pytest.raises(InvalidBundleError, match="both items and a definition"):
         _pack(
             collections=(
-                PackCollection(
+                BundleCollection(
                     ref="s", name="S", item_refs=("a",), definition={"v": 1}
                 ),
             )
         )
-    with pytest.raises(InvalidPackError, match="no items or definition"):
-        _pack(collections=(PackCollection(ref="s", name="S"),))
+    with pytest.raises(InvalidBundleError, match="no items or definition"):
+        _pack(collections=(BundleCollection(ref="s", name="S"),))
 
 
-def _collection(**overrides: object) -> PackCollection:
+def _collection(**overrides: object) -> BundleCollection:
     base: dict[str, object] = {"ref": "both", "name": "Both", "item_refs": ("a", "b")}
     base.update(overrides)
-    return PackCollection(**base)  # type: ignore[arg-type]
+    return BundleCollection(**base)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(
@@ -275,10 +280,10 @@ def _collection(**overrides: object) -> PackCollection:
     ],
 )
 def test_an_invalid_collection_is_rejected(
-    collections: tuple[PackCollection, ...],
+    collections: tuple[BundleCollection, ...],
 ) -> None:
     """A bad ref, duplicate ref, blank name, or bad membership is rejected."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         _pack(collections=collections)
 
 
@@ -293,21 +298,21 @@ def test_a_collection_name_may_be_120_characters_after_stripping() -> None:
 
 def test_a_collection_name_over_120_characters_is_rejected() -> None:
     """The error names the collection's ref."""
-    with pytest.raises(InvalidPackError, match=r"collection 'both'.*120"):
+    with pytest.raises(InvalidBundleError, match=r"collection 'both'.*120"):
         _pack(collections=(_collection(name="n" * 121),))
 
 
 def test_cover_styles_are_closed() -> None:
     """The cover styles are a fixed set, and each builds a cover."""
     assert COVER_STYLES == ("sleeve", "poster", "box", "card")
-    assert all(PackCover(style=s).style == s for s in COVER_STYLES)
+    assert all(BundleCover(style=s).style == s for s in COVER_STYLES)
 
 
 def test_an_unknown_cover_style_is_rejected() -> None:
     """An item type with a cover style outside the closed set cannot be built."""
-    with pytest.raises(InvalidPackError, match=r"'record'.*cover style"):
-        PackItemType(
-            ref="record", slug="record", label="Record", cover=PackCover(style="x")
+    with pytest.raises(InvalidBundleError, match=r"'record'.*cover style"):
+        BundleItemType(
+            ref="record", slug="record", label="Record", cover=BundleCover(style="x")
         )
 
 
@@ -315,18 +320,18 @@ def _addon(**overrides: object) -> ExamplePack:
     base: dict[str, object] = {
         "id": "addon",
         "requires": ("demo",),
-        "item_types": (PackItemType(ref="extra", slug="extra", label="Extra"),),
+        "item_types": (BundleItemType(ref="extra", slug="extra", label="Extra"),),
         "items": (
-            PackItem(ref="x", type_ref="demo:record", name="X"),
-            PackItem(ref="y", type_ref="extra", name="Y"),
+            BundleItem(ref="x", type_ref="demo:record", name="X"),
+            BundleItem(ref="y", type_ref="extra", name="Y"),
         ),
         "connections": (
-            PackConnection(
+            BundleConnection(
                 source_ref="x", target_ref="demo:b", type_ref="demo:signed-by"
             ),
         ),
         "collections": (
-            PackCollection(ref="mix", name="Mix", item_refs=("x", "demo:a")),
+            BundleCollection(ref="mix", name="Mix", item_refs=("x", "demo:a")),
         ),
     }
     base.update(overrides)
@@ -344,7 +349,7 @@ def test_split_ref_separates_an_optional_pack_prefix() -> None:
 )
 def test_split_ref_rejects_a_malformed_prefixed_ref(ref: str) -> None:
     """Exactly one colon with a valid ref on each side."""
-    with pytest.raises(InvalidPackError, match=r"exactly one colon|must be"):
+    with pytest.raises(InvalidBundleError, match=r"exactly one colon|must be"):
         split_ref(ref)
 
 
@@ -377,7 +382,7 @@ def test_a_pack_without_prefixed_refs_has_no_external_refs() -> None:
         {"requires": ("Bad Id",)},
         {
             "requires": ("demo",),
-            "items": (PackItem(ref="x", type_ref="other:t", name="X"),),
+            "items": (BundleItem(ref="x", type_ref="other:t", name="X"),),
         },
     ],
 )
@@ -385,26 +390,30 @@ def test_invalid_requires_or_unrequired_prefix_is_rejected(
     overrides: dict[str, object],
 ) -> None:
     """Requires must be unique, valid and not self; prefixes must be required."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         _addon(**overrides)
 
 
 def test_requires_errors_name_the_offending_value() -> None:
     """The messages name the pack id or ref."""
-    with pytest.raises(InvalidPackError, match="'addon'"):
+    with pytest.raises(InvalidBundleError, match="'addon'"):
         _addon(requires=("addon",))
-    with pytest.raises(InvalidPackError, match="'demo'"):
+    with pytest.raises(InvalidBundleError, match="'demo'"):
         _addon(requires=("demo", "demo"))
-    with pytest.raises(InvalidPackError, match="'other:t'"):
-        _addon(items=(PackItem(ref="x", type_ref="other:t", name="X"),))
-    with pytest.raises(InvalidPackError, match="'other:b'"):
+    with pytest.raises(InvalidBundleError, match="'other:t'"):
+        _addon(items=(BundleItem(ref="x", type_ref="other:t", name="X"),))
+    with pytest.raises(InvalidBundleError, match="'other:b'"):
         _addon(
             connections=(
-                PackConnection(source_ref="x", target_ref="other:b", type_ref="demo:t"),
+                BundleConnection(
+                    source_ref="x", target_ref="other:b", type_ref="demo:t"
+                ),
             )
         )
-    with pytest.raises(InvalidPackError, match="'other:a'"):
-        _addon(collections=(PackCollection(ref="m", name="M", item_refs=("other:a",)),))
+    with pytest.raises(InvalidBundleError, match="'other:a'"):
+        _addon(
+            collections=(BundleCollection(ref="m", name="M", item_refs=("other:a",)),)
+        )
 
 
 def test_an_empty_requires_is_allowed() -> None:
@@ -414,26 +423,26 @@ def test_an_empty_requires_is_allowed() -> None:
 
 def test_unprefixed_refs_still_resolve_only_locally() -> None:
     """A local ref naming a required pack's entity is unknown."""
-    with pytest.raises(InvalidPackError, match="unknown"):
-        _addon(items=(PackItem(ref="x", type_ref="record", name="X"),))
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError, match="unknown"):
+        _addon(items=(BundleItem(ref="x", type_ref="record", name="X"),))
+    with pytest.raises(InvalidBundleError):
         _addon(
-            collections=(PackCollection(ref="m", name="M", item_refs=("a",)),),
+            collections=(BundleCollection(ref="m", name="M", item_refs=("a",)),),
         )
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         _addon(
             connections=(
-                PackConnection(source_ref="x", target_ref="y", type_ref="signed-by"),
+                BundleConnection(source_ref="x", target_ref="y", type_ref="signed-by"),
             )
         )
 
 
 def test_a_connection_cannot_join_an_external_item_to_itself() -> None:
     """The self-join rule holds for prefixed ends."""
-    with pytest.raises(InvalidPackError, match="itself"):
+    with pytest.raises(InvalidBundleError, match="itself"):
         _addon(
             connections=(
-                PackConnection(
+                BundleConnection(
                     source_ref="demo:a", target_ref="demo:a", type_ref="demo:signed-by"
                 ),
             )
@@ -443,33 +452,33 @@ def test_a_connection_cannot_join_an_external_item_to_itself() -> None:
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"items": (PackItem(ref="demo:x", type_ref="extra", name="X"),)},
-        {"item_types": (PackItemType(ref="demo:t", slug="t", label="T"),)},
+        {"items": (BundleItem(ref="demo:x", type_ref="extra", name="X"),)},
+        {"item_types": (BundleItemType(ref="demo:t", slug="t", label="T"),)},
         {
             "relationship_types": (
-                PackRelationshipType(ref="demo:r", slug="r", label="R"),
+                BundleRelationshipType(ref="demo:r", slug="r", label="R"),
             )
         },
-        {"presets": (PackPreset(ref="demo:p", kind="choice_list", label="P"),)},
-        {"collections": (PackCollection(ref="demo:c", name="C", item_refs=("x",)),)},
-        {"item_types": (PackItemType(ref="extra", slug="demo:extra", label="T"),)},
+        {"presets": (BundlePreset(ref="demo:p", kind="choice_list", label="P"),)},
+        {"collections": (BundleCollection(ref="demo:c", name="C", item_refs=("x",)),)},
+        {"item_types": (BundleItemType(ref="extra", slug="demo:extra", label="T"),)},
     ],
 )
 def test_a_prefixed_ref_in_a_definition_is_rejected(
     overrides: dict[str, object],
 ) -> None:
     """A pack's own definitions never carry a prefix."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         _addon(**overrides)
 
 
 def test_a_preset_marker_with_a_prefix_is_rejected() -> None:
     """Preset markers are local only."""
     schema = {"x": {"$preset": "demo:grades"}}
-    with pytest.raises(InvalidPackError, match="demo:grades"):
+    with pytest.raises(InvalidBundleError, match="demo:grades"):
         _addon(
             item_types=(
-                PackItemType(
+                BundleItemType(
                     ref="extra", slug="extra", label="E", attributes_schema=schema
                 ),
             )
@@ -479,8 +488,8 @@ def test_a_preset_marker_with_a_prefix_is_rejected() -> None:
 def _plain(pack_id: str, **overrides: object) -> ExamplePack:
     base: dict[str, object] = {
         "id": pack_id,
-        "item_types": (PackItemType(ref="thing", slug="thing", label="Thing"),),
-        "items": (PackItem(ref="a", type_ref="thing", name="A"),),
+        "item_types": (BundleItemType(ref="thing", slug="thing", label="Thing"),),
+        "items": (BundleItem(ref="a", type_ref="thing", name="A"),),
     }
     base.update(overrides)
     return ExamplePack(**base)  # type: ignore[arg-type]
@@ -498,7 +507,7 @@ def test_validate_catalogue_accepts_a_chain_of_addons() -> None:
             "demo": _plain(
                 "demo",
                 relationship_types=(
-                    PackRelationshipType(
+                    BundleRelationshipType(
                         ref="by", slug="by", label="By", reverse_label="Made"
                     ),
                 ),
@@ -507,7 +516,7 @@ def test_validate_catalogue_accepts_a_chain_of_addons() -> None:
             "top": _plain(
                 "top",
                 requires=("mid", "demo"),
-                items=(PackItem(ref="n", type_ref="demo:thing", name="N"),),
+                items=(BundleItem(ref="n", type_ref="demo:thing", name="N"),),
             ),
         }
     )
@@ -515,7 +524,7 @@ def test_validate_catalogue_accepts_a_chain_of_addons() -> None:
 
 def test_validate_catalogue_rejects_an_unknown_required_pack() -> None:
     """A required pack that is not in the catalogue is named."""
-    with pytest.raises(InvalidPackError, match="pack a requires ghost"):
+    with pytest.raises(InvalidBundleError, match="pack a requires ghost"):
         validate_catalogue({"a": _chain("a", "ghost")})
 
 
@@ -534,7 +543,7 @@ def test_validate_catalogue_rejects_a_cycle(
         pack_id: _chain(pack_id, packs[(i + 1) % len(packs)])
         for i, pack_id in enumerate(packs)
     }
-    with pytest.raises(InvalidPackError, match=message):
+    with pytest.raises(InvalidBundleError, match=message):
         validate_catalogue(catalogue)
 
 
@@ -545,7 +554,7 @@ def test_validate_catalogue_names_only_the_cycle_not_the_way_in() -> None:
         "a": _chain("a", "b"),
         "b": _chain("b", "a"),
     }
-    with pytest.raises(InvalidPackError, match=r"cycle: a -> b -> a$"):
+    with pytest.raises(InvalidBundleError, match=r"cycle: a -> b -> a$"):
         validate_catalogue(catalogue)
 
 
@@ -566,10 +575,10 @@ def test_validate_catalogue_rejects_a_dangling_ref() -> None:
     addon = _plain(
         "extras",
         requires=("demo",),
-        items=(PackItem(ref="x", type_ref="demo:nope", name="X"),),
+        items=(BundleItem(ref="x", type_ref="demo:nope", name="X"),),
     )
     message = "pack extras refers to demo:nope, which demo does not define as an item"
-    with pytest.raises(InvalidPackError, match=message + " type"):
+    with pytest.raises(InvalidBundleError, match=message + " type"):
         validate_catalogue({"demo": _plain("demo"), "extras": addon})
 
 
@@ -578,9 +587,9 @@ def test_validate_catalogue_rejects_a_ref_of_the_wrong_kind() -> None:
     addon = _plain(
         "extras",
         requires=("demo",),
-        items=(PackItem(ref="x", type_ref="demo:a", name="X"),),
+        items=(BundleItem(ref="x", type_ref="demo:a", name="X"),),
     )
-    with pytest.raises(InvalidPackError, match="demo:a, which demo does not define"):
+    with pytest.raises(InvalidBundleError, match="demo:a, which demo does not define"):
         validate_catalogue({"demo": _plain("demo"), "extras": addon})
 
 
@@ -590,21 +599,21 @@ def test_validate_catalogue_checks_item_and_relationship_refs() -> None:
     bad_item = _plain(
         "e1",
         requires=("demo",),
-        collections=(PackCollection(ref="c", name="C", item_refs=("demo:zzz",)),),
+        collections=(BundleCollection(ref="c", name="C", item_refs=("demo:zzz",)),),
     )
     bad_type = _plain(
         "e2",
         requires=("demo",),
         connections=(
-            PackConnection(source_ref="a", target_ref="demo:a", type_ref="demo:rel"),
+            BundleConnection(source_ref="a", target_ref="demo:a", type_ref="demo:rel"),
         ),
     )
     with pytest.raises(
-        InvalidPackError, match=r"demo:zzz, which demo does not define as an item$"
+        InvalidBundleError, match=r"demo:zzz, which demo does not define as an item$"
     ):
         validate_catalogue({"demo": base, "e1": bad_item})
     with pytest.raises(
-        InvalidPackError,
+        InvalidBundleError,
         match="demo:rel, which demo does not define as a relationship type",
     ):
         validate_catalogue({"demo": base, "e2": bad_type})
@@ -612,9 +621,9 @@ def test_validate_catalogue_checks_item_and_relationship_refs() -> None:
 
 def test_a_trailing_newline_in_an_id_or_requires_entry_is_rejected() -> None:
     """Strict matching: no trailing newline."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         _pack(id="demo\n")
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         _addon(requires=("demo\n",))
 
 
@@ -624,14 +633,20 @@ def test_validate_catalogue_rejects_a_dangling_connection_source() -> None:
         "extras",
         requires=("demo",),
         connections=(
-            PackConnection(source_ref="demo:zzz", target_ref="a", type_ref="demo:rel"),
+            BundleConnection(
+                source_ref="demo:zzz", target_ref="a", type_ref="demo:rel"
+            ),
         ),
     )
     base = _plain(
         "demo",
         relationship_types=(
-            PackRelationshipType(ref="rel", slug="rel", label="Rel", reverse_label="R"),
+            BundleRelationshipType(
+                ref="rel", slug="rel", label="Rel", reverse_label="R"
+            ),
         ),
     )
-    with pytest.raises(InvalidPackError, match=r"demo:zzz, which demo does not define"):
+    with pytest.raises(
+        InvalidBundleError, match=r"demo:zzz, which demo does not define"
+    ):
         validate_catalogue({"demo": base, "extras": addon})

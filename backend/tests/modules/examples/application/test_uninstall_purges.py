@@ -21,7 +21,7 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallExamplePackCommand,
 )
 from app.modules.graph.domain.edge import Edge
-from app.modules.transfer.domain.bundle import PackCollection, PackCover
+from app.modules.transfer.domain.bundle import BundleCollection, BundleCover
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.ports.targets import RemoveResult
 from app.shared_kernel.access_guard import InMemoryAccessGuard
@@ -114,10 +114,12 @@ def _rig(make_world: MakeWorld, sample_pack: SamplePack) -> Rig:
     pack = replace(
         pack,
         item_types=(
-            replace(pack.item_types[0], cover=PackCover(style="sleeve")),
+            replace(pack.item_types[0], cover=BundleCover(style="sleeve")),
             pack.item_types[1],
         ),
-        collections=(PackCollection(ref="c", name="Both", item_refs=("blue", "ada")),),
+        collections=(
+            BundleCollection(ref="c", name="Both", item_refs=("blue", "ada")),
+        ),
     )
     world = make_world(pack)
     repos = build_in_memory_collections_repos()

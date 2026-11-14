@@ -39,7 +39,7 @@ class ListExampleEntities(
         actor: Actor,
     ) -> ExampleEntities:
         """Return the owned item, item type and collection ids across installations."""
-        active = await self._repos.installations.list_active(scope=self.scope(actor))
+        active = await self._repos.runs.list_active(scope=self.scope(actor))
         return ExampleEntities(
             item_ids=[r.entity_id for i in active for r in i.owned(EntityKind.ITEM)],
             item_type_ids=[

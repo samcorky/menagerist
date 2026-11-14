@@ -85,9 +85,6 @@ from app.modules.examples.adapters.api.dependencies import (
 from app.modules.examples.adapters.covers.in_memory_cover_renderer import (
     InMemoryCoverRenderer,
 )
-from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
-    InMemoryInstallationRepository,
-)
 from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
@@ -187,11 +184,14 @@ from app.modules.system.domain.readiness import (
     CheckStatus,
     ReadinessReport,
 )
+from app.modules.transfer.adapters.persistence.in_memory_run_repository import (
+    InMemoryRunRepository,
+)
 from app.modules.transfer.domain.bundle import (
-    PackConnection,
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
+    BundleConnection,
+    BundleItem,
+    BundleItemType,
+    BundleRelationshipType,
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -549,14 +549,14 @@ def _pack() -> ExamplePack:
     return ExamplePack(
         id=PACK_ID,
         relationship_types=(
-            PackRelationshipType(ref="by", slug="demo-by", label="By"),
+            BundleRelationshipType(ref="by", slug="demo-by", label="By"),
         ),
-        item_types=(PackItemType(ref="thing", slug="demo-thing", label="Thing"),),
+        item_types=(BundleItemType(ref="thing", slug="demo-thing", label="Thing"),),
         items=(
-            PackItem(ref="a", type_ref="thing", name="Pack A"),
-            PackItem(ref="b", type_ref="thing", name="Pack B"),
+            BundleItem(ref="a", type_ref="thing", name="Pack A"),
+            BundleItem(ref="b", type_ref="thing", name="Pack B"),
         ),
-        connections=(PackConnection(source_ref="a", target_ref="b", type_ref="by"),),
+        connections=(BundleConnection(source_ref="a", target_ref="b", type_ref="by"),),
     )
 
 
@@ -654,8 +654,8 @@ class World:
             external=external,
             definitions=CollectionsDefinitions(collections),
         )
-        installations = InMemoryInstallationRepository()
-        examples = ExampleRepos(installations=installations)
+        installations = InMemoryRunRepository()
+        examples = ExampleRepos(runs=installations)
         catalogue = InMemoryPackCatalogue()
         catalogue.add(_pack(), name="Demo", description="Demo examples")
         self.hasher = InMemoryPasswordHasher()

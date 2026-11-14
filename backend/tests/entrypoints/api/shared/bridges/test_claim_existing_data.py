@@ -19,10 +19,6 @@ from app.modules.collections.adapters.persistence.in_memory_membership_repositor
 )
 from app.modules.collections.domain.collection import Collection
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
-from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
-    InMemoryInstallationRepository,
-)
-from app.modules.examples.domain.installation import Installation
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
@@ -51,6 +47,10 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
 )
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.transfer.adapters.persistence.in_memory_run_repository import (
+    InMemoryRunRepository,
+)
+from app.modules.transfer.domain.run import Run
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.slug import Slug
 
@@ -71,7 +71,7 @@ class Stores:
     edge_types: InMemoryEdgeTypeRepository
     collections: InMemoryCollectionRepository
     assets: InMemoryMediaAssetRepository
-    installations: InMemoryInstallationRepository
+    runs: InMemoryRunRepository
     presets: InMemoryPresetRepository
     claim: ClaimExistingData
 
@@ -85,7 +85,7 @@ def stores() -> Stores:
     edge_types = InMemoryEdgeTypeRepository()
     collections = InMemoryCollectionRepository()
     assets = InMemoryMediaAssetRepository()
-    installations = InMemoryInstallationRepository()
+    installations = InMemoryRunRepository()
     presets = InMemoryPresetRepository()
     claim = build_claim_existing_data(
         graph=GraphRepos(
@@ -99,7 +99,7 @@ def stores() -> Stores:
             memberships=InMemoryMembershipRepository(collections),
         ),
         media=make_in_memory_repos(assets=assets),
-        examples=ExampleRepos(installations=installations),
+        examples=ExampleRepos(runs=installations),
         presets=PresetRepos(presets=presets),
     )
     return Stores(
@@ -109,7 +109,7 @@ def stores() -> Stores:
         edge_types=edge_types,
         collections=collections,
         assets=assets,
-        installations=installations,
+        runs=installations,
         presets=presets,
         claim=claim,
     )
@@ -161,8 +161,8 @@ def _preset(owner: uuid.UUID | None) -> Preset:
     return preset
 
 
-def _installation(owner: uuid.UUID | None, pack: str) -> Installation:
-    installation = Installation.start(pack, SYSTEM)
+def _installation(owner: uuid.UUID | None, pack: str) -> Run:
+    installation = Run.start(pack, SYSTEM)
     installation.owner_id = owner
     return installation
 
@@ -187,7 +187,7 @@ async def test_claims_ownerless_and_legacy_rows_in_every_module(stores: Stores) 
         (stores.edges, edges),
         (stores.collections, collections),
         (stores.assets, assets),
-        (stores.installations, installations),
+        (stores.runs, installations),
         (stores.presets, presets),
     ]
     for repository, rows in repositories:
@@ -227,7 +227,7 @@ async def test_other_peoples_rows_and_later_rows_are_untouched(stores: Stores) -
     await stores.nodes.add(theirs_node)
     await stores.collections.add(theirs_collection)
     await stores.assets.add(theirs_asset)
-    await stores.installations.add(theirs_installation)
+    await stores.runs.add(theirs_installation)
 
     first = await stores.claim.claim(ADMIN)
     # Created after setup by someone else, then a (mistaken) second claim.

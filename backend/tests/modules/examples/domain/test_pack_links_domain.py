@@ -4,11 +4,11 @@ import pytest
 
 from app.modules.examples.domain.pack import ExamplePack, PackLink
 from app.modules.transfer.domain.bundle import (
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
+    BundleItem,
+    BundleItemType,
+    BundleRelationshipType,
 )
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 
 def _pack(*links: PackLink, requires: tuple[str, ...] = ()) -> ExamplePack:
@@ -16,10 +16,10 @@ def _pack(*links: PackLink, requires: tuple[str, ...] = ()) -> ExamplePack:
         id="music",
         requires=requires,
         relationship_types=(
-            PackRelationshipType(ref="tie", slug="music-tie", label="Tie"),
+            BundleRelationshipType(ref="tie", slug="music-tie", label="Tie"),
         ),
-        item_types=(PackItemType(ref="thing", slug="music-thing", label="Thing"),),
-        items=(PackItem(ref="a", type_ref="thing", name="A"),),
+        item_types=(BundleItemType(ref="thing", slug="music-thing", label="Thing"),),
+        items=(BundleItem(ref="a", type_ref="thing", name="A"),),
         links=links,
     )
 
@@ -78,7 +78,7 @@ def test_a_bad_link_is_rejected(
     overrides: dict[str, str], requires: tuple[str, ...], message: str
 ) -> None:
     """Every rule in the spec's Pack format section is enforced."""
-    with pytest.raises(InvalidPackError, match=message):
+    with pytest.raises(InvalidBundleError, match=message):
         _pack(_link(**overrides), requires=requires)
 
 

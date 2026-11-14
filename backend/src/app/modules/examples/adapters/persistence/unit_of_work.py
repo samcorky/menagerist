@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING
 
-from app.modules.examples.adapters.persistence.installation_repository import (
-    SqlAlchemyInstallationRepository,
-)
 from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.transfer.adapters.persistence.run_repository import (
+    SqlAlchemyRunRepository,
+)
 from app.platform.unit_of_work import SqlAlchemySessionUnitOfWork
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 def build_example_repos(session: AsyncSession) -> ExampleRepos:
     """Build an `ExampleRepos` bundle of SQLAlchemy repositories over `session`."""
-    return ExampleRepos(installations=SqlAlchemyInstallationRepository(session))
+    return ExampleRepos(runs=SqlAlchemyRunRepository(session))
 
 
 def create_example_uow(

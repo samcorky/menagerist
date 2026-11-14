@@ -16,7 +16,7 @@ from app.entrypoints.api.shared.bridges.transfer_targets import (
 from app.modules.graph.domain.edge import Edge
 from app.modules.media.domain.media_attachment import MediaAttachment
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 from app.modules.transfer.ports.targets import Created, RemoveResult
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
@@ -239,7 +239,7 @@ async def test_unknown_marker_fails_before_anything_is_created(
     world = make_world()
     pack = sample_pack()
 
-    with pytest.raises(InvalidPackError, match="unknown preset"):
+    with pytest.raises(InvalidBundleError, match="unknown preset"):
         await world.graph.create_item_type(pack.item_types[0], {})
 
     assert (

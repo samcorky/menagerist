@@ -1,27 +1,27 @@
-"""Tests for the Installation aggregate."""
+"""Tests for the Run aggregate."""
 
 import uuid
 
 import pytest
 
-from app.modules.examples.domain.errors import InvalidInstallationStateError
-from app.modules.examples.domain.installation import (
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.errors import InvalidRunStateError
+from app.modules.transfer.domain.run import (
     REMOVAL_ORDER,
-    Installation,
-    InstallationStatus,
     Outcome,
+    Run,
+    RunStatus,
     adoptable_records,
 )
-from app.modules.transfer.domain.entity_kind import EntityKind
 
 OWNER = uuid.UUID(int=0xA1)
 
 
-def _started() -> Installation:
-    return Installation.start("demo", OWNER)
+def _started() -> Run:
+    return Run.start("demo", OWNER)
 
 
-def _record(installation: Installation, ref: str = "a") -> uuid.UUID:
+def _record(installation: Run, ref: str = "a") -> uuid.UUID:
     entity_id = uuid.uuid7()
     installation.record(EntityKind.ITEM, ref, ref.upper(), entity_id, "hash")
     return entity_id
@@ -30,7 +30,7 @@ def _record(installation: Installation, ref: str = "a") -> uuid.UUID:
 def test_start_creates_an_installing_installation() -> None:
     """A new installation is installing, active and empty."""
     installation = _started()
-    assert installation.status is InstallationStatus.INSTALLING
+    assert installation.status is RunStatus.INSTALLING
     assert installation.is_active
     assert installation.entities == []
 
@@ -56,7 +56,7 @@ def test_mark_installed_sets_the_time() -> None:
     """Marking installed sets the status and installed_at."""
     installation = _started()
     installation.mark_installed()
-    assert installation.status is InstallationStatus.INSTALLED
+    assert installation.status is RunStatus.INSTALLED
     assert installation.installed_at is not None
     assert installation.is_active
 
@@ -65,7 +65,7 @@ def test_record_is_only_allowed_while_installing() -> None:
     """Recording after the install finished is rejected."""
     installation = _started()
     installation.mark_installed()
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         _record(installation)
 
 
@@ -73,7 +73,7 @@ def test_mark_installed_twice_is_rejected() -> None:
     """An installed installation cannot be marked installed again."""
     installation = _started()
     installation.mark_installed()
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_installed()
 
 
@@ -94,10 +94,10 @@ def test_settle_rejects_an_unknown_or_already_settled_entity() -> None:
     """Only currently owned entities can be settled."""
     installation = _started()
     entity_id = _record(installation)
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.settle(uuid.uuid7(), Outcome.REMOVED)
     installation.settle(entity_id, Outcome.REMOVED)
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.settle(entity_id, Outcome.REMOVED)
 
 
@@ -105,7 +105,7 @@ def test_settle_rejects_the_owned_outcome() -> None:
     """Settling cannot set the outcome back to owned."""
     installation = _started()
     entity_id = _record(installation)
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.settle(entity_id, Outcome.OWNED)
 
 
@@ -113,11 +113,11 @@ def test_mark_failed_needs_nothing_left_owned() -> None:
     """Failing is only allowed once every entity has been settled."""
     installation = _started()
     entity_id = _record(installation)
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_failed()
     installation.settle(entity_id, Outcome.REMOVED)
     installation.mark_failed()
-    assert installation.status is InstallationStatus.FAILED
+    assert installation.status is RunStatus.FAILED
     assert not installation.is_active
 
 
@@ -126,7 +126,7 @@ def test_mark_removed_sets_the_time_when_nothing_is_owned() -> None:
     installation = _started()
     installation.mark_installed()
     installation.mark_removed()
-    assert installation.status is InstallationStatus.REMOVED
+    assert installation.status is RunStatus.REMOVED
     assert installation.removed_at is not None
 
 
@@ -134,7 +134,7 @@ def test_mark_removed_is_rejected_while_something_is_owned() -> None:
     """Removal is blocked while the pack still owns an entity."""
     installation = _started()
     _record(installation)
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_removed()
 
 
@@ -142,9 +142,9 @@ def test_removed_and_failed_installations_cannot_change_again() -> None:
     """A failed installation accepts no further transitions."""
     installation = _started()
     installation.mark_failed()
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_installed()
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_removed()
 
 
@@ -153,9 +153,9 @@ def test_a_removed_installation_cannot_be_installed_or_failed() -> None:
     installation = _started()
     installation.mark_installed()
     installation.mark_removed()
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_installed()
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_failed()
 
 
@@ -163,7 +163,7 @@ def test_an_installed_installation_cannot_be_failed() -> None:
     """Only an installing installation can fail."""
     installation = _started()
     installation.mark_installed()
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         installation.mark_failed()
 
 
@@ -177,7 +177,7 @@ def test_collection_is_a_kind_removed_between_connections_and_items() -> None:
     assert set(order) == set(EntityKind)
 
 
-def _closed(*records: tuple[EntityKind, str, Outcome]) -> Installation:
+def _closed(*records: tuple[EntityKind, str, Outcome]) -> Run:
     """An installation whose entities were all settled as given."""
     installation = _started()
     for kind, ref, outcome in records:

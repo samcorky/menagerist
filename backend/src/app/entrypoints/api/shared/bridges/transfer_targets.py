@@ -115,12 +115,12 @@ from app.modules.presets.domain.preset import Preset  # noqa: TC001
 from app.modules.presets.ports.preset_usage import PresetUsage
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
 from app.modules.transfer.domain.bundle import (
-    PackCollection,
-    PackConnection,
-    PackItem,
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleItem,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
     resolve_preset_refs,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
@@ -468,7 +468,7 @@ class PresetPackTarget:
         self._access = access or get_access_guard()
         self._scope = self._access.scope_for(actor)
 
-    async def ensure(self, presets: Sequence[PackPreset]) -> list[PresetOutcome]:
+    async def ensure(self, presets: Sequence[BundlePreset]) -> list[PresetOutcome]:
         """Create each preset unless an identical one exists."""
         if not presets:
             return []
@@ -505,7 +505,7 @@ class PresetPackTarget:
             for spec, imported in zip(presets, result.items, strict=True)
         ]
 
-    async def existing(self, presets: Sequence[PackPreset]) -> list[bool]:
+    async def existing(self, presets: Sequence[BundlePreset]) -> list[bool]:
         """Say, in order, whether the person already has an identical preset."""
         items = [
             {"kind": p.kind, "label": p.label, "definition": p.definition}
@@ -566,7 +566,7 @@ class GraphPackTarget:
             )
 
     async def create_relationship_type(
-        self, spec: PackRelationshipType, presets: Mapping[str, uuid.UUID]
+        self, spec: BundleRelationshipType, presets: Mapping[str, uuid.UUID]
     ) -> Created:
         """Create the relationship type."""
         command = CreateEdgeTypeCommand(
@@ -584,7 +584,7 @@ class GraphPackTarget:
         return Created(entity_id=edge_type.id, content=_edge_type_content(edge_type))
 
     async def create_item_type(
-        self, spec: PackItemType, presets: Mapping[str, uuid.UUID]
+        self, spec: BundleItemType, presets: Mapping[str, uuid.UUID]
     ) -> Created:
         """Create the item type."""
         command = CreateNodeTypeCommand(
@@ -601,7 +601,7 @@ class GraphPackTarget:
             ).handle(command, self._actor)
         return Created(entity_id=node_type.id, content=_node_type_content(node_type))
 
-    async def create_item(self, spec: PackItem, *, type_slug: str) -> Created:
+    async def create_item(self, spec: BundleItem, *, type_slug: str) -> Created:
         """Create the item under `type_slug`."""
         command = CreateNodeCommand(
             name=spec.name,
@@ -619,7 +619,7 @@ class GraphPackTarget:
 
     async def create_connection(
         self,
-        spec: PackConnection,
+        spec: BundleConnection,
         *,
         source_id: uuid.UUID,
         target_id: uuid.UUID,
@@ -804,7 +804,7 @@ class CollectionPackTarget:
         self._scope = self._access.scope_for(actor)
 
     async def create_collection(
-        self, spec: PackCollection, *, item_ids: Sequence[uuid.UUID]
+        self, spec: BundleCollection, *, item_ids: Sequence[uuid.UUID]
     ) -> Created:
         """Create the collection, put the items on it and return what was stored."""
         async with self._stores.checker() as checker:

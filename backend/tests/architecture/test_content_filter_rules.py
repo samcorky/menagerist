@@ -33,14 +33,6 @@ from app.modules.collections.adapters.persistence.models import CollectionModel
 from app.modules.collections.ports.collection_repository import CollectionRepository
 from app.modules.collections.ports.item_lookup import ItemLookup
 from app.modules.collections.ports.membership_repository import MembershipRepository
-from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
-    InMemoryInstallationRepository,
-)
-from app.modules.examples.adapters.persistence.installation_repository import (
-    SqlAlchemyInstallationRepository,
-)
-from app.modules.examples.adapters.persistence.models import ExampleInstallationModel
-from app.modules.examples.ports.installation_repository import InstallationRepository
 from app.modules.graph.adapters.persistence.edge_repository import (
     SqlAlchemyEdgeRepository,
 )
@@ -96,6 +88,14 @@ from app.modules.presets.adapters.persistence.preset_repository import (
 )
 from app.modules.presets.ports.preset_repository import PresetRepository
 from app.modules.settings.adapters.persistence.models import SettingValueModel
+from app.modules.transfer.adapters.persistence.in_memory_run_repository import (
+    InMemoryRunRepository,
+)
+from app.modules.transfer.adapters.persistence.models import RunModel
+from app.modules.transfer.adapters.persistence.run_repository import (
+    SqlAlchemyRunRepository,
+)
+from app.modules.transfer.ports.run_repository import RunRepository
 from app.platform.database import Base
 from app.platform.orm_mixins import OwnedMixin
 from app.shared_kernel.access import Content, Requires
@@ -168,7 +168,7 @@ NO_SCOPE_NEEDED: dict[type, dict[str, str]] = {
         "update": "persists an attachment fetched through its asset's scope",
         "delete": "removes an attachment fetched through its asset's scope",
     },
-    InstallationRepository: {"add": _ADD, "save": _SAVE, "claim_orphaned": _CLAIM},
+    RunRepository: {"add": _ADD, "save": _SAVE, "claim_orphaned": _CLAIM},
     PresetRepository: {
         "add": _ADD,
         "save": _SAVE,
@@ -202,8 +202,8 @@ PORTS: list[tuple[type, tuple[type, ...]]] = [
         (InMemoryMediaAttachmentRepository, SqlAlchemyMediaAttachmentRepository),
     ),
     (
-        InstallationRepository,
-        (InMemoryInstallationRepository, SqlAlchemyInstallationRepository),
+        RunRepository,
+        (InMemoryRunRepository, SqlAlchemyRunRepository),
     ),
     (PresetRepository, (InMemoryPresetRepository, SqlAlchemyPresetRepository)),
 ]
@@ -353,7 +353,7 @@ OWNED_MODELS = (
     NodeModel,
     EdgeModel,
     MediaAssetModel,
-    ExampleInstallationModel,
+    RunModel,
     PresetModel,
 )
 # `CollectionModel.owner_id` is NOT NULL (every collection has an owner from the

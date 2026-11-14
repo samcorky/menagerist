@@ -1457,12 +1457,18 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 
 **Choices that are not obvious:**
 
-- Behaviour-preserving move (#231a): names, the `example_installations` table, the `/examples` API and the permissions are unchanged. The `pack` to `bundle` and `installation` to `run` renames, and the move of the ledger and removal logic, wait for #231b so this change is only moves and imports.
+- Behaviour-preserving move (#231a): names, the `example_installations` table, the `/examples` API and the permissions are unchanged. The `pack` to `bundle` and `installation` to `run` renames, and the move of the ledger and removal logic, wait for #231b so this change is only moves and imports. _(Done in #231b, 2026-11-14: see below.)_
 - The bundle types moved with the ports because the ports take them; leaving them in `examples` would have made `transfer` import `examples`. `EntityKind` moved for the same reason.
 - Targets are neutral about who installs. A caller that does not record a run in the example ledger (the planned preset and starter-type catalogue, #100) installs without the "Example" marker, which comes only from that ledger.
 - Whether the bundle format is public is still open (#230).
 
 **Rationale:** the example-pack installer is the only code that writes a whole bundle today, and later importers (#230, #238) and the catalogue need the same targets. Moving them first keeps those changes from untangling example-specific code.
+
+**The ledger follows (#231b, 2026-11-14).** The run ledger (`Run`, formerly `Installation`, with `EntityRecord`, `Outcome`, `REMOVAL_ORDER` and `adoptable_records`), its `RunRepository` port and adapters, the removal rule and `settle_run` / `settle_records` moved into `transfer`, and the bundle types became `BundlePreset`, `BundleItemType` and so on (`InvalidBundleError`, `InvalidRunStateError`).
+
+- No migration: the `RunModel` keeps the `example_installations` table and its `pack_id` column, mapped to `Run.bundle_id`. Stored data, the `/examples` API and its "installation" wording are unchanged; an example pack's install is still an installation to the person.
+- Removal takes a `RemovalTargets` (presets, graph, collections, plus `others` by kind). Covers stay in `examples` and are passed as `others`, so `transfer` never learns about them; the rule that a kept cover is not reported moved to `examples` (`reported_kept`).
+- The two internal errors were renamed. Neither appears in `openapi.json`; `InvalidBundleError` is raised only for a malformed shipped pack.
 
 ## Presets belong to a person (2026-11-13)
 
