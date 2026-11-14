@@ -22,6 +22,7 @@ async def test_setup_is_required_only_while_there_are_no_accounts(
             sessions=world.sessions,
             attempts=world.attempts,
             tokens=world.tokens,
+            devices=world.devices,
         ),
         get_access_guard(),
     )

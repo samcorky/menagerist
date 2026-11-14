@@ -72,6 +72,7 @@ class Api:
             sessions=world.sessions,
             attempts=world.attempts,
             tokens=world.tokens,
+            devices=world.devices,
         )
         self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow

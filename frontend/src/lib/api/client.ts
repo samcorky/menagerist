@@ -6,6 +6,8 @@ import './etag-interceptor';
 import './auth-interceptor';
 // Tracks whether the server can be reached.
 import './offline-interceptor';
+// Says whether the app runs installed or in a browser tab.
+import './display-mode-interceptor';
 
 // Use relative URL in browser, fallback to localhost for Node tests.
 const defaultBase = typeof window !== 'undefined' ? '' : 'http://localhost';

@@ -10,6 +10,7 @@ class ThrottleKind(StrEnum):
     USER_ID = "user_id"
     IP = "ip"
     TOKEN_IP = "token_ip"
+    DEVICE = "device"
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -25,6 +26,9 @@ class ThrottlePolicy:
     """How many failures a key may make in one fixed window before it locks."""
 
     username_limit: int = 5
+    # A remembered browser counts on its own key instead of the username's, so
+    # other people's guesses cannot lock it out; finite in case the cookie leaks.
+    device_limit: int = 20
     ip_limit: int = 20
     window: timedelta = timedelta(minutes=15)
 

@@ -6,14 +6,14 @@
 	import { toast } from 'svelte-sonner';
 	import { auth } from '$lib/auth.svelte.js';
 	import { DISPLAY_NAME_MAX_LENGTH, displayNameProblem, PASSWORD_MIN_LENGTH } from '$lib/auth';
-	import { describeDevice, formatRelativeTime } from '$lib/devices';
+	import { deviceRow, formatRelativeTime, type DeviceRevoke, type DeviceRow } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
 	import { wide } from '$lib/viewport.svelte';
 	import {
-		listOwnSessions,
+		listOwnDevices,
+		revokeOwnDevice,
 		revokeOwnSession,
-		revokeOtherSessions,
-		type SessionResponse
+		revokeOtherSessions
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
@@ -45,7 +45,7 @@
 	let nameError = $state<string | null>(null);
 	let nameTouched = $state(false);
 
-	let sessions = $state<SessionResponse[]>([]);
+	let devices = $state<DeviceRow[]>([]);
 	let sessionsLoading = $state(true);
 	let sessionsError = $state<string | null>(null);
 	let sessionBusy = $state<string | null>(null);
@@ -105,11 +105,11 @@
 		sessionsLoading = true;
 		sessionsError = null;
 		try {
-			const result = await listOwnSessions();
+			const result = await listOwnDevices();
 			if (result.error || !result.data) {
 				sessionsError = networkAwareError(result).title;
 			} else {
-				sessions = result.data;
+				devices = result.data.map(deviceRow);
 			}
 		} catch {
 			sessionsError = 'Could not load devices.';
@@ -122,13 +122,16 @@
 		else sessionsLoading = false;
 	});
 
-	const hasOtherDevices = $derived(sessions.some((s) => !s.current));
+	const hasOtherDevices = $derived(devices.some((d) => !d.current));
 
-	async function handleRevokeSession(sessionId: string) {
+	async function handleRevoke(key: string, revoke: DeviceRevoke) {
 		if (sessionBusy !== null) return;
-		sessionBusy = sessionId;
+		sessionBusy = key;
 		try {
-			const result = await revokeOwnSession({ path: { session_id: sessionId } });
+			const result =
+				revoke.kind === 'device'
+					? await revokeOwnDevice({ path: { device_id: revoke.id } })
+					: await revokeOwnSession({ path: { session_id: revoke.id } });
 			if (result.error) {
 				toast.error(errorMessage(result.error));
 			} else {
@@ -346,7 +349,7 @@
 					<Skeleton class="h-20 w-full rounded-xl" />
 					<Skeleton class="h-20 w-full rounded-xl" />
 				</div>
-			{:else if sessions.length === 0}
+			{:else if devices.length === 0}
 				<p class="text-sm text-muted-foreground">No active devices.</p>
 			{:else}
 				{#if wide.current}
@@ -355,49 +358,41 @@
 						columns={[
 							{ label: 'Device' },
 							{ label: 'Address' },
-							{ label: 'Signed in' },
+							{ label: 'First signed in' },
 							{ label: 'Last active' },
 							{ label: 'Action', end: true }
 						]}
 					>
-						{#each sessions as session (session.id)}
-							{@const described = describeDevice({
-								userAgent: session.user_agent,
-								platform: session.client_platform,
-								mobile: session.client_mobile
-							})}
+						{#each devices as device (device.key)}
 							<Table.Row>
 								<Table.Cell>
 									<div class="flex items-center gap-2">
-										<DeviceIcon
-											kind={described.kind}
-											class="size-4 shrink-0 text-muted-foreground"
-										/>
-										<span class="font-medium" title={session.user_agent ?? undefined}
-											>{described.label}</span
+										<DeviceIcon kind={device.kind} class="size-4 shrink-0 text-muted-foreground" />
+										<span class="font-medium" title={device.userAgent ?? undefined}
+											>{device.label}</span
 										>
-										{#if session.current}
+										{#if device.current}
 											<Badge variant="secondary">This device</Badge>
 										{/if}
 									</div>
 								</Table.Cell>
-								<Table.Cell class="text-muted-foreground">{session.client_ip ?? '—'}</Table.Cell>
+								<Table.Cell class="text-muted-foreground">{device.address ?? '—'}</Table.Cell>
 								<Table.Cell class="text-muted-foreground">
-									{formatIsoDate(session.created_at.slice(0, 10), 'short')}
+									{formatIsoDate(device.firstSeen.slice(0, 10), 'short')}
 								</Table.Cell>
 								<Table.Cell class="text-muted-foreground">
-									{formatRelativeTime(session.last_seen_at)}
+									{formatRelativeTime(device.lastSeen)}
 								</Table.Cell>
 								<Table.Cell class="text-right">
-									{#if !session.current}
+									{#if !device.current}
 										<Button
 											type="button"
 											variant="outline"
 											class="h-9 px-3"
-											disabled={sessionBusy === session.id}
-											onclick={() => handleRevokeSession(session.id)}
+											disabled={sessionBusy === device.key}
+											onclick={() => handleRevoke(device.key, device.revoke)}
 										>
-											{#if sessionBusy === session.id}
+											{#if sessionBusy === device.key}
 												<Spinner class="size-4" />
 											{/if}
 											Sign out
@@ -409,12 +404,7 @@
 					</DataTable>
 				{:else}
 					<ul class="space-y-3" aria-label="Active devices">
-						{#each sessions as session (session.id)}
-							{@const described = describeDevice({
-								userAgent: session.user_agent,
-								platform: session.client_platform,
-								mobile: session.client_mobile
-							})}
+						{#each devices as device (device.key)}
 							<li>
 								<Card.Root>
 									<Card.Content
@@ -424,36 +414,36 @@
 											<div
 												class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
 											>
-												<DeviceIcon kind={described.kind} class="size-5" />
+												<DeviceIcon kind={device.kind} class="size-5" />
 											</div>
 											<div class="space-y-1">
 												<div class="flex flex-wrap items-center gap-2">
-													<p class="font-medium" title={session.user_agent ?? undefined}>
-														{described.label}
+													<p class="font-medium" title={device.userAgent ?? undefined}>
+														{device.label}
 													</p>
-													{#if session.current}
+													{#if device.current}
 														<Badge variant="secondary">This device</Badge>
 													{/if}
 												</div>
 												<p class="text-xs text-muted-foreground">
-													{#if session.client_ip}
-														{session.client_ip} &middot;
+													{#if device.address}
+														{device.address} &middot;
 													{/if}
-													Signed in {formatIsoDate(session.created_at.slice(0, 10), 'short')} &middot;
-													Last active {formatRelativeTime(session.last_seen_at)}
+													First signed in {formatIsoDate(device.firstSeen.slice(0, 10), 'short')} &middot;
+													Last active {formatRelativeTime(device.lastSeen)}
 												</p>
 											</div>
 										</div>
 
-										{#if !session.current}
+										{#if !device.current}
 											<Button
 												type="button"
 												variant="outline"
 												class="shrink-0 pointer-coarse:h-11"
-												disabled={sessionBusy === session.id}
-												onclick={() => handleRevokeSession(session.id)}
+												disabled={sessionBusy === device.key}
+												onclick={() => handleRevoke(device.key, device.revoke)}
 											>
-												{#if sessionBusy === session.id}
+												{#if sessionBusy === device.key}
 													<Spinner class="size-4" />
 												{/if}
 												Sign out
@@ -477,7 +467,7 @@
 		<ConfirmDialog
 			open={confirmRevokeOthers}
 			title="Sign out all other devices?"
-			description="You will stay signed in on this device, but any other sessions will end."
+			description="You will stay signed in on this device. Every other device is signed out and forgotten."
 			confirmLabel="Sign out other devices"
 			busyLabel="Signing out…"
 			busy={revokingOthers}

@@ -49,7 +49,10 @@ class ChangePasswordCommand:
 class ChangePassword(
     CommandHandler[IdentityUnitOfWork, ChangePasswordCommand, SignedInResult]
 ):
-    """Change the acting user's password and replace every session with one new one."""
+    """Change the acting user's password and replace every session with one new one.
+
+    Every remembered browser is forgotten, and this one is remembered afresh.
+    """
 
     access: ClassVar[Access] = OwnAccount()
 
@@ -62,12 +65,14 @@ class ChangePassword(
         throttle: SignInThrottle,
         *,
         session_ttl: timedelta,
+        device_ttl: timedelta,
     ) -> None:
         super().__init__(uow, guard)
         self._hasher = hasher
         self._throttle = throttle
         self._tokens = tokens
         self._ttl = session_ttl
+        self._device_ttl = device_ttl
 
     @staticmethod
     def _refusal(
@@ -129,11 +134,15 @@ class ChangePassword(
             await repos.users.save(user)
             ended = await repos.sessions.delete_for_user(user.id)
             tokens_ended = await repos.tokens.delete_for_user(user.id)
+            # Forget every remembered browser, so an old device cookie loses its
+            # higher sign-in limit; this one is remembered afresh below.
+            await repos.devices.delete_for_user(user.id)
             started = await start_session(
                 repos,
                 self._tokens,
                 user,
                 self._ttl,
+                device_ttl=self._device_ttl,
                 client_ip=command.client_ip,
                 device=command.device,
             )
@@ -142,5 +151,8 @@ class ChangePassword(
         logger.info("api tokens ended", user_id=user.id, count=tokens_ended)
         logger.info("password changed", user_id=user.id, session_id=started.session_id)
         return SignedInResult(
-            user=user, token=started.token, session_id=started.session_id
+            user=user,
+            token=started.token,
+            session_id=started.session_id,
+            device_token=started.device_token,
         )

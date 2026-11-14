@@ -37,6 +37,11 @@ def user_id_key(user_id: uuid.UUID) -> ThrottleKey:
     return _key(ThrottleKind.USER_ID, str(user_id))
 
 
+def device_key(device_id: uuid.UUID) -> ThrottleKey:
+    """The counter for a remembered browser, used in place of the username's."""
+    return _key(ThrottleKind.DEVICE, str(device_id))
+
+
 def ip_key(client_ip: str) -> ThrottleKey:
     """The counter for a client address."""
     return _key(ThrottleKind.IP, client_ip)
@@ -72,6 +77,8 @@ class SignInThrottle:
         """Return how many failures `key` may make in one window."""
         if key.kind in _ADDRESS_KINDS:
             return self.policy.ip_limit
+        if key.kind is ThrottleKind.DEVICE:
+            return self.policy.device_limit
         return self.policy.username_limit
 
     def throttled(self, locked_until: datetime, now: datetime) -> SignInThrottledError:

@@ -13,6 +13,9 @@ from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.modules.identity.adapters.persistence.api_token_repository import (
     SqlAlchemyApiTokenRepository,
 )
+from app.modules.identity.adapters.persistence.device_repository import (
+    SqlAlchemyDeviceRepository,
+)
 from app.modules.identity.adapters.persistence.models import SessionModel, UserModel
 from app.modules.identity.adapters.persistence.session_repository import (
     SqlAlchemySessionRepository,
@@ -94,6 +97,7 @@ def _setup(
         SecretsSessionTokenGenerator(),
         claim,
         session_ttl=timedelta(hours=1),
+        device_ttl=timedelta(days=365),
     )
 
 
@@ -146,6 +150,7 @@ def _slow_uow(factory: async_sessionmaker[AsyncSession]) -> IdentityUnitOfWork:
             sessions=_SlowSessionRepository(session),
             attempts=SqlAlchemySignInAttemptRepository(session),
             tokens=SqlAlchemyApiTokenRepository(session),
+            devices=SqlAlchemyDeviceRepository(session),
         )
 
     return SqlAlchemySessionUnitOfWork(factory, build)

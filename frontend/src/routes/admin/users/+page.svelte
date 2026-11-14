@@ -842,7 +842,8 @@
 						{@const described = describeDevice({
 							userAgent: dev.user_agent,
 							platform: dev.client_platform,
-							mobile: dev.client_mobile
+							mobile: dev.client_mobile,
+							displayMode: dev.display_mode
 						})}
 						<li>
 							<Card.Root>

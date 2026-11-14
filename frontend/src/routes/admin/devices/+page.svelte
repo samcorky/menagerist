@@ -204,7 +204,8 @@
 					{@const described = describeDevice({
 						userAgent: session.user_agent,
 						platform: session.client_platform,
-						mobile: session.client_mobile
+						mobile: session.client_mobile,
+						displayMode: session.display_mode
 					})}
 					<Table.Row>
 						<Table.Cell class="font-medium">
@@ -251,7 +252,8 @@
 					{@const described = describeDevice({
 						userAgent: session.user_agent,
 						platform: session.client_platform,
-						mobile: session.client_mobile
+						mobile: session.client_mobile,
+						displayMode: session.display_mode
 					})}
 					<li>
 						<Card.Root>

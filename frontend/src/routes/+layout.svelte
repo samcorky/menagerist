@@ -49,6 +49,7 @@
 	} from '$lib/service-worker-client';
 	import { themeController } from '$lib/theme.svelte.js';
 	import { offlineController } from '$lib/offline.svelte.js';
+	import { displayMode } from '$lib/display-mode.svelte.js';
 	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
@@ -83,6 +84,8 @@
 	});
 
 	$effect(() => offlineController.init());
+
+	$effect(() => displayMode.init());
 
 	// Launched with no connection, the sign-in check fails: try again once the connection returns.
 	$effect(() => {

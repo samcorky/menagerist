@@ -19,7 +19,7 @@ test('an administrator starts a task and sees the worker finish it', async ({ pa
 		has: page.getByRole('rowheader', { name: TASK })
 	});
 	await expect(
-		row.getByText('Removes sessions and access tokens that have expired.')
+		row.getByText('Removes expired sessions, access tokens and remembered devices.')
 	).toBeVisible();
 
 	await row.getByRole('button', { name: `Run ${TASK} now` }).click();

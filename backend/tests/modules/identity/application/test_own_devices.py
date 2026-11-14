@@ -72,6 +72,7 @@ async def test_list_own_sessions_returns_active_sessions_newest_first(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
@@ -130,6 +131,7 @@ async def test_list_own_sessions_excludes_expired_and_idle_sessions(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
@@ -167,6 +169,7 @@ async def test_list_own_sessions_excludes_other_users_sessions(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
@@ -195,6 +198,7 @@ async def test_list_own_sessions_with_unknown_or_none_current_session(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 

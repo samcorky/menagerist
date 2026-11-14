@@ -56,6 +56,7 @@ async def test_a_permission_the_role_lost_disappears(
             sessions=world.sessions,
             attempts=world.attempts,
             tokens=world.tokens,
+            devices=world.devices,
         ),
         get_access_guard(),
         RoleAuthorisationAdapter(member_permissions=reduced),

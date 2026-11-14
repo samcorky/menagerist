@@ -158,6 +158,7 @@ def create_admin(
                 SecretsSessionTokenGenerator(),
                 _claim_builder(session),
                 session_ttl=ttl,
+                device_ttl=timedelta(days=get_identity_settings().device_ttl_days),
             ).handle(
                 SetupFirstAdminCommand(
                     username=username, display_name=name, password=password

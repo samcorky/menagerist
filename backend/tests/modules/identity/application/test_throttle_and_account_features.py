@@ -254,6 +254,7 @@ async def test_a_locked_attempt_costs_a_hash_but_never_reaches_the_authenticator
         SignInThrottle(),
         decoy_hash="fake$decoy",
         session_ttl=timedelta(hours=1),
+        device_ttl=timedelta(days=365),
     )
     for _ in range(5):
         await world.attempts.record_failure(
@@ -562,6 +563,7 @@ async def test_has_administrator_counts_enabled_administrators(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     query = HasAdministrator(repos, get_access_guard())
     assert await query.handle(HasAdministratorQuery(), ANONYMOUS_ACTOR) is False

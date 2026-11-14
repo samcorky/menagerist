@@ -56,11 +56,14 @@ Configuration for the identity module.
 | --- | --- | --- | --- | --- |
 | `MENAGERIST_IDENTITY_SESSION_TTL_HOURS` | whole number | `168` | 1 or more | Maximum lifetime of a session in hours, even while it is active. |
 | `MENAGERIST_IDENTITY_SESSION_IDLE_HOURS` | whole number | `0` | 0 or more | Idle timeout in hours; 0 disables this limit. |
-| `MENAGERIST_IDENTITY_PURGE_EXPIRED_SCHEDULE` | cron schedule | `15 4 * * *` | five fields; empty turns the job off | Cron expression for removing expired sessions and API tokens in the instance timezone. Empty disables the job. Editable in the app's settings unless set here. |
+| `MENAGERIST_IDENTITY_PURGE_EXPIRED_SCHEDULE` | cron schedule | `15 4 * * *` | five fields; empty turns the job off | Cron expression for removing expired sessions, API tokens and devices in the instance timezone. Empty disables the job. Editable in the app's settings unless set here. |
 | `MENAGERIST_IDENTITY_COOKIE_NAME` | text | `menagerist-session` | matching `` ^[!#$%&'*+\-.^_`\|~0-9A-Za-z]+$ `` | Name of the HTTP-only session cookie. |
+| `MENAGERIST_IDENTITY_DEVICE_COOKIE_NAME` | text | `menagerist-device` | matching `` ^[!#$%&'*+\-.^_`\|~0-9A-Za-z]+$ `` | Name of the HTTP-only cookie that remembers a signed-in browser; it is kept on sign-out. |
+| `MENAGERIST_IDENTITY_DEVICE_TTL_DAYS` | whole number | `365` | 1 or more | Days a browser stays remembered after its last sign-in, for the device sign-in limit and the devices list. |
 | `MENAGERIST_IDENTITY_COOKIE_SECURE` | text | `auto` | `auto`, `origin`, `always`, `never` | Secure session cookies: auto detects HTTPS from each request, origin follows the scheme of api.public_origin, always and never force it. |
 | `MENAGERIST_IDENTITY_PASSWORD_HASHER` | text | `scrypt` | `scrypt` | Password-hashing scheme used for newly created password hashes. |
 | `MENAGERIST_IDENTITY_SIGN_IN_USERNAME_ATTEMPTS` | whole number | `5` | 1 or more | Failed sign-ins allowed per username in each throttle window. |
+| `MENAGERIST_IDENTITY_SIGN_IN_DEVICE_ATTEMPTS` | whole number | `20` | 1 or more | Failed sign-ins allowed per window from a remembered browser, counted apart from the username's limit so others cannot lock it out. |
 | `MENAGERIST_IDENTITY_SIGN_IN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed sign-ins allowed per IP address in each throttle window. |
 | `MENAGERIST_IDENTITY_API_TOKEN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed API-token checks allowed per IP address per window. |
 | `MENAGERIST_IDENTITY_SIGN_IN_WINDOW_MINUTES` | whole number | `15` | 1 or more | Duration of the failed sign-in throttle window in minutes. |

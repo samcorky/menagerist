@@ -67,6 +67,7 @@ class Api:
             sessions=world.sessions,
             attempts=world.attempts,
             tokens=world.tokens,
+            devices=world.devices,
         )
         graph = GraphRepos(
             nodes=InMemoryNodeRepository(),

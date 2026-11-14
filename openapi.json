@@ -19448,14 +19448,14 @@
           "Authentication"
         ],
         "summary": "Sign Out",
-        "description": "Sign out, ending the session and clearing the cookies.\n\nWithout a session cookie nothing is changed: the same-origin check does not\napply then, so clearing cookies would let a cross-site POST log someone out.",
+        "description": "Sign out, ending the session and clearing its cookie.\n\nThe device cookie is kept: signing out does not forget the browser.\nWithout a session cookie nothing is changed: the same-origin check does not\napply then, so clearing cookies would let a cross-site POST log someone out.",
         "operationId": "sign_out",
         "responses": {
           "204": {
             "description": "Signed out.",
             "headers": {
               "Set-Cookie": {
-                "description": "Clears the session cookie with `Max-Age=0` when a session was ended. The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`.",
+                "description": "Clears the session cookie with `Max-Age=0` when a session was ended. The device cookie is left alone. The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`.",
                 "schema": {
                   "type": "string",
                   "examples": [
@@ -19844,7 +19844,7 @@
           "Authentication"
         ],
         "summary": "Change Password",
-        "description": "Change your password. Other sessions end and this one gets a new token.\n\nWrong current passwords are throttled per user and per client address.",
+        "description": "Change your password. Other sessions end and this one gets a new token.\n\nEvery remembered browser is forgotten, and this one gets a new device cookie.\nWrong current passwords are throttled per user and per client address.",
         "operationId": "change_password",
         "requestBody": {
           "content": {
@@ -19861,7 +19861,7 @@
             "description": "Successful Response",
             "headers": {
               "Set-Cookie": {
-                "description": "Sets the session cookie. Its value is an opaque token, not to be parsed, and it lasts for the configured session lifetime (`Max-Age`). The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`.",
+                "description": "Sets the session cookie. Its value is an opaque token, not to be parsed, and it lasts for the configured session lifetime (`Max-Age`). The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`. A second cookie, named by `device_cookie_name` (`menagerist-device` by default) with the same prefix and attributes, remembers the browser for `device_ttl_days`; it is kept on sign-out.",
                 "schema": {
                   "type": "string",
                   "examples": [
@@ -20035,6 +20035,332 @@
         ]
       }
     },
+    "/api/v1/me/devices": {
+      "get": {
+        "tags": [
+          "v1",
+          "Authentication",
+          "Sessions"
+        ],
+        "summary": "List Own Devices",
+        "description": "List the browsers you are signed in on, each with its active sessions.",
+        "operationId": "list_own_devices",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OwnDeviceResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Own Devices"
+                },
+                "example": [
+                  {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+                    "platform": "Linux",
+                    "mobile": false,
+                    "first_seen_at": "2026-09-01T08:00:00.000000Z",
+                    "last_seen_at": "2026-10-10T12:30:00.000000Z",
+                    "current": true,
+                    "sessions": [
+                      {
+                        "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                        "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+                        "client_platform": "Linux",
+                        "client_mobile": false,
+                        "client_ip": "192.0.2.1",
+                        "created_at": "2026-10-10T12:00:00.000000Z",
+                        "last_seen_at": "2026-10-10T12:30:00.000000Z",
+                        "expires_at": "2026-10-11T12:00:00.000000Z",
+                        "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                        "display_mode": "standalone",
+                        "current": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "links": {
+              "RevokeOwnDevice": {
+                "operationId": "revoke_own_device",
+                "parameters": {
+                  "device_id": "$response.body#/0/id"
+                },
+                "description": "Revoke own device with the id from this response."
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/devices"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/devices"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/devices"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/devices"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/devices/{device_id}": {
+      "delete": {
+        "tags": [
+          "v1",
+          "Authentication",
+          "Sessions"
+        ],
+        "summary": "Revoke Own Device",
+        "description": "Sign out one of your devices and forget it, ending all its sessions.",
+        "operationId": "revoke_own_device",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The device to sign out and forget.",
+              "title": "Device Id"
+            },
+            "description": "The device to sign out and forget."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokedSessionsResponse"
+                },
+                "example": {
+                  "ended": 1
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested device does not exist or is someone else's.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "DeviceNotFoundError",
+                  "status": 404,
+                  "detail": "That device was not found.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Returned when an operation cannot be performed on the current session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "CurrentSessionError",
+                  "status": 409,
+                  "detail": "Cannot revoke the current device.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/sessions": {
       "get": {
         "tags": [
@@ -20154,7 +20480,7 @@
           "Sessions"
         ],
         "summary": "Revoke Other Sessions",
-        "description": "Sign out all other active devices for your account.",
+        "description": "Sign out everywhere except this device, forgetting the other devices.",
         "operationId": "revoke_other_sessions",
         "responses": {
           "200": {
@@ -22995,7 +23321,7 @@
             "description": "Successful Response",
             "headers": {
               "Set-Cookie": {
-                "description": "Sets the session cookie. Its value is an opaque token, not to be parsed, and it lasts for the configured session lifetime (`Max-Age`). The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`.",
+                "description": "Sets the session cookie. Its value is an opaque token, not to be parsed, and it lasts for the configured session lifetime (`Max-Age`). The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`. A second cookie, named by `device_cookie_name` (`menagerist-device` by default) with the same prefix and attributes, remembers the browser for `device_ttl_days`; it is kept on sign-out.",
                 "schema": {
                   "type": "string",
                   "examples": [
@@ -23121,7 +23447,7 @@
           "Authentication"
         ],
         "summary": "Sign In",
-        "description": "Sign in, setting the session cookie.\n\nRefused with 403 `cross_site_refused` when a page on another site sent it.\n\nThe 403 `account_disabled` answer is given only when the password was\nright; a wrong password for a disabled account gets the same 401 as any\nother. Failures are throttled per username and per client address (429 with\n`Retry-After`) whether or not the account exists.",
+        "description": "Sign in, setting the session cookie and the device cookie.\n\nRefused with 403 `cross_site_refused` when a page on another site sent it.\n\nThe 403 `account_disabled` answer is given only when the password was\nright; a wrong password for a disabled account gets the same 401 as any\nother. Failures are throttled per username and per client address (429 with\n`Retry-After`) whether or not the account exists. A browser sending a device\ncookie it was given when signing in to this account before is counted on its\nown, higher limit instead of the username's, so failures from elsewhere\ncannot lock it out.",
         "operationId": "sign_in",
         "requestBody": {
           "content": {
@@ -23138,7 +23464,7 @@
             "description": "Successful Response",
             "headers": {
               "Set-Cookie": {
-                "description": "Sets the session cookie. Its value is an opaque token, not to be parsed, and it lasts for the configured session lifetime (`Max-Age`). The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`.",
+                "description": "Sets the session cookie. Its value is an opaque token, not to be parsed, and it lasts for the configured session lifetime (`Max-Age`). The name is the configured session cookie name (`menagerist-session` by default), prefixed `__Host-Http-` when the cookie is Secure. The cookie is `HttpOnly`, `SameSite=Strict` and `Path=/`, has no `Domain`, and is `Secure` over HTTPS or when `cookie_secure` is `always`. A second cookie, named by `device_cookie_name` (`menagerist-device` by default) with the same prefix and attributes, remembers the browser for `device_ttl_days`; it is kept on sign-out.",
                 "schema": {
                   "type": "string",
                   "examples": [
@@ -23670,6 +23996,30 @@
             "type": "string",
             "format": "date-time",
             "title": "Expires At"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id",
+            "description": "The remembered browser this session was started in, if any."
+          },
+          "display_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisplayMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the session was started in a browser tab or the installed app, as the app reported it; absent for older sessions."
           }
         },
         "type": "object",
@@ -23689,6 +24039,8 @@
             "client_mobile": false,
             "client_platform": "Linux",
             "created_at": "2026-10-10T12:00:00.000000Z",
+            "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+            "display_mode": "browser",
             "display_name": "Alice Example",
             "expires_at": "2026-10-11T12:00:00.000000Z",
             "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
@@ -25241,6 +25593,15 @@
             "target_type": "node"
           }
         ]
+      },
+      "DisplayMode": {
+        "type": "string",
+        "enum": [
+          "browser",
+          "standalone"
+        ],
+        "title": "DisplayMode",
+        "description": "How the app was shown when a session started: a browser tab or installed."
       },
       "DuplicateNodeRequest": {
         "properties": {
@@ -27325,6 +27686,119 @@
         "title": "Overlap",
         "description": "How enqueueing handles already queued or running work."
       },
+      "OwnDeviceResponse": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "The device's id; null for a session from before devices."
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent",
+            "description": "The browser's user agent at its last sign-in."
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform",
+            "description": "The platform the browser reported, if any."
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile",
+            "description": "Whether the browser reported a mobile device."
+          },
+          "first_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen At",
+            "description": "When this browser was first remembered for the account."
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At",
+            "description": "The latest activity of the browser or any of its sessions."
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current",
+            "description": "Whether this is the browser making the request."
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SessionResponse"
+            },
+            "type": "array",
+            "title": "Sessions",
+            "description": "The browser's active sessions, newest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "first_seen_at",
+          "last_seen_at",
+          "current",
+          "sessions"
+        ],
+        "title": "OwnDeviceResponse",
+        "description": "A browser the current user is signed in on, with its active sessions.\n\n`id` is null for a session started before browsers were remembered; it is\nthen the only session listed, and is ended through `DELETE /me/sessions/{id}`.",
+        "examples": [
+          {
+            "current": true,
+            "first_seen_at": "2026-09-01T08:00:00.000000Z",
+            "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+            "last_seen_at": "2026-10-10T12:30:00.000000Z",
+            "mobile": false,
+            "platform": "Linux",
+            "sessions": [
+              {
+                "client_ip": "192.0.2.1",
+                "client_mobile": false,
+                "client_platform": "Linux",
+                "created_at": "2026-10-10T12:00:00.000000Z",
+                "current": true,
+                "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                "display_mode": "standalone",
+                "expires_at": "2026-10-11T12:00:00.000000Z",
+                "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                "last_seen_at": "2026-10-10T12:30:00.000000Z",
+                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0"
+              }
+            ],
+            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0"
+          }
+        ]
+      },
       "PackCountsResponse": {
         "properties": {
           "presets": {
@@ -28578,6 +29052,30 @@
             "format": "date-time",
             "title": "Expires At"
           },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id",
+            "description": "The remembered browser this session was started in, if any."
+          },
+          "display_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisplayMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the session was started in a browser tab or the installed app, as the app reported it; absent for older sessions."
+          },
           "current": {
             "type": "boolean",
             "title": "Current"
@@ -28600,6 +29098,8 @@
             "client_platform": "Linux",
             "created_at": "2026-10-10T12:00:00.000000Z",
             "current": true,
+            "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+            "display_mode": "standalone",
             "expires_at": "2026-10-11T12:00:00.000000Z",
             "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
             "last_seen_at": "2026-10-10T12:30:00.000000Z",

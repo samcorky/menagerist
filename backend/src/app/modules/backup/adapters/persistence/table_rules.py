@@ -33,6 +33,7 @@ TABLE_RULES = {
         TableRule.KEEP,
     ),
     "api_tokens": TableRule.SKIP,
+    "devices": TableRule.SKIP,
     "sessions": TableRule.SKIP,
     "sign_in_attempts": TableRule.SKIP,
     "job_runs": TableRule.SKIP,

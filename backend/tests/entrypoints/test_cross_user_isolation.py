@@ -122,6 +122,9 @@ from app.modules.identity.adapters.api.dependencies import (
 from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
     InMemoryApiTokenRepository,
 )
+from app.modules.identity.adapters.persistence.in_memory_device_repository import (
+    InMemoryDeviceRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
@@ -325,6 +328,8 @@ ALLOWED: dict[Route, str] = {
     ("PATCH", "/api/v1/me"): OWN_SESSION,
     ("POST", "/api/v1/me/password"): OWN_SESSION,
     ("GET", "/api/v1/me/permissions"): OWN_SESSION,
+    ("GET", "/api/v1/me/devices"): OWN_SESSION,
+    ("DELETE", "/api/v1/me/devices/{device_id}"): OWN_SESSION,
     ("GET", "/api/v1/me/sessions"): OWN_SESSION,
     ("DELETE", "/api/v1/me/sessions/{session_id}"): OWN_SESSION,
     ("DELETE", "/api/v1/me/sessions"): OWN_SESSION,
@@ -659,6 +664,7 @@ class World:
             sessions=InMemorySessionRepository(),
             attempts=InMemorySignInAttemptRepository(),
             tokens=InMemoryApiTokenRepository(),
+            devices=InMemoryDeviceRepository(),
         )
         storage = InMemoryMediaStorage()
         processor = InMemoryImageProcessor()

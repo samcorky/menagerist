@@ -20,6 +20,7 @@ from app.modules.identity.application.setup_first_admin import SetupFirstAdminCo
 from app.modules.identity.application.sign_in import SignInCommand
 from app.modules.identity.application.update_user import UpdateUserCommand
 from app.modules.identity.domain.api_token import MAX_TOKEN_NAME_LENGTH
+from app.modules.identity.domain.session import DisplayMode
 from app.modules.identity.domain.user import (
     MAX_DISPLAY_NAME_LENGTH,
     MAX_USERNAME_LENGTH,
@@ -29,6 +30,7 @@ from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.identity.application.client_device import ClientDevice
+    from app.modules.identity.application.list_own_devices import OwnDevice
     from app.modules.identity.application.list_own_sessions import OwnSession
     from app.modules.identity.application.session_listing import SessionListing
     from app.modules.identity.application.setup_first_admin import SetupFirstAdminResult
@@ -103,6 +105,7 @@ class LoginRequest(RequestModel):
         self,
         client_ip: str | None = None,
         device: ClientDevice | None = None,
+        device_token: str | None = None,
     ) -> SignInCommand:
         """Convert this request into a `SignInCommand`."""
         return SignInCommand(
@@ -110,6 +113,7 @@ class LoginRequest(RequestModel):
             password=self.password,
             client_ip=client_ip,
             device=device,
+            device_token=device_token,
         )
 
 
@@ -318,6 +322,8 @@ _SESSION_EXAMPLE: dict[str, Any] = {
     "created_at": "2026-10-10T12:00:00.000000Z",
     "last_seen_at": "2026-10-10T12:30:00.000000Z",
     "expires_at": "2026-10-11T12:00:00.000000Z",
+    "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+    "display_mode": "standalone",
     "current": True,
 }
 
@@ -333,6 +339,19 @@ _ADMIN_SESSION_EXAMPLE: dict[str, Any] = {
     "created_at": "2026-10-10T12:00:00.000000Z",
     "last_seen_at": "2026-10-10T12:30:00.000000Z",
     "expires_at": "2026-10-11T12:00:00.000000Z",
+    "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+    "display_mode": "browser",
+}
+
+DEVICE_EXAMPLE: dict[str, Any] = {
+    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+    "platform": "Linux",
+    "mobile": False,
+    "first_seen_at": "2026-09-01T08:00:00.000000Z",
+    "last_seen_at": "2026-10-10T12:30:00.000000Z",
+    "current": True,
+    "sessions": [_SESSION_EXAMPLE],
 }
 
 
@@ -349,6 +368,17 @@ class SessionResponse(BaseModel):
     created_at: datetime
     last_seen_at: datetime
     expires_at: datetime
+    device_id: uuid.UUID | None = Field(
+        default=None,
+        description="The remembered browser this session was started in, if any.",
+    )
+    display_mode: DisplayMode | None = Field(
+        default=None,
+        description=(
+            "Whether the session was started in a browser tab or the installed app,"
+            + " as the app reported it; absent for older sessions."
+        ),
+    )
     current: bool
 
     @classmethod
@@ -364,7 +394,71 @@ class SessionResponse(BaseModel):
             created_at=session.created_at,
             last_seen_at=session.last_seen_at,
             expires_at=session.expires_at,
+            device_id=session.device_id,
+            display_mode=session.display_mode,
             current=own.current,
+        )
+
+
+class OwnDeviceResponse(BaseModel):
+    """A browser the current user is signed in on, with its active sessions.
+
+    `id` is null for a session started before browsers were remembered; it is
+    then the only session listed, and is ended through `DELETE /me/sessions/{id}`.
+    """
+
+    model_config = ConfigDict(json_schema_extra={"examples": [DEVICE_EXAMPLE]})
+
+    id: uuid.UUID | None = Field(
+        default=None,
+        description="The device's id; null for a session from before devices.",
+    )
+    user_agent: str | None = Field(
+        default=None, description="The browser's user agent at its last sign-in."
+    )
+    platform: str | None = Field(
+        default=None, description="The platform the browser reported, if any."
+    )
+    mobile: bool | None = Field(
+        default=None, description="Whether the browser reported a mobile device."
+    )
+    first_seen_at: datetime = Field(
+        description="When this browser was first remembered for the account."
+    )
+    last_seen_at: datetime = Field(
+        description="The latest activity of the browser or any of its sessions."
+    )
+    current: bool = Field(description="Whether this is the browser making the request.")
+    sessions: list[SessionResponse] = Field(
+        description="The browser's active sessions, newest first."
+    )
+
+    @classmethod
+    def from_own_device(cls, own: OwnDevice) -> OwnDeviceResponse:
+        """Build a response from an `OwnDevice`."""
+        sessions = [SessionResponse.from_own_session(s) for s in own.sessions]
+        latest = max(s.last_seen_at for s in sessions)
+        device = own.device
+        if device is None:
+            only = own.sessions[0].session
+            return cls(
+                user_agent=only.user_agent,
+                platform=only.client_platform,
+                mobile=only.client_mobile,
+                first_seen_at=only.created_at,
+                last_seen_at=latest,
+                current=own.current,
+                sessions=sessions,
+            )
+        return cls(
+            id=device.id,
+            user_agent=device.user_agent,
+            platform=device.platform,
+            mobile=device.mobile,
+            first_seen_at=device.created_at,
+            last_seen_at=max(latest, device.last_seen_at),
+            current=own.current,
+            sessions=sessions,
         )
 
 
@@ -384,6 +478,17 @@ class AdminSessionResponse(BaseModel):
     created_at: datetime
     last_seen_at: datetime
     expires_at: datetime
+    device_id: uuid.UUID | None = Field(
+        default=None,
+        description="The remembered browser this session was started in, if any.",
+    )
+    display_mode: DisplayMode | None = Field(
+        default=None,
+        description=(
+            "Whether the session was started in a browser tab or the installed app,"
+            + " as the app reported it; absent for older sessions."
+        ),
+    )
 
     @classmethod
     def from_listing(cls, listing: SessionListing) -> AdminSessionResponse:
@@ -401,6 +506,8 @@ class AdminSessionResponse(BaseModel):
             created_at=session.created_at,
             last_seen_at=session.last_seen_at,
             expires_at=session.expires_at,
+            device_id=session.device_id,
+            display_mode=session.display_mode,
         )
 
 

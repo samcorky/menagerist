@@ -49,6 +49,7 @@ class SetupFirstAdminResult:
     user: User
     token: str = field(repr=False)
     session_id: uuid.UUID
+    device_token: str = field(repr=False)
     claim: ClaimReport
 
 
@@ -68,12 +69,14 @@ class SetupFirstAdmin(
         claim: ExistingDataClaim,
         *,
         session_ttl: timedelta,
+        device_ttl: timedelta,
     ) -> None:
         super().__init__(uow, guard)
         self._hasher = hasher
         self._tokens = tokens
         self._claim = claim
         self._ttl = session_ttl
+        self._device_ttl = device_ttl
 
     async def _handle(
         self, command: SetupFirstAdminCommand, actor: Actor
@@ -108,6 +111,7 @@ class SetupFirstAdmin(
                 self._tokens,
                 user,
                 self._ttl,
+                device_ttl=self._device_ttl,
                 client_ip=command.client_ip,
                 device=command.device,
             )
@@ -122,5 +126,6 @@ class SetupFirstAdmin(
             user=user,
             token=started.token,
             session_id=started.session_id,
+            device_token=started.device_token,
             claim=report,
         )

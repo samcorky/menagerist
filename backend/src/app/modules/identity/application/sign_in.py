@@ -6,10 +6,15 @@ from typing import TYPE_CHECKING, ClassVar
 import structlog
 
 from app.modules.identity.application.client_device import ClientDevice
-from app.modules.identity.application.session_start import SignedInResult, start_session
+from app.modules.identity.application.session_start import (
+    SignedInResult,
+    known_device,
+    start_session,
+)
 from app.modules.identity.application.sign_in_throttle import (
     Reservation,
     SignInThrottle,
+    device_key,
     ip_key,
     username_key,
 )
@@ -43,9 +48,10 @@ class SignInCommand:
     password: str
     client_ip: str | None = None
     device: ClientDevice | None = None
+    device_token: str | None = None
 
     def __repr__(self) -> str:
-        """Keep the password out of logs and tracebacks."""
+        """Keep the password and device cookie out of logs and tracebacks."""
         return f"SignInCommand(username={self.username!r})"
 
 
@@ -65,6 +71,7 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
         *,
         decoy_hash: str,
         session_ttl: timedelta,
+        device_ttl: timedelta,
     ) -> None:
         super().__init__(uow, guard)
         self._authenticator = authenticator
@@ -73,6 +80,7 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
         self._throttle = throttle
         self._decoy_hash = decoy_hash
         self._ttl = session_ttl
+        self._device_ttl = device_ttl
 
     async def _refund(self, reservation: Reservation) -> None:
         """Give the attempt back: a disabled account's correct check is no failure."""
@@ -85,8 +93,10 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
 
         Attempts are counted per username and per client address, whether or
         not the account exists, before the password is checked; one past a
-        limit is refused unchecked. A correct password clears the username
-        counter and refunds the address's.
+        limit is refused unchecked. A browser holding a live device cookie for
+        the username is counted on that device's own, higher limit instead of
+        the username's, so failures from elsewhere cannot lock it out. A correct
+        password clears the username or device counter and refunds the address's.
 
         Raises:
             InvalidCredentialsError: For an unknown user or wrong password.
@@ -96,16 +106,24 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
         """
         now = datetime.now(UTC)
         name_key = username_key(command.username)
-        keys = [name_key]
-        if command.client_ip:
-            keys.append(ip_key(command.client_ip))
-        log_fields = {
+        log_fields: dict[str, str | bool | None] = {
             "client_ip": command.client_ip,
             "username_hash": name_key.digest[:_LOG_HASH_LENGTH],
         }
         # Count the attempt before checking the password, so parallel guesses
         # cannot all pass a check made before any of them is recorded.
         async with self._uow as repos:
+            device = await known_device(
+                repos,
+                self._tokens,
+                command.device_token,
+                username=command.username,
+                now=now,
+            )
+            keys = [name_key if device is None else device_key(device.id)]
+            if command.client_ip:
+                keys.append(ip_key(command.client_ip))
+            log_fields["known_device"] = device is not None
             reservation = await self._throttle.reserve(repos.attempts, keys, now)
             await self._uow.commit()
         if reservation.locked_until is not None:
@@ -144,11 +162,21 @@ class SignIn(CommandHandler[IdentityUnitOfWork, SignInCommand, SignedInResult]):
                 self._tokens,
                 user,
                 self._ttl,
+                device_ttl=self._device_ttl,
                 client_ip=command.client_ip,
                 device=command.device,
+                device_token=command.device_token,
             )
             await self._uow.commit()
-        logger.info("signed in", user_id=user.id, session_id=started.session_id)
+        logger.info(
+            "signed in",
+            user_id=user.id,
+            session_id=started.session_id,
+            device_id=started.device_id,
+        )
         return SignedInResult(
-            user=user, token=started.token, session_id=started.session_id
+            user=user,
+            token=started.token,
+            session_id=started.session_id,
+            device_token=started.device_token,
         )

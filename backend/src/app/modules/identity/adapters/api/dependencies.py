@@ -15,6 +15,7 @@ from app.entrypoints.api.shared.authorisation import (
 )
 from app.entrypoints.api.shared.http.bearer import bearer_token
 from app.modules.identity.adapters.api.cookies import (
+    device_cookie_name,
     session_cookie_name,
     session_cookie_value,
 )
@@ -61,12 +62,14 @@ from app.modules.identity.application.list_grantable_permissions import (
     ListGrantablePermissions,
 )
 from app.modules.identity.application.list_own_api_tokens import ListOwnApiTokens
+from app.modules.identity.application.list_own_devices import ListOwnDevices
 from app.modules.identity.application.list_own_sessions import ListOwnSessions
 from app.modules.identity.application.list_sessions import ListSessions
 from app.modules.identity.application.list_users import ListUsers
 from app.modules.identity.application.reset_password import ResetPassword
 from app.modules.identity.application.revoke_other_sessions import RevokeOtherSessions
 from app.modules.identity.application.revoke_own_api_token import RevokeOwnApiToken
+from app.modules.identity.application.revoke_own_device import RevokeOwnDevice
 from app.modules.identity.application.revoke_own_session import RevokeOwnSession
 from app.modules.identity.application.revoke_session import RevokeSession
 from app.modules.identity.application.rotate_api_token import RotateApiToken
@@ -81,6 +84,7 @@ from app.modules.identity.domain.errors import (
     PasswordExpiredError,
     SessionRequiredError,
 )
+from app.modules.identity.domain.session import DisplayMode
 from app.modules.identity.domain.throttle import ThrottlePolicy
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.api_token_generator import ApiTokenGenerator
@@ -143,6 +147,7 @@ def get_sign_in_throttle(
     return SignInThrottle(
         ThrottlePolicy(
             username_limit=settings.sign_in_username_attempts,
+            device_limit=settings.sign_in_device_attempts,
             ip_limit=settings.sign_in_ip_attempts,
             window=timedelta(minutes=settings.sign_in_window_minutes),
         )
@@ -157,6 +162,20 @@ def get_client_ip(request: Request) -> str | None:
     `request.client.host`.
     """
     return None if request.client is None else request.client.host
+
+
+DISPLAY_MODE_HEADER = "X-Client-Display-Mode"
+
+
+def _display_mode(raw: str | None) -> DisplayMode | None:
+    """Read the app's display mode hint; anything unrecognised is ignored.
+
+    Only a label for the devices list, never trusted for anything else.
+    """
+    try:
+        return None if raw is None else DisplayMode(raw.strip().lower())
+    except ValueError:
+        return None
 
 
 def get_client_device(request: Request) -> ClientDevice:
@@ -179,7 +198,20 @@ def get_client_device(request: Request) -> ClientDevice:
         elif val == "?0":
             mobile = False
 
-    return ClientDevice(user_agent=user_agent, platform=platform, mobile=mobile)
+    return ClientDevice(
+        user_agent=user_agent,
+        platform=platform,
+        mobile=mobile,
+        display_mode=_display_mode(request.headers.get(DISPLAY_MODE_HEADER)),
+    )
+
+
+def get_device_token(
+    request: Request,
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+) -> str | None:
+    """Return the device cookie that remembers this browser, if any."""
+    return session_cookie_value(request, device_cookie_name(request, settings))
 
 
 def get_session_token_generator() -> SessionTokenGenerator:
@@ -202,6 +234,13 @@ def get_session_ttl(
 ) -> timedelta:
     """Return how long a new session lives."""
     return timedelta(hours=settings.session_ttl_hours)
+
+
+def get_device_ttl(
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+) -> timedelta:
+    """Return how long a browser stays remembered after its last sign-in."""
+    return timedelta(days=settings.device_ttl_days)
 
 
 def get_identity_uow(
@@ -254,9 +293,12 @@ def get_setup_first_admin_use_case(
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
     claim: Annotated[ExistingDataClaim, Depends(get_existing_data_claim)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
+    device_ttl: Annotated[timedelta, Depends(get_device_ttl)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SetupFirstAdmin:
-    return SetupFirstAdmin(uow, guard, hasher, tokens, claim, session_ttl=ttl)
+    return SetupFirstAdmin(
+        uow, guard, hasher, tokens, claim, session_ttl=ttl, device_ttl=device_ttl
+    )
 
 
 def get_sign_in_use_case(
@@ -267,6 +309,7 @@ def get_sign_in_use_case(
     throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
     decoy_hash: Annotated[str, Depends(get_decoy_hash)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
+    device_ttl: Annotated[timedelta, Depends(get_device_ttl)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SignIn:
     return SignIn(
@@ -278,6 +321,7 @@ def get_sign_in_use_case(
         throttle,
         decoy_hash=decoy_hash,
         session_ttl=ttl,
+        device_ttl=device_ttl,
     )
 
 
@@ -394,9 +438,12 @@ def get_change_password_use_case(
     tokens: Annotated[SessionTokenGenerator, Depends(get_session_token_generator)],
     throttle: Annotated[SignInThrottle, Depends(get_sign_in_throttle)],
     ttl: Annotated[timedelta, Depends(get_session_ttl)],
+    device_ttl: Annotated[timedelta, Depends(get_device_ttl)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ChangePassword:
-    return ChangePassword(uow, guard, hasher, tokens, throttle, session_ttl=ttl)
+    return ChangePassword(
+        uow, guard, hasher, tokens, throttle, session_ttl=ttl, device_ttl=device_ttl
+    )
 
 
 def get_set_own_display_name_use_case(
@@ -459,6 +506,24 @@ def get_list_own_sessions_use_case(
     return ListOwnSessions(
         repos, guard, idle_timeout=timedelta(hours=idle) if idle else None
     )
+
+
+def get_list_own_devices_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListOwnDevices:
+    idle = settings.session_idle_hours
+    return ListOwnDevices(
+        repos, guard, idle_timeout=timedelta(hours=idle) if idle else None
+    )
+
+
+def get_revoke_own_device_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RevokeOwnDevice:
+    return RevokeOwnDevice(uow, guard)
 
 
 def get_revoke_own_session_use_case(

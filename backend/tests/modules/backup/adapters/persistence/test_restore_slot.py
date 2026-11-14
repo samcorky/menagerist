@@ -18,6 +18,9 @@ from app.modules.identity.adapters.persistence import (
 from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
     InMemoryApiTokenRepository,
 )
+from app.modules.identity.adapters.persistence.in_memory_device_repository import (
+    InMemoryDeviceRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
@@ -54,6 +57,7 @@ async def test_in_memory_gate_uses_identity_setup_condition() -> None:
             sessions=InMemorySessionRepository(),
             attempts=attempts_adapter.InMemorySignInAttemptRepository(),
             tokens=InMemoryApiTokenRepository(),
+            devices=InMemoryDeviceRepository(),
         )
     )
     assert await gate.is_open()

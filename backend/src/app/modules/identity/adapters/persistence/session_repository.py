@@ -4,7 +4,7 @@ import structlog
 from sqlalchemy import CursorResult, delete, select
 
 from app.modules.identity.adapters.persistence.models import SessionModel
-from app.modules.identity.domain.session import Session
+from app.modules.identity.domain.session import DisplayMode, Session
 
 if TYPE_CHECKING:
     import uuid
@@ -28,7 +28,17 @@ def _to_domain(model: SessionModel) -> Session:
         client_ip=model.client_ip,
         client_platform=model.client_platform,
         client_mobile=model.client_mobile,
+        device_id=model.device_id,
+        display_mode=_display_mode(model.display_mode),
     )
+
+
+def _display_mode(value: str | None) -> DisplayMode | None:
+    """Read a stored display mode, ignoring one this version does not know."""
+    try:
+        return None if value is None else DisplayMode(value)
+    except ValueError:
+        return None
 
 
 def _to_model(session: Session) -> SessionModel:
@@ -44,6 +54,8 @@ def _to_model(session: Session) -> SessionModel:
         client_ip=session.client_ip,
         client_platform=session.client_platform,
         client_mobile=session.client_mobile,
+        device_id=session.device_id,
+        display_mode=session.display_mode,
     )
 
 
@@ -107,6 +119,14 @@ class SqlAlchemySessionRepository:
         await self._session.execute(
             delete(SessionModel).where(SessionModel.id == session_id)
         )
+
+    async def delete_for_device(self, device_id: uuid.UUID) -> int:
+        """Remove every session started on `device_id`, returning how many went."""
+        result = await self._session.execute(
+            delete(SessionModel).where(SessionModel.device_id == device_id)
+        )
+        assert isinstance(result, CursorResult)
+        return result.rowcount
 
     async def delete_for_user(self, user_id: uuid.UUID) -> int:
         """Remove every session belonging to `user_id`, returning how many went."""
