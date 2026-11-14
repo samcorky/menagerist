@@ -63,6 +63,27 @@ class OutboundHttpSettings(MenageristBaseSettings, group="http"):
             + "or `*` for all. Overrides the standard `NO_PROXY`."
         ),
     )
+    http_proxy_pin_addresses: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("MENAGERIST_HTTP_PROXY_PIN_ADDRESSES"),
+        description=(
+            "Connect through the proxy to the address Menagerist checked, keeping the "
+            + "real host name for `Host` and the certificate, so a name cannot answer "
+            + "one way here and another to the proxy. A name this host cannot resolve "
+            + "is then refused. Turn off only if your proxy filters by host name and "
+            + "refuses an address; the proxy must then block internal networks itself."
+        ),
+    )
+    http_proxy_allow_unresolved: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("MENAGERIST_HTTP_PROXY_ALLOW_UNRESOLVED"),
+        description=(
+            "Only when `MENAGERIST_HTTP_PROXY_PIN_ADDRESSES` is off: let a name this "
+            + "host cannot resolve go to the proxy, for a network where only the "
+            + "proxy has working DNS. The proxy must then refuse internal addresses "
+            + "itself."
+        ),
+    )
     connect_timeout_seconds: float = Field(
         default=5.0,
         gt=0,
@@ -74,6 +95,15 @@ class OutboundHttpSettings(MenageristBaseSettings, group="http"):
         gt=0,
         le=300,
         description="Seconds to wait for each part of an outbound service's reply.",
+    )
+    total_timeout_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        le=600,
+        description=(
+            "Seconds allowed for a whole outbound request, redirects included, so a "
+            + "reply that trickles in cannot hold it open."
+        ),
     )
     max_response_bytes: int = Field(
         default=2 * 1024 * 1024,
