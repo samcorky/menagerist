@@ -27,6 +27,21 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { mergeAttributeSchemas } from '$lib/schema-meta';
 	import { serverErrorsToFields } from '$lib/validation-messages';
+	import { auth } from '$lib/auth.svelte.js';
+	import { clearDraft, readDraft, registerDraft } from '$lib/drafts';
+	import DraftRestore from '$lib/components/draft-restore.svelte';
+
+	const DRAFT_KEY = 'item:new';
+	type NewItemDraft = {
+		name: string;
+		description: string;
+		selectedType: string | null;
+		tags: string[];
+		attrRows: AttributeRow[];
+		extraSchema: AttributesSchema | null;
+		/** A chosen photo cannot be kept, so the prompt asks for it again. */
+		hadPhoto: boolean;
+	};
 
 	let name = $state('');
 	let description = $state('');
@@ -40,6 +55,9 @@
 	let photoPreview = $state<string | null>(null);
 	let stagedAsset = $state<StagedPhoto | null>(null);
 	let nodeTypes = $state<NodeTypeResponse[]>([]);
+	let draft = $state.raw<NewItemDraft | null>(
+		auth.user ? readDraft<NewItemDraft>(auth.user.id, DRAFT_KEY) : null
+	);
 
 	let nodeSchema = $derived(
 		(nodeTypes.find((nt) => nt.slug === selectedType)
@@ -54,6 +72,40 @@
 			if (photoPreview) URL.revokeObjectURL(photoPreview);
 		};
 	});
+
+	/** What to keep if the session ends now, or null for an untouched form. */
+	function snapshot(): NewItemDraft | null {
+		const touched =
+			name.trim() !== '' ||
+			description.trim() !== '' ||
+			selectedType !== null ||
+			tags.length > 0 ||
+			extraSchema !== null ||
+			Object.keys(rowsToAttributes(attrRows, nodeSchema)).length > 0;
+		if (!touched) return null;
+		return {
+			name,
+			description,
+			selectedType,
+			tags,
+			attrRows,
+			extraSchema,
+			hadPhoto: photo !== null || stagedAsset !== null
+		};
+	}
+
+	$effect(() => registerDraft(DRAFT_KEY, snapshot));
+
+	function forgetDraft() {
+		draft = null;
+		if (auth.user) clearDraft(auth.user.id, DRAFT_KEY);
+	}
+
+	function restoreDraft() {
+		if (!draft) return;
+		({ name, description, selectedType, tags, attrRows, extraSchema } = draft);
+		forgetDraft();
+	}
 
 	onMount(() => {
 		const pending = captureController.consumePendingHandoff();
@@ -130,6 +182,7 @@
 				toast.error("Couldn't add the photo", { description: uploadErrorMessage(upload) });
 			}
 		}
+		forgetDraft();
 		await goto(resolve('/items/[id]', { id: result.data.id }));
 	}
 </script>
@@ -147,6 +200,14 @@
 		</Card.Header>
 		<Card.Content>
 			<form class="space-y-4" onsubmit={handleSubmit}>
+				{#if draft}
+					<DraftRestore
+						notes={draft.hadPhoto ? ['The photo was not kept, so add it again.'] : []}
+						onrestore={restoreDraft}
+						ondiscard={forgetDraft}
+					/>
+				{/if}
+
 				<!-- Photo -->
 				{#if photoPreview}
 					<div class="relative">
