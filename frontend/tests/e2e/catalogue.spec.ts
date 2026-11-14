@@ -27,7 +27,10 @@ test('adds a catalogue list to your saved lists and then shows it as added', asy
 	await expect(dialog.getByRole('button', { name: `Install ${TITLE}` })).toHaveCount(0);
 
 	await page.keyboard.press('Escape');
-	await expect(page.getByRole('listitem').filter({ hasText: TITLE })).toBeVisible();
+	await expect(dialog).toBeHidden();
+	// The page row says how many options it has, which the toast and the dialog entry do not.
+	const row = page.getByRole('listitem').filter({ hasText: /Condition grades\s*\d+ options/ });
+	await expect(row).toBeVisible();
 });
 
 test('an entry you already have shows as added and is not made twice', async ({
