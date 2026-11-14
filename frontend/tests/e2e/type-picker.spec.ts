@@ -48,12 +48,18 @@ test('creating a type from the new item form selects it and saves the item with 
 	page
 }) => {
 	const typeLabel = uniqueName('Vinyl');
+	// A slow create, so Save is pressed while the type is still being made: the item must not be
+	// saved without it (#441).
+	await page.route('**/api/v1/node-types', async (route) => {
+		if (route.request().method() === 'POST') await new Promise((done) => setTimeout(done, 1000));
+		await route.fallback();
+	});
 	await page.goto('/items/new');
 	await page.getByLabel('Name').fill(uniqueName('Kind of Blue'));
 	await picker(page).click();
 	await page.getByPlaceholder('Search item types…').fill(typeLabel);
 	await page.getByRole('option', { name: `Create “${typeLabel}”` }).click();
-	await expect(picker(page)).toContainText(typeLabel);
+	await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
 	await page.getByRole('button', { name: 'Save', exact: true }).click();
 	await page.waitForURL(/\/items\/(?!new$)[^/]+$/);

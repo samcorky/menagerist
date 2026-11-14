@@ -14,6 +14,7 @@
 
 	let name = $state('');
 	let selectedType = $state<string | null>(null);
+	let creatingType = $state(false);
 	let saving = $state(false);
 	let stagedAsset = $state<StagedPhoto | null>(null);
 	let staging = $state(false);
@@ -40,7 +41,7 @@
 	}
 
 	async function save() {
-		if (!name.trim() || saving) return;
+		if (!name.trim() || saving || creatingType) return;
 		saving = true;
 		const result = await createNode({ body: { name: name.trim(), type: selectedType || null } });
 		if (result.error || !result.data) {
@@ -140,7 +141,7 @@
 			<!-- Item type -->
 			<div class="space-y-1.5">
 				<Label class="text-xs text-muted-foreground">Item type</Label>
-				<TypePicker bind:value={selectedType} />
+				<TypePicker bind:value={selectedType} bind:creating={creatingType} />
 			</div>
 
 			<!-- Footer -->
@@ -152,7 +153,11 @@
 				>
 					Use full form →
 				</button>
-				<Button class="pointer-coarse:h-11" onclick={save} disabled={!name.trim() || saving}>
+				<Button
+					class="pointer-coarse:h-11"
+					onclick={save}
+					disabled={!name.trim() || saving || creatingType}
+				>
 					{saving ? 'Saving…' : 'Save'}
 				</Button>
 			</div>
