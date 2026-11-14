@@ -13,14 +13,14 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import PackNotInstalledError
-from app.modules.examples.domain.installation import InstallationStatus, Outcome
-from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_IN_USE, KEEP_USER_DATA
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_EDITED, KEEP_IN_USE, KEEP_USER_DATA
+from app.modules.transfer.domain.run import Outcome, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -114,9 +114,7 @@ async def test_removes_everything_that_is_untouched(make_world: MakeWorld) -> No
         result.removed.presets,
     ) == (2, 1, 1)
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -147,11 +145,11 @@ async def test_reinstalling_after_removal_succeeds(make_world: MakeWorld) -> Non
 
     await _install(world)
 
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
-    assert installation.status is InstallationStatus.INSTALLED
+    assert installation.status is RunStatus.INSTALLED
     assert (
         len(
             await world.graph_repos.node_types.list(
@@ -291,9 +289,7 @@ async def test_something_the_user_already_deleted_is_not_an_error(
     assert result.kept == ()
     assert result.removed.items == 2
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -331,9 +327,7 @@ async def test_kept_entities_are_no_longer_the_packs(make_world: MakeWorld) -> N
     await _uninstall(world)
 
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
     assert [
@@ -347,20 +341,18 @@ async def test_kept_entities_are_no_longer_the_packs(make_world: MakeWorld) -> N
 async def test_an_unfinished_installation_is_resumed(make_world: MakeWorld) -> None:
     """An installation stuck in INSTALLING is still removed cleanly."""
     world = await _installed(make_world)
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
-    installation.status = InstallationStatus.INSTALLING
+    installation.status = RunStatus.INSTALLING
 
     result = await _uninstall(world)
 
     assert result.kept == ()
     await _assert_empty(world)
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -382,11 +374,11 @@ async def test_a_failure_during_removal_leaves_the_installation_resumable(
     with pytest.raises(RuntimeError, match="boom"):
         await _uninstall(world)
 
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None
-    assert installation.status is not InstallationStatus.REMOVED
+    assert installation.status is not RunStatus.REMOVED
     assert {r.kind for r in installation.owned()} >= {
         EntityKind.ITEM,
         EntityKind.ITEM_TYPE,

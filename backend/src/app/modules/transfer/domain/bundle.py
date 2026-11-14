@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 PRESET_MARKER = "$preset"
 
@@ -25,16 +25,16 @@ def split_ref(ref: str) -> tuple[str | None, str]:
     A ref without a colon is local and returns `(None, ref)`.
 
     Raises:
-        InvalidPackError: If the ref has more than one colon or a malformed part.
+        InvalidBundleError: If the ref has more than one colon or a malformed part.
     """
     if ":" not in ref:
         return None, ref
     parts = ref.split(":")
     if len(parts) != 2:
-        raise InvalidPackError(f"ref '{ref}': pack:ref needs exactly one colon")
+        raise InvalidBundleError(f"ref '{ref}': pack:ref needs exactly one colon")
     pack_id, local = parts
     if not REF_PATTERN.match(pack_id) or not REF_PATTERN.match(local):
-        raise InvalidPackError(f"ref '{ref}' {REF_RULE} on both sides of the colon")
+        raise InvalidBundleError(f"ref '{ref}' {REF_RULE} on both sides of the colon")
     return pack_id, local
 
 
@@ -59,7 +59,7 @@ def resolve_preset_refs(value: Any, ids: Mapping[str, str]) -> Any:  # noqa: ANN
         if _is_marker(value):
             ref = value[PRESET_MARKER]
             if ref not in ids:
-                raise InvalidPackError(f"unknown preset '{ref}'")
+                raise InvalidBundleError(f"unknown preset '{ref}'")
             return ids[ref]
         return {k: resolve_preset_refs(v, ids) for k, v in value.items()}
     if isinstance(value, list):
@@ -68,7 +68,7 @@ def resolve_preset_refs(value: Any, ids: Mapping[str, str]) -> Any:  # noqa: ANN
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class PackPreset:
+class BundlePreset:
     """A saved field, field group or choice list the pack creates."""
 
     ref: str
@@ -79,7 +79,7 @@ class PackPreset:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class PackRelationshipType:
+class BundleRelationshipType:
     """A relationship type (an edge type) the pack creates."""
 
     ref: str
@@ -92,14 +92,14 @@ class PackRelationshipType:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class PackCover:
+class BundleCover:
     """How the covers of a type's items are drawn."""
 
     style: str
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class PackItemType:
+class BundleItemType:
     """An item type (a node type) the pack creates."""
 
     ref: str
@@ -107,21 +107,21 @@ class PackItemType:
     label: str
     description: str | None = None
     attributes_schema: dict[str, Any] | None = None
-    cover: PackCover | None = None
+    cover: BundleCover | None = None
     icon: str | None = None
     colour: str | None = None
 
     def __post_init__(self) -> None:
         """Reject a cover style outside the closed set."""
         if self.cover is not None and self.cover.style not in COVER_STYLES:
-            raise InvalidPackError(
+            raise InvalidBundleError(
                 f"item type '{self.ref}' has unknown cover style "
                 + f"'{self.cover.style}'; use one of {', '.join(COVER_STYLES)}"
             )
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class PackItem:
+class BundleItem:
     """An item (a node) the pack creates."""
 
     ref: str
@@ -134,7 +134,7 @@ class PackItem:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class PackConnection:
+class BundleConnection:
     """A connection (an edge) between two pack items."""
 
     source_ref: str
@@ -144,7 +144,7 @@ class PackConnection:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class PackCollection:
+class BundleCollection:
     """A collection: a manual list of pack items, or a smart one with a `definition`.
 
     Exactly one of `item_refs` and `definition` is given. A definition is a query

@@ -1,4 +1,4 @@
-from app.modules.examples.application.content_hash import content_hash
+from app.modules.transfer.application.content_hash import content_hash
 
 
 def test_key_order_does_not_matter_at_any_depth() -> None:

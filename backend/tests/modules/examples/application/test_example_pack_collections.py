@@ -15,10 +15,10 @@ from app.modules.examples.application.uninstall_example_pack import (
     UninstallResult,
 )
 from app.modules.examples.domain.errors import InstallFailedError
-from app.modules.examples.domain.installation import InstallationStatus, Outcome
-from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_USER_DATA
-from app.modules.transfer.domain.bundle import PackCollection
+from app.modules.transfer.domain.bundle import BundleCollection
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_EDITED, KEEP_USER_DATA
+from app.modules.transfer.domain.run import Outcome, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -31,13 +31,13 @@ if TYPE_CHECKING:
         World,
     )
 
-_ALL = PackCollection(
+_ALL = BundleCollection(
     ref="all", name="Everything", description="Both", item_refs=("ada", "blue")
 )
-_SOLO = PackCollection(ref="solo", name="Just Blue", item_refs=("blue",))
+_SOLO = BundleCollection(ref="solo", name="Just Blue", item_refs=("blue",))
 
 
-def _pack(sample_pack: SamplePack, *collections: PackCollection) -> ExamplePack:
+def _pack(sample_pack: SamplePack, *collections: BundleCollection) -> ExamplePack:
     return replace(sample_pack(), collections=collections or (_ALL, _SOLO))
 
 
@@ -66,7 +66,7 @@ async def _uninstall(world: World) -> UninstallResult:
 
 
 async def _world(
-    make_world: MakeWorld, sample_pack: SamplePack, *collections: PackCollection
+    make_world: MakeWorld, sample_pack: SamplePack, *collections: BundleCollection
 ) -> World:
     return make_world(_pack(sample_pack, *collections))
 
@@ -108,7 +108,7 @@ async def test_install_records_each_collection_with_a_hash(
     world = await _world(make_world, sample_pack)
     await _install(world)
 
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
 
@@ -129,19 +129,19 @@ async def test_a_failing_collection_step_rolls_everything_back(
     """A collection that cannot be made undoes the items, types and collections."""
     world = await _world(make_world, sample_pack)
     world.collections.fail_on_call = fail_on_call
-    statuses: list[InstallationStatus] = []
-    original = world.installations.save
+    statuses: list[RunStatus] = []
+    original = world.runs.save
 
-    async def spy(installation: object) -> None:
-        statuses.append(installation.status)  # type: ignore[attr-defined]
-        await original(installation)  # type: ignore[arg-type]
+    async def spy(run: object) -> None:
+        statuses.append(run.status)  # type: ignore[attr-defined]
+        await original(run)  # type: ignore[arg-type]
 
-    world.installations.save = spy  # type: ignore[method-assign]
+    world.runs.save = spy  # type: ignore[method-assign]
 
     with pytest.raises(InstallFailedError, match="collection boom"):
         await _install(world)
 
-    assert statuses[-1] is InstallationStatus.FAILED
+    assert statuses[-1] is RunStatus.FAILED
     assert world.collections.collections == {}
     assert (
         await world.graph_repos.nodes.list(
@@ -162,9 +162,7 @@ async def test_a_failing_collection_step_rolls_everything_back(
         == []
     )
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
     assert world.collections.events.count("collection") == fail_on_call - 1
@@ -179,7 +177,7 @@ async def test_a_collection_naming_a_missing_item_fails_the_install(
     object.__setattr__(
         pack,
         "collections",
-        (PackCollection(ref="bad", name="Bad", item_refs=("ghost",)),),
+        (BundleCollection(ref="bad", name="Bad", item_refs=("ghost",)),),
     )
     world = make_world(pack)
 
@@ -309,7 +307,7 @@ async def test_a_collection_the_user_already_deleted_counts_as_removed(
     assert result.kept == ()
     assert result.removed.collections == 1
     assert "collection" not in world.collections.events
-    installation = await world.installations.list_active(scope=ContentFilter.everyone())
+    installation = await world.runs.list_active(scope=ContentFilter.everyone())
     assert installation == []
 
 
@@ -327,7 +325,7 @@ async def test_reinstalling_after_removal_creates_the_collections_again(
     assert result.created.collections == 2
     assert len(world.collections.collections) == 2
     assert first.isdisjoint(world.collections.collections)
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None

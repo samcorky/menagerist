@@ -1,19 +1,19 @@
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.examples.application.install_example_pack import installation_counts
-from app.modules.examples.domain.installation import InstallationStatus
 
 if TYPE_CHECKING:
     from app.modules.examples.application.install_example_pack import InstallResult
     from app.modules.examples.application.list_example_entities import ExampleEntities
     from app.modules.examples.application.list_example_packs import ExamplePackStatus
-    from app.modules.examples.application.removal import KeptEntity
     from app.modules.examples.application.uninstall_example_pack import UninstallResult
     from app.modules.examples.domain.pack import PackCounts, PackSummary
+    from app.modules.transfer.application.removal import KeptEntity
 
 _COUNTS_EXAMPLE: dict[str, Any] = {
     "presets": 1,
@@ -61,6 +61,15 @@ class PackCountsResponse(BaseModel):
             connections=counts.connections,
             collections=counts.collections,
         )
+
+
+class InstallationStatus(StrEnum):
+    """Where an installation is in its life."""
+
+    INSTALLING = "installing"
+    INSTALLED = "installed"
+    REMOVED = "removed"
+    FAILED = "failed"
 
 
 class InstallationResponse(BaseModel):
@@ -160,7 +169,7 @@ class ExamplePackResponse(BaseModel):
             installation=None
             if installation is None
             else InstallationResponse(
-                status=installation.status,
+                status=InstallationStatus(installation.status.value),
                 installed_at=installation.installed_at,
                 counts=PackCountsResponse.from_domain(
                     installation_counts(installation)

@@ -39,7 +39,7 @@ class ClaimOrphanedInstallations(
     ) -> int:
         """Re-own every ownerless or system-owned installation; return the count."""
         async with self._uow as repos:
-            count = await repos.installations.claim_orphaned(
+            count = await repos.runs.claim_orphaned(
                 command.owner_id, legacy_owner_ids=_LEGACY_OWNERS
             )
             await self._uow.commit()

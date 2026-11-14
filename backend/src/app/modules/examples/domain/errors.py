@@ -45,10 +45,6 @@ class RequiredByInstalledPackError(ConflictError):
         self.names = tuple(names)
 
 
-class InvalidInstallationStateError(ConflictError):
-    """Raised when an installation is asked to make an impossible change."""
-
-
 class InstallFailedError(InfrastructureError):
     """Raised when an install failed part-way and was rolled back.
 

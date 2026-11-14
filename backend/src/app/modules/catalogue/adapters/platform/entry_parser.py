@@ -5,9 +5,9 @@ from typing import Any
 from app.modules.catalogue.domain.entry import CatalogueEntry, EntrySection
 from app.modules.catalogue.domain.errors import InvalidEntryError
 from app.modules.transfer.domain.bundle import (
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
 )
 from app.platform.shared_data import shared_data_path
 
@@ -28,11 +28,11 @@ def _text(data: dict[str, Any], key: str, where: str) -> str:
     return value
 
 
-def _countries() -> list[PackPreset]:
+def _countries() -> list[BundlePreset]:
     with shared_data_path(_ISO_DATA).open(encoding="utf-8") as f:
         names = [c["name"] for c in json.load(f)["countries"]]
     return [
-        PackPreset(
+        BundlePreset(
             ref="preset-1",
             kind="choice_list",
             label="Countries",
@@ -41,7 +41,7 @@ def _countries() -> list[PackPreset]:
     ]
 
 
-def _presets(value: object, where: str) -> tuple[PackPreset, ...]:
+def _presets(value: object, where: str) -> tuple[BundlePreset, ...]:
     block = _object(value, f"{where} presets")
     if block.get("generated") == "iso-countries":
         return tuple(_countries())
@@ -51,7 +51,7 @@ def _presets(value: object, where: str) -> tuple[PackPreset, ...]:
     if not isinstance(items, list):
         raise InvalidEntryError(f"{where} presets need an 'items' array")
     return tuple(
-        PackPreset(
+        BundlePreset(
             ref=f"preset-{n}",
             kind=_text(item := _object(raw, where), "kind", where),
             label=_text(item, "label", where),
@@ -62,7 +62,7 @@ def _presets(value: object, where: str) -> tuple[PackPreset, ...]:
     )
 
 
-def _item_types(value: object, where: str) -> tuple[PackItemType, ...]:
+def _item_types(value: object, where: str) -> tuple[BundleItemType, ...]:
     if not isinstance(value, list):
         raise InvalidEntryError(f"{where} itemTypes must be an array")
     result = []
@@ -70,7 +70,7 @@ def _item_types(value: object, where: str) -> tuple[PackItemType, ...]:
         item = _object(raw, where)
         slug = _text(item, "slug", where)
         result.append(
-            PackItemType(
+            BundleItemType(
                 ref=slug,
                 slug=slug,
                 label=_text(item, "label", where),
@@ -80,7 +80,9 @@ def _item_types(value: object, where: str) -> tuple[PackItemType, ...]:
     return tuple(result)
 
 
-def _relationship_types(value: object, where: str) -> tuple[PackRelationshipType, ...]:
+def _relationship_types(
+    value: object, where: str
+) -> tuple[BundleRelationshipType, ...]:
     if not isinstance(value, list):
         raise InvalidEntryError(f"{where} relationshipTypes must be an array")
     result = []
@@ -88,7 +90,7 @@ def _relationship_types(value: object, where: str) -> tuple[PackRelationshipType
         item = _object(raw, where)
         slug = _text(item, "slug", where)
         result.append(
-            PackRelationshipType(
+            BundleRelationshipType(
                 ref=slug,
                 slug=slug,
                 label=_text(item, "label", where),

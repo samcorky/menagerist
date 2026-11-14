@@ -15,7 +15,7 @@ class InMemoryPackCatalogue:
         """Add a pack under its id, after its required packs.
 
         Raises:
-            InvalidPackError: If the catalogue would no longer validate.
+            InvalidBundleError: If the catalogue would no longer validate.
         """
         packs = {k: v[2] for k, v in self._entries.items()}
         packs[pack.id] = pack

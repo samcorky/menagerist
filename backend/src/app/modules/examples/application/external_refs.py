@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.examples.domain.errors import RequirementsNotMetError
-from app.modules.examples.domain.installation import Installation, InstallationStatus
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.run import Run, RunStatus
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -28,7 +28,7 @@ ResolvedRefs = dict[tuple[EntityKind, str, str], ResolvedRef]
 
 async def resolve_external_refs(
     pack: ExamplePack,
-    active_installations: Sequence[Installation],
+    active_installations: Sequence[Run],
     graph: GraphTarget,
     catalogue: PackCatalogue,
 ) -> ResolvedRefs:
@@ -43,9 +43,7 @@ async def resolve_external_refs(
     """
     names = {s.id: s.name for s in await catalogue.list_packs()}
     finished = {
-        i.pack_id: i
-        for i in active_installations
-        if i.status is InstallationStatus.INSTALLED
+        i.bundle_id: i for i in active_installations if i.status is RunStatus.INSTALLED
     }
     for required in pack.requires:
         if required not in finished:

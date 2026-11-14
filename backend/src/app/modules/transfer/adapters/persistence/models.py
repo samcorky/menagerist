@@ -9,12 +9,16 @@ from app.platform.database import Base
 from app.platform.orm_mixins import IdentifiableMixin, OwnedMixin, TimestampedMixin
 
 
-class ExampleInstallationModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
-    """ORM row for an example pack installation."""
+class RunModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
+    """ORM row for a bundle run.
+
+    The table and `pack_id` keep the names they had when only example packs were
+    installed, so moving the ledger into `transfer` needed no migration.
+    """
 
     __tablename__ = "example_installations"
-    # The unique index is a backstop only: `InstallExamplePack` already refuses a
-    # second active install of a pack by the same person.
+    # The unique index is a backstop only: the installer already refuses a second
+    # active run of a bundle by the same person.
     __table_args__ = (
         Index(
             "uq_example_installations_active_pack",

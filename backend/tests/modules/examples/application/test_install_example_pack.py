@@ -14,11 +14,11 @@ from app.modules.examples.domain.errors import (
     PackNotFoundError,
     SlugClashError,
 )
-from app.modules.examples.domain.installation import Installation, InstallationStatus
 from app.modules.graph.domain.edge_type import EdgeType
 from app.modules.graph.domain.node_type import NodeType
-from app.modules.transfer.domain.bundle import PackPreset
+from app.modules.transfer.domain.bundle import BundlePreset
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.run import Run, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -44,32 +44,30 @@ def _use_case(world: World) -> InstallExamplePack:
     )
 
 
-async def _active(world: World, pack_id: str = "demo") -> Installation:
-    installation = await world.installations.get_active_for_pack(
+async def _active(world: World, pack_id: str = "demo") -> Run:
+    installation = await world.runs.get_active_for_bundle(
         pack_id, scope=ContentFilter.everyone()
     )
     assert installation is not None
     return installation
 
 
-def _capture_installations(world: World) -> list[Installation]:
+def _capture_installations(world: World) -> list[Run]:
     """Collect every installation added, so a FAILED one can be inspected."""
-    recorded: list[Installation] = []
-    original = world.installations.add
+    recorded: list[Run] = []
+    original = world.runs.add
 
-    async def add(installation: Installation) -> None:
-        recorded.append(installation)
-        await original(installation)
+    async def add(run: Run) -> None:
+        recorded.append(run)
+        await original(run)
 
-    world.installations.add = add  # type: ignore[method-assign]
+    world.runs.add = add  # type: ignore[method-assign]
     return recorded
 
 
 async def _assert_nothing_left(world: World) -> None:
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
     assert (
@@ -116,7 +114,7 @@ async def test_install_creates_everything_and_records_it(
     assert (counts.presets, counts.relationship_types, counts.item_types) == (1, 1, 2)
     assert (counts.items, counts.connections) == (2, 1)
     installation = await _active(world)
-    assert installation.status is InstallationStatus.INSTALLED
+    assert installation.status is RunStatus.INSTALLED
     assert len(installation.owned()) == 7
     assert await world.graph_repos.nodes.list(
         scope=ContentFilter.everyone(), after=None, limit=10
@@ -184,9 +182,7 @@ async def test_a_slug_clash_creates_nothing_and_names_the_slug(
     assert excinfo.value.slug == slug
     assert kind_phrase in str(excinfo.value)
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
     assert (
@@ -255,8 +251,8 @@ async def test_a_failure_rolls_everything_back(
 
     assert calls == fail_on_call  # the injected failure really happened
     assert isinstance(excinfo.value.__cause__, RuntimeError)
-    assert await world.installations.list_active(scope=ContentFilter.everyone()) == []
-    assert recorded[0].status is InstallationStatus.FAILED
+    assert await world.runs.list_active(scope=ContentFilter.everyone()) == []
+    assert recorded[0].status is RunStatus.FAILED
     await _assert_nothing_left(world)
 
 
@@ -280,7 +276,7 @@ async def test_a_rollback_that_cannot_finish_leaves_the_install_resumable(
 
     assert isinstance(excinfo.value.__cause__, RuntimeError)
     installation = await _active(world)
-    assert installation.status is InstallationStatus.INSTALLING
+    assert installation.status is RunStatus.INSTALLING
     assert installation.owned()  # recorded, so uninstall can finish the job
 
 
@@ -316,7 +312,7 @@ async def test_an_unfinished_installation_blocks_a_second_install(
 ) -> None:
     """A crash-orphaned INSTALLING record blocks another install."""
     world = make_world()
-    await world.installations.add(Installation.start("demo", USER_A.id))
+    await world.runs.add(Run.start("demo", USER_A.id))
     with pytest.raises(PackAlreadyInstalledError):
         await _use_case(world).handle(_COMMAND, world.actor)
 
@@ -340,7 +336,7 @@ async def test_every_preset_is_recorded_before_the_first_save_and_rolled_back(
         base,
         presets=(
             *base.presets,
-            PackPreset(
+            BundlePreset(
                 ref="formats",
                 kind="choice_list",
                 label="demo formats",
@@ -368,17 +364,17 @@ async def test_a_persist_failure_right_after_ensure_is_rolled_back(
 ) -> None:
     """Presets `ensure` committed are already recorded, so a failed save undoes them."""
     world = make_world()
-    original = world.installations.save
+    original = world.runs.save
     calls = 0
 
-    async def fail_first_save(installation: Installation) -> None:
+    async def fail_first_save(run: Run) -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
             raise RuntimeError("save failed")
-        await original(installation)
+        await original(run)
 
-    world.installations.save = fail_first_save  # type: ignore[method-assign]
+    world.runs.save = fail_first_save  # type: ignore[method-assign]
 
     with pytest.raises(InstallFailedError, match="save failed"):
         await _use_case(world).handle(_COMMAND, world.actor)

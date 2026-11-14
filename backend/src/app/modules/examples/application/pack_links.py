@@ -2,16 +2,16 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.modules.examples.application.content_hash import content_hash
-from app.modules.transfer.domain.bundle import PackConnection, split_ref
+from app.modules.transfer.application.content_hash import content_hash
+from app.modules.transfer.domain.bundle import BundleConnection, split_ref
 from app.modules.transfer.domain.entity_kind import EntityKind
 
 if TYPE_CHECKING:
     import uuid
     from collections.abc import Awaitable, Callable
 
-    from app.modules.examples.domain.installation import Installation
     from app.modules.examples.domain.pack import ExamplePack, PackLink
+    from app.modules.transfer.domain.run import Run
     from app.modules.transfer.ports.targets import GraphTarget
 
 logger = structlog.get_logger()
@@ -25,10 +25,10 @@ def link_ref(with_pack: str, index: int) -> str:
 async def apply_links(
     *,
     declaring_pack: ExamplePack,
-    declaring: Installation,
-    other: Installation,
+    declaring: Run,
+    other: Run,
     graph: GraphTarget,
-    persist: Callable[[Installation], Awaitable[None]],
+    persist: Callable[[Run], Awaitable[None]],
 ) -> int:
     """Create the links `declaring_pack` declares with the pack `other` installed.
 
@@ -42,7 +42,7 @@ async def apply_links(
     """
     created = 0
     for index, link in enumerate(declaring_pack.links):
-        if link.with_pack != other.pack_id:
+        if link.with_pack != other.bundle_id:
             continue
         try:
             if await _apply_one(
@@ -61,12 +61,12 @@ async def apply_links(
 
 async def _apply_one(
     pack: ExamplePack,
-    declaring: Installation,
-    other: Installation,
+    declaring: Run,
+    other: Run,
     link: PackLink,
     index: int,
     graph: GraphTarget,
-    persist: Callable[[Installation], Awaitable[None]],
+    persist: Callable[[Run], Awaitable[None]],
 ) -> bool:
     ref = link_ref(link.with_pack, index)
     if any(r.ref == ref for r in declaring.owned(EntityKind.CONNECTION)):
@@ -79,7 +79,7 @@ async def _apply_one(
     if await graph.connection_exists(source[0], target[0], slug):
         return False
     created = await graph.create_connection(
-        PackConnection(
+        BundleConnection(
             source_ref=link.source_ref,
             target_ref=link.target_ref,
             type_ref=link.type_ref,
@@ -101,7 +101,7 @@ async def _apply_one(
 
 
 async def _end(
-    ref: str, declaring: Installation, other: Installation, graph: GraphTarget
+    ref: str, declaring: Run, other: Run, graph: GraphTarget
 ) -> tuple[uuid.UUID, str] | None:
     """Return the live item's id and name behind a link end, or None if it is gone."""
     pack_id, local = split_ref(ref)

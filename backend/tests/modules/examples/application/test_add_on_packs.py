@@ -23,13 +23,7 @@ from app.modules.examples.domain.errors import (
     RequiredByInstalledPackError,
     RequirementsNotMetError,
 )
-from app.modules.examples.domain.installation import (
-    Installation,
-    InstallationStatus,
-    Outcome,
-)
 from app.modules.examples.domain.pack import ExamplePack
-from app.modules.examples.domain.removal import KEEP_EDITED, KEEP_USER_DATA
 from app.modules.media.domain.media_asset import MediaAsset
 from app.modules.media.domain.media_attachment import (
     AttachmentKey,
@@ -37,14 +31,16 @@ from app.modules.media.domain.media_attachment import (
     MediaAttachment,
 )
 from app.modules.transfer.domain.bundle import (
-    PackCollection,
-    PackConnection,
-    PackCover,
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleCover,
+    BundleItem,
+    BundleItemType,
+    BundleRelationshipType,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_EDITED, KEEP_USER_DATA
+from app.modules.transfer.domain.run import Outcome, Run, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -60,16 +56,16 @@ USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 def _base(pack_id: str, *, cover: str | None = None) -> ExamplePack:
     """A base pack: one item type, one relationship type, two items, one link."""
     title = pack_id.title()
-    style = None if cover is None else PackCover(style=cover)
+    style = None if cover is None else BundleCover(style=cover)
     return ExamplePack(
         id=pack_id,
         relationship_types=(
-            PackRelationshipType(
+            BundleRelationshipType(
                 ref="link", slug=f"{pack_id}-link", label="Link", reverse_label="Back"
             ),
         ),
         item_types=(
-            PackItemType(
+            BundleItemType(
                 ref="thing",
                 slug=f"{pack_id}-thing",
                 label=f"{title} thing",
@@ -77,10 +73,12 @@ def _base(pack_id: str, *, cover: str | None = None) -> ExamplePack:
             ),
         ),
         items=(
-            PackItem(ref="a", type_ref="thing", name=f"{title} A"),
-            PackItem(ref="b", type_ref="thing", name=f"{title} B"),
+            BundleItem(ref="a", type_ref="thing", name=f"{title} A"),
+            BundleItem(ref="b", type_ref="thing", name=f"{title} B"),
         ),
-        connections=(PackConnection(source_ref="a", target_ref="b", type_ref="link"),),
+        connections=(
+            BundleConnection(source_ref="a", target_ref="b", type_ref="link"),
+        ),
     )
 
 
@@ -90,21 +88,23 @@ def _extras() -> ExamplePack:
         id="extras",
         requires=("games",),
         relationship_types=(
-            PackRelationshipType(
+            BundleRelationshipType(
                 ref="own", slug="extras-own", label="Own", reverse_label="Owned"
             ),
         ),
-        item_types=(PackItemType(ref="extra", slug="extras-extra", label="Extra"),),
+        item_types=(BundleItemType(ref="extra", slug="extras-extra", label="Extra"),),
         items=(
-            PackItem(ref="x", type_ref="extra", name="Extra X"),
-            PackItem(ref="y", type_ref="games:thing", name="Extra Y"),
+            BundleItem(ref="x", type_ref="extra", name="Extra X"),
+            BundleItem(ref="y", type_ref="games:thing", name="Extra Y"),
         ),
         connections=(
-            PackConnection(source_ref="x", target_ref="games:a", type_ref="games:link"),
-            PackConnection(source_ref="y", target_ref="x", type_ref="own"),
+            BundleConnection(
+                source_ref="x", target_ref="games:a", type_ref="games:link"
+            ),
+            BundleConnection(source_ref="y", target_ref="x", type_ref="own"),
         ),
         collections=(
-            PackCollection(ref="mix", name="Mix", item_refs=("games:b", "x")),
+            BundleCollection(ref="mix", name="Mix", item_refs=("games:b", "x")),
         ),
     )
 
@@ -115,7 +115,7 @@ def _bridge() -> ExamplePack:
         id="tie",
         requires=("games", "music"),
         connections=(
-            PackConnection(
+            BundleConnection(
                 source_ref="games:a", target_ref="music:b", type_ref="games:link"
             ),
         ),
@@ -195,8 +195,8 @@ async def _snapshot(world: World) -> tuple[list[str], int, int, int]:
     )
 
 
-async def _installation(world: World, pack_id: str) -> Installation:
-    installation = await world.installations.get_active_for_pack(
+async def _installation(world: World, pack_id: str) -> Run:
+    installation = await world.runs.get_active_for_bundle(
         pack_id, scope=ContentFilter.everyone()
     )
     assert installation is not None
@@ -212,10 +212,7 @@ async def test_add_on_is_refused_without_its_base(make_world: MakeWorld) -> None
 
     assert await _snapshot(world) == ([], 0, 0, 0)
     assert (
-        await world.installations.list_for_pack(
-            "extras", scope=ContentFilter.everyone()
-        )
-        == []
+        await world.runs.list_for_bundle("extras", scope=ContentFilter.everyone()) == []
     )
 
 
@@ -224,16 +221,13 @@ async def test_add_on_is_refused_while_its_base_is_half_installed(
 ) -> None:
     """An unfinished installation of the base does not count."""
     world = _world(make_world)
-    await world.installations.add(Installation.start("games", USER_A.id))
+    await world.runs.add(Run.start("games", USER_A.id))
 
     with pytest.raises(RequirementsNotMetError, match=r"Add Games first\."):
         await _install(world, "extras")
 
     assert (
-        await world.installations.list_for_pack(
-            "extras", scope=ContentFilter.everyone()
-        )
-        == []
+        await world.runs.list_for_bundle("extras", scope=ContentFilter.everyone()) == []
     )
 
 
@@ -316,10 +310,7 @@ async def test_a_deleted_base_item_is_named_and_nothing_is_created(
     assert await _snapshot(world) == before
     assert world.collections.create_calls == []
     assert (
-        await world.installations.list_for_pack(
-            "extras", scope=ContentFilter.everyone()
-        )
-        == []
+        await world.runs.list_for_bundle("extras", scope=ContentFilter.everyone()) == []
     )
 
 
@@ -329,7 +320,7 @@ async def test_a_replaced_base_item_is_refused(make_world: MakeWorld) -> None:
     await _install(world, "games")
     await world.graph.remove(EntityKind.ITEM, (await _node(world, "Games A")).id)
     await world.graph.create_item(
-        PackItem(ref="again", type_ref="thing", name="Games A"),
+        BundleItem(ref="again", type_ref="thing", name="Games A"),
         type_slug="games-thing",
     )
     assert "Games A" in await _names(world)
@@ -338,10 +329,7 @@ async def test_a_replaced_base_item_is_refused(make_world: MakeWorld) -> None:
         await _install(world, "extras")
 
     assert (
-        await world.installations.list_for_pack(
-            "extras", scope=ContentFilter.everyone()
-        )
-        == []
+        await world.runs.list_for_bundle("extras", scope=ContentFilter.everyone()) == []
     )
 
 
@@ -366,7 +354,7 @@ async def test_a_deleted_base_type_is_named(make_world: MakeWorld) -> None:
     typed = ExamplePack(
         id="typed",
         requires=("games",),
-        items=(PackItem(ref="t", type_ref="games:thing", name="Typed T"),),
+        items=(BundleItem(ref="t", type_ref="games:thing", name="Typed T"),),
     )
     world = _world(make_world, typed)
     await _install(world, "games")
@@ -399,7 +387,7 @@ async def test_base_removal_is_blocked_by_every_dependant(
     assert str(blocked.value) == "Remove Extras and Tie first."
     assert blocked.value.names == ("Extras", "Tie")
     assert await _snapshot(world) == before
-    assert (await _installation(world, "games")).status is InstallationStatus.INSTALLED
+    assert (await _installation(world, "games")).status is RunStatus.INSTALLED
     assert world.collections.events == []
 
     await _uninstall(world, "extras")
@@ -418,7 +406,7 @@ async def test_a_half_installed_add_on_also_blocks_removal(
     """An unfinished installation of a dependant still needs the base."""
     world = _world(make_world)
     await _install(world, "games")
-    await world.installations.add(Installation.start("extras", USER_A.id))
+    await world.runs.add(Run.start("extras", USER_A.id))
 
     with pytest.raises(RequiredByInstalledPackError, match=r"Remove Extras first\."):
         await _uninstall(world, "games")
@@ -494,12 +482,12 @@ async def test_a_failed_add_on_install_leaves_the_base_intact(
 
     assert await _snapshot(world) == before
     games = await _installation(world, "games")
-    assert games.status is InstallationStatus.INSTALLED
+    assert games.status is RunStatus.INSTALLED
     assert list(games.entities) == base_entities
-    (failed,) = await world.installations.list_for_pack(
+    (failed,) = await world.runs.list_for_bundle(
         "extras", scope=ContentFilter.everyone()
     )
-    assert failed.status is InstallationStatus.FAILED
+    assert failed.status is RunStatus.FAILED
     assert (await _uninstall(world, "games")).kept == ()
 
 
@@ -553,7 +541,7 @@ async def test_ordinary_packs_are_unaffected(make_world: MakeWorld) -> None:
 async def test_a_missing_record_is_named_by_its_ref(make_world: MakeWorld) -> None:
     """If the required pack's record never existed, the ref stands in for the label."""
     world = _world(make_world)
-    finished = Installation.start("games", USER_A.id)
+    finished = Run.start("games", USER_A.id)
     finished.mark_installed()
 
     with pytest.raises(RequirementsNotMetError, match=r"Games no longer has a\."):
@@ -581,12 +569,12 @@ async def test_a_failed_dependant_does_not_block_removal(
     """Only active installations count; failed and removed ones are history."""
     world = _world(make_world)
     await _install(world, "games")
-    failed = Installation.start("extras", USER_A.id)
+    failed = Run.start("extras", USER_A.id)
     failed.mark_failed()
-    await world.installations.add(failed)
-    removed = Installation.start("tie", USER_A.id)
+    await world.runs.add(failed)
+    removed = Run.start("tie", USER_A.id)
     removed.mark_removed()
-    await world.installations.add(removed)
+    await world.runs.add(removed)
 
     assert (await _uninstall(world, "games")).kept == ()
 
@@ -611,7 +599,7 @@ async def test_removal_is_blocked_along_a_chain_of_add_ons(
     for pack_id in ("a-pack", "b-pack", "c-pack"):
         await _uninstall(world, pack_id)
 
-    assert await world.installations.list_active(scope=ContentFilter.everyone()) == []
+    assert await world.runs.list_active(scope=ContentFilter.everyone()) == []
 
 
 def _covered_world(make_world: MakeWorld) -> World:

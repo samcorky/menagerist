@@ -4,16 +4,16 @@ import uuid
 
 import pytest
 
-from app.modules.examples.domain.errors import InvalidInstallationStateError
-from app.modules.examples.domain.installation import EntityRecord, Outcome
-from app.modules.examples.domain.removal import (
+from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.errors import InvalidRunStateError
+from app.modules.transfer.domain.removal import (
     KEEP_EDITED,
     KEEP_IN_USE,
     KEEP_USER_DATA,
     Action,
     decide_removal,
 )
-from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.run import EntityRecord, Outcome
 
 
 def _record(outcome: Outcome = Outcome.OWNED) -> EntityRecord:
@@ -57,5 +57,5 @@ def test_truth_table(
 @pytest.mark.parametrize("outcome", [Outcome.REMOVED, Outcome.KEPT])
 def test_a_settled_record_is_never_decided_again(outcome: Outcome) -> None:
     """Only owned records can be decided."""
-    with pytest.raises(InvalidInstallationStateError):
+    with pytest.raises(InvalidRunStateError):
         decide_removal(_record(outcome), "h1", has_user_data=False, still_in_use=False)

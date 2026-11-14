@@ -7,7 +7,7 @@ import pytest
 
 from app.modules.examples.adapters.platform.file_pack_catalogue import FilePackCatalogue
 from app.modules.examples.adapters.platform.pack_parser import parse_index
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 _ENTRY = {"id": "demo", "name": "Demo", "description": "A demo"}
 
@@ -41,16 +41,16 @@ async def test_lists_and_gets_packs(tmp_path: Path, pack_data: dict[str, Any]) -
 
 
 async def test_an_index_entry_without_a_file_is_rejected(tmp_path: Path) -> None:
-    """An index entry with no pack file raises `InvalidPackError`."""
+    """An index entry with no pack file raises `InvalidBundleError`."""
     catalogue = _write(tmp_path, [_ENTRY], {})
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         await catalogue.list_packs()
 
 
 async def test_a_missing_index_is_rejected(tmp_path: Path) -> None:
-    """A missing `index.json` raises `InvalidPackError`."""
-    with pytest.raises(InvalidPackError):
+    """A missing `index.json` raises `InvalidBundleError`."""
+    with pytest.raises(InvalidBundleError):
         await FilePackCatalogue(tmp_path).list_packs()
 
 
@@ -60,16 +60,16 @@ async def test_a_file_whose_id_differs_from_its_name_is_rejected(
     """A pack declaring a different id from its file name is rejected."""
     catalogue = _write(tmp_path, [_ENTRY], {"demo": {**pack_data, "id": "other"}})
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         await catalogue.get("demo")
 
 
 async def test_unreadable_json_is_an_invalid_pack_error(tmp_path: Path) -> None:
-    """Invalid JSON raises `InvalidPackError`, not a bare decode error."""
+    """Invalid JSON raises `InvalidBundleError`, not a bare decode error."""
     catalogue = _write(tmp_path, [_ENTRY], {})
     (tmp_path / "demo.json").write_text("{not json", encoding="utf-8")
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         await catalogue.get("demo")
 
 
@@ -115,9 +115,9 @@ async def test_an_unsafe_index_id_never_reads_outside_the_directory(
     entry = {"id": "../outside", "name": "n", "description": "d"}
     catalogue = _write(root, [entry], {})
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         await catalogue.get("../outside")
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         await catalogue.list_packs()
 
 
@@ -141,16 +141,16 @@ async def test_a_pack_file_resolving_outside_the_directory_is_rejected(
     catalogue = _write(root, [_ENTRY], {})
     (root / "demo.json").symlink_to(tmp_path / "real.json")
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         await catalogue.get("demo")
 
 
 async def test_deeply_nested_json_is_an_invalid_pack_error(tmp_path: Path) -> None:
-    """Pathological nesting raises `InvalidPackError`, not `RecursionError`."""
+    """Pathological nesting raises `InvalidBundleError`, not `RecursionError`."""
     catalogue = _write(tmp_path, [_ENTRY], {})
     (tmp_path / "demo.json").write_text("[" * 100000, encoding="utf-8")
 
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         await catalogue.get("demo")
 
 
@@ -166,7 +166,7 @@ def test_load_refuses_an_unsafe_id_before_reading_anything(
 
     monkeypatch.setattr(catalogue, "_read", read)
 
-    with pytest.raises(InvalidPackError, match="outside the examples directory"):
+    with pytest.raises(InvalidBundleError, match="outside the examples directory"):
         catalogue._load(pack_id)
 
 
@@ -185,7 +185,7 @@ def test_load_refuses_an_escaping_path_before_reading_anything(
 
     monkeypatch.setattr(catalogue, "_read", read)
 
-    with pytest.raises(InvalidPackError, match="outside the examples directory"):
+    with pytest.raises(InvalidBundleError, match="outside the examples directory"):
         catalogue._load("demo")
 
 
@@ -226,7 +226,7 @@ async def test_list_rejects_a_dangling_cross_pack_ref(
         {"demo": pack_data, "extra": _addon("extra", ["demo"], "demo:nope")},
     )
 
-    with pytest.raises(InvalidPackError, match="extra refers to demo:nope"):
+    with pytest.raises(InvalidBundleError, match="extra refers to demo:nope"):
         await catalogue.list_packs()
 
 
@@ -246,7 +246,7 @@ async def test_get_validates_the_pack_and_its_requirements_only(
 
     assert await catalogue.get("demo") is not None
     assert await catalogue.get("extra") is not None
-    with pytest.raises(InvalidPackError, match="bad refers to demo:nope"):
+    with pytest.raises(InvalidBundleError, match="bad refers to demo:nope"):
         await catalogue.get("bad")
 
 
@@ -260,7 +260,7 @@ async def test_get_rejects_a_requirement_missing_from_the_index(
         {"demo": pack_data, "extra": _addon("extra", ["demo"])},
     )
 
-    with pytest.raises(InvalidPackError, match="extra requires demo"):
+    with pytest.raises(InvalidBundleError, match="extra requires demo"):
         await catalogue.get("extra")
 
 
@@ -272,7 +272,7 @@ async def test_get_rejects_a_cycle_naming_the_packs(tmp_path: Path) -> None:
         {"a": _addon("a", ["b"], "b:thing"), "b": _addon("b", ["a"], "a:thing")},
     )
 
-    with pytest.raises(InvalidPackError, match="cycle: a -> b -> a"):
+    with pytest.raises(InvalidBundleError, match="cycle: a -> b -> a"):
         await catalogue.get("a")
 
 
@@ -327,7 +327,7 @@ async def test_get_validates_transitive_requirements(
         },
     )
 
-    with pytest.raises(InvalidPackError, match="bad refers to demo:nope"):
+    with pytest.raises(InvalidBundleError, match="bad refers to demo:nope"):
         await catalogue.get("top")
 
 
@@ -343,5 +343,5 @@ async def test_get_reports_a_cycle_that_top_only_reaches(tmp_path: Path) -> None
         },
     )
 
-    with pytest.raises(InvalidPackError, match="cycle: a -> b -> a"):
+    with pytest.raises(InvalidBundleError, match="cycle: a -> b -> a"):
         await catalogue.get("top")

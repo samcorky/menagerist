@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.examples.application.required_by import dependants_by_pack
-from app.modules.examples.domain.installation import Installation
 from app.modules.examples.domain.pack import PackSummary
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.transfer.domain.run import Run
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
@@ -25,7 +25,7 @@ class ExamplePackStatus:
     """A shipped pack, its active installation, and how it relates to other packs."""
 
     summary: PackSummary
-    installation: Installation | None
+    installation: Run | None
     requires: tuple[PackSummary, ...] = ()
     required_by: tuple[PackSummary, ...] = ()
     links_with: tuple[PackSummary, ...] = ()
@@ -55,10 +55,8 @@ class ListExamplePacks(
         Only the actor's own installations count. `required_by` holds the installed
         add-ons (a half-finished installation counts) that need the pack.
         """
-        installations = await self._repos.installations.list_active(
-            scope=self.scope(actor)
-        )
-        active = {i.pack_id: i for i in installations}
+        installations = await self._repos.runs.list_active(scope=self.scope(actor))
+        active = {i.bundle_id: i for i in installations}
         packs = await self._catalogue.list_packs()
         by_id = {s.id: s for s in packs}
         dependants = dependants_by_pack(packs, active.keys())

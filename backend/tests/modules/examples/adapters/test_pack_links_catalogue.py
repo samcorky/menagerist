@@ -10,11 +10,11 @@ from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
 from app.modules.examples.adapters.platform.pack_parser import parse_pack
 from app.modules.examples.domain.pack import ExamplePack, PackLink
 from app.modules.transfer.domain.bundle import (
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
+    BundleItem,
+    BundleItemType,
+    BundleRelationshipType,
 )
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 
 def _doc(version: int = 5, **extra: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -48,7 +48,7 @@ def test_a_version_5_pack_may_declare_links() -> None:
 
 def test_links_need_version_5() -> None:
     """Older versions do not know the key."""
-    with pytest.raises(InvalidPackError, match="links"):
+    with pytest.raises(InvalidBundleError, match="links"):
         parse_pack(_doc(version=4, links=[_LINK]))
 
 
@@ -56,21 +56,21 @@ def test_links_need_version_5() -> None:
 def test_a_link_needs_its_four_keys(missing: str) -> None:
     """Required keys are enforced."""
     link = {k: v for k, v in _LINK.items() if k != missing}
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(_doc(links=[link]))
 
 
 def test_a_link_rejects_unknown_keys() -> None:
     """Strict like the rest of the format."""
-    with pytest.raises(InvalidPackError):
+    with pytest.raises(InvalidBundleError):
         parse_pack(_doc(links=[{**_LINK, "colour": "red"}]))
 
 
 def _movies() -> ExamplePack:
     return ExamplePack(
         id="movies",
-        item_types=(PackItemType(ref="film", slug="movies-film", label="Film"),),
-        items=(PackItem(ref="b", type_ref="film", name="B"),),
+        item_types=(BundleItemType(ref="film", slug="movies-film", label="Film"),),
+        items=(BundleItem(ref="b", type_ref="film", name="B"),),
     )
 
 
@@ -78,10 +78,10 @@ def _music(target: str = "movies:b") -> ExamplePack:
     return ExamplePack(
         id="music",
         relationship_types=(
-            PackRelationshipType(ref="tie", slug="music-tie", label="Tie"),
+            BundleRelationshipType(ref="tie", slug="music-tie", label="Tie"),
         ),
-        item_types=(PackItemType(ref="thing", slug="music-thing", label="Thing"),),
-        items=(PackItem(ref="a", type_ref="thing", name="A"),),
+        item_types=(BundleItemType(ref="thing", slug="music-thing", label="Thing"),),
+        items=(BundleItem(ref="a", type_ref="thing", name="A"),),
         links=(
             PackLink(
                 with_pack="movies", source_ref="a", target_ref=target, type_ref="tie"
@@ -106,7 +106,7 @@ def test_the_catalogue_rejects_a_link_to_a_missing_pack() -> None:
     """`with` must be a pack the catalogue has."""
     catalogue = InMemoryPackCatalogue()
 
-    with pytest.raises(InvalidPackError, match="links with movies"):
+    with pytest.raises(InvalidBundleError, match="links with movies"):
         catalogue.add(_music(), name="Music", description="d")
 
 
@@ -115,5 +115,5 @@ def test_the_catalogue_rejects_a_link_to_an_item_the_other_pack_lacks() -> None:
     catalogue = InMemoryPackCatalogue()
     catalogue.add(_movies(), name="Movies", description="d")
 
-    with pytest.raises(InvalidPackError, match="movies:nope"):
+    with pytest.raises(InvalidBundleError, match="movies:nope"):
         catalogue.add(_music(target="movies:nope"), name="Music", description="d")

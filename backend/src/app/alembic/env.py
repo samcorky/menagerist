@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 from app.modules.collections.adapters.persistence import models as collection_models  # noqa: F401
-from app.modules.examples.adapters.persistence import models as example_models  # noqa: F401
 from app.modules.graph.adapters.persistence import models as graph_models  # noqa: F401
 from app.modules.identity.adapters.persistence import models as identity_models  # noqa: F401
 from app.modules.media.adapters.persistence import models as media_models  # noqa: F401
@@ -17,6 +16,7 @@ from app.modules.presets.adapters.persistence import models as preset_models  # 
 from app.modules.scheduling.adapters.persistence import models as scheduling_models  # noqa: F401
 from app.modules.settings.adapters.persistence import models as settings_models  # noqa: F401
 from app.modules.system.adapters.persistence import models as system_models  # noqa: F401
+from app.modules.transfer.adapters.persistence import models as transfer_models  # noqa: F401
 from app.platform.alembic_runner import set_database_url
 from app.platform.database import Base
 

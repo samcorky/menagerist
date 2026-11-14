@@ -4,30 +4,35 @@ from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 import structlog
 
-from app.modules.examples.application.content_hash import content_hash
 from app.modules.examples.application.external_refs import (
     ResolvedRefs,
     resolve_external_refs,
 )
 from app.modules.examples.application.pack_links import apply_links
 from app.modules.examples.application.permissions import ExamplePermission
-from app.modules.examples.application.removal import inspect_record, settle_installation
+from app.modules.examples.application.reported_kept import reported_kept
 from app.modules.examples.domain.errors import (
     InstallFailedError,
     PackAlreadyInstalledError,
     PackNotFoundError,
     SlugClashError,
 )
-from app.modules.examples.domain.installation import (
-    EntityRecord,
-    Installation,
-    InstallationStatus,
-    adoptable_records,
-)
 from app.modules.examples.domain.pack import ExamplePack, PackCounts
 from app.modules.examples.ports.pack_catalogue import PackCatalogue  # noqa: TC001
 from app.modules.examples.ports.unit_of_work import ExampleUnitOfWork
+from app.modules.transfer.application.content_hash import content_hash
+from app.modules.transfer.application.removal import (
+    RemovalTargets,
+    inspect_record,
+    settle_run,
+)
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.run import (
+    EntityRecord,
+    Run,
+    RunStatus,
+    adoptable_records,
+)
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.slug import slugify
@@ -81,7 +86,7 @@ class _Run:
     """State shared by the install steps."""
 
     pack: ExamplePack
-    installation: Installation
+    installation: Run
     preset_ids: dict[str, uuid.UUID] = field(default_factory=dict)
     type_slugs: dict[str, str] = field(default_factory=dict)
     relationship_slugs: dict[str, str] = field(default_factory=dict)
@@ -134,6 +139,12 @@ class InstallExamplePack(
         self._graph = graph
         self._collections = collections
         self._covers = covers
+        self._targets = RemovalTargets(
+            presets=presets,
+            graph=graph,
+            collections=collections,
+            others={EntityKind.COVER: covers},
+        )
 
     async def _handle(
         self, command: InstallExamplePackCommand, actor: Actor
@@ -149,7 +160,7 @@ class InstallExamplePack(
         adoptions = await self._find_adoptions(pack, cover_styles, scope)
         await self._check_slugs(pack, adoptions)
 
-        installation = Installation.start(pack.id, actor.id)
+        installation = Run.start(pack.id, actor.id)
         await self._persist(installation, new=True)
         run = _Run(
             pack=pack,
@@ -183,14 +194,12 @@ class InstallExamplePack(
         )
 
     async def _apply_links(
-        self, pack: ExamplePack, installation: Installation, scope: ContentFilter
+        self, pack: ExamplePack, installation: Run, scope: ContentFilter
     ) -> int:
         """Apply this pack's links and other packs' links that point at it."""
         async with self._uow as repos:
-            active = await repos.installations.list_active(scope=scope)
-        finished = {
-            i.pack_id: i for i in active if i.status is InstallationStatus.INSTALLED
-        }
+            active = await repos.runs.list_active(scope=scope)
+        finished = {i.bundle_id: i for i in active if i.status is RunStatus.INSTALLED}
         linked = 0
         for target in pack.link_targets:
             if target in finished:
@@ -204,7 +213,7 @@ class InstallExamplePack(
         for other in finished.values():
             if other.id == installation.id:
                 continue
-            declaring_pack = await self._catalogue.get(other.pack_id)
+            declaring_pack = await self._catalogue.get(other.bundle_id)
             if declaring_pack is not None and pack.id in declaring_pack.link_targets:
                 linked += await apply_links(
                     declaring_pack=declaring_pack,
@@ -219,7 +228,7 @@ class InstallExamplePack(
         self, pack: ExamplePack, scope: ContentFilter
     ) -> None:
         async with self._uow as repos:
-            active = await repos.installations.get_active_for_pack(pack.id, scope=scope)
+            active = await repos.runs.get_active_for_bundle(pack.id, scope=scope)
         if active is not None:
             raise PackAlreadyInstalledError(
                 f"'{pack.id}' is already installed, or an earlier install did not "
@@ -236,7 +245,7 @@ class InstallExamplePack(
         if not pack.requires:
             return {}
         async with self._uow as repos:
-            active = await repos.installations.list_active(scope=scope)
+            active = await repos.runs.list_active(scope=scope)
         return await resolve_external_refs(pack, active, self._graph, self._catalogue)
 
     async def _cover_styles(self, pack: ExamplePack) -> dict[str, str]:
@@ -256,7 +265,7 @@ class InstallExamplePack(
     ) -> dict[_Key, _Adoption]:
         """Return what the installer's earlier installs kept that still fits."""
         async with self._uow as repos:
-            history = await repos.installations.list_for_pack(pack.id, scope=scope)
+            history = await repos.runs.list_for_bundle(pack.id, scope=scope)
         kept = adoptable_records(history)
         slugs: dict[_Key, str | None] = {
             (EntityKind.RELATIONSHIP_TYPE, r.ref): slugify(r.slug)
@@ -278,10 +287,7 @@ class InstallExamplePack(
                 continue
             inspection = await inspect_record(
                 record,
-                presets=self._presets,
-                graph=self._graph,
-                collections=self._collections,
-                covers=self._covers,
+                self._targets,
             )
             if inspection is None:
                 continue
@@ -310,12 +316,12 @@ class InstallExamplePack(
             if await self._graph.slug_taken(kind, slug):
                 raise SlugClashError(kind=noun, slug=slug)
 
-    async def _persist(self, installation: Installation, *, new: bool = False) -> None:
+    async def _persist(self, installation: Run, *, new: bool = False) -> None:
         async with self._uow as repos:
             if new:
-                await repos.installations.add(installation)
+                await repos.runs.add(installation)
             else:
-                await repos.installations.save(installation)
+                await repos.runs.save(installation)
             await self._uow.commit()
 
     async def _run_steps(self, run: _Run) -> None:
@@ -508,27 +514,20 @@ class InstallExamplePack(
                 created.content,
             )
 
-    async def _roll_back(
-        self, installation: Installation, cause: Exception
-    ) -> NoReturn:
+    async def _roll_back(self, installation: Run, cause: Exception) -> NoReturn:
         """Remove what was created, then raise `InstallFailedError`."""
         try:
-            kept = await settle_installation(
-                installation,
-                presets=self._presets,
-                graph=self._graph,
-                collections=self._collections,
-                covers=self._covers,
-                persist=self._persist,
+            kept = reported_kept(
+                await settle_run(installation, self._targets, persist=self._persist)
             )
             installation.mark_failed()
             await self._persist(installation)
         except Exception as rollback_error:
             logger.exception(
-                "example pack rollback failed", pack_id=installation.pack_id
+                "example pack rollback failed", pack_id=installation.bundle_id
             )
             raise InstallFailedError(
-                f"Adding '{installation.pack_id}' failed ({cause}) and could not be "
+                f"Adding '{installation.bundle_id}' failed ({cause}) and could not be "
                 + f"undone ({rollback_error}). "
                 + "Remove the examples from the Examples page to finish cleaning up."
             ) from cause
@@ -539,7 +538,7 @@ class InstallExamplePack(
             else "Nothing was left behind."
         )
         raise InstallFailedError(
-            f"Adding '{installation.pack_id}' failed ({cause}). {outcome}"
+            f"Adding '{installation.bundle_id}' failed ({cause}). {outcome}"
         ) from cause
 
 
@@ -569,7 +568,7 @@ def _covered(pack: ExamplePack, styles: dict[str, str]) -> list[str]:
     return [i.ref for i in pack.items if i.type_ref in styles]
 
 
-def installation_counts(installation: Installation) -> PackCounts:
+def installation_counts(installation: Run) -> PackCounts:
     """Count an installation's recorded entities by kind, whatever their outcome."""
     return _counts(r.kind for r in installation.entities)
 

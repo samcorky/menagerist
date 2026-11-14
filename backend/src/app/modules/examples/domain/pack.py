@@ -4,17 +4,17 @@ from typing import TYPE_CHECKING, Any
 from app.modules.transfer.domain.bundle import (
     REF_PATTERN,
     REF_RULE,
-    PackCollection,
-    PackConnection,
-    PackItem,
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleItem,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
     preset_refs,
     split_ref,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -72,9 +72,9 @@ class PackSummary:
 def _check_refs(section: str, refs: list[str]) -> None:
     for ref in refs:
         if not REF_PATTERN.match(ref):
-            raise InvalidPackError(f"{section} ref '{ref}' {REF_RULE}")
+            raise InvalidBundleError(f"{section} ref '{ref}' {REF_RULE}")
     if len(set(refs)) != len(refs):
-        raise InvalidPackError(f"{section} refs must be unique")
+        raise InvalidBundleError(f"{section} refs must be unique")
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -82,19 +82,19 @@ class ExamplePack:
     """A pack's content. Validates its own references on construction."""
 
     id: str
-    presets: tuple[PackPreset, ...] = ()
-    relationship_types: tuple[PackRelationshipType, ...] = ()
-    item_types: tuple[PackItemType, ...] = ()
-    items: tuple[PackItem, ...] = ()
-    connections: tuple[PackConnection, ...] = ()
-    collections: tuple[PackCollection, ...] = ()
+    presets: tuple[BundlePreset, ...] = ()
+    relationship_types: tuple[BundleRelationshipType, ...] = ()
+    item_types: tuple[BundleItemType, ...] = ()
+    items: tuple[BundleItem, ...] = ()
+    connections: tuple[BundleConnection, ...] = ()
+    collections: tuple[BundleCollection, ...] = ()
     requires: tuple[str, ...] = ()
     links: tuple[PackLink, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject a pack whose references do not resolve or that is too large."""
         if not REF_PATTERN.match(self.id):
-            raise InvalidPackError(f"pack id '{self.id}' {REF_RULE}")
+            raise InvalidBundleError(f"pack id '{self.id}' {REF_RULE}")
         self._check_requires()
         self._check_limits()
         _check_refs("preset", [p.ref for p in self.presets])
@@ -111,12 +111,12 @@ class ExamplePack:
     def _check_requires(self) -> None:
         for pack_id in self.requires:
             if not REF_PATTERN.match(pack_id):
-                raise InvalidPackError(f"required pack id '{pack_id}' {REF_RULE}")
+                raise InvalidBundleError(f"required pack id '{pack_id}' {REF_RULE}")
             if pack_id == self.id:
-                raise InvalidPackError(f"pack '{self.id}' cannot require itself")
+                raise InvalidBundleError(f"pack '{self.id}' cannot require itself")
         for pack_id in set(self.requires):
             if self.requires.count(pack_id) > 1:
-                raise InvalidPackError(f"requires lists '{pack_id}' more than once")
+                raise InvalidBundleError(f"requires lists '{pack_id}' more than once")
 
     def _external(self, ref: str) -> tuple[str, str] | None:
         """Return `(pack id, local ref)` for a prefixed ref, else None."""
@@ -124,7 +124,7 @@ class ExamplePack:
         if pack_id is None:
             return None
         if pack_id not in self.requires:
-            raise InvalidPackError(
+            raise InvalidBundleError(
                 f"ref '{ref}' names pack '{pack_id}', which is not in requires"
             )
         return pack_id, local
@@ -172,22 +172,22 @@ class ExamplePack:
             ends = (link.source_ref, link.target_ref)
             prefixed = sum(self._link_end(link, ref, item_refs) for ref in ends)
             if prefixed == 0:
-                raise InvalidPackError("a link must join an item of another pack")
+                raise InvalidBundleError("a link must join an item of another pack")
             if link.source_ref == link.target_ref:
-                raise InvalidPackError("a link cannot join an item to itself")
+                raise InvalidBundleError("a link cannot join an item to itself")
             if link.type_ref not in relationship_refs:
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"link has unknown type '{link.type_ref}'; use one of this "
                     + "pack's own relationship types"
                 )
 
     def _check_link_pack(self, link: PackLink) -> None:
         if not REF_PATTERN.match(link.with_pack):
-            raise InvalidPackError(f"link pack id '{link.with_pack}' {REF_RULE}")
+            raise InvalidBundleError(f"link pack id '{link.with_pack}' {REF_RULE}")
         if link.with_pack == self.id:
-            raise InvalidPackError(f"pack '{self.id}' cannot link with itself")
+            raise InvalidBundleError(f"pack '{self.id}' cannot link with itself")
         if link.with_pack in self.requires:
-            raise InvalidPackError(
+            raise InvalidBundleError(
                 f"pack '{self.id}' links with '{link.with_pack}', which it "
                 + "requires; use a normal connection instead"
             )
@@ -198,10 +198,10 @@ class ExamplePack:
         pack_id, local = split_ref(ref)
         if pack_id is None:
             if local not in item_refs:
-                raise InvalidPackError(f"link has unknown item '{local}'")
+                raise InvalidBundleError(f"link has unknown item '{local}'")
             return False
         if pack_id != link.with_pack:
-            raise InvalidPackError(
+            raise InvalidBundleError(
                 f"link ref '{ref}' names pack '{pack_id}', not '{link.with_pack}'"
             )
         return True
@@ -217,15 +217,15 @@ class ExamplePack:
         )
         for name, count, limit in limits:
             if count > limit:
-                raise InvalidPackError(f"a pack may hold at most {limit} {name}")
+                raise InvalidBundleError(f"a pack may hold at most {limit} {name}")
 
     def _check_slugs(self) -> None:
         for types in (self.relationship_types, self.item_types):
             slugs = [t.slug for t in types]
             if any(slugify(s) != s or s == "" for s in slugs):
-                raise InvalidPackError(f"type slugs {REF_RULE}")
+                raise InvalidBundleError(f"type slugs {REF_RULE}")
             if len(set(slugs)) != len(slugs):
-                raise InvalidPackError("type slugs must be unique within a pack")
+                raise InvalidBundleError("type slugs must be unique within a pack")
 
     def _check_links(self) -> None:
         item_type_refs = {t.ref for t in self.item_types}
@@ -235,7 +235,7 @@ class ExamplePack:
             if self._external(item.type_ref) is None and (
                 item.type_ref not in item_type_refs
             ):
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"item '{item.ref}' has unknown type '{item.type_ref}'"
                 )
         for c in self.connections:
@@ -243,45 +243,45 @@ class ExamplePack:
                 self._external(r) is None and r not in item_refs
                 for r in (c.source_ref, c.target_ref)
             ):
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     "a connection joins two items that are not in the pack"
                 )
             if c.source_ref == c.target_ref:
-                raise InvalidPackError("a connection cannot join an item to itself")
+                raise InvalidBundleError("a connection cannot join an item to itself")
             if self._external(c.type_ref) is None and (
                 c.type_ref not in relationship_refs
             ):
-                raise InvalidPackError(f"connection has unknown type '{c.type_ref}'")
+                raise InvalidBundleError(f"connection has unknown type '{c.type_ref}'")
 
     def _check_collections(self) -> None:
         item_refs = {i.ref for i in self.items}
         for collection in self.collections:
             if not 1 <= len(collection.name.strip()) <= _MAX_COLLECTION_NAME:
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"collection '{collection.ref}' needs a name of "
                     + f"1 to {_MAX_COLLECTION_NAME} characters"
                 )
             refs = collection.item_refs
             if collection.definition is not None:
                 if refs:
-                    raise InvalidPackError(
+                    raise InvalidBundleError(
                         f"collection '{collection.ref}' has both items and a "
                         + "definition"
                     )
                 continue
             if not refs:
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"collection '{collection.ref}' has no items or definition"
                 )
             if len(set(refs)) != len(refs):
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"collection '{collection.ref}' lists an item twice"
                 )
             unknown = [
                 r for r in refs if self._external(r) is None and r not in item_refs
             ]
             if unknown:
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"collection '{collection.ref}' has unknown item '{unknown[0]}'"
                 )
 
@@ -294,7 +294,7 @@ class ExamplePack:
             used |= preset_refs(schema)
         missing = used - {p.ref for p in self.presets}
         if missing:
-            raise InvalidPackError(f"unknown preset '{sorted(missing)[0]}'")
+            raise InvalidBundleError(f"unknown preset '{sorted(missing)[0]}'")
 
     @property
     def counts(self) -> PackCounts:
@@ -323,7 +323,7 @@ def _check_cycles(packs: Mapping[str, ExamplePack]) -> None:
     def visit(pack_id: str, path: list[str]) -> None:
         if pack_id in path:
             cycle = [*path[path.index(pack_id) :], pack_id]
-            raise InvalidPackError(f"pack dependency cycle: {' -> '.join(cycle)}")
+            raise InvalidBundleError(f"pack dependency cycle: {' -> '.join(cycle)}")
         if pack_id in done:
             return
         for required in packs[pack_id].requires:
@@ -340,12 +340,12 @@ def _check_links(
     for pack in packs.values():
         for target in pack.link_targets:
             if target not in packs:
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"pack {pack.id} links with {target}, which is not available"
                 )
         for pack_id, ref in sorted(pack.link_item_refs()):
             if ref not in defined[pack_id][EntityKind.ITEM]:
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"pack {pack.id} links to {pack_id}:{ref}, which {pack_id} "
                     + "does not define as an item"
                 )
@@ -359,12 +359,12 @@ def validate_catalogue(packs: Mapping[str, ExamplePack]) -> None:
     Linked packs must be present too, and every item a link names must exist.
 
     Raises:
-        InvalidPackError: If any check fails.
+        InvalidBundleError: If any check fails.
     """
     for pack in packs.values():
         for required in pack.requires:
             if required not in packs:
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"pack {pack.id} requires {required}, which is not available"
                 )
     _check_cycles(packs)
@@ -376,6 +376,6 @@ def validate_catalogue(packs: Mapping[str, ExamplePack]) -> None:
                 noun = kind.value.replace("_", " ")
                 article = "an" if noun[0] == "i" else "a"
                 what = f"pack {pack.id} refers to {pack_id}:{ref}"
-                raise InvalidPackError(
+                raise InvalidBundleError(
                     f"{what}, which {pack_id} does not define as {article} {noun}"
                 )

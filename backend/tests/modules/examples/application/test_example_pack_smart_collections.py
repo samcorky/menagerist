@@ -20,11 +20,11 @@ from app.modules.examples.domain.errors import (
     PackAlreadyInstalledError,
     SlugClashError,
 )
-from app.modules.examples.domain.installation import Outcome
-from app.modules.examples.domain.removal import KEEP_EDITED
 from app.modules.graph.domain.node_type import NodeType
-from app.modules.transfer.domain.bundle import PackCollection
+from app.modules.transfer.domain.bundle import BundleCollection
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.removal import KEEP_EDITED
+from app.modules.transfer.domain.run import Outcome
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -41,8 +41,8 @@ _RULE: dict[str, Any] = {
     "v": 1,
     "where": {"op": "and", "children": [{"kind": "type", "in": ["demo-record"]}]},
 }
-_MANUAL = PackCollection(ref="both", name="Both", item_refs=("ada", "blue"))
-_SMART = PackCollection(
+_MANUAL = BundleCollection(ref="both", name="Both", item_refs=("ada", "blue"))
+_SMART = BundleCollection(
     ref="records", name="Records", description="All records", definition=_RULE
 )
 
@@ -126,9 +126,7 @@ async def test_a_failing_smart_collection_rolls_the_whole_install_back(
         == []
     )
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -166,9 +164,7 @@ async def test_a_clashing_type_slug_never_half_installs_a_smart_collection(
     assert world.collections.collections == {}
     assert await _item_count(world) == 0
     assert (
-        await world.installations.get_active_for_pack(
-            "demo", scope=ContentFilter.everyone()
-        )
+        await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
     )
 
@@ -203,7 +199,7 @@ async def test_reinstalling_after_removal_recreates_the_smart_collection(
     again = _live(world, "Records")
     assert again.id != first
     assert again.definition == _RULE
-    installation = await world.installations.get_active_for_pack(
+    installation = await world.runs.get_active_for_bundle(
         "demo", scope=ContentFilter.everyone()
     )
     assert installation is not None

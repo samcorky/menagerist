@@ -1,42 +1,40 @@
 import uuid
 
-from app.modules.examples.adapters.persistence.in_memory_installation_repository import (  # noqa: E501
-    InMemoryInstallationRepository,
-)
 from app.modules.examples.application.list_example_entities import (
     ListExampleEntities,
     ListExampleEntitiesQuery,
 )
-from app.modules.examples.domain.installation import Installation, Outcome
 from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.transfer.adapters.persistence.in_memory_run_repository import (
+    InMemoryRunRepository,
+)
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.run import Outcome, Run
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 
 USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 
 
-def _installation(
-    pack_id: str, *entities: tuple[EntityKind, uuid.UUID]
-) -> Installation:
+def _installation(pack_id: str, *entities: tuple[EntityKind, uuid.UUID]) -> Run:
     """Build an installing installation recording the given entities."""
-    installation = Installation.start(pack_id, USER_A.id)
+    installation = Run.start(pack_id, USER_A.id)
     for kind, entity_id in entities:
         installation.record(kind, str(entity_id), "label", entity_id, "hash")
     return installation
 
 
-async def _list(repo: InMemoryInstallationRepository) -> tuple[list[uuid.UUID], ...]:
+async def _list(repo: InMemoryRunRepository) -> tuple[list[uuid.UUID], ...]:
     """Run the query and return the item, item type and collection ids."""
     result = await ListExampleEntities(
-        ExampleRepos(installations=repo), InMemoryAccessGuard()
+        ExampleRepos(runs=repo), InMemoryAccessGuard()
     ).handle(ListExampleEntitiesQuery(), USER_A)
     return result.item_ids, result.item_type_ids, result.collection_ids
 
 
 async def test_lists_owned_items_and_item_types_across_installations() -> None:
     """Owned items and item types are grouped; other kinds are ignored."""
-    repo = InMemoryInstallationRepository()
+    repo = InMemoryRunRepository()
     item_a, item_b, type_a, preset = (uuid.uuid7() for _ in range(4))
     first = _installation(
         "one",
@@ -57,7 +55,7 @@ async def test_lists_owned_items_and_item_types_across_installations() -> None:
 
 async def test_excludes_removed_and_kept_records() -> None:
     """Records no longer owned by the pack are not listed."""
-    repo = InMemoryInstallationRepository()
+    repo = InMemoryRunRepository()
     owned, removed, kept, kept_type = (uuid.uuid7() for _ in range(4))
     installation = _installation(
         "one",
@@ -80,8 +78,8 @@ async def test_excludes_removed_and_kept_records() -> None:
 
 async def test_excludes_removed_installations() -> None:
     """A removed installation contributes nothing."""
-    repo = InMemoryInstallationRepository()
-    installation = Installation.start("one", USER_A.id)
+    repo = InMemoryRunRepository()
+    installation = Run.start("one", USER_A.id)
     installation.mark_removed()
     await repo.add(installation)
 
@@ -90,12 +88,12 @@ async def test_excludes_removed_installations() -> None:
 
 async def test_is_empty_with_no_installations() -> None:
     """No installations means no ids."""
-    assert await _list(InMemoryInstallationRepository()) == ([], [], [])
+    assert await _list(InMemoryRunRepository()) == ([], [], [])
 
 
 async def test_lists_owned_collections_and_skips_kept_ones() -> None:
     """Owned collections are listed; kept or removed ones are not."""
-    repo = InMemoryInstallationRepository()
+    repo = InMemoryRunRepository()
     owned, kept, removed = (uuid.uuid7() for _ in range(3))
     installation = _installation(
         "one",

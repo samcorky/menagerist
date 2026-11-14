@@ -4,15 +4,15 @@ from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
     InMemoryPackCatalogue,
 )
 from app.modules.examples.domain.pack import ExamplePack
-from app.modules.transfer.domain.bundle import PackItem, PackItemType
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.bundle import BundleItem, BundleItemType
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 
 def _pack(pack_id: str) -> ExamplePack:
     return ExamplePack(
         id=pack_id,
-        item_types=(PackItemType(ref="thing", slug="thing", label="Thing"),),
-        items=(PackItem(ref="a", type_ref="thing", name="A"),),
+        item_types=(BundleItemType(ref="thing", slug="thing", label="Thing"),),
+        items=(BundleItem(ref="a", type_ref="thing", name="A"),),
     )
 
 
@@ -46,7 +46,7 @@ async def test_requires_appear_on_the_summary() -> None:
     addon = ExamplePack(
         id="extra",
         requires=("base",),
-        items=(PackItem(ref="b", type_ref="base:thing", name="B"),),
+        items=(BundleItem(ref="b", type_ref="base:thing", name="B"),),
     )
     catalogue.add(addon, name="Extra", description="Extra")
 
@@ -60,5 +60,5 @@ def test_adding_an_invalid_catalogue_is_refused() -> None:
     catalogue = InMemoryPackCatalogue()
     addon = ExamplePack(id="extra", requires=("base",))
 
-    with pytest.raises(InvalidPackError, match="requires base"):
+    with pytest.raises(InvalidBundleError, match="requires base"):
         catalogue.add(addon, name="Extra", description="Extra")

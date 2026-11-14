@@ -4,15 +4,15 @@ from typing import TYPE_CHECKING, Any
 
 from app.modules.examples.domain.pack import ExamplePack, PackLink
 from app.modules.transfer.domain.bundle import (
-    PackCollection,
-    PackConnection,
-    PackCover,
-    PackItem,
-    PackItemType,
-    PackPreset,
-    PackRelationshipType,
+    BundleCollection,
+    BundleConnection,
+    BundleCover,
+    BundleItem,
+    BundleItemType,
+    BundlePreset,
+    BundleRelationshipType,
 )
-from app.modules.transfer.domain.errors import InvalidPackError
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -48,13 +48,13 @@ class IndexEntry:
 
 def _object(value: object, where: str) -> Mapping[str, Any]:
     if not isinstance(value, dict):
-        raise InvalidPackError(f"{where} must be an object")
+        raise InvalidBundleError(f"{where} must be an object")
     return value
 
 
 def _array(value: object, where: str) -> list[Any]:
     if not isinstance(value, list):
-        raise InvalidPackError(f"{where} must be an array")
+        raise InvalidBundleError(f"{where} must be an array")
     return value
 
 
@@ -67,15 +67,15 @@ def _check_keys(
 ) -> None:
     missing = required - set(data)
     if missing:
-        raise InvalidPackError(f"{where} is missing {sorted(missing)[0]!r}")
+        raise InvalidBundleError(f"{where} is missing {sorted(missing)[0]!r}")
     unknown = set(data) - required - optional
     if unknown:
-        raise InvalidPackError(f"{where} has unknown key {sorted(unknown)[0]!r}")
+        raise InvalidBundleError(f"{where} has unknown key {sorted(unknown)[0]!r}")
 
 
 def _str(value: object, where: str) -> str:
     if not isinstance(value, str):
-        raise InvalidPackError(f"{where} must be a string")
+        raise InvalidBundleError(f"{where} must be a string")
     return value
 
 
@@ -85,7 +85,7 @@ def _opt_str(value: object, where: str) -> str | None:
 
 def _bool(value: object, where: str) -> bool:
     if not isinstance(value, bool):
-        raise InvalidPackError(f"{where} must be a boolean")
+        raise InvalidBundleError(f"{where} must be a boolean")
     return value
 
 
@@ -105,10 +105,10 @@ def _envelope(
 ) -> Mapping[str, Any]:
     root = _object(data, where)
     if root.get("format") != expected:
-        raise InvalidPackError(f"{where} format must be '{expected}'")
+        raise InvalidBundleError(f"{where} format must be '{expected}'")
     version = root.get("version")
     if type(version) is not int or version not in versions:
-        raise InvalidPackError(
+        raise InvalidBundleError(
             f"{where} version {root.get('version')!r} is not supported"
         )
     return root
@@ -118,7 +118,7 @@ def parse_index(data: object) -> list[IndexEntry]:
     """Parse `index.json`.
 
     Raises:
-        InvalidPackError: If the index is malformed.
+        InvalidBundleError: If the index is malformed.
     """
     root = _envelope(data, INDEX_FORMAT, _INDEX)
     _check_keys(
@@ -137,9 +137,9 @@ def parse_index(data: object) -> list[IndexEntry]:
         )
         pack_id = _str(entry["id"], "id")
         if not PACK_ID.match(pack_id):
-            raise InvalidPackError(f"{where} id is not a valid pack id")
+            raise InvalidBundleError(f"{where} id is not a valid pack id")
         if pack_id in seen:
-            raise InvalidPackError(f"{where} id '{pack_id}' is listed twice")
+            raise InvalidBundleError(f"{where} id '{pack_id}' is listed twice")
         seen.add(pack_id)
         entries.append(
             IndexEntry(
@@ -156,14 +156,14 @@ def _section(root: Mapping[str, Any], name: str) -> list[Mapping[str, Any]]:
     return [_object(v, f"{name}[{n}]") for n, v in enumerate(raw)]
 
 
-def _parse_preset(p: Mapping[str, Any]) -> PackPreset:
+def _parse_preset(p: Mapping[str, Any]) -> BundlePreset:
     _check_keys(
         p,
         required={"ref", "kind", "label", "definition"},
         optional={"description"},
         where="a preset",
     )
-    return PackPreset(
+    return BundlePreset(
         ref=_str(p["ref"], "ref"),
         kind=_str(p["kind"], "kind"),
         label=_str(p["label"], "label"),
@@ -172,14 +172,14 @@ def _parse_preset(p: Mapping[str, Any]) -> PackPreset:
     )
 
 
-def _parse_relationship_type(t: Mapping[str, Any]) -> PackRelationshipType:
+def _parse_relationship_type(t: Mapping[str, Any]) -> BundleRelationshipType:
     _check_keys(
         t,
         required={"ref", "slug", "label"},
         optional={"reverse_label", "description", "directional", "attributes_schema"},
         where="a relationship type",
     )
-    return PackRelationshipType(
+    return BundleRelationshipType(
         ref=_str(t["ref"], "ref"),
         slug=_str(t["slug"], "slug"),
         label=_str(t["label"], "label"),
@@ -190,20 +190,20 @@ def _parse_relationship_type(t: Mapping[str, Any]) -> PackRelationshipType:
     )
 
 
-def _parse_cover(c: object) -> PackCover:
+def _parse_cover(c: object) -> BundleCover:
     cover = _object(c, "cover")
     _check_keys(cover, required={"style"}, optional=set(), where="a cover")
-    return PackCover(style=_str(cover["style"], "style"))
+    return BundleCover(style=_str(cover["style"], "style"))
 
 
-def _parse_item_type(t: Mapping[str, Any]) -> PackItemType:
+def _parse_item_type(t: Mapping[str, Any]) -> BundleItemType:
     _check_keys(
         t,
         required={"ref", "slug", "label"},
         optional={"description", "attributes_schema", "cover", "icon", "colour"},
         where="an item type",
     )
-    return PackItemType(
+    return BundleItemType(
         ref=_str(t["ref"], "ref"),
         slug=_str(t["slug"], "slug"),
         label=_str(t["label"], "label"),
@@ -215,14 +215,14 @@ def _parse_item_type(t: Mapping[str, Any]) -> PackItemType:
     )
 
 
-def _parse_item(i: Mapping[str, Any]) -> PackItem:
+def _parse_item(i: Mapping[str, Any]) -> BundleItem:
     _check_keys(
         i,
         required={"ref", "type", "name"},
         optional={"description", "attributes", "tags", "extra_schema"},
         where="an item",
     )
-    return PackItem(
+    return BundleItem(
         ref=_str(i["ref"], "ref"),
         type_ref=_str(i["type"], "type"),
         name=_str(i["name"], "name"),
@@ -233,14 +233,14 @@ def _parse_item(i: Mapping[str, Any]) -> PackItem:
     )
 
 
-def _parse_connection(c: Mapping[str, Any]) -> PackConnection:
+def _parse_connection(c: Mapping[str, Any]) -> BundleConnection:
     _check_keys(
         c,
         required={"from", "to", "type"},
         optional={"attributes"},
         where="a connection",
     )
-    return PackConnection(
+    return BundleConnection(
         source_ref=_str(c["from"], "from"),
         target_ref=_str(c["to"], "to"),
         type_ref=_str(c["type"], "type"),
@@ -300,11 +300,11 @@ def _parse_definition(raw: object, ref: str) -> dict[str, Any]:
     found = _unportable(definition, "")
     if found is not None:
         path, reason = found
-        raise InvalidPackError(f"collection '{ref}' definition at '{path}': {reason}")
+        raise InvalidBundleError(f"collection '{ref}' definition at '{path}': {reason}")
     return definition
 
 
-def _parse_collection(c: Mapping[str, Any], version: int) -> PackCollection:
+def _parse_collection(c: Mapping[str, Any], version: int) -> BundleCollection:
     _check_keys(
         c,
         required={"ref", "name"},
@@ -312,7 +312,7 @@ def _parse_collection(c: Mapping[str, Any], version: int) -> PackCollection:
         where="a collection",
     )
     ref = _str(c["ref"], "ref")
-    return PackCollection(
+    return BundleCollection(
         ref=ref,
         name=_str(c["name"], "name"),
         description=_opt_str(c.get("description"), "description"),
@@ -333,7 +333,7 @@ def parse_pack(data: object) -> ExamplePack:
     """Parse one pack file; unknown keys and wrong types are rejected.
 
     Raises:
-        InvalidPackError: If the file is malformed or the pack is inconsistent.
+        InvalidBundleError: If the file is malformed or the pack is inconsistent.
     """
     root = _envelope(data, PACK_FORMAT, _PACK, PACK_VERSIONS)
     optional = (

@@ -2,10 +2,10 @@ import pytest
 
 from app.modules.catalogue.domain.entry import CatalogueEntry, EntrySection
 from app.modules.catalogue.domain.errors import InvalidEntryError
-from app.modules.transfer.domain.bundle import PackItemType, PackPreset
+from app.modules.transfer.domain.bundle import BundleItemType, BundlePreset
 
-_PRESET = PackPreset(ref="preset-1", kind="choice_list", label="L", definition={})
-_TYPE = PackItemType(ref="person", slug="person", label="Person")
+_PRESET = BundlePreset(ref="preset-1", kind="choice_list", label="L", definition={})
+_TYPE = BundleItemType(ref="person", slug="person", label="Person")
 
 
 def _entry(**kwargs: object) -> CatalogueEntry:

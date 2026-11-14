@@ -19,16 +19,17 @@ from app.modules.examples.adapters.api.dependencies import (
     get_example_uow,
     get_pack_catalogue,
 )
-from app.modules.examples.domain.installation import Installation
+from app.modules.examples.adapters.api.example.schemas import InstallationStatus
 from app.modules.examples.domain.pack import ExamplePack, PackLink
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.transfer.domain.bundle import (
-    PackCollection,
-    PackItem,
-    PackItemType,
-    PackRelationshipType,
+    BundleCollection,
+    BundleItem,
+    BundleItemType,
+    BundleRelationshipType,
 )
+from app.modules.transfer.domain.run import Run, RunStatus
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -45,9 +46,7 @@ USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 def _client(world: World, *, raise_server_exceptions: bool = True) -> TestClient:
     app: FastAPI = create_app()
     app.dependency_overrides[get_example_uow] = lambda: world.uow
-    app.dependency_overrides[get_example_repos] = lambda: ExampleRepos(
-        installations=world.installations
-    )
+    app.dependency_overrides[get_example_repos] = lambda: ExampleRepos(runs=world.runs)
     app.dependency_overrides[get_pack_catalogue] = lambda: world.catalogue
     app.dependency_overrides[get_preset_pack_target] = lambda: world.presets
     app.dependency_overrides[get_graph_pack_target] = lambda: world.graph
@@ -248,7 +247,9 @@ def test_entities_lists_owned_collection_ids(
     """Installed example collections are listed by id, and gone once removed."""
     pack = replace(
         sample_pack(),
-        collections=(PackCollection(ref="all", name="All", item_refs=("blue", "ada")),),
+        collections=(
+            BundleCollection(ref="all", name="All", item_refs=("blue", "ada")),
+        ),
     )
     world = make_world(pack)
     client = _client(world)
@@ -269,12 +270,12 @@ def _linking_packs() -> tuple[ExamplePack, ExamplePack]:
         return ExamplePack(
             id=pack_id,
             relationship_types=(
-                PackRelationshipType(ref="tie", slug=f"{pack_id}-tie", label="Tie"),
+                BundleRelationshipType(ref="tie", slug=f"{pack_id}-tie", label="Tie"),
             ),
             item_types=(
-                PackItemType(ref="thing", slug=f"{pack_id}-thing", label="Thing"),
+                BundleItemType(ref="thing", slug=f"{pack_id}-thing", label="Thing"),
             ),
-            items=(PackItem(ref="a", type_ref="thing", name=f"{pack_id} A"),),
+            items=(BundleItem(ref="a", type_ref="thing", name=f"{pack_id} A"),),
             links=links,
         )
 
@@ -290,8 +291,8 @@ def _add_on_world(make_world: MakeWorld, sample_pack: SamplePack) -> World:
         ExamplePack(
             id=pack_id,
             requires=("base",),
-            item_types=(PackItemType(ref="t", slug=f"{pack_id}-t", label="T"),),
-            items=(PackItem(ref="i", type_ref="t", name=f"{pack_id} item"),),
+            item_types=(BundleItemType(ref="t", slug=f"{pack_id}-t", label="T"),),
+            items=(BundleItem(ref="i", type_ref="t", name=f"{pack_id} item"),),
         )
         for pack_id in ("extras", "more")
     ]
@@ -379,7 +380,7 @@ def test_half_added_add_on_counts_as_dependant_and_blocks_removal(
     world = _add_on_world(make_world, sample_pack)
     client = _client(world)
     client.put("/api/v1/examples/base/installation")
-    asyncio.run(world.installations.add(Installation.start("extras", USER_A.id)))
+    asyncio.run(world.runs.add(Run.start("extras", USER_A.id)))
 
     listed = {p["id"]: p for p in client.get("/api/v1/examples").json()}
     blocked = client.delete("/api/v1/examples/base/installation")
@@ -400,3 +401,8 @@ def test_required_by_lists_every_dependant_in_catalogue_order(
     base = client.get("/api/v1/examples").json()[0]
 
     assert [r["id"] for r in base["required_by"]] == ["extras", "more"]
+
+
+def test_installation_status_in_the_api_matches_the_run_statuses() -> None:
+    """The API keeps its own enum (and schema name), with the run's values."""
+    assert {s.value for s in InstallationStatus} == {s.value for s in RunStatus}
