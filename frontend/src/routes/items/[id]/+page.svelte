@@ -63,6 +63,19 @@
 	import NodeCover from '$lib/components/node-cover.svelte';
 	import NodeSummary from '$lib/components/node-summary.svelte';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
+	import { auth } from '$lib/auth.svelte.js';
+	import { clearDraft, readDraft, registerDraft } from '$lib/drafts';
+	import DraftRestore from '$lib/components/draft-restore.svelte';
+
+	type ItemEditDraft = {
+		name: string;
+		description: string;
+		tags: string[];
+		attributeRows: AttributeRow[];
+		extraSchema: AttributesSchema | null;
+		/** The item's `updated_at` when the edit began, to tell whether it changed since. */
+		base: string;
+	};
 
 	let nodeId = $derived(page.params.id!);
 	// Bumped when a cover is added from the placeholder, so the cover and the Files card reload.
@@ -128,6 +141,8 @@
 	);
 	let attributeServerErrors = $state<Record<string, string> | null>(null);
 	let saving = $state(false);
+	let draft = $state.raw<ItemEditDraft | null>(null);
+	let draftKey = $derived(`item:${nodeId}`);
 	let deletingNode = $state(false);
 	let confirmDeleteNode = $state(false);
 	let duplicateOpen = $state(false);
@@ -214,7 +229,41 @@
 			node.attributes,
 			mergeAttributeSchemas(schemaOfType(node.type), extraSchema)
 		);
+		draft = auth.user ? readDraft<ItemEditDraft>(auth.user.id, draftKey) : null;
 		loading = false;
+	}
+
+	/** What to keep if the session ends now: only an edit that changed something. */
+	function snapshot(): ItemEditDraft | null {
+		if (mode !== 'edit' || !node) return null;
+		const current = { name, description, tags, attributeRows, extraSchema };
+		const savedExtra = (node.extra_schema as AttributesSchema | null) ?? null;
+		const saved = {
+			name: node.name,
+			description: node.description ?? '',
+			tags: node.tags,
+			attributeRows: attributesToRows(
+				node.attributes,
+				mergeAttributeSchemas(nodeSchema, savedExtra)
+			),
+			extraSchema: savedExtra
+		};
+		if (JSON.stringify(current) === JSON.stringify(saved)) return null;
+		return { ...current, base: node.updated_at };
+	}
+
+	$effect(() => registerDraft(draftKey, snapshot));
+
+	function forgetDraft() {
+		draft = null;
+		if (auth.user) clearDraft(auth.user.id, draftKey);
+	}
+
+	function restoreDraft() {
+		if (!draft) return;
+		({ name, description, tags, attributeRows, extraSchema } = draft);
+		forgetDraft();
+		mode = 'edit';
 	}
 
 	$effect(() => {
@@ -333,12 +382,14 @@
 		} else {
 			toast.success('Saved');
 			node = result.data;
+			forgetDraft();
 			mode = 'read';
 		}
 		saving = false;
 	}
 
 	function handleCancelEdit() {
+		forgetDraft();
 		if (node) {
 			name = node.name;
 			description = node.description ?? '';
@@ -657,6 +708,15 @@
 				</div>
 
 				<div data-testid="item-main" class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
+					{#if draft && node}
+						<DraftRestore
+							notes={draft.base === node.updated_at
+								? []
+								: ['This item has been changed since. Saving your changes replaces those.']}
+							onrestore={restoreDraft}
+							ondiscard={forgetDraft}
+						/>
+					{/if}
 					<Card.Root class="overflow-hidden">
 						<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
 							<div class="min-w-0 flex-1">

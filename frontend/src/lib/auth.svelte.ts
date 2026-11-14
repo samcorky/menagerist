@@ -11,6 +11,7 @@ import {
 } from '$lib/api/client';
 import { registerAuthHandlers, resetAuthEvents } from '$lib/api/auth-events';
 import { clearAllEtags } from '$lib/api/etagStore';
+import { clearDrafts, saveDrafts } from '$lib/drafts';
 import { OFFLINE_MESSAGE } from '$lib/offline';
 import {
 	authErrorMessage,
@@ -51,6 +52,8 @@ class AuthController {
 		registerAuthHandlers({
 			onUnauthenticated: () => {
 				this.sessionExpired = this.user !== null && !this.leftOnPurpose;
+				// Before clearing, while the forms are still on screen to ask.
+				if (this.sessionExpired && this.user) saveDrafts(this.user.id);
 				this.clearSession();
 			},
 			onSetupRequired: () => {
@@ -107,6 +110,8 @@ class AuthController {
 					message: 'Signed in, but your account could not be loaded. Try again.'
 				};
 			}
+			// Keep only this account's drafts: another person's never show here.
+			if (this.user) clearDrafts(this.user.id);
 			return { ok: true };
 		} catch {
 			return { ok: false, message: OFFLINE_MESSAGE };
@@ -144,6 +149,7 @@ class AuthController {
 	 */
 	async signOut(): Promise<AuthResult> {
 		this.leftOnPurpose = true;
+		clearDrafts();
 		this.clearSession();
 		let failure: string | null = null;
 		try {
