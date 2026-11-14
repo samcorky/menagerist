@@ -384,6 +384,12 @@ Generated release notes group pull requests by label (`.github/release.yml`), so
 
 A pull request appears under the first section it matches, in the order above; one with no label lands under "Other changes". Renovate follows the same titles: `chore(deps):` for dependencies, `ci(deps):` for GitHub Actions, `build(deps):` for Docker images and the build system, and `fix(security):` for vulnerability updates, so its pull requests are labelled like any other.
 
+## Renovate
+
+`.github/renovate.json` holds the rules; each has a `description` saying why it exists, so keep one on every new rule. The Dependency Dashboard (#3) groups updates under headings set by `dependencyDashboardCategory` (backend, frontend, CI and tooling, Docker, language runtimes). A heading only changes the dashboard's layout; `groupName` decides which updates share a pull request.
+
+`poe validate-renovate` checks the schema only, so a rule can be valid and still never match (the `filetype` rule once named a datasource where it needed a manager). To check that a rule applies, run `poe renovate-local`, which validates the config and then runs Renovate in dry-run mode through Docker with debug logging (a few minutes; it needs network access, and without a `GITHUB_COM_TOKEN` it logs a GitHub rate-limit warning that is safe to ignore). In the log, find the `packageFiles with updates` message and look at the dependency you care about: a pending update carries a `branchName`, and a matching rule shows in it (`renovate/bits-ui-2.x` for the rule that gives `bits-ui` its own pull request, `renovate/python-interpreter-version` for the Python version group). A dependency whose update has the default branch name is not matched by the rule that should cover it. Dashboard headings and the header and footer only show on the real dashboard, so check those after the change merges.
+
 ## Issues
 
 File an issue from one of the forms (feature, bug or documentation). Each form sets the issue's GitHub type, a title prefix and a label:
