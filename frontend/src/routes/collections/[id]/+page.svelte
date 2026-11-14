@@ -590,11 +590,17 @@
 		void loadCollection(id);
 	});
 
+	function retryItems() {
+		if (smart) void fetchSmart();
+		else void fetchPage(canonicalId, q, selectedType);
+	}
+
 	// Coming back online, or Retry in the banner, reloads a collection that had failed.
 	$effect(() => {
 		void offlineController.retryCount;
 		untrack(() => {
 			if (loadFailed && collectionId) void loadCollection(collectionId);
+			else if (itemsFailed) void retryItems();
 		});
 	});
 
@@ -1261,15 +1267,7 @@
 		{/if}
 
 		{#if itemsFailed}
-			<div class="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5">
-				<p class="text-sm text-muted-foreground">Couldn't load the items in this collection.</p>
-				<Button
-					variant="outline"
-					onclick={() => (smart ? void fetchSmart() : void fetchPage(canonicalId, q, selectedType))}
-				>
-					Try again
-				</Button>
-			</div>
+			<LoadFailed what="the items in this collection" onretry={retryItems} />
 		{:else if items.length > 0 && shownItems.length === 0 && !loading && !hasMore}
 			<div class="flex flex-col items-center gap-3 py-12 text-center">
 				<EyeOff class="size-10 text-muted-foreground/50" />

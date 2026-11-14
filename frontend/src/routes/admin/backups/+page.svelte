@@ -34,6 +34,8 @@
 	import BackButton from '$lib/components/back-button.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
 	import FileDrop from '$lib/components/file-drop.svelte';
+	import LoadFailed from '$lib/components/load-failed.svelte';
+	import { offlineController } from '$lib/offline.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -48,7 +50,7 @@
 	const canDelete = $derived(auth.can('backup:archive:delete'));
 	let backups = $state.raw<BackupResponse[]>([]);
 	let loading = $state(true);
-	let error = $state<string | null>(null);
+	let loadFailed = $state(false);
 	let busy = $state<string | null>(null);
 	let label = $state('manual');
 	let createOpen = $state(false);
@@ -67,16 +69,30 @@
 		if (canRead) untrack(() => void load());
 		else loading = false;
 	});
+	// Coming back online, or Retry in the banner, reloads a list that had failed.
+	$effect(() => {
+		void offlineController.retryCount;
+		untrack(() => {
+			if (loadFailed) void load();
+		});
+	});
 
 	async function load() {
 		loading = true;
-		error = null;
+		loadFailed = false;
 		try {
 			const result = await listBackups();
-			if (result.error || !result.data) error = networkAwareError(result).title;
-			else backups = result.data;
+			if (result.error || !result.data) {
+				loadFailed = true;
+				// A failed refresh keeps the list already shown; only an empty page shows LoadFailed.
+				if (backups.length > 0) {
+					const { title, description } = networkAwareError(result);
+					toast.error(title, { description });
+				}
+			} else backups = result.data;
 		} catch {
-			error = 'Could not load backups. Check your connection and try again.';
+			loadFailed = true;
+			if (backups.length > 0) toast.error("Couldn't refresh the backups");
 		} finally {
 			loading = false;
 		}
@@ -287,19 +303,15 @@
 				onclick={load}><RefreshCw class="size-4" aria-hidden="true" />Refresh</Button
 			>
 		</div>
-		{#if error}<Alert.Root variant="destructive"
-				><Alert.Description>{error}</Alert.Description><Button
-					variant="outline"
-					class="mt-2 pointer-coarse:h-11"
-					disabled={loading || busy !== null}
-					onclick={load}><RefreshCw class="size-4" aria-hidden="true" />Retry</Button
-				></Alert.Root
-			>{/if}
+		{#if loadFailed && !loading && backups.length === 0}<LoadFailed
+				what="the backups"
+				onretry={() => void load()}
+			/>{/if}
 		{#if loadingDisplay.show}
 			<div role="status" aria-label="Loading backups" class="space-y-3">
 				<Skeleton class="h-40 w-full" /><Skeleton class="h-40 w-full" />
 			</div>
-		{:else if !loading && !error && backups.length === 0}
+		{:else if !loading && !loadFailed && backups.length === 0}
 			<p class="rounded-xl border p-6 text-muted-foreground">
 				No backups yet. Create a backup to keep a copy of this Menagerist.
 			</p>
