@@ -6,6 +6,6 @@
     "node": "^26.0.0"
   },
   "devDependencies": {
-    "ibm-openapi-validator": "1.38.8"
+    "ibm-openapi-validator": "1.38.9"
   }
 }
