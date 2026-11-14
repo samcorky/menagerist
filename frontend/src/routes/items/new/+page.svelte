@@ -46,6 +46,7 @@
 	let name = $state('');
 	let description = $state('');
 	let selectedType = $state<string | null>(null);
+	let creatingType = $state(false);
 	let tags = $state<string[]>([]);
 	let attrRows = $state<AttributeRow[]>([]);
 	let extraSchema = $state<AttributesSchema | null>(null);
@@ -136,7 +137,7 @@
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
-		if (!name.trim() || saving) return;
+		if (!name.trim() || saving || creatingType) return;
 		saving = true;
 		const result = await createNode({
 			body: {
@@ -244,7 +245,7 @@
 				<!-- Item type -->
 				<div class="space-y-2">
 					<Label>Item type</Label>
-					<TypePicker bind:value={selectedType} />
+					<TypePicker bind:value={selectedType} bind:creating={creatingType} />
 				</div>
 
 				<!-- Description -->
@@ -266,7 +267,7 @@
 				/>
 
 				<div class="flex justify-end">
-					<Button type="submit" disabled={!name.trim() || saving}>
+					<Button type="submit" disabled={!name.trim() || saving || creatingType}>
 						{saving ? 'Saving…' : 'Save'}
 					</Button>
 				</div>
