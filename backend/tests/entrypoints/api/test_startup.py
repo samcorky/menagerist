@@ -1,5 +1,6 @@
 """The start-up checks: no administrator, unusable storage and open CORS."""
 
+import asyncio
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -34,6 +35,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from app.platform.storage_probe import DirectoryState
+
+
+_START_UPDATE_CHECK = startup.start_update_check
 
 
 class _Session:
@@ -277,3 +281,95 @@ def test_the_application_lifespan_runs_the_check_once(
         client.get("/api/health")
 
     assert calls == ["storage", "cors", "checked"]
+
+
+@pytest.mark.parametrize(
+    ("check_enabled", "check_on_startup", "runs"),
+    [(True, True, True), (True, False, False), (False, True, False)],
+)
+async def test_the_update_check_runs_at_start_up_only_when_both_switches_allow(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    check_enabled: bool,
+    check_on_startup: bool,
+    runs: bool,
+) -> None:
+    """Start-up looks for updates in the background unless a switch is off."""
+    calls: list[object] = []
+
+    async def fake_check(actor: object) -> None:
+        calls.append(actor)
+
+    monkeypatch.setattr(
+        startup,
+        "get_release_settings",
+        lambda: SimpleNamespace(
+            check_enabled=check_enabled, check_on_startup=check_on_startup
+        ),
+    )
+    monkeypatch.setattr(
+        "app.modules.system.adapters.scheduling.jobs.check_for_updates", fake_check
+    )
+
+    task = _START_UPDATE_CHECK()
+    if task is not None:
+        await task
+
+    assert (task is not None) is runs
+    assert len(calls) == int(runs)
+
+
+async def test_a_failed_start_up_update_check_is_logged_not_raised(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Start-up never fails because the release source could not be reached."""
+
+    async def failing_check(_actor: object) -> None:
+        raise RuntimeError
+
+    monkeypatch.setattr(
+        startup,
+        "get_release_settings",
+        lambda: SimpleNamespace(check_enabled=True, check_on_startup=True),
+    )
+    monkeypatch.setattr(
+        "app.modules.system.adapters.scheduling.jobs.check_for_updates",
+        failing_check,
+    )
+
+    with capture_logs() as logs:
+        task = _START_UPDATE_CHECK()
+        assert task is not None
+        await task
+
+    assert [(e["log_level"], e["event"]) for e in logs] == [
+        ("warning", "startup update check failed")
+    ]
+
+
+async def test_the_lifespan_starts_and_cancels_the_update_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The background check is started before serving and cancelled on shutdown."""
+    started = asyncio.Event()
+
+    async def slow() -> None:
+        started.set()
+        await asyncio.sleep(60)
+
+    monkeypatch.setattr(startup, "warn_if_storage_not_writable", _noop)
+    monkeypatch.setattr(startup, "warn_if_cors_open", _noop)
+    monkeypatch.setattr(startup, "warn_if_no_administrator", _noop)
+    task = asyncio.create_task(slow())
+    monkeypatch.setattr(startup, "start_update_check", lambda: task)
+
+    async with startup.lifespan(create_app()):
+        await started.wait()
+        assert not task.done()
+
+    await asyncio.sleep(0)
+    assert task.cancelled()
+
+
+async def _noop() -> None:
+    return None
