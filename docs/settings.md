@@ -105,8 +105,11 @@ How Menagerist behaves when it calls out to other web services.
 | `MENAGERIST_HTTP_PROXY` | secret | none (sensitive) | any | Proxy for outbound `http://` requests, as `http://host:port` with optional `user:password@`. Empty uses none, even when the standard `HTTP_PROXY` is set, which this overrides. Sensitive: best given as a secrets file. Also read from `HTTP_PROXY`. |
 | `MENAGERIST_HTTPS_PROXY` | secret | none (sensitive) | any | Proxy for outbound `https://` requests, as `http://host:port` with optional `user:password@`. Empty uses none, even when the standard `HTTPS_PROXY` is set, which this overrides. Sensitive: best given as a secrets file. Also read from `HTTPS_PROXY`. |
 | `MENAGERIST_NO_PROXY` | text | empty | any | Comma-separated host names, domains (`example.com` also matches its subdomains), IP addresses and network ranges that skip the proxy, or `*` for all. Overrides the standard `NO_PROXY`. Also read from `NO_PROXY`. |
+| `MENAGERIST_HTTP_PROXY_PIN_ADDRESSES` | true or false | `true` | any | Connect through the proxy to the address Menagerist checked, keeping the real host name for `Host` and the certificate, so a name cannot answer one way here and another to the proxy. A name this host cannot resolve is then refused. Turn off only if your proxy filters by host name and refuses an address; the proxy must then block internal networks itself. |
+| `MENAGERIST_HTTP_PROXY_ALLOW_UNRESOLVED` | true or false | `false` | any | Only when `MENAGERIST_HTTP_PROXY_PIN_ADDRESSES` is off: let a name this host cannot resolve go to the proxy, for a network where only the proxy has working DNS. The proxy must then refuse internal addresses itself. |
 | `MENAGERIST_HTTP_CONNECT_TIMEOUT_SECONDS` | text | `5.0` | more than 0 | Seconds to wait for a connection to an outbound service. |
 | `MENAGERIST_HTTP_READ_TIMEOUT_SECONDS` | text | `10.0` | more than 0 | Seconds to wait for each part of an outbound service's reply. |
+| `MENAGERIST_HTTP_TOTAL_TIMEOUT_SECONDS` | text | `30.0` | more than 0 | Seconds allowed for a whole outbound request, redirects included, so a reply that trickles in cannot hold it open. |
 | `MENAGERIST_HTTP_MAX_RESPONSE_BYTES` | whole number | `2097152` | 1024 or more | Largest reply, in bytes, accepted from an outbound service unless the caller asks for a smaller one. |
 
 ## Rate_Limit

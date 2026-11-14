@@ -77,8 +77,9 @@ async def test_an_https_request_goes_through_the_https_proxy(
     assert recorder.proxies == [PROXY]
     assert not direct
     (request,) = recorder.requests
-    assert request.url.host == "example.com"
-    assert str(request.url) == "https://example.com/a?p=1"
+    assert request.url.host == PUBLIC
+    assert request.headers["host"] == "example.com"
+    assert str(request.url) == f"https://{PUBLIC}/a?p=1"
     assert request.headers["user-agent"].startswith("Menagerist/1.2.3 (")
 
 
@@ -146,10 +147,10 @@ async def test_a_target_that_is_private_here_is_refused_before_the_proxy(
     assert not recorder.proxies
 
 
-async def test_a_name_this_host_cannot_resolve_is_left_to_the_proxy(
+async def test_a_name_this_host_cannot_resolve_is_refused_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A name this host cannot resolve is left to the proxy."""
+    """A name this host cannot resolve is refused, as it cannot be pinned."""
     recorder = Recorder()
     outbound, _ = client(
         monkeypatch,
@@ -158,9 +159,86 @@ async def test_a_name_this_host_cannot_resolve_is_left_to_the_proxy(
         resolves={"proxy-only.example": None},
     )
 
+    with pytest.raises(OutboundHttpError) as caught:
+        await outbound.get("https://proxy-only.example/")
+
+    assert caught.value.failure is OutboundFailure.NETWORK
+    assert not recorder.requests
+
+
+async def test_a_name_this_host_cannot_resolve_can_be_left_to_the_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With pinning off and the opt-in set, the proxy resolves such a name."""
+    recorder = Recorder()
+    outbound, _ = client(
+        monkeypatch,
+        recorder,
+        env={
+            "HTTPS_PROXY": PROXY,
+            "MENAGERIST_HTTP_PROXY_PIN_ADDRESSES": "false",
+            "MENAGERIST_HTTP_PROXY_ALLOW_UNRESOLVED": "true",
+        },
+        resolves={"proxy-only.example": None},
+    )
+
     response = await outbound.get("https://proxy-only.example/")
 
     assert response.body == b"via proxy"
+
+
+async def test_without_pinning_an_unresolvable_name_is_still_refused_unless_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Turning pinning off alone does not open the unresolved-name gap."""
+    recorder = Recorder()
+    outbound, _ = client(
+        monkeypatch,
+        recorder,
+        env={
+            "HTTPS_PROXY": PROXY,
+            "MENAGERIST_HTTP_PROXY_PIN_ADDRESSES": "false",
+        },
+        resolves={"proxy-only.example": None},
+    )
+
+    with pytest.raises(OutboundHttpError):
+        await outbound.get("https://proxy-only.example/")
+
+
+async def test_the_proxy_is_asked_to_connect_to_the_checked_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Behind a proxy the request names the vetted address and keeps the real host."""
+    recorder = Recorder()
+    outbound, _ = client(monkeypatch, recorder, env={"HTTPS_PROXY": PROXY})
+
+    await outbound.get("https://example.com:8443/a")
+
+    (request,) = recorder.requests
+    assert request.url.host == PUBLIC
+    assert request.headers["host"] == "example.com:8443"
+    assert request.extensions["sni_hostname"] == "example.com"
+
+
+async def test_with_pinning_off_the_proxy_gets_the_host_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With pinning off the proxy receives the name and resolves it itself."""
+    recorder = Recorder()
+    outbound, _ = client(
+        monkeypatch,
+        recorder,
+        env={
+            "HTTPS_PROXY": PROXY,
+            "MENAGERIST_HTTP_PROXY_PIN_ADDRESSES": "false",
+        },
+    )
+
+    await outbound.get("https://example.com/a")
+
+    (request,) = recorder.requests
+    assert request.url.host == "example.com"
 
 
 async def test_a_redirect_is_checked_and_proxied_like_the_first_request(

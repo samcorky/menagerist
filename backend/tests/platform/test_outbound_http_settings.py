@@ -96,3 +96,19 @@ def test_a_note_of_the_longest_allowed_length_is_accepted() -> None:
     note = "x" * MAX_NOTE_LENGTH
 
     assert OutboundHttpSettings(user_agent_note=note).user_agent_note == note
+
+
+def test_proxy_pinning_is_on_and_unresolved_names_are_refused_by_default() -> None:
+    """The safer choice is the default for both proxy settings."""
+    settings = OutboundHttpSettings()
+
+    assert settings.http_proxy_pin_addresses is True
+    assert settings.http_proxy_allow_unresolved is False
+    assert settings.total_timeout_seconds == 30.0
+
+
+def test_the_total_timeout_must_be_positive_and_bounded() -> None:
+    """A zero or huge deadline is refused."""
+    for value in (0, 601):
+        with pytest.raises(ValidationError):
+            OutboundHttpSettings(total_timeout_seconds=value)
