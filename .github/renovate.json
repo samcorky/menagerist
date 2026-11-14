@@ -22,12 +22,9 @@
   "semanticCommitType": "chore",
   "semanticCommitScope": "deps",
   "osvVulnerabilityAlerts": true,
-  "dependencyDashboard": {
-    "enabled": true,
-    "header": "This issue lists Renovate updates and detected dependencies; the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs explain the layout.\n\n**How we use Renovate**\n\n- Updates are raised before 6am UTC on Saturday, Sunday and Monday. Security fixes are raised at any time and are never automerged.\n- Minor, patch and digest updates automerge once CI passes for GitHub Actions, pre-commit hooks, the compose test images and dev-only dependencies.\n- Major updates, runtime dependencies, the Postgres image, the Python and Node versions and lock file maintenance need a manual review.\n- Each rule in `.github/renovate.json` has a `description` that says why it exists.",
-    "footer": "To check that a rule matches, see \"Renovate\" in [CONTRIBUTING.md](https://github.com/samcorky/menagerist/blob/main/CONTRIBUTING.md).",
-    "osvVulnerabilitySummary": "unresolved"
-  },
+  "dependencyDashboardHeader": "This issue lists Renovate updates and detected dependencies; the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs explain the layout.\n\n**How we use Renovate**\n\n- Updates are raised before 6am UTC on Saturday, Sunday and Monday. Security fixes are raised at any time and are never automerged.\n- Minor, patch and digest updates automerge once CI passes for GitHub Actions, pre-commit hooks, the compose test images and dev-only dependencies.\n- Major updates, runtime dependencies, the Postgres image, the Python and Node versions and lock file maintenance need a manual review.\n- Each rule in `.github/renovate.json` has a `description` that says why it exists.",
+  "dependencyDashboardFooter": "To check that a rule matches, see \"Renovate\" in [CONTRIBUTING.md](https://github.com/samcorky/menagerist/blob/main/CONTRIBUTING.md).",
+  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
   "abandonmentThreshold": "3 years",
   "internalChecksFilter": "strict",
   "rebaseWhen": "behind-base-branch",
