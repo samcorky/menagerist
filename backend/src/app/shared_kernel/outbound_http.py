@@ -53,10 +53,14 @@ class OutboundHttp(Protocol):
         headers: Mapping[str, str] | None = None,
         params: Mapping[str, str | int] | None = None,
         max_bytes: int | None = None,
+        admin_configured: bool = False,
     ) -> OutboundResponse:
         """Fetch `url`, following redirects that stay on the public internet.
 
-        `max_bytes` can only lower the instance's response cap. `response.url` is
+        `max_bytes` can only lower the instance's response cap. Set `admin_configured`
+        only for an address an administrator chose, such as a provider's base URL, so
+        that a host they trust may resolve to a private address; a URL a person typed
+        or imported must never set it. `response.url` is
         the address finally read, so a caller that trusts one host can check it.
 
         Raises:
@@ -74,6 +78,7 @@ class RecordedRequest:
     headers: Mapping[str, str]
     params: Mapping[str, str | int]
     max_bytes: int | None
+    admin_configured: bool = False
 
 
 class InMemoryOutboundHttp:
@@ -98,6 +103,7 @@ class InMemoryOutboundHttp:
         headers: Mapping[str, str] | None = None,
         params: Mapping[str, str | int] | None = None,
         max_bytes: int | None = None,
+        admin_configured: bool = False,
     ) -> OutboundResponse:
         """Return what was registered for `url`, enforcing `max_bytes` on its body."""
         self.requests.append(
@@ -106,6 +112,7 @@ class InMemoryOutboundHttp:
                 headers=dict(headers or {}),
                 params=dict(params or {}),
                 max_bytes=max_bytes,
+                admin_configured=admin_configured,
             )
         )
         reply = self._replies.get(url)

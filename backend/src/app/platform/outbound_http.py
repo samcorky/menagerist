@@ -15,6 +15,13 @@ name itself and is the enforcement point; a name this host cannot resolve is the
 refused unless the settings allow it. Only the settings configure a proxy: the HTTP
 library never reads the environment itself.
 
+A host the administrator lists in `MENAGERIST_HTTP_TRUSTED_HOSTS` may resolve to a
+private (RFC 1918 or unique local) address, but only for a caller that says the
+destination was admin-configured. Every address it resolves to must be allowed, the
+connection is still pinned, the allowance does not follow a redirect to another host,
+and a request that used the allowance is logged. Loopback, link-local and the other
+floor ranges are refused regardless.
+
 A whole request, redirects included, must finish within a total deadline. Each address
 a name resolves to is tried in order, and refusals and failures are logged at warning
 level with the host and address but never the query string or credentials.
@@ -58,6 +65,14 @@ _DEFAULT_PORTS = {"http": 80, "https": 443}
 _EMBEDDING_NETWORKS = tuple(
     ipaddress.ip_network(network)
     for network in ("64:ff9b::/96", "64:ff9b:1::/48", "2002::/16")
+)
+
+
+# The only private ranges a trusted host may resolve to. Loopback, link-local
+# (cloud metadata), multicast and the rest stay refused whatever the settings say.
+_TRUSTABLE_NETWORKS = tuple(
+    ipaddress.ip_network(network)
+    for network in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7")
 )
 
 
@@ -118,6 +133,17 @@ def is_public_address(address: str) -> bool:
             if network.version == ip.version
         )
     )
+
+
+def is_trusted_private_address(address: str) -> bool:
+    """Whether `address` is in a range an administrator may trust (RFC 1918, ULA)."""
+    try:
+        ip = ipaddress.ip_address(address.partition("%")[0])
+    except ValueError:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return any(ip in n for n in _TRUSTABLE_NETWORKS if n.version == ip.version)
 
 
 def refusal_rule(address: str) -> str:
@@ -190,8 +216,13 @@ class HttpxOutboundHttp:
         headers: Mapping[str, str] | None = None,
         params: Mapping[str, str | int] | None = None,
         max_bytes: int | None = None,
+        admin_configured: bool = False,
     ) -> OutboundResponse:
-        """Fetch `url` from the public internet, re-checking every redirect hop."""
+        """Fetch `url` from the public internet, re-checking every redirect hop.
+
+        A host in the trusted list may also resolve to a private address, but only
+        when the caller says an administrator configured the destination.
+        """
         cap = self._settings.max_response_bytes
         limit = min(max_bytes, cap) if max_bytes else cap
         sent = {"Accept-Encoding": "identity", **(headers or {})}
@@ -200,17 +231,30 @@ class HttpxOutboundHttp:
             target = httpx2.URL(url, params=params)
         except (httpx2.InvalidURL, ValueError) as exc:
             raise OutboundHttpError(OutboundFailure.INVALID_URL) from exc
-        return await self._follow(target, sent, limit)
+        return await self._follow(target, sent, limit, admin_configured)
 
     async def _follow(
-        self, target: httpx2.URL, sent: dict[str, str], limit: int
+        self,
+        target: httpx2.URL,
+        sent: dict[str, str],
+        limit: int,
+        admin_configured: bool,
     ) -> OutboundResponse:
         """Follow redirects by hand inside one deadline, logging what fails."""
         failure = OutboundFailure.TOO_MANY_REDIRECTS
+        # The allowance belongs to the host the administrator configured. A redirect
+        # to any other host, trusted or not, is held to the public-only rules, so a
+        # third-party service cannot steer a request onto the trusted network.
+        configured_host = target.host
         try:
             async with asyncio.timeout(self._settings.total_timeout_seconds):
                 for _ in range(MAX_REDIRECTS + 1):
-                    response = await self._hop(target, sent, limit)
+                    response = await self._hop(
+                        target,
+                        sent,
+                        limit,
+                        admin_configured and target.host == configured_host,
+                    )
                     logger.debug(
                         "outbound_hop_completed",
                         scheme=target.scheme,
@@ -254,18 +298,23 @@ class HttpxOutboundHttp:
         return following
 
     async def _hop(
-        self, target: httpx2.URL, headers: Mapping[str, str], limit: int
+        self,
+        target: httpx2.URL,
+        headers: Mapping[str, str],
+        limit: int,
+        admin_configured: bool,
     ) -> OutboundResponse:
         port = self._checked_port(target)
+        trusted = admin_configured and self._is_trusted(target, port)
         proxy = self._proxy_for(target)
         pin = proxy is None or self._settings.http_proxy_pin_addresses
         if pin:
-            vetted = await self._vetted_addresses(target, port)
+            vetted = await self._vetted_addresses(target, port, trusted=trusted)
             # Behind a proxy the proxy makes the connection, so a second address
             # cannot be tried here.
             candidates: list[str | None] = list(vetted if proxy is None else vetted[:1])
         else:
-            await self._vet_before_proxy(target, port)
+            await self._vet_before_proxy(target, port, trusted=trusted)
             candidates = [None]
         logger.debug(
             "outbound_hop_started",
@@ -364,15 +413,27 @@ class HttpxOutboundHttp:
             return [target.host]
         return await self._resolver(target.host, port)
 
-    async def _vetted_addresses(self, target: httpx2.URL, port: int) -> list[str]:
+    def _is_trusted(self, target: httpx2.URL, port: int) -> bool:
+        """Whether the administrator listed this exact host (and port, if given)."""
+        if _is_ip_literal(target.host):
+            return False
+        entries = self._settings.trusted_host_entries
+        host = target.host.lower()
+        return host in entries or f"{host}:{port}" in entries
+
+    async def _vetted_addresses(
+        self, target: httpx2.URL, port: int, *, trusted: bool
+    ) -> list[str]:
         """The addresses to try, once every address `target` names is public."""
         addresses = await self._addresses(target, port)
         if not addresses:
             raise OutboundHttpError(OutboundFailure.NETWORK)
-        _refuse_non_public(target, addresses)
+        _refuse_non_public(target, addresses, trusted=trusted)
         return addresses
 
-    async def _vet_before_proxy(self, target: httpx2.URL, port: int) -> None:
+    async def _vet_before_proxy(
+        self, target: httpx2.URL, port: int, *, trusted: bool
+    ) -> None:
         """Vet a name the proxy will resolve itself, as it will not be pinned.
 
         A name this host cannot resolve is refused unless the settings leave it to the
@@ -384,19 +445,29 @@ class HttpxOutboundHttp:
             if self._settings.http_proxy_allow_unresolved:
                 return
             raise
-        _refuse_non_public(target, addresses)
+        _refuse_non_public(target, addresses, trusted=trusted)
 
 
-def _refuse_non_public(target: httpx2.URL, addresses: list[str]) -> None:
+def _refuse_non_public(
+    target: httpx2.URL, addresses: list[str], *, trusted: bool
+) -> None:
+    """Refuse the request unless every address is public, or private and trusted."""
     for address in addresses:
-        if not is_public_address(address):
-            logger.warning(
-                "outbound_request_refused",
-                host=target.host,
-                address=address,
-                rule=refusal_rule(address),
-            )
-            raise OutboundHttpError(OutboundFailure.BLOCKED_ADDRESS)
+        if is_public_address(address):
+            continue
+        if trusted and is_trusted_private_address(address):
+            continue
+        logger.warning(
+            "outbound_request_refused",
+            host=target.host,
+            address=address,
+            rule=refusal_rule(address),
+        )
+        raise OutboundHttpError(OutboundFailure.BLOCKED_ADDRESS)
+    if trusted and not all(is_public_address(address) for address in addresses):
+        logger.warning(
+            "outbound_trusted_host_used", host=target.host, addresses=addresses
+        )
 
 
 def _log_failure(target: httpx2.URL, failure: OutboundFailure) -> None:

@@ -12,6 +12,10 @@ _HEADER_SAFE = re.compile(r"[ -~]*")
 _FORBIDDEN_IN_HEADER_TEXT = "();"
 MAX_CONTACT_LENGTH = 200
 MAX_NOTE_LENGTH = 100
+# A dotted name that is not an IP address, with an optional port.
+_TRUSTED_HOST = re.compile(
+    r"(?!\d+(\.\d+){3}(:|$))[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:\d{1,5})?"
+)
 _PROXY_SCHEMES = frozenset({"http", "https"})
 
 
@@ -84,6 +88,22 @@ class OutboundHttpSettings(MenageristBaseSettings, group="http"):
             + "itself."
         ),
     )
+    trusted_hosts: str = Field(
+        default="",
+        max_length=1000,
+        description=(
+            "Comma-separated exact host names, optionally with a port "
+            + "(`ollama,books.lan:8080`), that an administrator-configured service "
+            + "may resolve to a private address (10.0.0.0/8, 172.16.0.0/12, "
+            + "192.168.0.0/16 or fc00::/7). No wildcards or subdomain matching, and "
+            + "a URL a person types or imports never gets the allowance. Loopback, "
+            + "link-local (including cloud metadata), multicast and unspecified "
+            + "addresses are always refused. A trusted name is only as safe as the "
+            + "DNS that answers for it, and a public address that loops back into "
+            + "your network (NAT hairpinning) cannot be detected here. Empty trusts "
+            + "nothing."
+        ),
+    )
     connect_timeout_seconds: float = Field(
         default=5.0,
         gt=0,
@@ -123,6 +143,25 @@ class OutboundHttpSettings(MenageristBaseSettings, group="http"):
     @classmethod
     def _note_is_header_safe(cls, value: str) -> str:
         return _header_safe(value, MAX_NOTE_LENGTH)
+
+    @field_validator("trusted_hosts")
+    @classmethod
+    def _trusted_hosts_are_exact_names(cls, value: str) -> str:
+        entries = [entry.strip().lower() for entry in value.split(",")]
+        entries = [entry for entry in entries if entry]
+        for entry in entries:
+            if not _TRUSTED_HOST.fullmatch(entry):
+                message = (
+                    f"{entry!r} must be an exact host name, optionally with a port: "
+                    + "no wildcards, schemes, paths or addresses"
+                )
+                raise ValueError(message)
+        return ",".join(entries)
+
+    @property
+    def trusted_host_entries(self) -> frozenset[str]:
+        """The trusted `host` or `host:port` entries, lower-case."""
+        return frozenset(entry for entry in self.trusted_hosts.split(",") if entry)
 
     @field_validator("http_proxy", "https_proxy")
     @classmethod
