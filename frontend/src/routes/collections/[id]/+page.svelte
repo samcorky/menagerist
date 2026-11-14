@@ -2,6 +2,7 @@
 	import IconButton from '$lib/components/icon-button.svelte';
 	import Page from '$lib/components/page.svelte';
 	import { goto } from '$app/navigation';
+	import { staysOnPage } from '$lib/back-layers';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -372,6 +373,8 @@
 	// Replaces an id (or an old slug) in the address with the slug, without a history entry.
 	function showCanonicalAddress(loaded: CollectionResponse) {
 		if (canonicalSlugFor(collectionId, loaded) === null) return;
+		// Same collection under its new slug: an open dialog (Regenerate) stays open.
+		staysOnPage();
 		void goto(resolve(collectionAddress(loaded, page.url)), {
 			replaceState: true,
 			keepFocus: true,

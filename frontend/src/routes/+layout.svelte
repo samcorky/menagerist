@@ -3,7 +3,12 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { noteArrival, replaceNext } from '$lib/in-app-history.js';
-	import { keepLayersThrough, popAllLayers, restoreLayers } from '$lib/back-layers.js';
+	import {
+		keepLayersThrough,
+		popAllLayers,
+		restoreLayers,
+		takeStaysOnPage
+	} from '$lib/back-layers.js';
 	import { onNavigate, beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import {
 		CirclePlus,
@@ -121,8 +126,9 @@
 	// A navigation that stays on the page, such as filters written to the address, leaves the
 	// sheet open and keeps its entry.
 	beforeNavigate(({ cancel, to, type, willUnload }) => {
+		const staysOnPage = takeStaysOnPage();
 		if (!to || willUnload || type === 'popstate' || !(page.state.layers?.length ?? 0)) return;
-		if (to.url.pathname === page.url.pathname) {
+		if (to.url.pathname === page.url.pathname || staysOnPage) {
 			keepLayersThrough();
 			return;
 		}
