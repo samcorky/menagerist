@@ -156,6 +156,12 @@ export const test = base.extend<object, { workerBaseURL: string; workerSession: 
 	storageState: async ({ workerSession }, use) => {
 		await use(workerSession.storageState);
 	},
+	// A route handler still awaiting `route.fetch()` when a test ends (a search fired by its last
+	// keystroke) would otherwise throw "Test ended" and be reported against the next test.
+	page: async ({ page }, use) => {
+		await use(page);
+		await page.unrouteAll({ behavior: 'ignoreErrors' });
+	},
 	request: async ({ playwright, workerBaseURL, workerSession }, use) => {
 		const api = await playwright.request.newContext(
 			apiSessionOptions(workerBaseURL, workerSession)
