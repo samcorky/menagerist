@@ -46,6 +46,18 @@ class ReleaseSettings(MenageristBaseSettings, group="release"):
         ),
         Tunable(),
     ] = "20 5 * * *"
+    check_on_startup: Annotated[
+        bool,
+        Field(
+            title="Check for updates on startup",
+            description=(
+                "Whether the app also looks for a newer release each time it starts, "
+                + "so the Status page is current after a deploy rather than waiting "
+                + "for the next scheduled check. Has no effect while update checks "
+                + "are off."
+            ),
+        ),
+    ] = True
 
 
 @lru_cache(maxsize=1)

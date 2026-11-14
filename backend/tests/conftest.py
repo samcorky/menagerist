@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
+from app.entrypoints.api import startup
 from app.entrypoints.api.shared import settings_reader
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.rate_limit import get_rate_limiter
@@ -34,6 +35,12 @@ if TYPE_CHECKING:
 # one of these folders is included without remembering a decorator.
 _FAST_LAYERS = frozenset({"domain", "application"})
 _FAST_TOP_LEVEL = frozenset({"shared_kernel", "architecture", "platform"})
+
+
+@pytest.fixture(autouse=True)
+def _no_startup_update_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep an app started in a test from calling out to GitHub."""
+    monkeypatch.setattr(startup, "start_update_check", lambda: None)
 
 
 def _is_fast(parts: tuple[str, ...], *, integration: bool) -> bool:
