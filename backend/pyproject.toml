@@ -2,7 +2,7 @@
 name = "menagerist"
 dynamic = ["version"]
 description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 license = "Apache-2.0"
 
 dependencies = [
