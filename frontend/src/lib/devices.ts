@@ -1,4 +1,5 @@
 import Bowser from 'bowser';
+import type { DisplayMode, OwnDeviceResponse } from '$lib/api/client';
 
 export type DeviceKind = 'tool' | 'phone' | 'tablet' | 'desktop' | 'unknown';
 
@@ -6,6 +7,8 @@ export interface DeviceInfo {
 	userAgent?: string | null;
 	platform?: string | null;
 	mobile?: boolean | null;
+	/** How the app was shown when the session started; `standalone` is the installed app. */
+	displayMode?: DisplayMode | null;
 }
 
 export interface DescribedDevice {
@@ -80,8 +83,48 @@ export function describeDevice(info: DeviceInfo): DescribedDevice {
 	} else if (system) {
 		label = `${system} device`;
 	}
+	if (info.displayMode === 'standalone') label = `${label}, installed app`;
 
 	return { label, kind };
+}
+
+/** What signing out one row of the devices list ends: a whole device, or one older session. */
+export type DeviceRevoke = { kind: 'device'; id: string } | { kind: 'session'; id: string };
+
+export interface DeviceRow extends DescribedDevice {
+	key: string;
+	userAgent: string | null;
+	address: string | null;
+	firstSeen: string;
+	lastSeen: string;
+	current: boolean;
+	sessionCount: number;
+	revoke: DeviceRevoke;
+}
+
+/**
+ * One row of the devices list. The newest session supplies the address and display mode; a
+ * session from before devices were remembered has no device id and is signed out on its own.
+ */
+export function deviceRow(device: OwnDeviceResponse): DeviceRow {
+	const latest = device.sessions[0];
+	const described = describeDevice({
+		userAgent: device.user_agent,
+		platform: device.platform,
+		mobile: device.mobile,
+		displayMode: latest?.display_mode
+	});
+	return {
+		...described,
+		key: device.id ?? `session-${latest?.id}`,
+		userAgent: device.user_agent ?? null,
+		address: latest?.client_ip ?? null,
+		firstSeen: device.first_seen_at,
+		lastSeen: device.last_seen_at,
+		current: device.current,
+		sessionCount: device.sessions.length,
+		revoke: device.id ? { kind: 'device', id: device.id } : { kind: 'session', id: latest.id }
+	};
 }
 
 export { formatRelativeTime } from '$lib/format-date';

@@ -205,6 +205,7 @@ async def test_parallel_guesses_never_verify_more_than_the_limit(
             SignInThrottle(),
             decoy_hash=hasher.hash("decoy"),
             session_ttl=timedelta(hours=1),
+            device_ttl=timedelta(days=365),
         )
 
     async def guess(i: int) -> str:
@@ -241,6 +242,7 @@ async def test_a_password_change_between_check_and_session_voids_the_sign_in(
         tokens,
         throttle,
         session_ttl=timedelta(hours=1),
+        device_ttl=timedelta(days=365),
     )
 
     class _Racing:
@@ -269,6 +271,7 @@ async def test_a_password_change_between_check_and_session_voids_the_sign_in(
         throttle,
         decoy_hash="fake$decoy",
         session_ttl=timedelta(hours=1),
+        device_ttl=timedelta(days=365),
     )
 
     with pytest.raises(InvalidCredentialsError):

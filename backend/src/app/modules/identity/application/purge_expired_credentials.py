@@ -23,10 +23,11 @@ class PurgeExpiredCredentialsCommand:
 
 @dataclass(kw_only=True, frozen=True)
 class PurgeExpiredCredentialsResult:
-    """How many expired sessions and API tokens were removed."""
+    """How many expired sessions, API tokens and devices were removed."""
 
     sessions: int
     tokens: int
+    devices: int
 
 
 class PurgeExpiredCredentials(
@@ -36,7 +37,7 @@ class PurgeExpiredCredentials(
         PurgeExpiredCredentialsResult,
     ]
 ):
-    """Remove sessions and API tokens that are past their expiry."""
+    """Remove sessions, API tokens and remembered devices past their expiry."""
 
     access: ClassVar[Access] = System()
 
@@ -46,6 +47,14 @@ class PurgeExpiredCredentials(
         async with self._uow as repos:
             sessions = await repos.sessions.delete_expired(command.now)
             tokens = await repos.tokens.delete_expired(command.now)
+            devices = await repos.devices.delete_expired(command.now)
             await self._uow.commit()
-        logger.info("expired credentials purged", sessions=sessions, tokens=tokens)
-        return PurgeExpiredCredentialsResult(sessions=sessions, tokens=tokens)
+        logger.info(
+            "expired credentials purged",
+            sessions=sessions,
+            tokens=tokens,
+            devices=devices,
+        )
+        return PurgeExpiredCredentialsResult(
+            sessions=sessions, tokens=tokens, devices=devices
+        )

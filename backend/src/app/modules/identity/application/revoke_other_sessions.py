@@ -24,15 +24,23 @@ class RevokeOtherSessionsCommand:
 class RevokeOtherSessions(
     CommandHandler[IdentityUnitOfWork, RevokeOtherSessionsCommand, int]
 ):
-    """End all active sessions of the calling user except the current one."""
+    """Sign out everywhere except this device.
+
+    Ends every other session of the calling user and forgets every other
+    remembered browser, so their device cookies lose the higher sign-in limit.
+    """
 
     access: ClassVar[Access] = OwnAccount()
 
     async def _handle(self, command: RevokeOtherSessionsCommand, actor: Actor) -> int:
         """Revoke all sessions for `actor` except `command.current_session_id`."""
         async with self._uow as repos:
+            current = await repos.sessions.get(command.current_session_id)
             ended = await repos.sessions.delete_all_except(
                 actor.id, command.current_session_id
+            )
+            forgotten = await repos.devices.delete_for_user(
+                actor.id, keep_id=current.device_id if current is not None else None
             )
             await self._uow.commit()
 
@@ -41,5 +49,6 @@ class RevokeOtherSessions(
             user_id=actor.id,
             current_session_id=command.current_session_id,
             count=ended,
+            devices=forgotten,
         )
         return ended

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { describeDevice } from '../src/lib/devices';
+import { describeDevice, deviceRow } from '../src/lib/devices';
+import type { OwnDeviceResponse, SessionResponse } from '../src/lib/api/client';
 
 describe('describeDevice', () => {
 	it('labels Firefox on Linux', () => {
@@ -191,5 +192,75 @@ describe('describeDevice', () => {
 			label: 'Chrome on a phone',
 			kind: 'phone'
 		});
+	});
+});
+
+describe('describeDevice and the display mode', () => {
+	const iphone =
+		'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+
+	it('says installed app for a standalone session', () => {
+		const result = describeDevice({ userAgent: iphone, displayMode: 'standalone' });
+		expect(result.label).toBe('Safari on iOS, installed app');
+		expect(result.kind).toBe('phone');
+	});
+
+	it('says nothing more for a browser tab or an older session', () => {
+		expect(describeDevice({ userAgent: iphone, displayMode: 'browser' }).label).toBe(
+			'Safari on iOS'
+		);
+		expect(describeDevice({ userAgent: iphone, displayMode: null }).label).toBe('Safari on iOS');
+	});
+});
+
+function session(overrides: Partial<SessionResponse> = {}): SessionResponse {
+	return {
+		id: 's1',
+		created_at: '2026-10-01T09:00:00Z',
+		last_seen_at: '2026-10-10T12:00:00Z',
+		expires_at: '2026-10-17T09:00:00Z',
+		current: false,
+		client_ip: '192.0.2.1',
+		display_mode: 'standalone',
+		...overrides
+	};
+}
+
+function device(overrides: Partial<OwnDeviceResponse> = {}): OwnDeviceResponse {
+	return {
+		id: 'd1',
+		user_agent: 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0',
+		first_seen_at: '2026-09-01T08:00:00Z',
+		last_seen_at: '2026-10-10T12:00:00Z',
+		current: false,
+		sessions: [session(), session({ id: 's0', client_ip: '192.0.2.9', display_mode: null })],
+		...overrides
+	};
+}
+
+describe('deviceRow', () => {
+	it('describes a remembered browser from its newest session', () => {
+		expect(deviceRow(device())).toEqual({
+			label: 'Firefox on Linux, installed app',
+			kind: 'desktop',
+			key: 'd1',
+			userAgent: device().user_agent,
+			address: '192.0.2.1',
+			firstSeen: '2026-09-01T08:00:00Z',
+			lastSeen: '2026-10-10T12:00:00Z',
+			current: false,
+			sessionCount: 2,
+			revoke: { kind: 'device', id: 'd1' }
+		});
+	});
+
+	it('signs out an older session on its own', () => {
+		const row = deviceRow(device({ id: null, sessions: [session({ id: 'legacy' })] }));
+		expect(row.key).toBe('session-legacy');
+		expect(row.revoke).toEqual({ kind: 'session', id: 'legacy' });
+	});
+
+	it('marks this device', () => {
+		expect(deviceRow(device({ current: true })).current).toBe(true);
 	});
 });

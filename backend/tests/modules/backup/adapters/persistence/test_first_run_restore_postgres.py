@@ -160,6 +160,7 @@ async def test_first_run_restores_credentials_and_rolls_back_media_failure(
                 SignInThrottle(),
                 decoy_hash=hasher.hash("decoy"),
                 session_ttl=timedelta(hours=1),
+                device_ttl=timedelta(days=365),
             )
             signed_in = await sign_in.handle(
                 SignInCommand(username="archived", password="archived-password"),

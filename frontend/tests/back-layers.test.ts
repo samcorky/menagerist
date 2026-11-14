@@ -29,7 +29,9 @@ import {
 	registerLayer,
 	resetLayers,
 	restoreLayers,
-	syncLayers
+	staysOnPage,
+	syncLayers,
+	takeStaysOnPage
 } from '../src/lib/back-layers';
 
 describe('back layers', () => {
@@ -209,5 +211,15 @@ describe('back layers', () => {
 		unregister();
 		await settle();
 		expect(router.gotos).toEqual([]);
+	});
+
+	it('marks one navigation as staying on the page, then forgets it', () => {
+		expect(takeStaysOnPage()).toBe(false);
+		staysOnPage();
+		expect(takeStaysOnPage()).toBe(true);
+		expect(takeStaysOnPage()).toBe(false);
+		staysOnPage();
+		resetLayers();
+		expect(takeStaysOnPage()).toBe(false);
 	});
 });

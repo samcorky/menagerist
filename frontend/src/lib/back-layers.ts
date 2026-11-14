@@ -84,6 +84,22 @@ export function keepLayersThrough(): void {
 	keepTimer = setTimeout(restoreLayers, 1500);
 }
 
+// Set by a page about to move itself to another path that is still the same page (a collection
+// whose slug changed), so the next navigation keeps the open layers instead of leaving.
+let staying = false;
+
+/** The next navigation moves this page to a new address; open layers stay open through it. */
+export function staysOnPage(): void {
+	staying = true;
+}
+
+/** Whether the navigation now starting was marked by `staysOnPage`; clears the mark. */
+export function takeStaysOnPage(): boolean {
+	const marked = staying;
+	staying = false;
+	return marked;
+}
+
 /** Put the layers' state back once such a navigation has finished. */
 export function restoreLayers(): void {
 	clearTimeout(keepTimer);
@@ -144,6 +160,7 @@ async function routerIdle(): Promise<void> {
 export function resetLayers(): void {
 	stack.length = 0;
 	keeping = null;
+	staying = false;
 	clearTimeout(keepTimer);
 	known = 0;
 	scheduled = false;

@@ -28,8 +28,8 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
         Field(
             title="Sign-in clean-up schedule",
             description=(
-                "Cron expression for removing expired sessions and API tokens in the "
-                + "instance timezone. Empty disables the job."
+                "Cron expression for removing expired sessions, API tokens and devices"
+                + " in the instance timezone. Empty disables the job."
             ),
         ),
         Tunable(),
@@ -39,6 +39,23 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
         min_length=1,
         pattern=r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$",
         description="Name of the HTTP-only session cookie.",
+    )
+    device_cookie_name: str = Field(
+        default="menagerist-device",
+        min_length=1,
+        pattern=r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$",
+        description=(
+            "Name of the HTTP-only cookie that remembers a signed-in browser; it is"
+            + " kept on sign-out."
+        ),
+    )
+    device_ttl_days: int = Field(
+        default=365,
+        ge=1,
+        description=(
+            "Days a browser stays remembered after its last sign-in, for the"
+            + " device sign-in limit and the devices list."
+        ),
     )
     cookie_secure: Literal["auto", "origin", "always", "never"] = Field(
         default="auto",
@@ -55,6 +72,14 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
         default=5,
         ge=1,
         description="Failed sign-ins allowed per username in each throttle window.",
+    )
+    sign_in_device_attempts: int = Field(
+        default=20,
+        ge=1,
+        description=(
+            "Failed sign-ins allowed per window from a remembered browser, counted"
+            + " apart from the username's limit so others cannot lock it out."
+        ),
     )
     sign_in_ip_attempts: int = Field(
         default=20,
@@ -96,9 +121,12 @@ class IdentitySettings(MenageristBaseSettings, group="identity"):
     )
 
     @model_validator(mode="after")
-    def _default_within_max(self) -> IdentitySettings:
+    def _check_related_fields(self) -> IdentitySettings:
         if self.api_token_default_days > self.api_token_max_days:
             msg = "api_token_default_days must not exceed api_token_max_days"
+            raise ValueError(msg)
+        if self.device_cookie_name == self.cookie_name:
+            msg = "device_cookie_name must differ from cookie_name"
             raise ValueError(msg)
         return self
 

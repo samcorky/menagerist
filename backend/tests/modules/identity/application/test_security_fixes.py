@@ -101,6 +101,7 @@ async def test_a_password_changed_after_the_check_voids_the_sign_in(
         SignInThrottle(),
         decoy_hash="fake$decoy",
         session_ttl=TTL,
+        device_ttl=timedelta(days=365),
     )
 
     with pytest.raises(InvalidCredentialsError):
@@ -133,6 +134,7 @@ def _sign_in_with(world: World, hasher: _CountingHasher) -> SignIn:
         SignInThrottle(),
         decoy_hash=hasher.hash("decoy"),
         session_ttl=TTL,
+        device_ttl=timedelta(days=365),
     )
 
 

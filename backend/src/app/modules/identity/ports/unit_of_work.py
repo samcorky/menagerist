@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.modules.identity.ports.api_token_repository import ApiTokenRepository
+from app.modules.identity.ports.device_repository import DeviceRepository
 from app.modules.identity.ports.session_repository import SessionRepository
 from app.modules.identity.ports.sign_in_attempt_repository import (
     SignInAttemptRepository,
@@ -17,6 +18,7 @@ class IdentityRepos:
     sessions: SessionRepository
     attempts: SignInAttemptRepository
     tokens: ApiTokenRepository
+    devices: DeviceRepository
 
 
 IdentityUnitOfWork = UnitOfWork[IdentityRepos]

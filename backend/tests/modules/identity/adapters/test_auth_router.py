@@ -29,6 +29,7 @@ from app.modules.identity.adapters.security.in_memory_password_hasher import (
     InMemoryPasswordHasher,
 )
 from app.modules.identity.application.client_device import ClientDevice
+from app.modules.identity.domain.session import DisplayMode
 from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.platform.config import IdentitySettings
@@ -46,6 +47,8 @@ USERS = "/api/v1/users"
 FOREIGN_ORIGIN = "https://evil.example"
 SESSION_COOKIE = "menagerist-session"
 PREFIXED_COOKIE = "__Host-Http-menagerist-session"
+DEVICE_COOKIE = "menagerist-device"
+PREFIXED_DEVICE_COOKIE = "__Host-Http-menagerist-device"
 SETUP_BODY = {
     "username": "Admin",
     "display_name": "Admin",
@@ -71,6 +74,7 @@ class Api:
             sessions=world.sessions,
             attempts=world.attempts,
             tokens=world.tokens,
+            devices=world.devices,
         )
         self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
@@ -180,16 +184,17 @@ def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
 
 
 def test_setup_sets_secure_cookie_attributes(api: Api) -> None:
-    """The session cookie is HttpOnly and SameSite=Strict; no CSRF cookie is set."""
+    """Session and device cookies are HttpOnly and SameSite=Strict; no CSRF cookie."""
     cookies = _cookie_headers(api.setup())
 
-    session = cookies[SESSION_COOKIE].lower()
-    assert "httponly" in session
-    assert "samesite=strict" in session
-    assert "path=/" in session
-    assert "max-age=604800" in session
-    assert "secure" not in session
-    assert set(cookies) == {SESSION_COOKIE}
+    assert set(cookies) == {SESSION_COOKIE, DEVICE_COOKIE}
+    for name, max_age in ((SESSION_COOKIE, 604800), (DEVICE_COOKIE, 365 * 86400)):
+        cookie = cookies[name].lower()
+        assert "httponly" in cookie
+        assert "samesite=strict" in cookie
+        assert "path=/" in cookie
+        assert f"max-age={max_age}" in cookie
+        assert "secure" not in cookie
 
 
 def test_cookie_is_host_prefixed_over_https(world: World) -> None:
@@ -198,11 +203,12 @@ def test_cookie_is_host_prefixed_over_https(world: World) -> None:
 
     cookies = _cookie_headers(api.setup())
 
-    assert set(cookies) == {PREFIXED_COOKIE}
-    session = cookies[PREFIXED_COOKIE].lower()
-    for attribute in ("secure", "httponly", "path=/", "samesite=strict"):
-        assert attribute in session
-    assert "domain" not in session
+    assert set(cookies) == {PREFIXED_COOKIE, PREFIXED_DEVICE_COOKIE}
+    for name in cookies:
+        cookie = cookies[name].lower()
+        for attribute in ("secure", "httponly", "path=/", "samesite=strict"):
+            assert attribute in cookie
+        assert "domain" not in cookie
 
 
 @pytest.mark.parametrize(("mode", "secure"), [("always", True), ("never", False)])
@@ -214,9 +220,14 @@ def test_cookie_secure_setting_overrides_the_scheme(
 
     cookies = _cookie_headers(api.setup())
 
-    name = PREFIXED_COOKIE if secure else SESSION_COOKIE
-    assert set(cookies) == {name}
-    assert ("secure" in cookies[name].lower()) is secure
+    names = (
+        {PREFIXED_COOKIE, PREFIXED_DEVICE_COOKIE}
+        if secure
+        else {SESSION_COOKIE, DEVICE_COOKIE}
+    )
+    assert set(cookies) == names
+    for name in names:
+        assert ("secure" in cookies[name].lower()) is secure
 
 
 def _https_session(world: World) -> tuple[Api, str]:
@@ -1089,6 +1100,24 @@ def test_get_client_device_header_parsing() -> None:
         platform=None,
         mobile=None,
     )
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        ("standalone", DisplayMode.STANDALONE),
+        (" Browser ", DisplayMode.BROWSER),
+        ("fullscreen", None),
+        ("", None),
+    ],
+)
+def test_get_client_device_reads_the_display_mode(
+    header: str, expected: DisplayMode | None
+) -> None:
+    """`X-Client-Display-Mode` is read case-insensitively; others are ignored."""
+    device = get_client_device(_make_request({"X-Client-Display-Mode": header}))
+
+    assert device.display_mode is expected
 
 
 async def test_sign_in_stores_client_device_and_ip(

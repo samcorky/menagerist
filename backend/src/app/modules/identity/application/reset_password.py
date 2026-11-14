@@ -34,7 +34,10 @@ class ResetPasswordCommand:
 
 
 class ResetPassword(CommandHandler[IdentityUnitOfWork, ResetPasswordCommand, None]):
-    """Set a new initial password, end the user's sessions and require a change."""
+    """Set a new initial password, end the user's sessions and require a change.
+
+    The user's remembered browsers are forgotten too.
+    """
 
     access: ClassVar[Access] = Requires(IdentityPermission.RESET_USER_PASSWORD)
 
@@ -69,6 +72,7 @@ class ResetPassword(CommandHandler[IdentityUnitOfWork, ResetPasswordCommand, Non
             await repos.attempts.clear(user_id_key(user.id))
             ended = await repos.sessions.delete_for_user(user.id)
             tokens_ended = await repos.tokens.delete_for_user(user.id)
+            await repos.devices.delete_for_user(user.id)
             await self._uow.commit()
         logger.info("sessions ended", user_id=user.id, count=ended)
         logger.info("api tokens ended", user_id=user.id, count=tokens_ended)

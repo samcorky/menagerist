@@ -3,7 +3,12 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { noteArrival, replaceNext } from '$lib/in-app-history.js';
-	import { keepLayersThrough, popAllLayers, restoreLayers } from '$lib/back-layers.js';
+	import {
+		keepLayersThrough,
+		popAllLayers,
+		restoreLayers,
+		takeStaysOnPage
+	} from '$lib/back-layers.js';
 	import { onNavigate, beforeNavigate, afterNavigate, goto } from '$app/navigation';
 	import {
 		CirclePlus,
@@ -49,6 +54,7 @@
 	} from '$lib/service-worker-client';
 	import { themeController } from '$lib/theme.svelte.js';
 	import { offlineController } from '$lib/offline.svelte.js';
+	import { displayMode } from '$lib/display-mode.svelte.js';
 	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
@@ -84,6 +90,8 @@
 
 	$effect(() => offlineController.init());
 
+	$effect(() => displayMode.init());
+
 	// Launched with no connection, the sign-in check fails: try again once the connection returns.
 	$effect(() => {
 		void offlineController.retryCount;
@@ -118,8 +126,9 @@
 	// A navigation that stays on the page, such as filters written to the address, leaves the
 	// sheet open and keeps its entry.
 	beforeNavigate(({ cancel, to, type, willUnload }) => {
+		const staysOnPage = takeStaysOnPage();
 		if (!to || willUnload || type === 'popstate' || !(page.state.layers?.length ?? 0)) return;
-		if (to.url.pathname === page.url.pathname) {
+		if (to.url.pathname === page.url.pathname || staysOnPage) {
 			keepLayersThrough();
 			return;
 		}

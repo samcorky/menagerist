@@ -77,6 +77,7 @@ def _client(world: World) -> TestClient:
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     app.dependency_overrides[get_identity_uow] = lambda: world.uow
     app.dependency_overrides[get_identity_repos] = lambda: repos

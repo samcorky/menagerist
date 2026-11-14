@@ -1,11 +1,25 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 from app.shared_kernel.mixins import Identifiable
 
 MAX_USER_AGENT_LENGTH = 256
 MAX_CLIENT_PLATFORM_LENGTH = 64
+
+
+class DisplayMode(StrEnum):
+    """How the app was shown when a session started: a browser tab or installed."""
+
+    BROWSER = "browser"
+    STANDALONE = "standalone"
+
+
+def clean_text(value: str | None, limit: int) -> str | None:
+    """Strip `value` and cut it to `limit` characters; blank gives `None`."""
+    cleaned = value.strip() if value else None
+    return cleaned[:limit] if cleaned else None
 
 
 @dataclass(kw_only=True, eq=False)
@@ -21,6 +35,8 @@ class Session(Identifiable):
     client_ip: str | None = None
     client_platform: str | None = None
     client_mobile: bool | None = None
+    device_id: uuid.UUID | None = None
+    display_mode: DisplayMode | None = None
 
     @classmethod
     def create(
@@ -34,19 +50,11 @@ class Session(Identifiable):
         client_ip: str | None = None,
         client_platform: str | None = None,
         client_mobile: bool | None = None,
+        device_id: uuid.UUID | None = None,
+        display_mode: DisplayMode | None = None,
     ) -> Session:
         """Create a session that expires `ttl` after `now`."""
-        cleaned_ua = user_agent.strip() if user_agent else None
-        cleaned_ua = cleaned_ua[:MAX_USER_AGENT_LENGTH] if cleaned_ua else None
-
-        cleaned_platform = client_platform.strip() if client_platform else None
-        cleaned_platform = (
-            cleaned_platform[:MAX_CLIENT_PLATFORM_LENGTH] if cleaned_platform else None
-        )
-
         cleaned_ip = client_ip.strip() if client_ip else None
-        cleaned_ip = cleaned_ip if cleaned_ip else None
-
         return cls(
             id=uuid.uuid7(),
             user_id=user_id,
@@ -54,10 +62,12 @@ class Session(Identifiable):
             created_at=now,
             expires_at=now + ttl,
             last_seen_at=now,
-            user_agent=cleaned_ua,
-            client_ip=cleaned_ip,
-            client_platform=cleaned_platform,
+            user_agent=clean_text(user_agent, MAX_USER_AGENT_LENGTH),
+            client_ip=cleaned_ip or None,
+            client_platform=clean_text(client_platform, MAX_CLIENT_PLATFORM_LENGTH),
             client_mobile=client_mobile,
+            device_id=device_id,
+            display_mode=display_mode,
         )
 
     def seen(self, now: datetime) -> None:

@@ -72,6 +72,7 @@ async def test_list_sessions_forbidden_for_members(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -160,6 +161,7 @@ async def test_list_sessions_returns_all_active_sessions_with_user_details(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -222,6 +224,7 @@ async def test_list_sessions_excludes_expired_and_idle_sessions(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -255,6 +258,7 @@ async def test_list_sessions_filters_by_user_id(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
@@ -285,6 +289,7 @@ async def test_list_sessions_unknown_user_id_returns_empty_list(
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     guard = get_access_guard()
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)

@@ -9,6 +9,9 @@ import pytest
 from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
     InMemoryApiTokenRepository,
 )
+from app.modules.identity.adapters.persistence.in_memory_device_repository import (
+    InMemoryDeviceRepository,
+)
 from app.modules.identity.adapters.persistence.in_memory_session_repository import (
     InMemorySessionRepository,
 )
@@ -36,6 +39,7 @@ class World:
     sessions: InMemorySessionRepository
     attempts: InMemorySignInAttemptRepository
     tokens: InMemoryApiTokenRepository
+    devices: InMemoryDeviceRepository
     uow: InMemoryUnitOfWork[IdentityRepos]
 
 
@@ -49,14 +53,20 @@ def world() -> World:
     sessions = InMemorySessionRepository()
     attempts = InMemorySignInAttemptRepository()
     tokens = InMemoryApiTokenRepository()
+    devices = InMemoryDeviceRepository()
     return World(
         users=users,
         sessions=sessions,
         attempts=attempts,
         tokens=tokens,
+        devices=devices,
         uow=InMemoryUnitOfWork(
             IdentityRepos(
-                users=users, sessions=sessions, attempts=attempts, tokens=tokens
+                users=users,
+                sessions=sessions,
+                attempts=attempts,
+                tokens=tokens,
+                devices=devices,
             )
         ),
     )

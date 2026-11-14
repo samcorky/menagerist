@@ -15,6 +15,7 @@ CORS_REQUEST_HEADERS = [
     "If-None-Match",
     "If-Modified-Since",
     "Request-Id",
+    "X-Client-Display-Mode",
 ]
 
 # `ETag` is not CORS-safelisted, so a cross-origin client cannot read it unless listed.

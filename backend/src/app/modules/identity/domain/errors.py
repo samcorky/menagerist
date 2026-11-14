@@ -42,6 +42,10 @@ class SessionNotFoundError(NotFoundError):
     """Raised when a requested session does not exist."""
 
 
+class DeviceNotFoundError(NotFoundError):
+    """Raised when a requested device does not exist or is someone else's."""
+
+
 class CurrentSessionError(ConflictError):
     """Raised when an operation cannot be performed on the current session."""
 

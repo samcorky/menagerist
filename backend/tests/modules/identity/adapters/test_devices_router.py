@@ -63,6 +63,7 @@ class Api:
             sessions=world.sessions,
             attempts=world.attempts,
             tokens=world.tokens,
+            devices=world.devices,
         )
         self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
         self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
@@ -433,3 +434,150 @@ async def test_revoke_session_requires_csrf(
 
     del_resp = api.delete(admin_client, f"{SESSIONS}/{uuid.uuid7()}", csrf=False)
     assert del_resp.status_code == 403
+
+
+# --- remembered browsers: /api/v1/me/devices -----------------------------------
+
+DEVICE_COOKIE = "menagerist-device"
+DEVICES = f"{ME}/devices"
+
+
+async def test_list_own_devices_groups_by_browser_and_marks_this_one(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Each browser is one entry with its display mode; this one is marked."""
+    await api.add_user(make_user, "alice")
+    phone, _ = api.sign_in(
+        headers={"User-Agent": "Phone", "X-Client-Display-Mode": "standalone"}
+    )
+    laptop, _ = api.sign_in(headers={"User-Agent": "Laptop"})
+
+    response = laptop.get(DEVICES)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [(d["user_agent"], d["current"]) for d in body] == [
+        ("Laptop", True),
+        ("Phone", False),
+    ]
+    assert body[1]["sessions"][0]["display_mode"] == "standalone"
+    assert body[0]["sessions"][0]["display_mode"] is None
+    assert all(d["id"] == d["sessions"][0]["device_id"] for d in body)
+    from_phone = phone.get(DEVICES).json()
+    assert [(d["user_agent"], d["current"]) for d in from_phone] == [
+        ("Laptop", False),
+        ("Phone", True),
+    ]
+
+
+async def test_signing_in_again_keeps_one_device(api: Api, make_user: MakeUser) -> None:
+    """The browser sends its device cookie back and stays one entry."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+    cookie = client.cookies[DEVICE_COOKIE]
+
+    response = client.post(
+        f"{AUTH}/login", json={"username": "alice", "password": "password-123"}
+    )
+
+    assert response.status_code == 200
+    assert client.cookies[DEVICE_COOKIE] == cookie
+    assert len(client.get(DEVICES).json()) == 1
+
+
+async def test_signing_out_keeps_the_device_cookie(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Sign-out clears only the session cookie."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+    cookie = client.cookies[DEVICE_COOKIE]
+
+    response = api.post(client, f"{AUTH}/logout")
+
+    assert response.status_code == 204
+    set_cookies = response.headers.get_list("set-cookie")
+    assert [c.split("=", 1)[0] for c in set_cookies] == [SESSION_COOKIE]
+    assert client.cookies[DEVICE_COOKIE] == cookie
+
+
+async def test_a_remembered_browser_signs_in_while_the_username_is_locked(
+    api: Api, make_user: MakeUser
+) -> None:
+    """Someone else's failures lock the username, not the browser with the cookie."""
+    await api.add_user(make_user, "alice")
+    remembered, _ = api.sign_in()
+    api.post(remembered, f"{AUTH}/logout")
+    for _ in range(6):
+        api.sign_in(password="wrong-password")
+
+    _, refused = api.sign_in()
+    response = remembered.post(
+        f"{AUTH}/login", json={"username": "alice", "password": "password-123"}
+    )
+
+    assert refused.status_code == 429
+    assert response.status_code == 200
+
+
+async def test_revoke_own_device_signs_it_out(api: Api, make_user: MakeUser) -> None:
+    """Revoking another browser ends its sessions; it then needs to sign in."""
+    await api.add_user(make_user, "alice")
+    other, _ = api.sign_in(headers={"User-Agent": "Other"})
+    this, _ = api.sign_in(headers={"User-Agent": "This"})
+    other_id = next(d["id"] for d in this.get(DEVICES).json() if not d["current"])
+
+    response = api.delete(this, f"{DEVICES}/{other_id}")
+
+    assert response.status_code == 200
+    assert response.json() == {"ended": 1}
+    assert other.get(ME).status_code == 401
+    assert [d["user_agent"] for d in this.get(DEVICES).json()] == ["This"]
+
+
+async def test_revoke_own_device_refuses_this_one_and_unknown_ones(
+    api: Api, make_user: MakeUser
+) -> None:
+    """This browser is a 409; an unknown or foreign device is a 404."""
+    await api.add_user(make_user, "alice")
+    await api.add_user(make_user, "bob")
+    bob, _ = api.sign_in("bob")
+    alice, _ = api.sign_in("alice")
+    this_id = alice.get(DEVICES).json()[0]["id"]
+    bobs_id = bob.get(DEVICES).json()[0]["id"]
+
+    current = api.delete(alice, f"{DEVICES}/{this_id}")
+    foreign = api.delete(alice, f"{DEVICES}/{bobs_id}")
+    unknown = api.delete(alice, f"{DEVICES}/{uuid.uuid7()}")
+
+    assert current.status_code == 409
+    assert current.json()["title"] == "CurrentSessionError"
+    assert foreign.status_code == 404
+    assert foreign.json()["title"] == "DeviceNotFoundError"
+    assert unknown.status_code == 404
+    assert bob.get(ME).status_code == 200
+
+
+async def test_revoke_own_device_requires_csrf(api: Api, make_user: MakeUser) -> None:
+    """DELETE /me/devices/{id} requires a same-origin request."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in()
+
+    response = api.delete(client, f"{DEVICES}/{uuid.uuid7()}", csrf=False)
+
+    assert response.status_code == 403
+
+
+async def test_admin_session_list_shows_the_display_mode(api: Api) -> None:
+    """Administrators see whether a session runs in the installed app."""
+    api.post(
+        api.client,
+        f"{AUTH}/setup",
+        SETUP_BODY,
+    )
+    client, _ = api.sign_in("admin", headers={"X-Client-Display-Mode": "standalone"})
+
+    sessions = client.get(SESSIONS).json()
+
+    assert sorted(str(s["display_mode"]) for s in sessions) == ["None", "standalone"]
+    assert all(s["device_id"] for s in sessions)

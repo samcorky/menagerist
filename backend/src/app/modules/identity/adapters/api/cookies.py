@@ -16,6 +16,12 @@ _COOKIE_NOTE = (
     + " over HTTPS or when `cookie_secure` is `always`."
 )
 
+_DEVICE_NOTE = (
+    " A second cookie, named by `device_cookie_name` (`menagerist-device` by"
+    + " default) with the same prefix and attributes, remembers the browser for"
+    + " `device_ttl_days`; it is kept on sign-out."
+)
+
 
 def session_cookie_header(*, clears: bool = False) -> dict[str, Any]:
     """Return the OpenAPI `Set-Cookie` header entry for a session cookie response.
@@ -26,7 +32,7 @@ def session_cookie_header(*, clears: bool = False) -> dict[str, Any]:
     if clears:
         description = (
             "Clears the session cookie with `Max-Age=0` when a session was ended."
-            + " "
+            + " The device cookie is left alone. "
             + _COOKIE_NOTE
         )
         example = "menagerist-session=; Max-Age=0; Path=/; HttpOnly; SameSite=strict"
@@ -36,6 +42,7 @@ def session_cookie_header(*, clears: bool = False) -> dict[str, Any]:
             + " parsed, and it lasts for the configured session lifetime"
             + " (`Max-Age`). "
             + _COOKIE_NOTE
+            + _DEVICE_NOTE
         )
         example = (
             "menagerist-session=<opaque-token>; Max-Age=2592000; Path=/; HttpOnly;"
@@ -55,15 +62,25 @@ def _secure(request: Request, settings: IdentitySettings) -> bool:
     return request.url.scheme == "https"
 
 
-def session_cookie_name(request: Request, settings: IdentitySettings) -> str:
-    """Return `__Host-Http-<name>` when the cookie is Secure, else the plain name.
+def _cookie_name(request: Request, settings: IdentitySettings, name: str) -> str:
+    """Return `__Host-Http-<name>` when cookies are Secure, else the plain name.
 
     The prefix needs `Secure`, `HttpOnly`, `Path=/` and no `Domain`, so the
     browser then refuses a cookie of that name set by a sibling site or by script.
     """
     if _secure(request, settings):
-        return _SESSION_PREFIX + settings.cookie_name
-    return settings.cookie_name
+        return _SESSION_PREFIX + name
+    return name
+
+
+def session_cookie_name(request: Request, settings: IdentitySettings) -> str:
+    """Return the session cookie's name, prefixed when Secure."""
+    return _cookie_name(request, settings, settings.cookie_name)
+
+
+def device_cookie_name(request: Request, settings: IdentitySettings) -> str:
+    """Return the device cookie's name, prefixed when Secure."""
+    return _cookie_name(request, settings, settings.device_cookie_name)
 
 
 def session_cookie_value(request: Request, name: str) -> str | None:
@@ -86,15 +103,30 @@ def session_cookie_value(request: Request, name: str) -> str | None:
 
 
 def set_session_cookies(
-    request: Request, response: Response, token: str, settings: IdentitySettings
+    request: Request,
+    response: Response,
+    token: str,
+    settings: IdentitySettings,
+    *,
+    device_token: str,
 ) -> None:
-    """Set the HttpOnly, SameSite=Strict session cookie, prefixed when Secure."""
+    """Set the session and device cookies, HttpOnly and SameSite=Strict."""
+    secure = _secure(request, settings)
     response.set_cookie(
         session_cookie_name(request, settings),
         token,
         max_age=settings.session_ttl_hours * 3600,
         path="/",
-        secure=_secure(request, settings),
+        secure=secure,
+        httponly=True,
+        samesite="strict",
+    )
+    response.set_cookie(
+        device_cookie_name(request, settings),
+        device_token,
+        max_age=settings.device_ttl_days * 86400,
+        path="/",
+        secure=secure,
         httponly=True,
         samesite="strict",
     )
@@ -103,7 +135,7 @@ def set_session_cookies(
 def clear_session_cookies(
     request: Request, response: Response, settings: IdentitySettings
 ) -> None:
-    """Expire the session cookie."""
+    """Expire the session cookie; the device cookie stays, as the browser is kept."""
     response.delete_cookie(
         session_cookie_name(request, settings),
         path="/",

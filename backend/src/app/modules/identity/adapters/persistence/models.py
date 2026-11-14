@@ -37,6 +37,27 @@ class SessionModel(IdentifiableMixin, Base):
     client_ip: Mapped[str | None]
     client_platform: Mapped[str | None]
     client_mobile: Mapped[bool | None]
+    device_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("devices.id", ondelete="CASCADE"), index=True
+    )
+    display_mode: Mapped[str | None]
+
+
+class DeviceModel(IdentifiableMixin, Base):
+    """ORM row for a remembered browser; only the device cookie's hash is stored."""
+
+    __tablename__ = "devices"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    user_agent: Mapped[str | None]
+    platform: Mapped[str | None]
+    mobile: Mapped[bool | None]
 
 
 class ApiTokenModel(IdentifiableMixin, Base):

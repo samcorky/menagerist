@@ -100,6 +100,7 @@ async def test_sign_in_rechecks_the_account_after_authentication(
         SignInThrottle(),
         decoy_hash=hasher.hash("decoy"),
         session_ttl=TTL,
+        device_ttl=timedelta(days=365),
     )
 
     with pytest.raises(refusal):

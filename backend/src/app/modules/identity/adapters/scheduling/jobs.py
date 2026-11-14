@@ -23,13 +23,13 @@ if TYPE_CHECKING:
         job_key="identity.purge_expired",
         schedule_key="identity.purge_expired_schedule",
         title="Clear expired sign-ins",
-        description="Removes sessions and access tokens that have expired.",
+        description="Removes expired sessions, access tokens and remembered devices.",
     )
 )
 async def purge_expired_credentials(
     actor: Actor, progress: ProgressReporter = NULL_PROGRESS
 ) -> None:
-    """Remove sessions and API tokens that have passed their expiry."""
+    """Remove sessions, API tokens and remembered devices past their expiry."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
 
     await PurgeExpiredCredentials(

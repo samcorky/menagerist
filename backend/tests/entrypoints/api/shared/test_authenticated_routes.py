@@ -52,6 +52,7 @@ IDENTITY_PREFIXES = (
     "/v1/tokens",
     "/v1/me/password",
     "/v1/me/sessions",
+    "/v1/me/devices",
 )
 # `/me` itself is the signed-in account; the rest of `/me` (exports, import,
 # permissions) acts on content.

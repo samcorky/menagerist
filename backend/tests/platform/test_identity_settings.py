@@ -139,3 +139,17 @@ def test_api_token_default_above_max_is_rejected() -> None:
     """A default lifetime longer than the maximum is a configuration error."""
     with pytest.raises(ValidationError):
         IdentitySettings(api_token_default_days=100, api_token_max_days=50)
+
+
+def test_device_cookie_defaults() -> None:
+    """A browser is remembered for a year and may fail twenty times per window."""
+    defaults = IdentitySettings()
+    assert defaults.device_cookie_name == "menagerist-device"
+    assert defaults.device_ttl_days == 365
+    assert defaults.sign_in_device_attempts == 20
+
+
+def test_device_cookie_sharing_the_session_cookie_name_is_rejected() -> None:
+    """The two cookies must have different names, or each would overwrite the other."""
+    with pytest.raises(ValidationError, match="device_cookie_name"):
+        IdentitySettings(cookie_name="shared", device_cookie_name="shared")

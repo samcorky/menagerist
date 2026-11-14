@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -23,11 +23,14 @@ from app.modules.identity.adapters.api.dependencies import (
     get_client_device,
     get_client_ip,
     get_current_session_id,
+    get_device_token,
     get_get_setup_status_use_case,
     get_identity_actor,
     get_identity_settings_dep,
+    get_list_own_devices_use_case,
     get_list_own_sessions_use_case,
     get_revoke_other_sessions_use_case,
+    get_revoke_own_device_use_case,
     get_revoke_own_session_use_case,
     get_session_token,
     get_set_own_display_name_use_case,
@@ -38,9 +41,11 @@ from app.modules.identity.adapters.api.dependencies import (
 )
 from app.modules.identity.adapters.api.device_header_fields import device_header_fields
 from app.modules.identity.adapters.api.schemas import (
+    DEVICE_EXAMPLE,
     AuthStatusResponse,
     ChangePasswordRequest,
     LoginRequest,
+    OwnDeviceResponse,
     RevokedSessionsResponse,
     SessionResponse,
     SetupRequest,
@@ -54,6 +59,10 @@ from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
 )
+from app.modules.identity.application.list_own_devices import (
+    ListOwnDevices,
+    ListOwnDevicesQuery,
+)
 from app.modules.identity.application.list_own_sessions import (
     ListOwnSessions,
     ListOwnSessionsQuery,
@@ -61,6 +70,10 @@ from app.modules.identity.application.list_own_sessions import (
 from app.modules.identity.application.revoke_other_sessions import (
     RevokeOtherSessions,
     RevokeOtherSessionsCommand,
+)
+from app.modules.identity.application.revoke_own_device import (
+    RevokeOwnDevice,
+    RevokeOwnDeviceCommand,
 )
 from app.modules.identity.application.revoke_own_session import (
     RevokeOwnSession,
@@ -74,6 +87,7 @@ from app.modules.identity.domain.errors import (
     AccountDisabledError,
     CurrentPasswordIncorrectError,
     CurrentSessionError,
+    DeviceNotFoundError,
     InvalidCredentialsError,
     InvalidPasswordError,
     InvalidUserError,
@@ -175,7 +189,9 @@ async def setup_first_admin(
     result = await use_case.handle(
         payload.to_command(client_ip=client_ip, device=device), ANONYMOUS_ACTOR
     )
-    set_session_cookies(request, response, result.token, settings)
+    set_session_cookies(
+        request, response, result.token, settings, device_token=result.device_token
+    )
     return SetupResponse.from_result(result)
 
 
@@ -201,24 +217,33 @@ async def sign_in(
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
     client_ip: Annotated[str | None, Depends(get_client_ip)],
     device: Annotated[ClientDevice, Depends(get_client_device)],
+    device_token: Annotated[str | None, Depends(get_device_token)],
 ) -> UserResponse:
-    """Sign in, setting the session cookie.
+    """Sign in, setting the session cookie and the device cookie.
 
     Refused with 403 `cross_site_refused` when a page on another site sent it.
 
     The 403 `account_disabled` answer is given only when the password was
     right; a wrong password for a disabled account gets the same 401 as any
     other. Failures are throttled per username and per client address (429 with
-    `Retry-After`) whether or not the account exists.
+    `Retry-After`) whether or not the account exists. A browser sending a device
+    cookie it was given when signing in to this account before is counted on its
+    own, higher limit instead of the username's, so failures from elsewhere
+    cannot lock it out.
     """
     logger.debug(
         "sign_in_device_headers",
         **device_header_fields(request.headers, client_ip),
     )
     result = await use_case.handle(
-        payload.to_command(client_ip=client_ip, device=device), ANONYMOUS_ACTOR
+        payload.to_command(
+            client_ip=client_ip, device=device, device_token=device_token
+        ),
+        ANONYMOUS_ACTOR,
     )
-    set_session_cookies(request, response, result.token, settings)
+    set_session_cookies(
+        request, response, result.token, settings, device_token=result.device_token
+    )
     return UserResponse.from_domain(result.user)
 
 
@@ -248,8 +273,9 @@ async def sign_out(
     token: Annotated[str | None, Depends(get_session_token)],
     settings: Annotated[IdentitySettings, Depends(get_identity_settings_dep)],
 ) -> None:
-    """Sign out, ending the session and clearing the cookies.
+    """Sign out, ending the session and clearing its cookie.
 
+    The device cookie is kept: signing out does not forget the browser.
     Without a session cookie nothing is changed: the same-origin check does not
     apply then, so clearing cookies would let a cross-site POST log someone out.
     """
@@ -328,13 +354,70 @@ async def change_password(
 ) -> UserResponse:
     """Change your password. Other sessions end and this one gets a new token.
 
+    Every remembered browser is forgotten, and this one gets a new device cookie.
     Wrong current passwords are throttled per user and per client address.
     """
     result = await use_case.handle(
         payload.to_command(client_ip=client_ip, device=device), actor
     )
-    set_session_cookies(request, response, result.token, settings)
+    set_session_cookies(
+        request, response, result.token, settings, device_token=result.device_token
+    )
     return UserResponse.from_domain(result.user)
+
+
+@me_router.get(
+    "/devices",
+    response_model=list[OwnDeviceResponse],
+    operation_id="list_own_devices",
+    tags=["Sessions"],
+    responses={
+        200: {"content": {"application/json": {"example": [DEVICE_EXAMPLE]}}},
+        **_UNAUTHENTICATED,
+    },
+)
+async def list_own_devices(
+    use_case: Annotated[ListOwnDevices, Depends(get_list_own_devices_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+) -> list[OwnDeviceResponse]:
+    """List the browsers you are signed in on, each with its active sessions."""
+    devices = await use_case.handle(
+        ListOwnDevicesQuery(current_session_id=current_session_id), actor
+    )
+    return [OwnDeviceResponse.from_own_device(d) for d in devices]
+
+
+@me_router.delete(
+    "/devices/{device_id}",
+    response_model=RevokedSessionsResponse,
+    operation_id="revoke_own_device",
+    tags=["Sessions"],
+    responses={
+        200: {"content": {"application/json": {"example": {"ended": 1}}}},
+        **_UNAUTHENTICATED,
+        **error_response(DeviceNotFoundError, detail="That device was not found."),
+        **error_response(
+            CurrentSessionError, detail="Cannot revoke the current device."
+        ),
+    },
+)
+async def revoke_own_device(
+    device_id: Annotated[
+        uuid.UUID, Path(description="The device to sign out and forget.")
+    ],
+    use_case: Annotated[RevokeOwnDevice, Depends(get_revoke_own_device_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+) -> RevokedSessionsResponse:
+    """Sign out one of your devices and forget it, ending all its sessions."""
+    ended = await use_case.handle(
+        RevokeOwnDeviceCommand(
+            device_id=device_id, current_session_id=current_session_id
+        ),
+        actor,
+    )
+    return RevokedSessionsResponse(ended=ended)
 
 
 @me_router.get(
@@ -399,7 +482,7 @@ async def revoke_other_sessions(
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
     current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
 ) -> RevokedSessionsResponse:
-    """Sign out all other active devices for your account."""
+    """Sign out everywhere except this device, forgetting the other devices."""
     ended = await use_case.handle(
         RevokeOtherSessionsCommand(current_session_id=current_session_id),
         actor,

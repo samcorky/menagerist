@@ -68,6 +68,7 @@ class UpdateUser(CommandHandler[IdentityUnitOfWork, UpdateUserCommand, UserListi
             if command.disabled is True:
                 user.disable()
                 ended = await repos.sessions.delete_for_user(user.id)
+                await repos.devices.delete_for_user(user.id)
             elif command.disabled is False:
                 user.enable()
             await repos.users.save(user)

@@ -1495,3 +1495,18 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 - A failure part-way through an entry leaves what was created in place. Installing again is safe and finishes the job.
 
 **Rationale:** per-user presets (previous entry) left no way for a person to get the old built-ins back. The catalogue is that way, kept apart from example packs because starter types are meant to be kept and example content is meant to be removed. It must ship in the same release as per-user presets.
+
+## Remembered browsers and the device cookie (2026-11-14)
+
+**Decision:** a successful sign-in, first-run setup or password change sets a second HttpOnly cookie (`MENAGERIST_IDENTITY_DEVICE_COOKIE_NAME`, default `menagerist-device`, with the same `__Host-Http-` prefix and attributes as the session cookie) that remembers the browser for the account. A `devices` row holds only the hash of its secret, the account and the browser's user agent and platform. Each session links to the device it was started in, and the account page lists devices rather than sessions. It stops targeted lockout: anyone who knew a username could lock that account by failing on purpose, and the real user could not tell why.
+
+**Choices that are not obvious:**
+
+- A browser presenting a live cookie for the username it signs in as is counted on its own throttle key (`ThrottleKind.DEVICE`, `MENAGERIST_IDENTITY_SIGN_IN_DEVICE_ATTEMPTS`, default 20) **instead of** the username key, not on the username key with a higher limit. With a shared counter, someone else's failures would still reach the higher limit and lock the remembered browser too. The per-address limit applies as before, and the device limit is finite so a stolen cookie is no free pass.
+- The cookie is looked up by its hash before anything about the account is known, and counts only when its owner's username equals the one typed. An unknown username, another account's cookie and a made-up cookie all fall back to the username key, so nothing about the throttle depends on whether the account exists. Nothing depends on the client address or proxy headers either.
+- Signing in again on a remembered browser ends that device's older sessions: the browser held one session cookie, so they could no longer be used. A browser shared by two people gets a new device for the second account, replacing the cookie.
+- Signing out keeps the cookie. A password change, a reset and disabling the account forget all of the account's devices (a change remembers the current browser afresh); "Sign out all other devices" and revoking a device (`DELETE /me/devices/{device_id}`) forget the others. Devices expire `MENAGERIST_IDENTITY_DEVICE_TTL_DAYS` (default 365) after their last sign-in and are purged by the credentials clean-up job. The `devices` table is skipped in backups, like sessions.
+- Whether the app ran installed or in a browser tab (`X-Client-Display-Mode`, sent by the frontend on every request) is stored on the **session**, not the device. On Android and desktop an installed app shares cookies with the browser, so both are one device; on iOS it has its own cookie store and becomes a device of its own. The value is a label and nothing trusts it.
+- Sessions started before this change have no device; `GET /me/devices` lists each on its own (`id` null), ended through `DELETE /me/sessions/{id}`.
+
+**Not chosen:** counting the username limit per (username, address), which stops targeted lockout but lets a distributed attack guess one account from many addresses; and exempting addresses that signed in before, which shared networks inherit and which behaves differently for existing and unknown accounts.

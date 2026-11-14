@@ -125,6 +125,7 @@ def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     return Cases(
         setup=SetupFirstAdmin(
@@ -134,6 +135,7 @@ def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
             tokens,
             claim or NoOpExistingDataClaim(),
             session_ttl=TTL,
+            device_ttl=timedelta(days=365),
         ),
         sign_in=SignIn(
             world.uow,
@@ -144,11 +146,18 @@ def build_cases(world: World, claim: ExistingDataClaim | None = None) -> Cases:
             throttle,
             decoy_hash=decoy,
             session_ttl=TTL,
+            device_ttl=timedelta(days=365),
         ),
         sign_out=SignOut(world.uow, get_access_guard(), tokens),
         current_user=GetCurrentUser(world.uow, get_access_guard(), tokens),
         change_password=ChangePassword(
-            world.uow, get_access_guard(), hasher, tokens, throttle, session_ttl=TTL
+            world.uow,
+            get_access_guard(),
+            hasher,
+            tokens,
+            throttle,
+            session_ttl=TTL,
+            device_ttl=timedelta(days=365),
         ),
         create_user=CreateUser(world.uow, guard, hasher),
         list_users=ListUsers(repos, guard),

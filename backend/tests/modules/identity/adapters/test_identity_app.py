@@ -89,6 +89,7 @@ def _wired(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
         sessions=world.sessions,
         attempts=world.attempts,
         tokens=world.tokens,
+        devices=world.devices,
     )
     monkeypatch.setattr("app.platform.database.get_session_factory", lambda: _Session)
     monkeypatch.setattr(
