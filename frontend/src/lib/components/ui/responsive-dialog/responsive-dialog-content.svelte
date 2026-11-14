@@ -33,6 +33,7 @@
 	import PageScrollLock from '$lib/components/page-scroll-lock.svelte';
 	import ResponsiveDialogPortal from './responsive-dialog-portal.svelte';
 	import ResponsiveDialogOverlay from './responsive-dialog-overlay.svelte';
+	import { shouldCloseSheet } from '$lib/sheet-drag';
 
 	let {
 		ref = $bindable(null),
@@ -50,6 +51,62 @@
 		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof ResponsiveDialogPortal>>;
 		overlayProps?: WithoutChildrenOrChild<ComponentProps<typeof ResponsiveDialogOverlay>>;
 	} = $props();
+
+	const SLIDE_OUT_MS = 180;
+	let closeButton = $state<HTMLElement | null>(null);
+	let drag: { id: number; startY: number; lastY: number; lastT: number; velocity: number } | null =
+		null;
+
+	function dragStart(e: PointerEvent) {
+		if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		if (ref) ref.style.transition = 'none';
+		drag = {
+			id: e.pointerId,
+			startY: e.clientY,
+			lastY: e.clientY,
+			lastT: e.timeStamp,
+			velocity: 0
+		};
+	}
+
+	function dragMove(e: PointerEvent) {
+		if (!drag || e.pointerId !== drag.id || !ref) return;
+		const dt = e.timeStamp - drag.lastT;
+		if (dt > 0) drag.velocity = (e.clientY - drag.lastY) / dt;
+		drag.lastY = e.clientY;
+		drag.lastT = e.timeStamp;
+		ref.style.transform = `translateY(${Math.max(0, e.clientY - drag.startY)}px)`;
+	}
+
+	function springBack() {
+		if (!ref) return;
+		// Reduced motion shortens this to an instant snap via the global rule in layout.css.
+		ref.style.transition = 'transform 200ms ease-out';
+		ref.style.transform = '';
+	}
+
+	function dragEnd(e: PointerEvent) {
+		if (!drag || e.pointerId !== drag.id || !ref) return;
+		const distance = e.clientY - drag.startY;
+		const close =
+			e.type === 'pointerup' && shouldCloseSheet(distance, ref.offsetHeight, drag.velocity);
+		drag = null;
+		if (!close) return springBack();
+		// Slide out first, then close through the button so a form's "Discard changes?" check
+		// still runs; if the dialog stays open, the sheet returns to where it was.
+		const sheet = ref;
+		const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		sheet.style.transition = reduced ? 'none' : `transform ${SLIDE_OUT_MS}ms ease-in`;
+		sheet.style.transform = `translateY(${sheet.offsetHeight}px)`;
+		setTimeout(
+			() => {
+				closeButton?.click();
+				queueMicrotask(springBack);
+			},
+			reduced ? 0 : SLIDE_OUT_MS
+		);
+	}
 </script>
 
 <ResponsiveDialogPortal {...portalProps}>
@@ -62,10 +119,22 @@
 		{...restProps}
 	>
 		<PageScrollLock />
-		<div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-muted sm:hidden"></div>
+		<!-- Decorative: the Close button below is the accessible way to dismiss. -->
+		<div
+			aria-hidden="true"
+			data-slot="sheet-grab-bar"
+			class="-mx-6 -mt-6 flex touch-none justify-center px-6 pt-6 pb-5 sm:hidden"
+			onpointerdown={dragStart}
+			onpointermove={dragMove}
+			onpointerup={dragEnd}
+			onpointercancel={dragEnd}
+		>
+			<div class="h-1.5 w-12 rounded-full bg-muted"></div>
+		</div>
 		<div class="flex items-center justify-between">
 			<DialogPrimitive.Title class="text-lg font-semibold">{title}</DialogPrimitive.Title>
 			<DialogPrimitive.Close
+				bind:ref={closeButton}
 				class="relative rounded-md p-1 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
 				aria-label="Close"
 			>
