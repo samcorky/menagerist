@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+from app.modules.catalogue.application.entry_plan import plan_entry
 from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.catalogue.domain.entry import CatalogueEntry
 from app.modules.catalogue.ports.entry_catalogue import EntryCatalogue  # noqa: TC001
-from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.plan import PlanAction
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
 
@@ -37,13 +38,9 @@ async def count_present(
     entry: CatalogueEntry, presets: PresetTarget, graph: GraphTarget
 ) -> EntryStatus:
     """Count how many of the entry's presets or types the person already has."""
-    present = sum(await presets.existing(entry.presets))
-    for spec in entry.item_types:
-        present += await graph.slug_taken(EntityKind.ITEM_TYPE, spec.slug)
-    for rel in entry.relationship_types:
-        present += await graph.slug_taken(EntityKind.RELATIONSHIP_TYPE, rel.slug)
-    total = len(entry.presets) + len(entry.item_types) + len(entry.relationship_types)
-    return EntryStatus(entry=entry, present=present, total=total)
+    plan = await plan_entry(entry, presets, graph)
+    present = len(plan.with_action(PlanAction.UNCHANGED))
+    return EntryStatus(entry=entry, present=present, total=len(plan.entities))
 
 
 class ListCatalogueEntries(UseCase[ListCatalogueEntriesQuery, list[EntryStatus]]):

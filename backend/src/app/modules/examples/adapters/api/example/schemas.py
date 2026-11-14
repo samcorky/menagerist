@@ -6,6 +6,12 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.examples.application.install_example_pack import installation_counts
+from app.modules.transfer.adapters.api.plan_schemas import (
+    PlanBlockerResponse,
+    PlannedEntityResponse,
+    blockers_from_domain,
+    entities_from_domain,
+)
 
 if TYPE_CHECKING:
     from app.modules.examples.application.install_example_pack import InstallResult
@@ -217,60 +223,6 @@ class InstallResultResponse(BaseModel):
         )
 
 
-class PlanAction(StrEnum):
-    """What adding a set would do with one of its entities."""
-
-    CREATE = "create"
-    UNCHANGED = "unchanged"
-    CONFLICT = "conflict"
-
-
-class PlannedEntityResponse(BaseModel):
-    """One entity of an example set and what adding the set would do with it."""
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {
-                    "kind": "item_type",
-                    "ref": "album",
-                    "label": "Album",
-                    "action": "conflict",
-                    "reason": "You already have an item type called 'album'. "
-                    + "Rename or remove it, then try again.",
-                }
-            ]
-        }
-    )
-
-    kind: str = Field(
-        description="What sort of thing it is, such as `item_type` or `item`."
-    )
-    ref: str = Field(description="The entity's id within the set.")
-    label: str = Field(description="Its name, as it would be shown.")
-    action: PlanAction
-    reason: str | None = Field(
-        default=None, description="Why it is unchanged or conflicts."
-    )
-
-
-class PlanBlockerResponse(BaseModel):
-    """Something that stops the whole set being added."""
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {"code": "RequirementsNotMetError", "reason": "Add Vinyl first."}
-            ]
-        }
-    )
-
-    code: str = Field(
-        description="The problem `title` adding the set would return for it."
-    )
-    reason: str = Field(description="The problem `detail` adding would return.")
-
-
 PLAN_EXAMPLE: dict[str, Any] = {
     "pack_id": "vinyl",
     "ready": True,
@@ -314,19 +266,8 @@ class InstallPlanResponse(BaseModel):
         return cls(
             pack_id=plan.bundle_id,
             ready=plan.ready,
-            blockers=[
-                PlanBlockerResponse(code=b.code, reason=b.reason) for b in plan.blockers
-            ],
-            entities=[
-                PlannedEntityResponse(
-                    kind=e.kind.value,
-                    ref=e.ref,
-                    label=e.label,
-                    action=PlanAction(e.action.value),
-                    reason=e.reason,
-                )
-                for e in plan.entities
-            ],
+            blockers=blockers_from_domain(plan),
+            entities=entities_from_domain(plan),
         )
 
 

@@ -48,6 +48,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "collections.UpdateCollection": "collections:collection:write",
     "catalogue.InstallCatalogueEntry": "catalogue:entry:install",
     "catalogue.ListCatalogueEntries": "catalogue:entry:read",
+    "catalogue.PlanCatalogueEntryInstall": "catalogue:entry:install",
     "examples.InstallExamplePack": "examples:pack:install",
     "examples.ListExampleEntities": "examples:pack:read",
     "examples.ListExamplePacks": "examples:pack:read",

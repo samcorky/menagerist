@@ -66,3 +66,35 @@ def test_an_unknown_entry_is_a_404_problem(shared: Shared) -> None:
 
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("application/problem+json")
+
+
+def test_the_plan_previews_an_install_without_making_anything(shared: Shared) -> None:
+    """The plan previews an install without making anything; then it is unchanged."""
+    client = _client(shared)
+
+    before = client.get("/api/v1/catalogue/condition-grades/installation/plan")
+    listed = client.get("/api/v1/catalogue").json()
+    client.put("/api/v1/catalogue/condition-grades/installation")
+    after = client.get("/api/v1/catalogue/condition-grades/installation/plan").json()
+
+    assert before.status_code == 200
+    body = before.json()
+    assert (body["entry_id"], body["ready"], body["blockers"]) == (
+        "condition-grades",
+        True,
+        [],
+    )
+    assert [(e["kind"], e["label"], e["action"]) for e in body["entities"]] == [
+        ("preset", "Condition grades", "create")
+    ]
+    assert next(e for e in listed if e["id"] == "condition-grades")["present"] == 0
+    assert after["entities"][0]["action"] == "unchanged"
+    assert after["entities"][0]["reason"] == "You already have one the same."
+
+
+def test_planning_an_unknown_entry_is_a_404_problem(shared: Shared) -> None:
+    """Planning an unknown entry is a 404 problem."""
+    response = _client(shared).get("/api/v1/catalogue/nope/installation/plan")
+
+    assert response.status_code == 404
+    assert response.json()["title"] == "CatalogueEntryNotFoundError"

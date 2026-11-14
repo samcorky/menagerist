@@ -1478,6 +1478,7 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 - The install plans again rather than taking a plan from the client, so nothing a client sends can widen what is applied. A plan can go stale between the dry run and the install; the install's own plan is the one that counts.
 - Only `create`, `unchanged` and `conflict` exist. "To update" and "no longer in the source" arrive with importing a source again (#234), and CSV import (#238) gets its own planner producing the same `Plan`.
 - Applying still records each entity as it is made, so a failure part-way is undone as before.
+- The catalogue plans the same way (#450): `plan_entry` marks each preset or type `create` or `unchanged` (an identical preset, or a taken name), the install applies it, and `GET /catalogue/{entry_id}/installation/plan` (`PlanCatalogueEntryInstall`, `catalogue:entry:install`) is its dry run. A taken name is skipped, not a conflict, so a catalogue plan is always ready; it still has `ready` and `blockers` so one preview can show either plan. The list's "present" count is the plan's `unchanged` count.
 
 ## Presets belong to a person (2026-11-13)
 

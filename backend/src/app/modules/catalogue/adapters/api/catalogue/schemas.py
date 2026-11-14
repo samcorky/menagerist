@@ -3,10 +3,17 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.catalogue.domain.entry import EntrySection
+from app.modules.transfer.adapters.api.plan_schemas import (
+    PlanBlockerResponse,
+    PlannedEntityResponse,
+    blockers_from_domain,
+    entities_from_domain,
+)
 
 if TYPE_CHECKING:
     from app.modules.catalogue.application.install_catalogue_entry import InstallOutcome
     from app.modules.catalogue.application.list_catalogue_entries import EntryStatus
+    from app.modules.transfer.domain.plan import Plan
 
 
 ENTRY_EXAMPLE: dict[str, Any] = {
@@ -102,4 +109,54 @@ class InstallOutcomeResponse(BaseModel):
             item_types_skipped=outcome.item_types_skipped,
             relationship_types_created=outcome.relationship_types_created,
             relationship_types_skipped=outcome.relationship_types_skipped,
+        )
+
+
+PLAN_EXAMPLE: dict[str, Any] = {
+    "entry_id": "starter-types",
+    "ready": True,
+    "blockers": [],
+    "entities": [
+        {
+            "kind": "item_type",
+            "ref": "person",
+            "label": "Person",
+            "action": "unchanged",
+            "reason": "You already have one with this name.",
+        },
+        {
+            "kind": "item_type",
+            "ref": "place",
+            "label": "Place",
+            "action": "create",
+            "reason": None,
+        },
+    ],
+}
+
+
+class CataloguePlanResponse(BaseModel):
+    """What installing an entry would do, worked out without changing anything."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [PLAN_EXAMPLE]})
+
+    entry_id: str = Field(description="The entry planned.")
+    ready: bool = Field(
+        description="Whether installing would go ahead; always true for an entry."
+    )
+    blockers: list[PlanBlockerResponse] = Field(
+        description="Problems that stop the install; an entry has none."
+    )
+    entities: list[PlannedEntityResponse] = Field(
+        description="Everything the entry holds, in the order installing makes it."
+    )
+
+    @classmethod
+    def from_domain(cls, plan: Plan) -> CataloguePlanResponse:
+        """Build from the entry's plan."""
+        return cls(
+            entry_id=plan.bundle_id,
+            ready=plan.ready,
+            blockers=blockers_from_domain(plan),
+            entities=entities_from_domain(plan),
         )
