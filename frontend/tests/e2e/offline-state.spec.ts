@@ -153,7 +153,28 @@ test('Home shows that it is offline, and loads again from the banner Retry', asy
 	const banner = page.getByTestId('offline-banner');
 	await expect(banner).toBeVisible();
 
-	await restoreApi(page);
+	// Any request answered would bring Home back by itself and take the banner with it, so the
+	// API stays cut until the page has seen Retry pressed: only then are requests let through.
+	await page.evaluate(() =>
+		document.addEventListener(
+			'click',
+			(event) => {
+				const button = (event.target as Element).closest('button');
+				if (
+					button?.closest('[data-testid="offline-banner"]') &&
+					/Retry/.test(button.textContent ?? '')
+				)
+					(window as { retried?: boolean }).retried = true;
+			},
+			{ capture: true }
+		)
+	);
+	await page.route('**/api/**', async (route) => {
+		const retried = await page
+			.evaluate(() => (window as { retried?: boolean }).retried === true)
+			.catch(() => false);
+		await (retried ? route.continue() : route.abort('internetdisconnected'));
+	});
 	await banner.getByRole('button', { name: 'Retry' }).click();
 	await expect(page.getByText("You're offline, so your totals can't load.")).toHaveCount(0);
 	await expect(banner).toHaveCount(0);

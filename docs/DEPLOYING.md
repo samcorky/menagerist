@@ -73,7 +73,7 @@ No other website may call the API unless you list its origin in `MENAGERIST_API_
 
 The update check contacts two hosts: `github.com` (the repository's releases) and, on a development build such as the `edge` image, `ghcr.io`, to read which commit the published `edge` image was built from and tell you whether yours is the current one. Both are read anonymously, with no token, and are sent only what any request sends: your address and a `Menagerist/<version>` user agent. Nothing about your collection leaves the instance.
 
-It runs on `MENAGERIST_RELEASE_CHECK_SCHEDULE` (default `20 5 * * *`) and whenever an administrator chooses Check now on the Status page. Set the schedule empty to stop the timer while leaving Check now available.
+It runs on `MENAGERIST_RELEASE_CHECK_SCHEDULE` (default `20 5 * * *`), once in the background each time the app starts (unless a check was made recently; set `MENAGERIST_RELEASE_CHECK_ON_STARTUP=false` to skip it), and whenever an administrator chooses Check now on the Status page. Set the schedule empty to stop the timer while leaving Check now available.
 
 To stop the instance calling out at all, set `MENAGERIST_RELEASE_CHECK_ENABLED=false`. The scheduled job is then not registered (so it is not on Administration > Scheduled tasks and cannot be run by hand), Check now is unavailable, and the Status page says checks are turned off by the deployment. It is a deployment setting on purpose, so an administrator cannot turn it back on from the interface; changing it needs a restart of both the app and the worker.
 
