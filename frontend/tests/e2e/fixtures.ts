@@ -30,6 +30,9 @@ export const E2E_ADMIN: Credentials = {
 	password: 'e2e-admin-password-1'
 };
 
+// The device cookie's name, with or without the `__Host-Http-` prefix.
+const DEVICE = 'menagerist-device';
+
 type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>;
 export type Session = { storageState: StorageState };
 
@@ -46,8 +49,16 @@ export function apiSessionOptions(baseURL: string, session: Session) {
 	return { ...sessionOptions(baseURL, session), extraHTTPHeaders: { Origin: baseURL } };
 }
 
+/**
+ * A session is copied into many contexts, each of them a separate browser, so it leaves out the
+ * device cookie that remembers the one browser it was made in. Sharing it would make a later
+ * sign-in in any of them end this session, as signing in again in the same browser does.
+ */
 async function captureSession(api: APIRequestContext): Promise<Session> {
-	return { storageState: await api.storageState() };
+	const state = await api.storageState();
+	return {
+		storageState: { ...state, cookies: state.cookies.filter((c) => !c.name.endsWith(DEVICE)) }
+	};
 }
 
 /** Signs in through the API and returns the session; throws on bad credentials. */
