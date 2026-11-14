@@ -6,6 +6,7 @@ from app.modules.presets.application.export_presets import ExportPresets
 from app.modules.presets.application.get_preset import GetPreset
 from app.modules.presets.application.import_presets import ImportPresets
 from app.modules.presets.application.list_presets import ListPresets
+from app.modules.presets.application.match_presets import MatchPresets
 from app.modules.presets.application.permissions import PresetPermission
 from app.modules.presets.application.update_preset import UpdatePreset
 from app.shared_kernel.access import Access, Content
@@ -20,6 +21,7 @@ STANCES: dict[type[UseCase[Any, Any]], Access] = {
     ExportPresets: READ,
     GetPreset: READ,
     ListPresets: READ,
+    MatchPresets: READ,
     CreatePreset: WRITE,
     DeletePreset: WRITE,
     ImportPresets: WRITE,

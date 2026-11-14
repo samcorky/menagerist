@@ -44,6 +44,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for managing example graphs.",
     },
     {
+        "name": "Catalogue",
+        "description": "Endpoints for adding ready-made saved fields and types.",
+    },
+    {
         "name": "Collections",
         "description": "Endpoints for managing collections of graphs.",
     },

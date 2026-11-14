@@ -1,0 +1,105 @@
+{
+  "id": "group-recipe",
+  "title": "Recipe",
+  "description": "Serves, prep time, ingredients table and numbered instructions.",
+  "section": "field_group",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field_set",
+        "label": "Recipe",
+        "description": null,
+        "definition": {
+          "section": "Recipe",
+          "properties": [
+            {
+              "title": "Serves",
+              "type": "number",
+              "x-menagerist": {
+                "kind": "number"
+              }
+            },
+            {
+              "title": "Prep time",
+              "type": "object",
+              "properties": {
+                "value": {
+                  "title": "Value",
+                  "type": "number"
+                },
+                "unit": {
+                  "title": "Unit",
+                  "type": "string"
+                }
+              },
+              "x-menagerist": {
+                "kind": "quantity"
+              }
+            },
+            {
+              "title": "Ingredients",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ingredient": {
+                    "title": "Ingredient",
+                    "type": "string",
+                    "x-menagerist": {
+                      "kind": "text"
+                    }
+                  },
+                  "amount": {
+                    "title": "Amount",
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "title": "Value",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "title": "Unit",
+                        "type": "string"
+                      }
+                    },
+                    "x-menagerist": {
+                      "kind": "quantity"
+                    }
+                  },
+                  "notes": {
+                    "title": "Notes",
+                    "type": "string",
+                    "x-menagerist": {
+                      "kind": "text"
+                    }
+                  }
+                }
+              },
+              "x-menagerist": {
+                "kind": "group",
+                "columns": [
+                  "ingredient",
+                  "amount",
+                  "notes"
+                ]
+              }
+            },
+            {
+              "title": "Instructions",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "x-menagerist": {
+                "kind": "list",
+                "display": "numbered"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "field-purchase-price",
+  "title": "Purchase price",
+  "description": "An amount of money with a currency.",
+  "section": "field",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field",
+        "label": "Purchase price",
+        "description": null,
+        "definition": {
+          "property": {
+            "title": "Purchase price",
+            "type": "object",
+            "properties": {
+              "value": {
+                "title": "Value",
+                "type": "number"
+              },
+              "currency": {
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "x-menagerist": {
+              "kind": "money"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

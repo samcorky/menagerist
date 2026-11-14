@@ -1480,3 +1480,18 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 - This must ship in the same release as the planned catalogue (#100). On its own it leaves nobody with the old built-ins.
 
 **Rationale:** the ownership model for types ("Types belong to a person" above) applies to presets too, so every piece of collector content has one owner and one access policy. The install side of example packs and the planned catalogue use the neutral targets described in [A transfer module owns the targets](#a-transfer-module-owns-the-targets-2026-11-13). A clean install with nothing preinstalled is the intent, and people install what they want.
+
+## A catalogue to install presets and starter types from (2026-11-14)
+
+**Decision:** the former built-in presets ship as a `catalogue` module of JSON entries instead of database rows. An entry is a named group: a saved list (Condition grades, Countries), a saved field, a saved field group, or the starter types (Person, Place, Organisation, Event, Book, Note and four relationship types). A person installs an entry from "Install from catalogue", in the preset picker and on the Saved fields page, and gets ordinary presets or types that they own, edit and delete. Nothing is installed unasked, so a fresh install has no presets or types.
+
+**Choices that are not obvious:**
+
+- The catalogue installs through the `transfer` targets, as the signed-in person: the preset target runs the existing `menagerist-presets` import, and the graph target creates types by slug. It has no persistence, ports of its own beyond the entry catalogue, or ledger, and it never touches `examples`. So nothing it installs carries the "Example" marker, and there is no uninstall: what was installed is deleted like anything else.
+- "Installed" is worked out from content: a preset's content hash, a type's slug. An entry reads as installed only while all of it is there. If the catalogue's content later changes (Countries is rebuilt from `shared/data/iso-data.json`), the entry reads as not installed and offers a fresh copy. That is accepted.
+- Collisions are skipped, not merged: an identical preset or a taken slug is skipped and counted, and a same-named preset with different content installs alongside the existing one.
+- Entries keep a stable `id` written in their JSON, not derived from the title, so later source links (#233) can key on it. Permissions are `catalogue:entry:read` and `catalogue:entry:install`; both are token-grantable.
+- The install route is `PUT /catalogue/{entry_id}/installation`, idempotent like the examples one, and the list response wraps its array in `catalogue` so the API linter's collection rule holds without raising the baseline.
+- A failure part-way through an entry leaves what was created in place. Installing again is safe and finishes the job.
+
+**Rationale:** per-user presets (previous entry) left no way for a person to get the old built-ins back. The catalogue is that way, kept apart from example packs because starter types are meant to be kept and example content is meant to be removed. It must ship in the same release as per-user presets.

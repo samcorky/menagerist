@@ -1,0 +1,27 @@
+{
+  "id": "field-released",
+  "title": "Released",
+  "description": "A release date.",
+  "section": "field",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field",
+        "label": "Released",
+        "description": null,
+        "definition": {
+          "property": {
+            "title": "Released",
+            "type": "string",
+            "format": "date",
+            "x-menagerist": {
+              "kind": "date"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -390,6 +390,7 @@ PATH_PARAMS: dict[str, Callable[[Seed], str]] = {
     "token_id": lambda s: s.token,
     "preset_id": lambda s: s.preset,
     "pack_id": lambda _: PACK_ID,
+    "entry_id": lambda _: "condition-grades",
     "key": lambda _: "rating",
 }
 QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
@@ -497,6 +498,25 @@ def _no_installation(response: Response) -> str | None:
 
 
 SPECIAL[("PUT", "/api/v1/examples/{pack_id}/installation")] = _installed_for_b
+
+
+def _catalogue_installed_for_b(response: Response) -> str | None:
+    if response.status_code != 200:
+        return f"B installing an entry for B should work, got {response.status_code}"
+    return None
+
+
+def _catalogue_shows_b_nothing(response: Response) -> str | None:
+    if response.status_code != 200:
+        return f"expected 200, got {response.status_code}"
+    shown = [e["id"] for e in response.json() if e["present"] > 0]
+    return f"B sees A's installs of {shown}" if shown else None
+
+
+SPECIAL[("PUT", "/api/v1/catalogue/{entry_id}/installation")] = (
+    _catalogue_installed_for_b
+)
+SPECIAL[("GET", "/api/v1/catalogue")] = _catalogue_shows_b_nothing
 
 
 def _not_installed_for_b(response: Response) -> str | None:

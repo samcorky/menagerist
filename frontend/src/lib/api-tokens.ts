@@ -37,6 +37,12 @@ export const AREAS: TokenArea[] = [
 		label: 'Example packs',
 		read: ['examples:pack:read'],
 		write: ['examples:pack:install']
+	},
+	{
+		id: 'catalogue',
+		label: 'Catalogue',
+		read: ['catalogue:entry:read'],
+		write: ['catalogue:entry:install']
 	}
 ];
 

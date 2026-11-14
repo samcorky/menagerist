@@ -105,6 +105,10 @@ from app.modules.presets.application.import_presets import (
     ImportPresets,
     ImportPresetsCommand,
 )
+from app.modules.presets.application.match_presets import (
+    MatchPresets,
+    MatchPresetsQuery,
+)
 from app.modules.presets.application.pack import PACK_FORMAT, PACK_VERSION
 from app.modules.presets.domain.errors import PresetInUseError, PresetNotFoundError
 from app.modules.presets.domain.preset import Preset  # noqa: TC001
@@ -500,6 +504,17 @@ class PresetPackTarget:
             )
             for spec, imported in zip(presets, result.items, strict=True)
         ]
+
+    async def existing(self, presets: Sequence[PackPreset]) -> list[bool]:
+        """Say, in order, whether the person already has an identical preset."""
+        items = [
+            {"kind": p.kind, "label": p.label, "definition": p.definition}
+            for p in presets
+        ]
+        async with self._stores.read() as repos:
+            return await MatchPresets(repos, self._access).handle(
+                MatchPresetsQuery(items=items), self._actor
+            )
 
     async def inspect(self, preset_id: uuid.UUID) -> Inspection | None:
         """Return the preset as it is now, or `None` if it is gone."""

@@ -16592,6 +16592,364 @@
         "x-required-permission": "examples:pack:install"
       }
     },
+    "/api/v1/catalogue": {
+      "get": {
+        "tags": [
+          "v1",
+          "Catalogue"
+        ],
+        "summary": "List Catalogue Entries",
+        "description": "List the saved lists, fields, field groups and starter types you can add.\n\n`present` of `total` says how much of an entry you already have; `installed` is\ntrue when it is all there.\n\n**Requires permission:** `catalogue:entry:read`",
+        "operationId": "list_catalogue_entries",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogueEntryResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Catalogue Entries"
+                },
+                "example": [
+                  {
+                    "id": "condition-grades",
+                    "title": "Condition grades",
+                    "description": "Mint through Poor, for rating condition.",
+                    "section": "choice_list",
+                    "installed": false,
+                    "present": 0,
+                    "total": 1,
+                    "contents": [
+                      "Condition grades"
+                    ]
+                  }
+                ]
+              }
+            },
+            "links": {
+              "InstallCatalogueEntry": {
+                "operationId": "install_catalogue_entry",
+                "parameters": {
+                  "entry_id": "$response.body#/0/id"
+                },
+                "description": "Install catalogue entry with the id from this response."
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/catalogue"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/catalogue"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/catalogue"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "catalogue:entry:read"
+      }
+    },
+    "/api/v1/catalogue/{entry_id}/installation": {
+      "put": {
+        "tags": [
+          "v1",
+          "Catalogue"
+        ],
+        "summary": "Install Catalogue Entry",
+        "description": "Add an entry to your own saved fields or types.\n\nWhat is added is yours to edit and delete. Anything you already have is skipped\nand counted: an identical saved list, field or field group, or a type whose name\nis taken. Adding the same entry again is safe.\n\n**Requires permission:** `catalogue:entry:install`",
+        "operationId": "install_catalogue_entry",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the entry to add.",
+              "title": "Entry Id"
+            },
+            "description": "The id of the entry to add."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallOutcomeResponse"
+                },
+                "example": {
+                  "entry_id": "starter-types",
+                  "presets_created": 0,
+                  "presets_skipped": 0,
+                  "item_types_created": 5,
+                  "item_types_skipped": 1,
+                  "relationship_types_created": 4,
+                  "relationship_types_skipped": 0
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a catalogue entry id is not one the app ships.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "CatalogueEntryNotFoundError",
+                  "status": 404,
+                  "detail": "Catalogue entry 'condition-grades' not found",
+                  "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "catalogue:entry:install"
+      }
+    },
     "/api/v1/collections": {
       "post": {
         "tags": [
@@ -23670,6 +24028,87 @@
           }
         ]
       },
+      "CatalogueEntryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Stable id of the entry, used to install it."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "What the entry is called."
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What the entry holds, in a sentence."
+          },
+          "section": {
+            "$ref": "#/components/schemas/EntrySection"
+          },
+          "installed": {
+            "type": "boolean",
+            "title": "Installed",
+            "description": "Whether everything in the entry is already yours."
+          },
+          "present": {
+            "type": "integer",
+            "title": "Present",
+            "description": "How many of the entry's things you already have."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "How many things the entry holds."
+          },
+          "contents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Contents",
+            "description": "The names of the things the entry holds."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "section",
+          "installed",
+          "present",
+          "total",
+          "contents"
+        ],
+        "title": "CatalogueEntryResponse",
+        "description": "A shipped entry and how much of it the person already has.",
+        "examples": [
+          {
+            "contents": [
+              "Condition grades"
+            ],
+            "description": "Mint through Poor, for rating condition.",
+            "id": "condition-grades",
+            "installed": false,
+            "present": 0,
+            "section": "choice_list",
+            "title": "Condition grades",
+            "total": 1
+          }
+        ]
+      },
+      "CataloguePermission": {
+        "type": "string",
+        "enum": [
+          "catalogue:entry:read",
+          "catalogue:entry:install"
+        ],
+        "title": "CataloguePermission",
+        "description": "Permissions for the catalogue of installable presets and starter types."
+      },
       "ChangePasswordRequest": {
         "properties": {
           "current_password": {
@@ -25069,6 +25508,17 @@
           }
         ]
       },
+      "EntrySection": {
+        "type": "string",
+        "enum": [
+          "choice_list",
+          "field",
+          "field_group",
+          "starter_types"
+        ],
+        "title": "EntrySection",
+        "description": "Where an entry is shown, and what kind of thing it installs."
+      },
       "ExampleEntitiesResponse": {
         "properties": {
           "item_ids": {
@@ -25300,6 +25750,9 @@
                   "$ref": "#/components/schemas/BackupPermission"
                 },
                 {
+                  "$ref": "#/components/schemas/CataloguePermission"
+                },
+                {
                   "$ref": "#/components/schemas/CollectionPermission"
                 },
                 {
@@ -25433,6 +25886,68 @@
           {
             "created": 1,
             "skipped": 1
+          }
+        ]
+      },
+      "InstallOutcomeResponse": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id",
+            "description": "The entry that was installed."
+          },
+          "presets_created": {
+            "type": "integer",
+            "title": "Presets Created",
+            "description": "Saved lists, fields or groups added."
+          },
+          "presets_skipped": {
+            "type": "integer",
+            "title": "Presets Skipped",
+            "description": "Saved lists, fields or groups you already had."
+          },
+          "item_types_created": {
+            "type": "integer",
+            "title": "Item Types Created",
+            "description": "Item types added."
+          },
+          "item_types_skipped": {
+            "type": "integer",
+            "title": "Item Types Skipped",
+            "description": "Item types skipped because the name was taken."
+          },
+          "relationship_types_created": {
+            "type": "integer",
+            "title": "Relationship Types Created",
+            "description": "Relationship types added."
+          },
+          "relationship_types_skipped": {
+            "type": "integer",
+            "title": "Relationship Types Skipped",
+            "description": "Relationship types skipped because the name was taken."
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "presets_created",
+          "presets_skipped",
+          "item_types_created",
+          "item_types_skipped",
+          "relationship_types_created",
+          "relationship_types_skipped"
+        ],
+        "title": "InstallOutcomeResponse",
+        "description": "What installing an entry created, and what the person already had.",
+        "examples": [
+          {
+            "entry_id": "starter-types",
+            "item_types_created": 5,
+            "item_types_skipped": 1,
+            "presets_created": 0,
+            "presets_skipped": 0,
+            "relationship_types_created": 4,
+            "relationship_types_skipped": 0
           }
         ]
       },
@@ -26985,6 +27500,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/BackupPermission"
+                },
+                {
+                  "$ref": "#/components/schemas/CataloguePermission"
                 },
                 {
                   "$ref": "#/components/schemas/CollectionPermission"
@@ -29594,6 +30112,10 @@
     {
       "name": "Examples",
       "description": "Endpoints for managing example graphs."
+    },
+    {
+      "name": "Catalogue",
+      "description": "Endpoints for adding ready-made saved fields and types."
     },
     {
       "name": "Collections",

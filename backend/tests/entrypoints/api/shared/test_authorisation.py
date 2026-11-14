@@ -40,6 +40,8 @@ CONTENT_VALUES = frozenset(
         "presets:preset:write",
         "examples:pack:read",
         "examples:pack:install",
+        "catalogue:entry:read",
+        "catalogue:entry:install",
         "backup:own_data:export",
         "backup:own_data:import",
     }
@@ -52,7 +54,7 @@ def test_the_default_member_grant_is_the_content_set() -> None:
     assert frozenset(CONTENT_PERMISSIONS) == CONTENT_VALUES
     assert not CONTENT_PERMISSIONS & ADMIN_ONLY_ACTIONS
     assert ALL_PERMISSIONS - MEMBER_PERMISSIONS == ADMIN_ONLY_ACTIONS
-    assert len(ALL_PERMISSIONS) == 37
+    assert len(ALL_PERMISSIONS) == 39
 
 
 def test_the_admin_only_set_matches_the_catalogue() -> None:

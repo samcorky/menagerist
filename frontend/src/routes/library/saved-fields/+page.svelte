@@ -11,7 +11,8 @@
 		Pencil,
 		Trash2,
 		Upload,
-		Ellipsis
+		Ellipsis,
+		Library
 	} from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { untrack } from 'svelte';
@@ -27,6 +28,7 @@
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import CatalogueDialog from '$lib/components/catalogue-dialog.svelte';
 	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
 	import IconButton from '$lib/components/icon-button.svelte';
 	import LoadFailed from '$lib/components/load-failed.svelte';
@@ -247,6 +249,8 @@
 	function failureMessage(error: unknown): string {
 		return error instanceof Error ? error.message : errorMessage(error);
 	}
+
+	let catalogueOpen = $state(false);
 
 	async function reloadAll() {
 		fields = [];
@@ -568,8 +572,8 @@
 <Page width="reading" class="gap-6">
 	<BackButton peer fallback={resolve('/settings')} />
 
-	<div class="flex items-start justify-between gap-4">
-		<div>
+	<div class="flex flex-wrap items-start justify-between gap-4">
+		<div class="min-w-0 flex-1 basis-64">
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Saved fields</h1>
 			<p class="mt-1 text-muted-foreground">
 				Reuse a field or a list of choices across item types instead of rebuilding it each time.
@@ -582,36 +586,51 @@
 			class="hidden"
 			onchange={handleImportFile}
 		/>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
-					<Button
-						{...props}
-						type="button"
-						variant="outline"
-						size="icon"
-						class="pointer-coarse:size-11"
-						aria-label="More actions"
+		<div class="flex shrink-0 items-center gap-2">
+			<Button
+				type="button"
+				variant="outline"
+				class="pointer-coarse:min-h-11"
+				onclick={() => (catalogueOpen = true)}
+			>
+				<Library class="size-4" />
+				Install from catalogue
+			</Button>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							type="button"
+							variant="outline"
+							size="icon"
+							class="pointer-coarse:size-11"
+							aria-label="More actions"
+						>
+							<Ellipsis class="size-4" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="min-w-52">
+					<DropdownMenu.Item
+						class="pointer-coarse:min-h-11"
+						disabled={busy}
+						onSelect={() => importInput?.click()}
 					>
-						<Ellipsis class="size-4" />
-					</Button>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="end" class="min-w-52">
-				<DropdownMenu.Item
-					class="pointer-coarse:min-h-11"
-					disabled={busy}
-					onSelect={() => importInput?.click()}
-				>
-					<Upload class="size-4" />
-					Import
-				</DropdownMenu.Item>
-				<DropdownMenu.Item class="pointer-coarse:min-h-11" disabled={busy} onSelect={handleExport}>
-					<Download class="size-4" />
-					Export all
-				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
+						<Upload class="size-4" />
+						Import
+					</DropdownMenu.Item>
+					<DropdownMenu.Item
+						class="pointer-coarse:min-h-11"
+						disabled={busy}
+						onSelect={handleExport}
+					>
+						<Download class="size-4" />
+						Export all
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+		</div>
 	</div>
 
 	<CollapsibleSection id="saved-fields-fields" title="Fields" count={fields.length} class="gap-3">
@@ -787,3 +806,9 @@
 		{/key}
 	{/if}
 </Page>
+
+<CatalogueDialog
+	open={catalogueOpen}
+	onOpenChange={(value) => (catalogueOpen = value)}
+	onInstalled={() => void reloadAll()}
+/>

@@ -59,6 +59,8 @@ Read only the feature section relevant to the task.
 
 ### Examples
 
+"Install from catalogue" (`src/lib/components/catalogue-dialog.svelte`) is one dialog shared by the preset picker and the Saved fields page. It lists the shipped entries from `GET /catalogue`, installs one with `PUT /catalogue/{entry_id}/installation` and calls `onInstalled` so the opener reloads; the wording helpers live in `src/lib/catalogue.ts`.
+
 Library > Examples (`src/routes/library/examples/`) adds and removes the shipped example packs. Home links to it from the empty state and shows a dismissible line while examples are installed. The wording helpers (counts, removal messages, dismissal in `localStorage`) live in `src/lib/examples.ts` so they can be unit tested.
 
 ### Collections

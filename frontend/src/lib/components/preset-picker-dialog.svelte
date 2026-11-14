@@ -4,7 +4,9 @@
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
+	import CatalogueDialog from '$lib/components/catalogue-dialog.svelte';
 	import type { Preset, PresetKind } from '$lib/presets';
+	import type { EntrySection } from '$lib/api/client';
 
 	let {
 		open,
@@ -24,6 +26,11 @@
 	let loading = $state(false);
 	let loadError = $state<string | null>(null);
 	let search = $state('');
+	let catalogueOpen = $state(false);
+
+	const catalogueSections = $derived<EntrySection[]>(
+		kind === 'choice_list' ? ['choice_list'] : kind === 'field_set' ? ['field_group'] : ['field']
+	);
 
 	const emptyLabel = $derived(
 		kind === 'choice_list'
@@ -82,6 +89,11 @@
 					disabled={loading || presets.length === 0}
 					class="min-w-48 flex-1"
 				/>
+				{#if presets.length > 0}
+					<Button type="button" variant="ghost" size="sm" onclick={() => (catalogueOpen = true)}>
+						Install from catalogue
+					</Button>
+				{/if}
 			</div>
 			{#if loading}
 				<p class="py-6 text-center text-sm text-muted-foreground">Loading…</p>
@@ -96,6 +108,13 @@
 				<p class="py-6 text-center text-sm text-muted-foreground">
 					{presets.length === 0 ? emptyLabel : 'No matches'}
 				</p>
+				{#if presets.length === 0}
+					<div class="flex justify-center">
+						<Button type="button" size="sm" onclick={() => (catalogueOpen = true)}>
+							Install from catalogue
+						</Button>
+					</div>
+				{/if}
 			{:else}
 				<ul class="max-h-80 space-y-1 overflow-y-auto">
 					{#each filtered as preset (preset.id)}
@@ -116,3 +135,10 @@
 		</div>
 	</ResponsiveDialog.Content>
 </ResponsiveDialog.Root>
+
+<CatalogueDialog
+	open={catalogueOpen}
+	onOpenChange={(value) => (catalogueOpen = value)}
+	onInstalled={() => void load()}
+	sections={catalogueSections}
+/>

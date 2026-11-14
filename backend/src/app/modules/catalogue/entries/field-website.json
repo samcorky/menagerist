@@ -1,0 +1,27 @@
+{
+  "id": "field-website",
+  "title": "Website",
+  "description": "A link to a web page.",
+  "section": "field",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field",
+        "label": "Website",
+        "description": null,
+        "definition": {
+          "property": {
+            "title": "Website",
+            "type": "string",
+            "format": "uri",
+            "x-menagerist": {
+              "kind": "url"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

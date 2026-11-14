@@ -59,6 +59,8 @@ IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}
 
 Request bodies are named Pydantic models, with multipart uploads as the one exception: see [Request bodies](../backend/README.md#request-bodies-named-pydantic-models-not-form-fields). Operation ids are `verb_noun` (`list_nodes`, `get_node`, `count_nodes`, `restore_node`). A name that reads as a number (`count_*`) returns a number.
 
+A list route returns a bare array (`response_model=list[PresetResponse]`), never an object wrapping one, and its operation id is `list_<plural>` (`list_presets`, `list_example_packs`). An install route is `install_<noun>` (`install_example_pack`). Do not wrap a list or rename an operation to silence an IBM rule: match the existing routes and raise that rule's count in `scripts/api-lint/baseline.json`, as the existing routes already do.
+
 ## Where we differ from the sources
 
 | Source         | Their convention                   | Ours                                               | Why                                                         |

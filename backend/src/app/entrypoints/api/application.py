@@ -35,6 +35,9 @@ from app.modules.backup.adapters.api.router import (
     router as backup_router,
 )
 from app.modules.backup.adapters.api.user_router import router as user_backup_router
+from app.modules.catalogue.adapters.api.catalogue.router import (
+    router as catalogue_router,
+)
 from app.modules.collections.adapters.api.collection.router import (
     router as collection_router,
 )
@@ -104,6 +107,7 @@ api_v1_router.include_router(scheduling_router)
 api_v1_router.include_router(settings_router)
 api_v1_router.include_router(search_router)
 api_v1_router.include_router(example_router)
+api_v1_router.include_router(catalogue_router)
 api_v1_router.include_router(collection_router)
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(me_router)

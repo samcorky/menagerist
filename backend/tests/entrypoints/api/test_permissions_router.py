@@ -14,6 +14,8 @@ URL = "/api/v1/me/permissions"
 CONTENT = [
     "backup:own_data:export",
     "backup:own_data:import",
+    "catalogue:entry:install",
+    "catalogue:entry:read",
     "collections:collection:purge",
     "collections:collection:read",
     "collections:collection:write",

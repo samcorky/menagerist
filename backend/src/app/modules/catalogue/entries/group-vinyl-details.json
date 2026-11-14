@@ -1,0 +1,57 @@
+{
+  "id": "group-vinyl-details",
+  "title": "Vinyl details",
+  "description": "Artist, label, catalogue number and format.",
+  "section": "field_group",
+  "presets": {
+    "format": "menagerist-presets",
+    "version": 1,
+    "items": [
+      {
+        "kind": "field_set",
+        "label": "Vinyl details",
+        "description": null,
+        "definition": {
+          "section": "Vinyl details",
+          "properties": [
+            {
+              "title": "Artist",
+              "type": "string",
+              "x-menagerist": {
+                "kind": "text"
+              }
+            },
+            {
+              "title": "Label",
+              "type": "string",
+              "x-menagerist": {
+                "kind": "text"
+              }
+            },
+            {
+              "title": "Catalogue number",
+              "type": "string",
+              "x-menagerist": {
+                "kind": "text"
+              }
+            },
+            {
+              "title": "Format",
+              "type": "string",
+              "enum": [
+                "LP",
+                "EP",
+                "Single",
+                "Box set"
+              ],
+              "x-menagerist": {
+                "kind": "choice",
+                "display": "radio"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
