@@ -2,7 +2,7 @@
 name = "menagerist-workspace"
 version = "0.0.0"
 description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 
 dependencies = [
     "menagerist",
