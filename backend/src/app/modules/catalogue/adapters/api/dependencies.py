@@ -19,6 +19,9 @@ from app.modules.catalogue.application.install_catalogue_entry import (
 from app.modules.catalogue.application.list_catalogue_entries import (
     ListCatalogueEntries,
 )
+from app.modules.catalogue.application.plan_catalogue_entry_install import (
+    PlanCatalogueEntryInstall,
+)
 from app.modules.catalogue.ports.entry_catalogue import EntryCatalogue
 from app.shared_kernel.access_guard import AccessGuard
 
@@ -49,3 +52,12 @@ def get_install_catalogue_entry_use_case(
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
 ) -> InstallCatalogueEntry:
     return InstallCatalogueEntry(guard, catalogue, presets, graph)
+
+
+def get_plan_catalogue_entry_install_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    catalogue: Annotated[EntryCatalogue, Depends(get_entry_catalogue)],
+    presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
+    graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
+) -> PlanCatalogueEntryInstall:
+    return PlanCatalogueEntryInstall(guard, catalogue, presets, graph)

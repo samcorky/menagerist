@@ -8,12 +8,15 @@ from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRou
 from app.modules.catalogue.adapters.api.catalogue.schemas import (
     CATALOGUE_EXAMPLE,
     OUTCOME_EXAMPLE,
+    PLAN_EXAMPLE,
     CatalogueEntryResponse,
+    CataloguePlanResponse,
     InstallOutcomeResponse,
 )
 from app.modules.catalogue.adapters.api.dependencies import (
     get_install_catalogue_entry_use_case,
     get_list_catalogue_entries_use_case,
+    get_plan_catalogue_entry_install_use_case,
 )
 from app.modules.catalogue.application.install_catalogue_entry import (
     InstallCatalogueEntry,
@@ -22,6 +25,10 @@ from app.modules.catalogue.application.install_catalogue_entry import (
 from app.modules.catalogue.application.list_catalogue_entries import (
     ListCatalogueEntries,
     ListCatalogueEntriesQuery,
+)
+from app.modules.catalogue.application.plan_catalogue_entry_install import (
+    PlanCatalogueEntryInstall,
+    PlanCatalogueEntryInstallQuery,
 )
 from app.modules.catalogue.domain.errors import CatalogueEntryNotFoundError
 from app.shared_kernel.actor import Actor
@@ -84,3 +91,31 @@ async def install_catalogue_entry(
         InstallCatalogueEntryCommand(entry_id=entry_id), actor
     )
     return InstallOutcomeResponse.from_domain(result)
+
+
+@router.get(
+    "/{entry_id}/installation/plan",
+    response_model=CataloguePlanResponse,
+    operation_id="plan_catalogue_entry_install",
+    responses={**_NOT_FOUND, 200: _example(PLAN_EXAMPLE)},
+)
+async def plan_catalogue_entry_install(
+    entry_id: Annotated[
+        str,
+        Path(description="The id of the entry to plan.", examples=["starter-types"]),
+    ],
+    use_case: Annotated[
+        PlanCatalogueEntryInstall, Depends(get_plan_catalogue_entry_install_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> CataloguePlanResponse:
+    """See what adding an entry would do, without adding anything.
+
+    Each thing the entry holds is `create`, or `unchanged` when you already have it
+    (an identical saved list, field or field group, or a type whose name is taken),
+    with the reason. Adding the entry does exactly this.
+    """
+    plan = await use_case.handle(
+        PlanCatalogueEntryInstallQuery(entry_id=entry_id), actor
+    )
+    return CataloguePlanResponse.from_domain(plan)
