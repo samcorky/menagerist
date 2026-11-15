@@ -896,6 +896,8 @@ Further known limits, left as they are for now:
 
 **Not chosen:** resolving per-item keys through the type (no type is involved) and a server-side stale-field warning (it would need a scan of every overlay on each search).
 
+**Update (2026-11-15):** `field_kind` without `type` now means that key and kind on *any* item: a type field or the item's own field. It may name a table column (`sub_key`), which reaches type fields only. The rule that a type field never matches a per-item condition is reversed on purpose. See "Field conditions across item types".
+
 ## Smart collections: a stored search, resolved through bridges (2026-10-17)
 
 **Decision:** a collection has a `kind`, `manual` or `dynamic` (a smart collection). A smart collection stores a `definition`, the phase 1 condition tree (`{v, where, sort}`), as JSONB. The `collections` module treats it as opaque: it never parses or evaluates it. Members are not stored; they are whatever the search matches for the viewer, so they are always current.
@@ -1573,3 +1575,18 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 **Not in this version:** attachments and covers. A JSON file cannot hold them; a zip with the files beside the JSON is the likely shape, as its own change.
 
 **Rationale:** #471 asks for Export on item and collection screens. Types alone were the part that needed no format change; items and collections need the format settled first, and the open question was what an import does with things that have no unique name.
+
+## Field conditions across item types (2026-11-15)
+
+**Decision:** a field condition names exactly one of `type` (a field of one item type), `field_kind` (key K of that kind on any item) or `origin` (every type field copied from that saved field, with no `key`). Either cross-type form may name a table column with `sub_key`. Only `type` may compare with another field. Before resolution, `expand_field_scopes` (`graph/application/field_scope_expansion.py`) rewrites each cross-type condition into an `or` of one-type leaves taken from the current schemas: every live property with key K and kind T, or with `x-menagerist.origin.preset` equal to the id. A `field_kind` condition without a column also keeps itself as a leaf for the item's own overlay. The pass runs in `prepare_query` and on each inlined smart collection, so a type added after a smart collection was saved is matched without re-saving it.
+
+**Rationale:** wishlist status (#241), acquisitions (#349) and set completion (#346) all need "the same field on every type". Saved fields are copied into each type with that type's own key, so a one-type condition can't say it once. Rewriting into conditions the adapters already run keeps SQL, the in-memory evaluator and the scoped `!=` / `not_in` semantics unchanged. Keys are slugged from the title, so copies of one saved field normally share a key, and `field_kind` covers them along with fields made by hand. `origin` is the exact form for when keys differ (`status_2`).
+
+**Rulings:**
+
+- A cross-type condition that reaches no field stays as written and resolves as stale **without** a warning, as for R15: a later type may match it.
+- The operator and value are checked once against the named kind (`field_kind`). For `origin`, only copies whose kind accepts them are kept. When none do, the query is refused at the condition's path.
+- `origin` reaches type fields only. A copy in an item's own overlay has a key that varies per item, so it can't be one SQL test. Such copies are still found by `field_kind`.
+- No sorting by a cross-type field, and no field references from one.
+
+**Not chosen:** matching on the visible name (a rename would silently drop a type from stored searches; names aren't unique), a stored status column (status is a field like any other), and a pack-shipped search that lists one condition per type (it misses types added later).

@@ -375,7 +375,7 @@ test('the count line stays while more items load', async ({ page, request }) => 
 	await expect(countLine).toBeVisible();
 });
 
-test('filter items by a per-item field, and never match a type field with the same key', async ({
+test('filter items by a field on any item type: own fields and type fields with that key', async ({
 	page,
 	request
 }) => {
@@ -422,17 +422,17 @@ test('filter items by a per-item field, and never match a type field with the sa
 	await dialog.getByRole('button', { name: 'Done' }).click();
 	await expect(dialog).toHaveCount(0);
 
-	// Only the item whose own field matches is listed: not B (pine), not C (type field, same value).
+	// A (its own field) and C (its type's field, same key and kind) match; B (pine) does not.
 	await expect(itemLink(page, names.a)).toBeVisible();
+	await expect(itemLink(page, names.c)).toBeVisible();
 	await expect(itemLink(page, names.b)).toHaveCount(0);
-	await expect(itemLink(page, names.c)).toHaveCount(0);
-	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
+	await expect(page.getByText('2 items', { exact: true })).toBeVisible();
 	await expect(page).toHaveURL(/[?&]f=/);
 
 	await page.reload();
 	await expect(itemLink(page, names.a)).toBeVisible();
+	await expect(itemLink(page, names.c)).toBeVisible();
 	await expect(itemLink(page, names.b)).toHaveCount(0);
-	await expect(itemLink(page, names.c)).toHaveCount(0);
 	await expect(page.getByRole('list', { name: 'Active filters' })).toContainText(label);
 });
 

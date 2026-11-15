@@ -126,8 +126,8 @@ export function subjectOf(c: Condition): string {
 		case 'field':
 			if (isBlank(c)) return 'blank';
 			return c.field_kind !== undefined
-				? itemFieldSubject(c.field_kind, c.key)
-				: fieldSubject(c.type ?? '', c.key, c.sub_key);
+				? itemFieldSubject(c.field_kind, c.key ?? '')
+				: fieldSubject(c.type ?? '', c.key ?? '', c.sub_key);
 		case 'date':
 			return c.on === 'updated' ? 'updated' : 'created';
 		default:
@@ -138,8 +138,8 @@ export function subjectOf(c: Condition): string {
 /** The field a row is about. A per-item field is read from the row's own kind. */
 export function fieldOf(c: Condition, catalogue: Catalogue): FieldInfo | undefined {
 	if (c.kind !== 'field' || isBlank(c)) return undefined;
-	if (c.field_kind !== undefined) return itemFieldInfo(catalogue, c.field_kind, c.key);
-	return findField(catalogue, c.type ?? '', c.key, c.sub_key);
+	if (c.field_kind !== undefined) return itemFieldInfo(catalogue, c.field_kind, c.key ?? '');
+	return findField(catalogue, c.type ?? '', c.key ?? '', c.sub_key);
 }
 
 const LAST_30_DAYS = { rel: '-30d' };
@@ -920,7 +920,7 @@ export function fieldStatus(c: Condition, catalogue: Catalogue): FieldStatus {
 		const listed =
 			catalogue.itemFields === null ||
 			catalogue.itemFields.length >= ITEM_FIELDS_CAP ||
-			findItemField(catalogue, c.field_kind, c.key);
+			findItemField(catalogue, c.field_kind, c.key ?? '');
 		return listed ? 'ok' : 'missing';
 	}
 	const field = fieldOf(c, catalogue);

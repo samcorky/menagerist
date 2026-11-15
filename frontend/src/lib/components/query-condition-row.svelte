@@ -59,7 +59,7 @@
 			const label = fieldReferenceLabel(
 				view.catalogue,
 				condition.type,
-				condition.key,
+				condition.key ?? '',
 				condition.sub_key
 			);
 			const suffix =
@@ -87,7 +87,7 @@
 		// A per-item row chosen before the listing was read still needs a label on the trigger.
 		if (condition.kind === 'field' && condition.field_kind !== undefined && status === 'ok') {
 			if (!items.some((i) => i.value === subject)) {
-				const label = fieldReferenceLabel(view.catalogue, undefined, condition.key);
+				const label = fieldReferenceLabel(view.catalogue, undefined, condition.key ?? '');
 				items.push({ value: subject, label });
 			}
 		}

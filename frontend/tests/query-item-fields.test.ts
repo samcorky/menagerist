@@ -65,7 +65,6 @@ describe('decoder', () => {
 		['an empty field_kind', { ...signed, field_kind: '' }],
 		['an unknown field_kind', { ...signed, field_kind: 'hologram' }],
 		['an inherited field_kind name', { ...signed, field_kind: 'toString' }],
-		['a sub_key', { ...signed, sub_key: 'role' }],
 		['a reference operand', { ...signed, key: 'a', op: '=', value: { ref: 'b' } }],
 		['a reference in a list', { ...signed, op: 'in', value: ['x', { ref: 'b' }] }]
 	])('rejects %s', (_name, condition) => {
@@ -75,6 +74,11 @@ describe('decoder', () => {
 	it('rejects neither type nor field_kind', () => {
 		const { field_kind: _kind, ...rest } = signed;
 		expect(roundTrip(rest as Condition)).toBeNull();
+	});
+
+	it('accepts a sub_key, which reaches table columns on any type', () => {
+		const column = { ...signed, sub_key: 'role' };
+		expect(roundTrip(column as Condition)).toEqual(wrap(column));
 	});
 
 	it('accepts a null sub_key', () => {
