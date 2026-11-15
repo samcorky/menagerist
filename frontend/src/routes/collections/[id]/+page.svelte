@@ -38,7 +38,7 @@
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { downloadBundle, exportCollectionBundle, presetFilename } from '$lib/preset-packs';
 	import { fetchAllNodeTypes } from '$lib/node-types';
-	import { fetchItemFields, type ItemField } from '$lib/item-fields';
+	import { fetchItemFields, fetchSavedFields, type ItemField } from '$lib/item-fields';
 	import NarrowedBar from '$lib/components/narrowed-bar.svelte';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
 	import QueryChips from '$lib/components/query-chips.svelte';
@@ -48,7 +48,7 @@
 	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
 	import { parseQuery } from '$lib/query/codec';
 	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
-	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
+	import { buildCatalogue, summaryLookup, type SavedField } from '$lib/query/fields';
 	import {
 		FILTER_PARAM,
 		INVALID_LINK_MESSAGE,
@@ -173,12 +173,13 @@
 	let smartWarnings = $state<SearchWarning[]>([]);
 	let typesLoaded = $state(false);
 	let itemFields = $state<ItemField[] | null>(null);
+	let savedFields = $state<SavedField[] | null>(null);
 	let conditionsOpen = $state(false);
 	let wasConditionsOpen = false;
 	let draft = $state<Query | null>(null);
 	let conditionsSaving = $state(false);
 	let conditionsError = $state<BuilderError | null>(null);
-	const catalogue = $derived(buildCatalogue(itemTypes, typesLoaded, itemFields));
+	const catalogue = $derived(buildCatalogue(itemTypes, typesLoaded, itemFields, savedFields));
 	let collectionsFailed = $state(false);
 	let allCollections = $state<CollectionResponse[] | null>(null);
 	const connections = new ConnectionLookups();
@@ -705,6 +706,9 @@
 		if (!smart) return;
 		void fetchItemFields().then((fields) => {
 			itemFields = fields;
+		});
+		void fetchSavedFields().then((fields) => {
+			savedFields = fields;
 		});
 	});
 

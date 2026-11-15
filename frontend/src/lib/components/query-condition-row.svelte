@@ -19,9 +19,11 @@
 		CONNECTION_MODES,
 		withConnectionMode,
 		fieldStatus,
+		GONE_SAVED_FIELD_NOTE,
 		itemFieldPickerItems,
 		missingFieldMessage,
 		NO_ITEM_FIELD_NOTE,
+		savedFieldPickerItems,
 		strayValueText,
 		subjectOf,
 		TAG_MODES,
@@ -31,7 +33,12 @@
 		withSubject,
 		type BuilderView
 	} from '$lib/query/builder';
-	import { fieldReferenceLabel, filterableFields, groupByType } from '$lib/query/fields';
+	import {
+		fieldReferenceLabel,
+		filterableFields,
+		groupByType,
+		SAVED_FIELDS_LABEL
+	} from '$lib/query/fields';
 	import { operatorsForCondition, operatorsForKind } from '$lib/query/operators';
 	import { pathKey } from '$lib/query/warnings';
 	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
@@ -56,16 +63,23 @@
 	const subjectItems = $derived.by((): ComboboxItem[] => {
 		const items: ComboboxItem[] = [];
 		if (status !== 'ok' && condition.kind === 'field') {
-			const label = fieldReferenceLabel(
-				view.catalogue,
-				condition.type,
-				condition.key ?? '',
-				condition.sub_key
-			);
+			const label =
+				condition.origin !== undefined
+					? SAVED_FIELDS_LABEL
+					: fieldReferenceLabel(
+							view.catalogue,
+							condition.type,
+							condition.key ?? '',
+							condition.sub_key
+						);
 			const suffix =
-				status === 'missing' && condition.field_kind !== undefined
-					? ` (${NO_ITEM_FIELD_NOTE})`
-					: STATUS_SUFFIX[status];
+				status !== 'missing'
+					? STATUS_SUFFIX[status]
+					: condition.origin !== undefined
+						? ` (${GONE_SAVED_FIELD_NOTE})`
+						: condition.field_kind !== undefined
+							? ` (${NO_ITEM_FIELD_NOTE})`
+							: STATUS_SUFFIX[status];
 			items.push({ value: subject, label: `${label}${suffix}` });
 		}
 		for (const general of GENERAL_SUBJECTS) {
@@ -84,12 +98,17 @@
 			}
 		}
 		items.push(...itemFieldPickerItems(view.catalogue));
+		items.push(...savedFieldPickerItems(view.catalogue));
 		// A per-item row chosen before the listing was read still needs a label on the trigger.
 		if (condition.kind === 'field' && condition.field_kind !== undefined && status === 'ok') {
 			if (!items.some((i) => i.value === subject)) {
 				const label = fieldReferenceLabel(view.catalogue, undefined, condition.key ?? '');
 				items.push({ value: subject, label });
 			}
+		}
+		if (condition.kind === 'field' && condition.origin !== undefined && status === 'ok') {
+			if (!items.some((i) => i.value === subject))
+				items.push({ value: subject, label: SAVED_FIELDS_LABEL });
 		}
 		return items;
 	});

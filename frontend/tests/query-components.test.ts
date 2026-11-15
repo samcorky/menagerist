@@ -631,7 +631,7 @@ describe('per-item fields', () => {
 	it('shows the chosen per-item field under its group on the trigger', () => {
 		const html = row(perItem('signed', 'boolean', '='));
 		expect(html).toContain('aria-label="Condition 1, field"');
-		expect(html).toContain('Per-item fields › Signed');
+		expect(html).toContain('Any item type › Signed');
 		expect(html).toContain('aria-label="Condition 1, operator"');
 		expect(html).not.toContain(NO_ITEM_FIELD_MESSAGE);
 	});
@@ -640,7 +640,7 @@ describe('per-item fields', () => {
 		const html = row(perItem('gone', 'number', '>', 3));
 		expect(html).toContain(NO_ITEM_FIELD_MESSAGE);
 		expect(html).not.toContain(STALE_FIELD_MESSAGE);
-		expect(html).toContain('Per-item fields › gone (no item has this field)');
+		expect(html).toContain('Any item type › gone (no item has this field)');
 	});
 
 	it('does not flag a per-item field when the listing was not read', () => {
@@ -685,7 +685,7 @@ describe('per-item fields', () => {
 				onclear: () => {}
 			}
 		}).body;
-		expect(html).toContain('Per-item field › Signed: is yes');
+		expect(html).toContain('Any item type › Signed: is yes');
 		expect(html).toContain(NO_ITEM_FIELD_MESSAGE);
 		expect(html).not.toContain(STALE_FIELD_MESSAGE);
 	});
@@ -710,16 +710,16 @@ describe('per-item fields', () => {
 	it('offers the per-item options under their group, found by group name or label', () => {
 		const items = itemFieldPickerItems(withFields);
 		expect(items.map((i) => i.value)).toEqual([
-			'item:boolean:signed',
 			'item:choice:mood',
-			'item:multichoice:tags'
+			'item:multichoice:tags',
+			'item:boolean:signed'
 		]);
-		expect(items[0]).toMatchObject({
+		expect(items[2]).toMatchObject({
 			label: 'Signed',
-			group: 'Per-item fields',
-			selectedLabel: 'Per-item fields › Signed'
+			group: 'Any item type',
+			selectedLabel: 'Any item type › Signed'
 		});
-		expect(filterComboboxItems(items, 'per-item').length).toBe(3);
+		expect(filterComboboxItems(items, 'any item').length).toBe(3);
 		expect(filterComboboxItems(items, 'signed').length).toBe(1);
 		expect(itemFieldPickerItems(catalogue)).toEqual([]);
 	});
