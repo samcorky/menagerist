@@ -93,7 +93,10 @@ export type PackSectionKind = PresetResponse['kind'];
 export function bundleKindMismatch(bundle: PresetBundle, kind: PackSectionKind): string | null {
 	const others = bundle.presets.filter((preset) => preset.kind !== kind).length;
 	if (others === 0) return null;
-	return `${others} ${others === 1 ? 'item in this file is' : 'items in this file are'} not ${kindNoun(kind, others)}`;
+	const noun = kindNoun(kind, others);
+	return others === 1
+		? `1 item in this file is not a ${noun}`
+		: `${others} items in this file are not ${noun}`;
 }
 
 /** A readable name for a kind; `count` picks the plural. */
