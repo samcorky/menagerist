@@ -4,12 +4,7 @@ from typing import TYPE_CHECKING, Any
 from app.modules.transfer.domain.bundle import (
     REF_PATTERN,
     REF_RULE,
-    BundleCollection,
-    BundleConnection,
-    BundleItem,
-    BundleItemType,
-    BundlePreset,
-    BundleRelationshipType,
+    Bundle,
     preset_refs,
     split_ref,
 )
@@ -78,16 +73,13 @@ def _check_refs(section: str, refs: list[str]) -> None:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
-class ExamplePack:
-    """A pack's content. Validates its own references on construction."""
+class ExamplePack(Bundle):
+    """A bundle that may need other packs and link to them.
 
-    id: str
-    presets: tuple[BundlePreset, ...] = ()
-    relationship_types: tuple[BundleRelationshipType, ...] = ()
-    item_types: tuple[BundleItemType, ...] = ()
-    items: tuple[BundleItem, ...] = ()
-    connections: tuple[BundleConnection, ...] = ()
-    collections: tuple[BundleCollection, ...] = ()
+    The content is the bundle's; `requires` and `links` are what only a pack has.
+    Validates its own references on construction.
+    """
+
     requires: tuple[str, ...] = ()
     links: tuple[PackLink, ...] = ()
 
@@ -107,6 +99,7 @@ class ExamplePack:
         self._check_pack_links()
         self._check_collections()
         self._check_presets()
+        super().__post_init__()
 
     def _check_requires(self) -> None:
         for pack_id in self.requires:

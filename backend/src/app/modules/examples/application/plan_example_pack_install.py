@@ -13,9 +13,9 @@ from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
 
 if TYPE_CHECKING:
-    from app.modules.examples.ports.cover_target import CoverTarget
     from app.modules.transfer.ports.targets import (
         CollectionTarget,
+        CoverTarget,
         GraphTarget,
         PresetTarget,
     )

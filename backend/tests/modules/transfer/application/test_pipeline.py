@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from app.modules.presets.domain.errors import InvalidPresetDefinitionError
+from app.modules.transfer.application.extras import Adoption, BundleExtras
 from app.modules.transfer.application.pipeline import (
     AppliedBundle,
     apply_bundle,
@@ -11,12 +12,15 @@ from app.modules.transfer.application.pipeline import (
 )
 from app.modules.transfer.domain.bundle import (
     Bundle,
+    BundleCollection,
+    BundleConnection,
+    BundleItem,
     BundleItemType,
     BundlePreset,
     BundleRelationshipType,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.domain.errors import BundleConflictError
+from app.modules.transfer.domain.errors import BundleConflictError, InvalidBundleError
 from app.modules.transfer.domain.plan import (
     ClashPolicy,
     Plan,
@@ -24,6 +28,7 @@ from app.modules.transfer.domain.plan import (
     PlanBlocker,
     PlannedEntity,
 )
+from app.modules.transfer.domain.run import EntityRecord
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
@@ -182,3 +187,88 @@ def test_an_applied_bundle_with_nothing_counts_zero() -> None:
     """Totals of an empty result are zero."""
     applied = AppliedBundle(bundle_id="b")
     assert (applied.total_created, applied.total_skipped) == (0, 0)
+
+
+def _graph_bundle(*collections: BundleCollection) -> Bundle:
+    return Bundle(
+        id="b",
+        relationship_types=(WROTE,),
+        item_types=(BOOK,),
+        items=(
+            BundleItem(ref="a", type_ref="book", name="A"),
+            BundleItem(ref="b", type_ref="book", name="B"),
+        ),
+        connections=(
+            BundleConnection(source_ref="a", target_ref="b", type_ref="wrote"),
+        ),
+        collections=collections,
+    )
+
+
+async def test_items_and_connections_apply_without_a_ledger(shared: Shared) -> None:
+    """A source with no ledger still creates items and connections, and counts them."""
+    t = shared.targets(ALICE)
+    bundle = _graph_bundle()
+    plan = await _plan(t, bundle)
+
+    applied = await apply_bundle(plan, bundle, t.presets, t.graph)
+
+    assert [e.label for e in plan.entities if e.kind is EntityKind.CONNECTION] == [
+        "A to B"
+    ]
+    assert applied.created[EntityKind.ITEM] == 2
+    assert applied.created[EntityKind.CONNECTION] == 1
+    assert EntityKind.COLLECTION not in applied.created
+
+
+async def test_a_taken_back_entity_needs_no_ledger(shared: Shared) -> None:
+    """With nothing to record into, taking an entity back changes nothing."""
+    t = shared.targets(ALICE)
+    bundle = _graph_bundle()
+    first = await apply_bundle(await _plan(t, bundle), bundle, t.presets, t.graph)
+    assert first.total_created == 5
+    kept = {
+        (EntityKind.ITEM_TYPE, "book"): Adoption(
+            record=EntityRecord(
+                kind=EntityKind.ITEM_TYPE,
+                ref="book",
+                label="Book",
+                entity_id=uuid.UUID(int=1),
+                content_hash="x",
+            ),
+            content={},
+        )
+    }
+
+    plan = await plan_bundle(
+        bundle,
+        t.presets,
+        t.graph,
+        clash=ClashPolicy.SKIP,
+        extras=BundleExtras(adoptions=kept),
+    )
+    applied = await apply_bundle(
+        plan, bundle, t.presets, t.graph, extras=BundleExtras(adoptions=kept)
+    )
+
+    assert applied.created[EntityKind.ITEM_TYPE] == 0
+
+
+async def test_collections_need_a_target_to_be_made(shared: Shared) -> None:
+    """A source with no collection target cannot apply a bundle that has collections."""
+    t = shared.targets(ALICE)
+    bundle = _graph_bundle(BundleCollection(ref="all", name="All", item_refs=("a",)))
+    plan = await _plan(t, bundle)
+
+    with pytest.raises(InvalidBundleError, match="cannot make collections"):
+        await apply_bundle(plan, bundle, t.presets, t.graph)
+
+
+async def test_a_collection_of_items_never_made_is_refused(shared: Shared) -> None:
+    """A collection that names an item the bundle does not hold stops the apply."""
+    t = shared.targets(ALICE)
+    bundle = _graph_bundle(BundleCollection(ref="all", name="All", item_refs=("zzz",)))
+    plan = await _plan(t, bundle)
+
+    with pytest.raises(InvalidBundleError, match="names items that were not created"):
+        await apply_bundle(plan, bundle, t.presets, t.graph)

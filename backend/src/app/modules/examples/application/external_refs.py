@@ -1,9 +1,7 @@
-import uuid
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.modules.examples.domain.errors import RequirementsNotMetError
-from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.application.extras import ResolvedRef, ResolvedRefs
 from app.modules.transfer.domain.run import Run, RunStatus
 
 if TYPE_CHECKING:
@@ -12,18 +10,6 @@ if TYPE_CHECKING:
     from app.modules.examples.domain.pack import ExamplePack
     from app.modules.examples.ports.pack_catalogue import PackCatalogue
     from app.modules.transfer.ports.targets import GraphTarget
-
-
-@dataclass(kw_only=True, frozen=True, eq=False)
-class ResolvedRef:
-    """A live entity of a required pack: its id, and its slug or name."""
-
-    entity_id: uuid.UUID
-    slug: str | None = None
-    name: str | None = None
-
-
-ResolvedRefs = dict[tuple[EntityKind, str, str], ResolvedRef]
 
 
 async def resolve_external_refs(
