@@ -46,6 +46,11 @@ export function exampleData() {
 export async function install(page: Page, pack: RegExp) {
 	await page.goto('/library/examples');
 	await page.getByRole('button', { name: new RegExp(`^Add ${pack.source.slice(1)}`) }).click();
+	// The preview of what will be added, confirmed.
+	await page
+		.getByRole('dialog', { name: new RegExp(`^Add ${pack.source.slice(1)}`) })
+		.getByRole('button', { name: 'Add', exact: true })
+		.click();
 	await expect(page.getByText('Examples added')).toBeVisible();
 	await expect(
 		page.getByRole('button', { name: new RegExp(`^Remove ${pack.source.slice(1)}`) })

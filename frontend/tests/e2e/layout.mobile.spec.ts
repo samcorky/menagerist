@@ -477,6 +477,10 @@ for (const size of SIZES) {
 			expect(await fits(page, a)).toBe(true);
 			expect(a.height).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 			await add.tap();
+			await page
+				.getByRole('dialog', { name: /^Add Music/ })
+				.getByRole('button', { name: 'Add', exact: true })
+				.tap();
 			const remove = page.getByRole('button', { name: /^Remove Music/ });
 			await expect(remove).toBeVisible();
 			await remove.scrollIntoViewIfNeeded();

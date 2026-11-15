@@ -22,12 +22,15 @@
 		createPreset,
 		deletePreset,
 		importBundle,
+		planBundleImport,
 		listPresets,
 		type PresetResponse
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import PlanPreviewDialog from '$lib/components/plan-preview-dialog.svelte';
+	import type { ImportPlan } from '$lib/import-plan';
 	import CatalogueDialog from '$lib/components/catalogue-dialog.svelte';
 	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
 	import IconButton from '$lib/components/icon-button.svelte';
@@ -45,7 +48,8 @@
 		bundleKindMismatch,
 		parseBundleText,
 		presetFilename,
-		type PackSectionKind
+		type PackSectionKind,
+		type PresetBundle
 	} from '$lib/preset-packs';
 
 	const PAGE_SIZE = 50;
@@ -262,15 +266,56 @@
 		await Promise.all([fetchFields(), fetchLists(), fetchFieldSets()]);
 	}
 
-	async function handleImportFile(event: Event) {
+	// The file chosen to import, and what importing it would do, until it is confirmed.
+	let pendingImport = $state<{ bundle: PresetBundle; kind?: PackSectionKind } | null>(null);
+	let plan = $state<ImportPlan | null>(null);
+	let planLoading = $state(false);
+	let planError = $state<string | null>(null);
+
+	async function previewImport(event: Event, kind?: PackSectionKind) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
 
-		busy = true;
 		try {
 			const bundle = parseBundleText(await file.text());
+			const mismatch = kind ? bundleKindMismatch(bundle, kind) : null;
+			if (mismatch) {
+				toast.error("Can't import here", { description: mismatch });
+				return;
+			}
+			pendingImport = { bundle, kind };
+			plan = null;
+			planError = null;
+			planLoading = true;
+			const result = await planBundleImport({ body: bundle });
+			planLoading = false;
+			if (result.error || !result.data) {
+				planError = errorMessage(result.error);
+				return;
+			}
+			plan = result.data;
+		} catch (error) {
+			toast.error("Couldn't import", { description: failureMessage(error) });
+		} finally {
+			input.value = '';
+		}
+	}
+
+	function closeImportPreview(open: boolean) {
+		if (!open && !busy && !sectionBusy) pendingImport = null;
+	}
+
+	async function confirmImport() {
+		const pending = pendingImport;
+		if (!pending) return;
+		const { bundle, kind } = pending;
+
+		if (kind) sectionBusy = true;
+		else busy = true;
+		try {
 			const result = await importBundle({ body: bundle });
+			pendingImport = null;
 			if (result.error || !result.data) {
 				toast.error("Couldn't import", { description: errorMessage(result.error) });
 				return;
@@ -283,17 +328,21 @@
 			if (created === 0) {
 				toast('Nothing new to import', { description: skippedText });
 			} else {
-				toast.success(`Imported ${created} ${created === 1 ? 'preset' : 'presets'}`, {
-					description: skippedText
-				});
+				const noun = kind ? kindNoun(kind, created) : created === 1 ? 'preset' : 'presets';
+				toast.success(`Imported ${created} ${noun}`, { description: skippedText });
 			}
 			await reloadAll();
 		} catch (error) {
+			pendingImport = null;
 			toast.error("Couldn't import", { description: failureMessage(error) });
 		} finally {
-			input.value = '';
 			busy = false;
+			sectionBusy = false;
 		}
+	}
+
+	function handleImportFile(event: Event) {
+		return previewImport(event);
 	}
 
 	async function handleExport() {
@@ -325,43 +374,8 @@
 		}
 	}
 
-	async function handleSectionImport(kind: PackSectionKind, event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-
-		sectionBusy = true;
-		try {
-			const bundle = parseBundleText(await file.text());
-			const mismatch = bundleKindMismatch(bundle, kind);
-			if (mismatch) {
-				toast.error("Can't import here", { description: mismatch });
-				return;
-			}
-			const result = await importBundle({ body: bundle });
-			if (result.error || !result.data) {
-				toast.error("Couldn't import", { description: errorMessage(result.error) });
-				return;
-			}
-			const { created, skipped } = result.data;
-			const skippedText =
-				skipped > 0
-					? `${skipped} ${skipped === 1 ? 'was' : 'were'} already saved and skipped`
-					: undefined;
-			if (created === 0) {
-				toast('Nothing new to import', { description: skippedText });
-			} else {
-				toast.success(`Imported ${created} ${kindNoun(kind, created)}`, {
-					description: skippedText
-				});
-			}
-			await reloadAll();
-		} catch (error) {
-			toast.error("Couldn't import", { description: failureMessage(error) });
-		} finally {
-			input.value = '';
-			sectionBusy = false;
-		}
+	function handleSectionImport(kind: PackSectionKind, event: Event) {
+		return previewImport(event, kind);
 	}
 
 	async function handlePresetExport(preset: PresetResponse) {
@@ -802,6 +816,20 @@
 		{/key}
 	{/if}
 </Page>
+
+<PlanPreviewDialog
+	open={pendingImport !== null}
+	title="Import saved items"
+	description="Here is what this file would add."
+	{plan}
+	loading={planLoading}
+	error={planError}
+	busy={busy || sectionBusy}
+	confirmLabel="Import"
+	busyLabel="Importing…"
+	onOpenChange={closeImportPreview}
+	onConfirm={() => void confirmImport()}
+/>
 
 <CatalogueDialog
 	open={catalogueOpen}
