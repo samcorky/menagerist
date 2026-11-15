@@ -175,6 +175,9 @@ class Bundle:
     presets: tuple[BundlePreset, ...] = ()
     relationship_types: tuple[BundleRelationshipType, ...] = ()
     item_types: tuple[BundleItemType, ...] = ()
+    items: tuple[BundleItem, ...] = ()
+    connections: tuple[BundleConnection, ...] = ()
+    collections: tuple[BundleCollection, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject two entities of one kind sharing a ref.
@@ -186,6 +189,8 @@ class Bundle:
             ("preset", self.presets),
             ("relationship type", self.relationship_types),
             ("item type", self.item_types),
+            ("item", self.items),
+            ("collection", self.collections),
         ):
             refs = [s.ref for s in specs]
             if len(set(refs)) != len(refs):
