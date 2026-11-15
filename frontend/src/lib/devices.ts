@@ -73,17 +73,22 @@ export function describeDevice(info: DeviceInfo): DescribedDevice {
 		kind = 'desktop';
 	}
 
+	const where = system ? `on ${system}` : mobileHint === true ? 'on a phone' : null;
+	const installed = info.displayMode === 'standalone';
+
 	let label = 'Unknown device';
-	if (browser && system) {
-		label = `${browser} on ${system}`;
-	} else if (browser && mobileHint === true) {
-		label = `${browser} on a phone`;
+	if (installed) {
+		// The installed app leads with "App" and names the browser engine behind it in brackets.
+		label = [where ? `App ${where}` : 'App', browser ? `(${browser})` : null]
+			.filter(Boolean)
+			.join(' ');
+	} else if (browser && where) {
+		label = `${browser} ${where}`;
 	} else if (browser) {
 		label = browser;
 	} else if (system) {
 		label = `${system} device`;
 	}
-	if (info.displayMode === 'standalone') label = `${label}, installed app`;
 
 	return { label, kind };
 }

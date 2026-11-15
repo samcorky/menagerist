@@ -78,7 +78,7 @@ test('signing in from the installed app is shown on the devices list, and change
 
 	await page.goto('/settings/account');
 	const devices = page.getByRole('heading', { name: 'Devices' }).locator('xpath=ancestor::section');
-	await expect(devices.getByText(/, installed app$/)).toBeVisible();
+	await expect(devices.getByText(/^App on .+ \(.+\)$/)).toBeVisible();
 	await expect(devices.getByText('This device')).toBeVisible();
 
 	// Leaving the installed window (for example opening the app in a tab) applies at once.
