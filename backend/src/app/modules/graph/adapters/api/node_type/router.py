@@ -1,17 +1,26 @@
-import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
     link_next_header,
+)
+from app.entrypoints.api.shared.http.parameters import (
+    FieldKey,
+    NodeTypeId,
+    PageAfter,
+    PageLimit,
+    SubFieldKey,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
@@ -99,10 +108,10 @@ async def create_node_type(
     },
 )
 async def get_node_type(
-    node_type_id: uuid.UUID,
+    node_type_id: NodeTypeId,
     use_case: Annotated[GetNodeType, Depends(get_get_node_type_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> NodeTypeResponse | Response:
     """Fetch a single node type by id."""
     node_type = await use_case.handle(
@@ -124,8 +133,8 @@ async def list_node_types(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: uuid.UUID | None = None,
-    limit: int = 50,
+    after: PageAfter = None,
+    limit: PageLimit = 50,
 ) -> list[NodeTypeResponse]:
     """List node types, paginated by id."""
     node_types = await use_case.handle(
@@ -152,11 +161,11 @@ async def list_node_types(
     },
 )
 async def update_node_type(
-    node_type_id: uuid.UUID,
+    node_type_id: NodeTypeId,
     payload: UpdateNodeTypeRequest,
     get_usecase: Annotated[GetNodeType, Depends(get_get_node_type_use_case)],
     update_usecase: Annotated[UpdateNodeType, Depends(get_update_node_type_use_case)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> NodeTypeResponse | Response:
     """Update a node type's editable fields. `slug` is immutable."""
@@ -185,7 +194,7 @@ async def update_node_type(
     },
 )
 async def delete_node_type(
-    node_type_id: uuid.UUID,
+    node_type_id: NodeTypeId,
     use_case: Annotated[DeleteNodeType, Depends(get_delete_node_type_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
@@ -203,15 +212,18 @@ async def delete_node_type(
     ),
 )
 async def count_node_type_attribute_usage(
-    node_type_id: uuid.UUID,
-    key: str,
+    node_type_id: NodeTypeId,
+    key: FieldKey,
     use_case: Annotated[
         CountNodeTypeAttributeUsage,
         Depends(get_count_node_type_attribute_usage_use_case),
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    value: str | None = None,
-    sub_key: str | None = None,
+    value: Annotated[
+        str | None,
+        Query(description="Count only items where the field holds this value."),
+    ] = None,
+    sub_key: SubFieldKey = None,
 ) -> AttributeUsageResponse:
     """Count nodes of this type holding `key`, optionally where it equals `value`.
 
@@ -237,14 +249,17 @@ async def count_node_type_attribute_usage(
     ),
 )
 async def list_attribute_values(
-    node_type_id: uuid.UUID,
-    key: str,
+    node_type_id: NodeTypeId,
+    key: FieldKey,
     use_case: Annotated[
         ListAttributeValues, Depends(get_list_attribute_values_use_case)
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    q: str | None = None,
-    limit: int = 20,
+    q: Annotated[
+        str | None,
+        Query(description="Keep values containing this text, ignoring case."),
+    ] = None,
+    limit: PageLimit = 20,
 ) -> list[AttributeValueCountResponse]:
     """List previously-used string values of `key` on nodes of this type.
 
@@ -273,13 +288,13 @@ async def list_attribute_values(
     },
 )
 async def purge_node_type_attribute(
-    node_type_id: uuid.UUID,
-    key: str,
+    node_type_id: NodeTypeId,
+    key: FieldKey,
     use_case: Annotated[
         PurgeNodeTypeAttribute, Depends(get_purge_node_type_attribute_use_case)
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    sub_key: str | None = None,
+    sub_key: SubFieldKey = None,
 ) -> None:
     """Permanently remove `key` from every node of this type (cannot be undone).
 

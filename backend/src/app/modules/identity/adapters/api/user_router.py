@@ -1,8 +1,8 @@
-import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from app.entrypoints.api.shared.http.parameters import UserId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.dependencies import (
@@ -95,7 +95,7 @@ async def create_user(
     },
 )
 async def update_user(
-    user_id: uuid.UUID,
+    user_id: UserId,
     payload: UpdateUserRequest,
     use_case: Annotated[UpdateUser, Depends(get_update_user_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
@@ -118,7 +118,7 @@ async def update_user(
     },
 )
 async def reset_user_password(
-    user_id: uuid.UUID,
+    user_id: UserId,
     payload: ResetPasswordRequest,
     use_case: Annotated[ResetPassword, Depends(get_reset_password_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
@@ -134,7 +134,7 @@ async def reset_user_password(
     responses={**_ADMIN_ONLY, **_NOT_FOUND},
 )
 async def unlock_user(
-    user_id: uuid.UUID,
+    user_id: UserId,
     use_case: Annotated[UnlockUser, Depends(get_unlock_user_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
 ) -> None:

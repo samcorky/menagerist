@@ -7,8 +7,6 @@
   "ibm-major-version-in-path": 1,
   "ibm-no-operation-requestbody": 2,
   "ibm-operationid-naming-convention": 41,
-  "ibm-parameter-description": 101,
-  "ibm-precondition-headers": 7,
   "ibm-property-casing-convention": 3,
   "ibm-property-description": 296,
   "ibm-request-and-response-content": 7,

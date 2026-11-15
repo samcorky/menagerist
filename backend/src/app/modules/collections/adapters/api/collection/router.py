@@ -3,17 +3,25 @@ import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
     link_next_header,
+)
+from app.entrypoints.api.shared.http.parameters import (
+    PAGE_LIMIT_DESCRIPTION,
+    NodeId,
+    PageAfter,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
@@ -194,9 +202,11 @@ async def list_collections(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: uuid.UUID | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    item_id: uuid.UUID | None = None,
+    after: PageAfter = None,
+    limit: Annotated[int, Query(ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)] = 50,
+    item_id: Annotated[
+        uuid.UUID | None, Query(description="Keep collections holding this item.")
+    ] = None,
     q: Annotated[
         str | None,
         Query(
@@ -244,8 +254,8 @@ async def list_deleted_collections(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: uuid.UUID | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    after: PageAfter = None,
+    limit: Annotated[int, Query(ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)] = 50,
 ) -> list[DeletedCollectionResponse]:
     """List your deleted collections, newest deleted first.
 
@@ -273,7 +283,7 @@ async def get_collection(
     collection_id: CollectionIdPath,
     use_case: Annotated[GetCollection, Depends(get_get_collection_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> CollectionResponse | Response:
     """Fetch a single collection by id or slug, with a smart collection's warnings."""
     summary = await use_case.handle(
@@ -336,7 +346,7 @@ async def update_collection(
     update_usecase: Annotated[
         UpdateCollection, Depends(get_update_collection_use_case)
     ],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> CollectionResponse | Response:
     """Update a collection's name, description, slug or smart definition.
@@ -417,7 +427,7 @@ async def add_items_to_collection(
 )
 async def remove_item_from_collection(
     collection_id: CollectionIdPath,
-    item_id: uuid.UUID,
+    item_id: NodeId,
     use_case: Annotated[
         RemoveItemFromCollection, Depends(get_remove_item_from_collection_use_case)
     ],
@@ -446,7 +456,9 @@ async def remove_item_from_collection(
     },
 )
 async def restore_collection(
-    collection_id: uuid.UUID,
+    collection_id: Annotated[
+        uuid.UUID, Path(description="The deleted collection's id.")
+    ],
     use_case: Annotated[RestoreCollection, Depends(get_restore_collection_use_case)],
     get_usecase: Annotated[GetCollection, Depends(get_get_collection_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -472,7 +484,9 @@ async def restore_collection(
     responses=_NOT_FOUND,
 )
 async def purge_collection(
-    collection_id: uuid.UUID,
+    collection_id: Annotated[
+        uuid.UUID, Path(description="The deleted collection's id.")
+    ],
     use_case: Annotated[
         PurgeDeletedCollection, Depends(get_purge_deleted_collection_use_case)
     ],

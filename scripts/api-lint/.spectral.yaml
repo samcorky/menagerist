@@ -33,10 +33,15 @@ rules:
   ibm-integer-attributes: off
   ibm-array-attributes: off
 
+  # --- Fixed, and kept that way -----------------------------------------------------
+  # Recurring parameters take their description from entrypoints/api/shared/http/parameters.py.
+  ibm-parameter-description: error
+  # ConditionalGetDep and ConditionalPatchDep declare If-None-Match and If-Match.
+  ibm-precondition-headers: error
+
   # --- Findings to fix, then raise to "error" ---------------------------------------
   ibm-enum-casing-convention: warn
   ibm-property-casing-convention: warn
-  ibm-precondition-headers: warn
   ibm-required-array-properties-in-response: warn
   ibm-schema-keywords: warn
   no-$ref-siblings: warn

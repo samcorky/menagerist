@@ -131,7 +131,7 @@ async def plan_example_pack_install(
     responses={**_NOT_FOUND, **_ALREADY},
 )
 async def install_example_pack(
-    pack_id: str,
+    pack_id: Annotated[str, Path(description="The example set's id.")],
     use_case: Annotated[InstallExamplePack, Depends(get_install_example_pack_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> InstallResultResponse:
@@ -159,7 +159,7 @@ async def install_example_pack(
     responses={**_NOT_FOUND, **_NOT_INSTALLED},
 )
 async def uninstall_example_pack(
-    pack_id: str,
+    pack_id: Annotated[str, Path(description="The example set's id.")],
     use_case: Annotated[
         UninstallExamplePack, Depends(get_uninstall_example_pack_use_case)
     ],
