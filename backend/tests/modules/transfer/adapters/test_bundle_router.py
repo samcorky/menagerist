@@ -11,6 +11,8 @@ from app.entrypoints.api.shared.bridges.transfer_targets import (
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.presets.adapters.api.dependencies import get_preset_repos
 from app.modules.transfer.domain.bundle import (
+    BundleConnection,
+    BundleItem,
     BundleItemType,
     BundlePreset,
     BundleRelationshipType,
@@ -213,3 +215,197 @@ def _presets_in(file: dict[str, Any]) -> list[BundlePreset]:
         )
         for p in file["presets"]
     ]
+
+
+async def _alices_records(shared: Shared) -> tuple[list[uuid.UUID], uuid.UUID]:
+    """Alice's record type, two records joined by a connection, and an untyped item.
+
+    Also an item outside the export that one record is joined to. Returns the ids
+    of the three items to export and the id of the one left out.
+    """
+    alice = shared.targets(ALICE)
+    preset = await alice.presets.ensure(
+        [
+            BundlePreset(
+                ref="grades",
+                kind="choice_list",
+                label="Condition grades",
+                definition={"options": ["Mint", "Good"]},
+            )
+        ]
+    )
+    await alice.graph.create_item_type(
+        BundleItemType(
+            ref="record",
+            slug="record",
+            label="Record",
+            attributes_schema=_RECORD_SCHEMA,
+        ),
+        {"grades": preset[0].entity_id},
+    )
+    await alice.graph.create_relationship_type(
+        BundleRelationshipType(ref="by", slug="by", label="By"), {}
+    )
+    made = [
+        await alice.graph.create_item(
+            BundleItem(
+                ref=name,
+                name=name,
+                attributes={"condition": "Mint"},
+                tags=("jazz",),
+            ),
+            type_slug="record",
+        )
+        for name in ("Blue", "Love")
+    ]
+    loose = await alice.graph.create_item(
+        BundleItem(ref="loose", name="Loose end"), type_slug=None
+    )
+    outside = await alice.graph.create_item(
+        BundleItem(ref="out", name="Elsewhere"), type_slug=None
+    )
+    a, b = made[0].entity_id, made[1].entity_id
+    for source, target in ((a, b), (a, outside.entity_id)):
+        await alice.graph.create_connection(
+            BundleConnection(source_ref="s", target_ref="t", type_ref="by"),
+            source_id=source,
+            target_id=target,
+            type_slug="by",
+        )
+    return [a, b, loose.entity_id], outside.entity_id
+
+
+def _export_items(shared: Shared, ids: list[uuid.UUID]) -> dict[str, Any]:
+    response = _client(shared).get(
+        "/api/v1/bundles/export", params={"item_ids": [str(i) for i in ids]}
+    )
+    assert response.status_code == 200
+    file: dict[str, Any] = response.json()
+    return file
+
+
+async def test_items_travel_with_their_type_and_connections(shared: Shared) -> None:
+    """Exporting items brings their type, its list and the connections between them."""
+    ids, outside = await _alices_records(shared)
+
+    file = _export_items(shared, ids)
+
+    assert [(i["name"], i["tags"]) for i in file["items"]] == [
+        ("Blue", ["jazz"]),
+        ("Love", ["jazz"]),
+        ("Loose end", []),
+    ]
+    type_ref = file["item_types"][0]["ref"]
+    assert [i["type_ref"] for i in file["items"]] == [type_ref, type_ref, None]
+    assert [(c["source_ref"], c["target_ref"]) for c in file["connections"]] == [
+        (str(ids[0]), str(ids[1]))
+    ]
+    assert str(outside) not in {i["ref"] for i in file["items"]}
+    assert [t["slug"] for t in file["relationship_types"]] == ["by"]
+    assert [p["label"] for p in file["presets"]] == ["Condition grades"]
+
+    bob = _client(shared, BOB)
+    plan = bob.post("/api/v1/bundles/import/plan", json=file)
+    imported = bob.post("/api/v1/bundles/import", json=file)
+
+    assert plan.json()["ready"] is True
+    kinds = [e["kind"] for e in plan.json()["entities"]]
+    assert (kinds.count("item"), kinds.count("connection")) == (3, 1)
+    assert imported.status_code == 200
+    assert imported.json()["created"] == 7
+
+
+async def test_a_repeated_item_id_is_written_once(shared: Shared) -> None:
+    """The same item asked for twice is exported once."""
+    ids, _ = await _alices_records(shared)
+
+    file = _export_items(shared, [ids[0], ids[0], ids[1]])
+
+    assert [i["ref"] for i in file["items"]] == [str(ids[0]), str(ids[1])]
+
+
+def test_export_refuses_more_items_than_a_file_can_hold(shared: Shared) -> None:
+    """The cap is checked on the request, before anything is read."""
+    ids = [str(uuid.uuid7()) for _ in range(501)]
+
+    response = _client(shared).get("/api/v1/bundles/export", params={"item_ids": ids})
+
+    assert response.status_code == 422
+
+
+async def test_a_taken_type_without_the_items_fields_stops_the_import(
+    shared: Shared,
+) -> None:
+    """Items are not added under a type you have that lacks a field they use."""
+    ids, _ = await _alices_records(shared)
+    file = _export_items(shared, ids)
+    await shared.targets(BOB).graph.create_item_type(
+        BundleItemType(ref="record", slug="record", label="My records"), {}
+    )
+
+    bob = _client(shared, BOB)
+    plan = bob.post("/api/v1/bundles/import/plan", json=file)
+    refused = bob.post("/api/v1/bundles/import", json=file)
+
+    assert plan.json()["ready"] is False
+    assert plan.json()["blockers"][0]["code"] == "ItemTypeMismatchError"
+    assert "'condition'" in plan.json()["blockers"][0]["reason"]
+    assert refused.status_code >= 400
+
+
+async def test_a_taken_type_with_the_fields_takes_the_items(shared: Shared) -> None:
+    """The person's own type is used when it has every field the items fill in."""
+    ids, _ = await _alices_records(shared)
+    file = _export_items(shared, ids)
+    await shared.targets(BOB).graph.create_item_type(
+        BundleItemType(
+            ref="record",
+            slug="record",
+            label="My records",
+            attributes_schema={
+                "type": "object",
+                "properties": {"condition": {"type": "string"}},
+            },
+        ),
+        {},
+    )
+
+    plan = _client(shared, BOB).post("/api/v1/bundles/import/plan", json=file)
+
+    assert plan.json()["ready"] is True
+    assert plan.json()["blockers"] == []
+
+
+async def test_only_the_fields_items_use_decide_whether_a_type_fits(
+    shared: Shared,
+) -> None:
+    """An item's own fields do not count, and an item with no values needs none."""
+    file: dict[str, Any] = {
+        "format": "menagerist-bundle",
+        "version": 3,
+        "presets": [],
+        "relationship_types": [],
+        "item_types": [{"ref": "record", "slug": "record", "label": "Record"}],
+        "items": [
+            {
+                "ref": "one",
+                "type_ref": "record",
+                "name": "One",
+                "attributes": {"mine": 1},
+                "extra_schema": {
+                    "type": "object",
+                    "properties": {"mine": {"type": "integer"}},
+                },
+            },
+            {"ref": "two", "type_ref": "record", "name": "Two"},
+        ],
+        "connections": [],
+        "collections": [],
+    }
+    await shared.targets(BOB).graph.create_item_type(
+        BundleItemType(ref="record", slug="record", label="Mine"), {}
+    )
+
+    plan = _client(shared, BOB).post("/api/v1/bundles/import/plan", json=file)
+
+    assert plan.json()["ready"] is True

@@ -22,13 +22,15 @@ from app.modules.transfer.domain.plan import (
     ClashPolicy,
     Plan,
     PlanAction,
+    PlanBlocker,
     PlannedEntity,
 )
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Sequence
 
-    from app.modules.transfer.domain.bundle import Bundle
+    from app.modules.transfer.domain.bundle import Bundle, BundleItem
     from app.modules.transfer.ports.targets import (
         Created,
         GraphTarget,
@@ -95,14 +97,25 @@ async def plan_bundle(
     planner.presets(await presets.existing(bundle.presets))
     await planner.types(graph, clash)
     planner.items()
+    await planner.items_fit(graph)
     planner.connections()
     planner.collections()
     await planner.covers()
     return Plan(
         bundle_id=bundle.id,
         entities=tuple(planner.entities),
-        blockers=extras.blockers,
+        blockers=(*extras.blockers, *planner.blockers),
     )
+
+
+def _fields_used(items: Sequence[BundleItem], type_ref: str) -> set[str]:
+    """The field keys the items of a type fill in, apart from fields only they have."""
+    used: set[str] = set()
+    for item in items:
+        if item.type_ref == type_ref:
+            own = (item.extra_schema or {}).get("properties", {})
+            used |= {key for key in item.attributes if key not in own}
+    return used
 
 
 class _Planner:
@@ -112,6 +125,9 @@ class _Planner:
         self._bundle = bundle
         self._extras = extras
         self.entities: list[PlannedEntity] = []
+        self.blockers: list[PlanBlocker] = []
+        # Item types the file names whose slug the person already uses: ref to slug.
+        self._reused_types: dict[str, str] = {}
         self._taken_back: set[Key] = set()
         # Item ids and names known before anything is created: adopted and external.
         self._item_ids: dict[str, uuid.UUID] = {}
@@ -173,6 +189,8 @@ class _Planner:
                     continue
                 taken = await graph.slug_taken(kind, spec.slug)
                 self._type(kind, spec.ref, spec.label, spec.slug, taken, clash)
+                if taken and kind is EntityKind.ITEM_TYPE and clash is ClashPolicy.SKIP:
+                    self._reused_types[spec.ref] = spec.slug
 
     def _type(
         self,
@@ -204,6 +222,30 @@ class _Planner:
             else:
                 self._item_names[spec.ref] = spec.name
                 self._add(EntityKind.ITEM, spec.ref, spec.name, PlanAction.CREATE)
+
+    async def items_fit(self, graph: GraphTarget) -> None:
+        """Block when items would go under a type the person has that lacks a field.
+
+        A taken slug keeps the person's own type. Items written for a type with other
+        fields would be refused part-way through applying, so the plan says so first.
+        """
+        for ref, slug in self._reused_types.items():
+            used = _fields_used(self._bundle.items, ref)
+            if not used:
+                continue
+            have = await graph.item_type_field_keys(slug) or frozenset()
+            missing = sorted(used - have)
+            if missing:
+                self.blockers.append(
+                    PlanBlocker(
+                        code="ItemTypeMismatchError",
+                        reason=(
+                            f"You already have an item type called '{slug}', and it "
+                            + f"has no field {', '.join(repr(k) for k in missing)} "
+                            + "that items in this file use."
+                        ),
+                    )
+                )
 
     def connections(self) -> None:
         """A kept connection is taken back only if it still joins the same items."""

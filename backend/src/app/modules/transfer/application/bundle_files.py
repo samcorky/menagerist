@@ -1,7 +1,7 @@
 """Import and export bundle files: decode with a codec, then plan and apply."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -45,6 +45,7 @@ class ExportBundleQuery:
     preset_ids: list[uuid.UUID] = field(default_factory=list)
     item_type_ids: list[uuid.UUID] = field(default_factory=list)
     relationship_type_ids: list[uuid.UUID] = field(default_factory=list)
+    item_ids: list[uuid.UUID] = field(default_factory=list)
     format: str = BUNDLE_FORMAT
 
 
@@ -128,12 +129,21 @@ class ExportBundle(_FileUseCase, UseCase[ExportBundleQuery, dict[str, Any]]):
         """Read the types, then the presets they use and those asked for, and encode."""
         codec = self._codecs.get(request.format)
         if not (
-            request.preset_ids or request.item_type_ids or request.relationship_type_ids
+            request.preset_ids
+            or request.item_type_ids
+            or request.relationship_type_ids
+            or request.item_ids
         ):
             raise InvalidBundleError("Choose something to export.")
-        item_types = await self._graph.read_item_types(request.item_type_ids)
+        item_ids = list(dict.fromkeys(request.item_ids))
+        items = await self._graph.read_items(item_ids)
+        connections = await self._graph.read_connections(item_ids)
+        # Items and connections bring the types they use, so the file stands alone.
+        item_types = await self._graph.read_item_types(
+            _with_ids(request.item_type_ids, (i.type_ref for i in items))
+        )
         relationship_types = await self._graph.read_relationship_types(
-            request.relationship_type_ids
+            _with_ids(request.relationship_type_ids, (c.type_ref for c in connections))
         )
         wanted = {str(i): i for i in request.preset_ids}
         schemas = [t.attributes_schema for t in item_types]
@@ -148,5 +158,14 @@ class ExportBundle(_FileUseCase, UseCase[ExportBundleQuery, dict[str, Any]]):
                 presets=tuple(presets),
                 relationship_types=tuple(relationship_types),
                 item_types=tuple(item_types),
+                items=tuple(items),
+                connections=tuple(connections),
             )
         )
+
+
+def _with_ids(asked: list[uuid.UUID], refs: Iterable[str | None]) -> list[uuid.UUID]:
+    """The ids asked for, then those of `refs` not already there; refs are ids."""
+    ids = dict.fromkeys(asked)
+    ids.update(dict.fromkeys(uuid.UUID(r) for r in refs if r is not None))
+    return list(ids)

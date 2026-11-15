@@ -76,6 +76,13 @@ export async function exportConnectionTypeBundle(typeId: string): Promise<Preset
 	return result.data;
 }
 
+/** Export items, with their types, saved lists and the connections between them. */
+export async function exportItemsBundle(itemIds: string[]): Promise<PresetBundle> {
+	const result = await exportBundle({ query: { item_ids: itemIds } });
+	if (result.error || !result.data) throw result.error ?? new Error('Could not export the items');
+	return result.data;
+}
+
 /** Parse a bundle file's text, checking only the envelope. The server validates the rest. */
 export function parseBundleText(text: string): PresetBundle {
 	let data: unknown;
