@@ -1974,6 +1974,20 @@
                 },
                 "description": "Delete node with the id from this response."
               },
+              "ListNodeContents": {
+                "operationId": "list_node_contents",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "List node contents with the id from this response."
+              },
+              "ListNodePath": {
+                "operationId": "list_node_path",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "List node path with the id from this response."
+              },
               "DuplicateNode": {
                 "operationId": "duplicate_node",
                 "parameters": {
@@ -2314,6 +2328,20 @@
                   "node_id": "$response.body#/0/id"
                 },
                 "description": "Delete node with the id from this response."
+              },
+              "ListNodeContents": {
+                "operationId": "list_node_contents",
+                "parameters": {
+                  "node_id": "$response.body#/0/id"
+                },
+                "description": "List node contents with the id from this response."
+              },
+              "ListNodePath": {
+                "operationId": "list_node_path",
+                "parameters": {
+                  "node_id": "$response.body#/0/id"
+                },
+                "description": "List node path with the id from this response."
               },
               "DuplicateNode": {
                 "operationId": "duplicate_node",
@@ -3946,6 +3974,20 @@
                 },
                 "description": "Delete node with the id from this response."
               },
+              "ListNodeContents": {
+                "operationId": "list_node_contents",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "List node contents with the id from this response."
+              },
+              "ListNodePath": {
+                "operationId": "list_node_path",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "List node path with the id from this response."
+              },
               "DuplicateNode": {
                 "operationId": "duplicate_node",
                 "parameters": {
@@ -4169,6 +4211,20 @@
                   "node_id": "$response.body#/id"
                 },
                 "description": "Delete node with the id from this response."
+              },
+              "ListNodeContents": {
+                "operationId": "list_node_contents",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "List node contents with the id from this response."
+              },
+              "ListNodePath": {
+                "operationId": "list_node_path",
+                "parameters": {
+                  "node_id": "$response.body#/id"
+                },
+                "description": "List node path with the id from this response."
               },
               "DuplicateNode": {
                 "operationId": "duplicate_node",
@@ -4549,6 +4605,495 @@
           }
         },
         "x-required-permission": "graph:item:write"
+      }
+    },
+    "/api/v1/nodes/{node_id}/contents": {
+      "get": {
+        "tags": [
+          "v1",
+          "Nodes"
+        ],
+        "summary": "List Node Contents",
+        "description": "List the items this item holds, nearest first.\n\nFollows the relationship from the item to what it holds, then what those hold,\nup to `depth` steps. Each item appears once, at its nearest depth, ordered by\ndepth and then id. Page with `after`, the id of the last item on the previous\npage.\n\n**Requires permission:** `graph:item:read`",
+        "operationId": "list_node_contents",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "relationship",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Slug of the relationship to follow, such as `contains`.",
+              "title": "Relationship"
+            },
+            "description": "Slug of the relationship to follow, such as `contains`."
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "How many steps to follow, from 1 to 25.",
+              "default": 1,
+              "title": "Depth"
+            },
+            "description": "How many steps to follow, from 1 to 25."
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NodeContentsEntryResponse"
+                  },
+                  "title": "Response List Node Contents"
+                }
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a depth is below one or above `MAX_REACH_DEPTH`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidReachDepthError",
+                  "status": 400,
+                  "detail": "Depth must be between 1 and 25",
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested edge type does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "EdgeTypeNotFoundError",
+                  "status": 404,
+                  "detail": "Relationship 'contains' not found",
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/contents"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:item:read"
+      }
+    },
+    "/api/v1/nodes/{node_id}/path": {
+      "get": {
+        "tags": [
+          "v1",
+          "Nodes"
+        ],
+        "summary": "List Node Path",
+        "description": "List the items that hold this item, outermost first.\n\nThe last entry is the item's direct holder. An item held in two places lists\nboth holders at that distance, in id order.\n\n**Requires permission:** `graph:item:read`",
+        "operationId": "list_node_path",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "relationship",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Slug of the relationship to follow, such as `contains`.",
+              "title": "Relationship"
+            },
+            "description": "Slug of the relationship to follow, such as `contains`."
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "How many steps up to follow, from 1 to 25.",
+              "default": 25,
+              "title": "Depth"
+            },
+            "description": "How many steps up to follow, from 1 to 25."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NodeResponse"
+                  },
+                  "title": "Response List Node Path"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a depth is below one or above `MAX_REACH_DEPTH`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidReachDepthError",
+                  "status": 400,
+                  "detail": "Depth must be between 1 and 25",
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested edge type does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "EdgeTypeNotFoundError",
+                  "status": 404,
+                  "detail": "Relationship 'contains' not found",
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/path"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:item:read"
       }
     },
     "/api/v1/nodes/{node_id}/attributes/{key}/promote": {
@@ -28112,6 +28657,49 @@
         ],
         "title": "MissedRun",
         "description": "Whether to catch up the latest missed occurrence."
+      },
+      "NodeContentsEntryResponse": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/NodeResponse"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth",
+            "description": "1 for an item held directly, 2 for one held by that, and so on.",
+            "examples": [
+              1
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "depth"
+        ],
+        "title": "NodeContentsEntryResponse",
+        "description": "An item found inside another, and how many steps in it sits.",
+        "examples": [
+          {
+            "depth": 1,
+            "item": {
+              "attributes": {
+                "year": 1979
+              },
+              "created_at": "2026-08-23T10:14:44.465954Z",
+              "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+              "favourite": false,
+              "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+              "name": "Alien",
+              "tags": [
+                "sci-fi",
+                "horror"
+              ],
+              "type": "film",
+              "updated_at": "2026-08-23T10:14:44.465954Z"
+            }
+          }
+        ]
       },
       "NodeCountResponse": {
         "properties": {

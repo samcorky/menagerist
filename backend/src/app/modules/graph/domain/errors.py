@@ -53,3 +53,7 @@ class NodeTypeDeletedError(ConflictError):
 
 class EdgeTypeInUseError(ConflictError):
     """Raised when deleting an edge type still referenced by existing edges."""
+
+
+class RelationshipNotDirectionalError(ValidationError):
+    """Raised when a contents or path is asked of a relationship with no direction."""

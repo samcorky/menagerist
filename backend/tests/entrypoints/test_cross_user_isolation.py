@@ -91,22 +91,10 @@ from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
 from app.modules.examples.domain.pack import ExamplePack
 from app.modules.examples.ports.unit_of_work import ExampleRepos
 from app.modules.graph.adapters.api.dependencies import get_graph_repos, get_graph_uow
-from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
-    InMemoryEdgeRepository,
-)
-from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
-    InMemoryEdgeTypeRepository,
-)
-from app.modules.graph.adapters.persistence.in_memory_node_repository import (
-    InMemoryNodeRepository,
-)
-from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
-    InMemoryNodeTypeRepository,
-)
 from app.modules.graph.adapters.persistence.unit_of_work import (
+    build_in_memory_graph_repos,
     create_in_memory_graph_uow,
 )
-from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
     get_decoy_hash,
@@ -408,6 +396,8 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
     "node_id": lambda s: s.item,
     "item_id": lambda s: s.item,
     "after": lambda s: s.item,
+    "relationship": lambda _: "owns",
+    "depth": lambda _: "1",
     "limit": lambda _: "50",
     "value": lambda _: "R",
     "sub_key": lambda _: "x",
@@ -675,13 +665,8 @@ class World:
         collections = build_in_memory_collections_repos()
         media = make_in_memory_repos()
         external = WorldExternalConditions(collections, media)
-        graph = GraphRepos(
-            nodes=InMemoryNodeRepository(external),
-            edges=InMemoryEdgeRepository(),
-            node_types=InMemoryNodeTypeRepository(),
-            edge_types=InMemoryEdgeTypeRepository(),
-            external=external,
-            definitions=CollectionsDefinitions(collections),
+        graph = build_in_memory_graph_repos(
+            external=external, definitions=CollectionsDefinitions(collections)
         )
         installations = InMemoryRunRepository()
         examples = ExampleRepos(runs=installations)
@@ -1174,6 +1159,14 @@ def build_request(
     kwargs = _aim_at_smart(case, values, seed)
     url = case.template.format(**values)
     query_names = [p["name"] for p in op.get("parameters", []) if p["in"] == "query"]
+    # A required parameter is always sent, or the call would stop at a 422.
+    required = [
+        p["name"]
+        for p in op.get("parameters", [])
+        if p["in"] == "query" and p.get("required")
+    ]
+    if required and not case.variant.startswith("query:"):
+        kwargs["params"] = _fill(case, QUERY_PARAMS, required, seed, "query")
     if case.variant.startswith("query:"):
         # `after` would skip A's first item, so the combined call leaves it out.
         chosen = (
@@ -1181,6 +1174,7 @@ def build_request(
             if case.variant == "query:all"
             else [case.variant[6:]]
         )
+        chosen = list(dict.fromkeys([*required, *chosen]))
         kwargs["params"] = _fill(case, QUERY_PARAMS, chosen, seed, "query")
         for (template, name), value in QUERY_OVERRIDES.items():
             if case.template == template and name in kwargs["params"]:
@@ -1245,6 +1239,16 @@ def _shape(response: Response) -> tuple[object, ...]:
 
 # Variants whose value cannot match anything of A's even for A, and why.
 EMPTY_FOR_A: dict[tuple[str, str], str] = {
+    ("/api/v1/nodes/{node_id}/contents", "query:after"): (
+        "the cursor is the holder itself, which is not in its own contents"
+    ),
+    **{
+        (
+            "/api/v1/nodes/{node_id}/path",
+            variant,
+        ): "nothing holds A's item; it holds one"
+        for variant in ("bare", "query:relationship", "query:depth", "query:all")
+    },
     ("/api/v1/presets", "query:kind"): "no preset has the kind 'manual'",
     ("/api/v1/presets", "query:all"): "no preset has the kind 'manual'",
     ("/api/v1/search", "bare"): "blank text finds nothing",

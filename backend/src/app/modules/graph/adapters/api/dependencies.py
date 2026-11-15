@@ -43,12 +43,14 @@ from app.modules.graph.application.delete_node_type import DeleteNodeType
 from app.modules.graph.application.duplicate_node import DuplicateNode
 from app.modules.graph.application.get_edge import GetEdge
 from app.modules.graph.application.get_edge_type import GetEdgeType
+from app.modules.graph.application.get_item_path import GetItemPath
 from app.modules.graph.application.get_node import GetNode
 from app.modules.graph.application.get_node_type import GetNodeType
 from app.modules.graph.application.list_attribute_values import ListAttributeValues
 from app.modules.graph.application.list_deleted_nodes import ListDeletedNodes
 from app.modules.graph.application.list_edge_types import ListEdgeTypes
 from app.modules.graph.application.list_edges import ListEdges
+from app.modules.graph.application.list_item_contents import ListItemContents
 from app.modules.graph.application.list_item_fields import ListItemFields
 from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
@@ -120,6 +122,20 @@ def get_get_node_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetNode:
     return GetNode(repos, guard)
+
+
+def get_list_item_contents_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListItemContents:
+    return ListItemContents(repos, guard)
+
+
+def get_get_item_path_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> GetItemPath:
+    return GetItemPath(repos, guard)
 
 
 def get_list_nodes_use_case(
