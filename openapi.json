@@ -29,6 +29,9 @@
               "application/health+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "pass"
                 }
               }
             }
@@ -93,8 +96,19 @@
                     "$ref": "#/components/schemas/BackupResponse"
                   },
                   "type": "array",
-                  "title": "Response List Backups"
-                }
+                  "title": "Response List Backups",
+                  "description": "Each entry is a `BackupResponse`."
+                },
+                "example": [
+                  {
+                    "alembic_revision": "a1b2c3d4e5f6",
+                    "app_version": "0.1.0",
+                    "created_at": "2026-10-19T12:00:00Z",
+                    "id": "0199ec2d-f086-7000-8000-000000000001",
+                    "label": "manual",
+                    "size": 1048576
+                  }
+                ]
               }
             },
             "links": {
@@ -225,6 +239,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BackupResponse"
+                },
+                "example": {
+                  "alembic_revision": "a1b2c3d4e5f6",
+                  "app_version": "0.1.0",
+                  "created_at": "2026-10-19T12:00:00Z",
+                  "id": "0199ec2d-f086-7000-8000-000000000001",
+                  "label": "manual",
+                  "size": 1048576
                 }
               }
             },
@@ -384,6 +406,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PruneResponse"
+                },
+                "example": {
+                  "deleted": [],
+                  "freed_bytes": 0,
+                  "kept": [
+                    "0199ec2d-f086-7000-8000-000000000001"
+                  ],
+                  "orphans_removed": [],
+                  "unreadable": [],
+                  "user_exports_removed": []
                 }
               }
             }
@@ -508,7 +540,8 @@
             "application/gzip": {
               "schema": {
                 "type": "string",
-                "format": "binary"
+                "format": "binary",
+                "description": "A Menagerist archive: a gzipped tar file."
               }
             }
           },
@@ -521,6 +554,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BackupResponse"
+                },
+                "example": {
+                  "alembic_revision": "a1b2c3d4e5f6",
+                  "app_version": "0.1.0",
+                  "created_at": "2026-10-19T12:00:00Z",
+                  "id": "0199ec2d-f086-7000-8000-000000000001",
+                  "label": "manual",
+                  "size": 1048576
                 }
               }
             }
@@ -682,6 +723,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VerificationResponse"
+                },
+                "example": {
+                  "findings": []
                 }
               }
             }
@@ -836,13 +880,11 @@
           "200": {
             "description": "The compressed backup archive.",
             "content": {
-              "application/json": {
-                "schema": {}
-              },
               "application/gzip": {
                 "schema": {
                   "type": "string",
-                  "format": "binary"
+                  "format": "binary",
+                  "description": "A Menagerist archive: a gzipped tar file."
                 }
               }
             }
@@ -1134,8 +1176,17 @@
                     "$ref": "#/components/schemas/UserExportResponse"
                   },
                   "type": "array",
-                  "title": "Response List User Exports"
-                }
+                  "title": "Response List User Exports",
+                  "description": "Each entry is a `UserExportResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-10-24T12:00:00Z",
+                    "expires_at": "2026-10-25T12:00:00Z",
+                    "id": "0199ec2d-f086-7000-8000-000000000001",
+                    "size": 1048576
+                  }
+                ]
               }
             },
             "links": {
@@ -1264,6 +1315,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BackupResponse"
+                },
+                "example": {
+                  "alembic_revision": "a1b2c3d4e5f6",
+                  "app_version": "0.1.0",
+                  "created_at": "2026-10-19T12:00:00Z",
+                  "id": "0199ec2d-f086-7000-8000-000000000001",
+                  "label": "manual",
+                  "size": 1048576
                 }
               }
             },
@@ -1421,13 +1480,11 @@
           "200": {
             "description": "The caller's personal archive.",
             "content": {
-              "application/json": {
-                "schema": {}
-              },
               "application/gzip": {
                 "schema": {
                   "type": "string",
-                  "format": "binary"
+                  "format": "binary",
+                  "description": "A Menagerist archive: a gzipped tar file."
                 }
               }
             }
@@ -1754,7 +1811,8 @@
             "application/gzip": {
               "schema": {
                 "type": "string",
-                "format": "binary"
+                "format": "binary",
+                "description": "A Menagerist archive: a gzipped tar file."
               }
             }
           },
@@ -1962,6 +2020,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeResponse"
+                },
+                "example": {
+                  "attributes": {
+                    "year": 1979
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                  "favourite": false,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "name": "Alien",
+                  "tags": [
+                    "sci-fi",
+                    "horror"
+                  ],
+                  "type": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -2301,8 +2375,27 @@
                   "items": {
                     "$ref": "#/components/schemas/NodeResponse"
                   },
-                  "title": "Response List Nodes"
-                }
+                  "title": "Response List Nodes",
+                  "description": "Each entry is a `NodeResponse`."
+                },
+                "example": [
+                  {
+                    "attributes": {
+                      "year": 1979
+                    },
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                    "favourite": false,
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "name": "Alien",
+                    "tags": [
+                      "sci-fi",
+                      "horror"
+                    ],
+                    "type": "film",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  }
+                ]
               }
             },
             "headers": {
@@ -2549,6 +2642,29 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeSearchResponse"
+                },
+                "example": {
+                  "items": [
+                    {
+                      "attributes": {
+                        "year": 1979
+                      },
+                      "created_at": "2026-08-23T10:14:44.465954Z",
+                      "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                      "favourite": false,
+                      "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                      "name": "Alien",
+                      "tags": [
+                        "sci-fi",
+                        "horror"
+                      ],
+                      "type": "film",
+                      "updated_at": "2026-08-23T10:14:44.465954Z"
+                    }
+                  ],
+                  "total": 1,
+                  "total_capped": false,
+                  "warnings": []
                 }
               }
             }
@@ -2765,6 +2881,20 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeSearchCountsResponse"
+                },
+                "example": {
+                  "counts": {
+                    "everything": {
+                      "total": 1284,
+                      "total_capped": false,
+                      "warnings": []
+                    },
+                    "no_photo": {
+                      "total": 232,
+                      "total_capped": false,
+                      "warnings": []
+                    }
+                  }
                 }
               }
             }
@@ -2974,8 +3104,17 @@
                     "$ref": "#/components/schemas/ItemFieldResponse"
                   },
                   "type": "array",
-                  "title": "Response List Item Fields"
-                }
+                  "title": "Response List Item Fields",
+                  "description": "Each entry is a `ItemFieldResponse`."
+                },
+                "example": [
+                  {
+                    "count": 3,
+                    "key": "signed",
+                    "kind": "boolean",
+                    "label": "Signed copy"
+                  }
+                ]
               }
             }
           },
@@ -3149,8 +3288,17 @@
                   "items": {
                     "$ref": "#/components/schemas/DeletedNodeResponse"
                   },
-                  "title": "Response List Deleted Nodes"
-                }
+                  "title": "Response List Deleted Nodes",
+                  "description": "Each entry is a `DeletedNodeResponse`."
+                },
+                "example": [
+                  {
+                    "deleted_at": "2026-10-25T09:30:12.104233Z",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "name": "Alien",
+                    "type": "film"
+                  }
+                ]
               }
             },
             "headers": {
@@ -3409,6 +3557,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeResponse"
+                },
+                "example": {
+                  "attributes": {
+                    "year": 1979
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                  "favourite": false,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "name": "Alien",
+                  "tags": [
+                    "sci-fi",
+                    "horror"
+                  ],
+                  "type": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             }
@@ -3655,6 +3819,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeCountResponse"
+                },
+                "example": {
+                  "count": 1234
                 }
               }
             }
@@ -3821,8 +3988,15 @@
                     "$ref": "#/components/schemas/NodeTypeCountResponse"
                   },
                   "type": "array",
-                  "title": "Response Count Node Types"
-                }
+                  "title": "Response Count Node Types",
+                  "description": "Each entry is a `NodeTypeCountResponse`."
+                },
+                "example": [
+                  {
+                    "count": 12,
+                    "type": "film"
+                  }
+                ]
               }
             }
           },
@@ -3990,6 +4164,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeResponse"
+                },
+                "example": {
+                  "attributes": {
+                    "year": 1979
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                  "favourite": false,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "name": "Alien",
+                  "tags": [
+                    "sci-fi",
+                    "horror"
+                  ],
+                  "type": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -4267,6 +4457,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeResponse"
+                },
+                "example": {
+                  "attributes": {
+                    "year": 1979
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                  "favourite": false,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "name": "Alien",
+                  "tags": [
+                    "sci-fi",
+                    "horror"
+                  ],
+                  "type": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -4791,8 +4997,30 @@
                   "items": {
                     "$ref": "#/components/schemas/NodeContentsEntryResponse"
                   },
-                  "title": "Response List Node Contents"
-                }
+                  "title": "Response List Node Contents",
+                  "description": "Each entry is a `NodeContentsEntryResponse`."
+                },
+                "example": [
+                  {
+                    "depth": 1,
+                    "item": {
+                      "attributes": {
+                        "year": 1979
+                      },
+                      "created_at": "2026-08-23T10:14:44.465954Z",
+                      "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                      "favourite": false,
+                      "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                      "name": "Alien",
+                      "tags": [
+                        "sci-fi",
+                        "horror"
+                      ],
+                      "type": "film",
+                      "updated_at": "2026-08-23T10:14:44.465954Z"
+                    }
+                  }
+                ]
               }
             },
             "headers": {
@@ -5028,8 +5256,27 @@
                   "items": {
                     "$ref": "#/components/schemas/NodeResponse"
                   },
-                  "title": "Response List Node Path"
-                }
+                  "title": "Response List Node Path",
+                  "description": "Each entry is a `NodeResponse`."
+                },
+                "example": [
+                  {
+                    "attributes": {
+                      "year": 1979
+                    },
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                    "favourite": false,
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "name": "Alien",
+                    "tags": [
+                      "sci-fi",
+                      "horror"
+                    ],
+                    "type": "film",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  }
+                ]
               }
             }
           },
@@ -5252,6 +5499,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeResponse"
+                },
+                "example": {
+                  "attributes": {
+                    "year": 1979
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                  "favourite": false,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "name": "Alien",
+                  "tags": [
+                    "sci-fi",
+                    "horror"
+                  ],
+                  "type": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             }
@@ -5464,6 +5727,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeResponse"
+                },
+                "example": {
+                  "attributes": {
+                    "year": 1979
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                  "favourite": false,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "name": "Alien",
+                  "tags": [
+                    "sci-fi",
+                    "horror"
+                  ],
+                  "type": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             }
@@ -5686,6 +5965,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeResponse"
+                },
+                "example": {
+                  "attributes": {
+                    "year": 1979
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A 1979 science fiction horror film directed by Ridley Scott.",
+                  "favourite": false,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "name": "Alien",
+                  "tags": [
+                    "sci-fi",
+                    "horror"
+                  ],
+                  "type": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             }
@@ -6052,6 +6347,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EdgeResponse"
+                },
+                "example": {
+                  "attributes": {},
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11",
+                  "source_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e12",
+                  "type": "directed-by",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -6326,8 +6630,20 @@
                   "items": {
                     "$ref": "#/components/schemas/EdgeResponse"
                   },
-                  "title": "Response List Edges"
-                }
+                  "title": "Response List Edges",
+                  "description": "Each entry is a `EdgeResponse`."
+                },
+                "example": [
+                  {
+                    "attributes": {},
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11",
+                    "source_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                    "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e12",
+                    "type": "directed-by",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  }
+                ]
               }
             },
             "headers": {
@@ -6514,6 +6830,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CreateEdgesResponse"
+                },
+                "example": {
+                  "created": [
+                    {
+                      "attributes": {},
+                      "created_at": "2026-08-23T10:14:44.465954Z",
+                      "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11",
+                      "source_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                      "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e12",
+                      "type": "directed-by",
+                      "updated_at": "2026-08-23T10:14:44.465954Z"
+                    }
+                  ],
+                  "skipped": [
+                    "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e13"
+                  ]
                 }
               }
             }
@@ -6752,6 +7084,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EdgeResponse"
+                },
+                "example": {
+                  "attributes": {},
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11",
+                  "source_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e12",
+                  "type": "directed-by",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -7001,6 +7342,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EdgeResponse"
+                },
+                "example": {
+                  "attributes": {},
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11",
+                  "source_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e12",
+                  "type": "directed-by",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -7419,6 +7769,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeTypeResponse"
+                },
+                "example": {
+                  "colour": "red",
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A motion picture.",
+                  "icon": "clapperboard",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "label": "Film",
+                  "slug": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -7657,8 +8017,21 @@
                   "items": {
                     "$ref": "#/components/schemas/NodeTypeResponse"
                   },
-                  "title": "Response List Node Types"
-                }
+                  "title": "Response List Node Types",
+                  "description": "Each entry is a `NodeTypeResponse`."
+                },
+                "example": [
+                  {
+                    "colour": "red",
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "A motion picture.",
+                    "icon": "clapperboard",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "label": "Film",
+                    "slug": "film",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  }
+                ]
               }
             },
             "headers": {
@@ -7875,6 +8248,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeTypeResponse"
+                },
+                "example": {
+                  "colour": "red",
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A motion picture.",
+                  "icon": "clapperboard",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "label": "Film",
+                  "slug": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -8124,6 +8507,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NodeTypeResponse"
+                },
+                "example": {
+                  "colour": "red",
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "A motion picture.",
+                  "icon": "clapperboard",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "label": "Film",
+                  "slug": "film",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -8555,6 +8948,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AttributeUsageResponse"
+                },
+                "example": {
+                  "count": 12
                 }
               }
             }
@@ -8784,8 +9180,15 @@
                   "items": {
                     "$ref": "#/components/schemas/AttributeValueCountResponse"
                   },
-                  "title": "Response List Attribute Values"
-                }
+                  "title": "Response List Attribute Values",
+                  "description": "Each entry is a `AttributeValueCountResponse`."
+                },
+                "example": [
+                  {
+                    "count": 12,
+                    "value": "Draft"
+                  }
+                ]
               }
             }
           },
@@ -9145,6 +9548,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EdgeTypeResponse"
+                },
+                "example": {
+                  "attributes_schema": {
+                    "type": "object"
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "Links a film to its director.",
+                  "directional": true,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                  "label": "Directed by",
+                  "reverse_label": "Directed",
+                  "slug": "directed-by",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -9383,8 +9799,24 @@
                   "items": {
                     "$ref": "#/components/schemas/EdgeTypeResponse"
                   },
-                  "title": "Response List Edge Types"
-                }
+                  "title": "Response List Edge Types",
+                  "description": "Each entry is a `EdgeTypeResponse`."
+                },
+                "example": [
+                  {
+                    "attributes_schema": {
+                      "type": "object"
+                    },
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "Links a film to its director.",
+                    "directional": true,
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                    "label": "Directed by",
+                    "reverse_label": "Directed",
+                    "slug": "directed-by",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  }
+                ]
               }
             },
             "headers": {
@@ -9601,6 +10033,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EdgeTypeResponse"
+                },
+                "example": {
+                  "attributes_schema": {
+                    "type": "object"
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "Links a film to its director.",
+                  "directional": true,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                  "label": "Directed by",
+                  "reverse_label": "Directed",
+                  "slug": "directed-by",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -9850,6 +10295,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EdgeTypeResponse"
+                },
+                "example": {
+                  "attributes_schema": {
+                    "type": "object"
+                  },
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "Links a film to its director.",
+                  "directional": true,
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                  "label": "Directed by",
+                  "reverse_label": "Directed",
+                  "slug": "directed-by",
+                  "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
             },
@@ -10298,6 +10756,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AttributeUsageResponse"
+                },
+                "example": {
+                  "count": 12
                 }
               }
             }
@@ -10650,6 +11111,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAssetResponse"
+                },
+                "example": {
+                  "content_type": "image/jpeg",
+                  "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "filename": "cover.jpg",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "size": 204800,
+                  "status": "attached",
+                  "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
             },
@@ -10962,6 +11435,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAttachmentResponse"
+                },
+                "example": {
+                  "asset_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "attribute_key": "cover",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e21",
+                  "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "target_type": "node"
                 }
               }
             }
@@ -11259,6 +11740,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAssetResponse"
+                },
+                "example": {
+                  "content_type": "image/jpeg",
+                  "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "filename": "cover.jpg",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "size": 204800,
+                  "status": "attached",
+                  "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
             },
@@ -11564,6 +12057,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAssetResponse"
+                },
+                "example": {
+                  "content_type": "image/jpeg",
+                  "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "filename": "cover.jpg",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "size": 204800,
+                  "status": "attached",
+                  "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
             },
@@ -12056,9 +12561,6 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "application/json": {
-                "schema": {}
-              },
               "application/octet-stream": {
                 "schema": {
                   "type": "string",
@@ -12246,9 +12748,6 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "application/json": {
-                "schema": {}
-              },
               "image/webp": {
                 "schema": {
                   "type": "string",
@@ -12474,6 +12973,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAttachmentResponse"
+                },
+                "example": {
+                  "asset_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "attribute_key": "cover",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e21",
+                  "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "target_type": "node"
                 }
               }
             }
@@ -12939,6 +13446,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAttachmentResponse"
+                },
+                "example": {
+                  "asset_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "attribute_key": "cover",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e21",
+                  "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "target_type": "node"
                 }
               }
             }
@@ -13359,6 +13874,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAssetResponse"
+                },
+                "example": {
+                  "content_type": "image/jpeg",
+                  "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "filename": "cover.jpg",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "size": 204800,
+                  "status": "attached",
+                  "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
             }
@@ -13571,6 +14098,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MediaAssetResponse"
+                },
+                "example": {
+                  "content_type": "image/jpeg",
+                  "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+                  "created_at": "2026-09-07T10:00:00Z",
+                  "filename": "cover.jpg",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "size": 204800,
+                  "status": "attached",
+                  "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
             }
@@ -13786,8 +14325,24 @@
                   "items": {
                     "$ref": "#/components/schemas/NodeMediaItemResponse"
                   },
-                  "title": "Response List Node Media"
-                }
+                  "title": "Response List Node Media",
+                  "description": "Each entry is a `NodeMediaItemResponse`."
+                },
+                "example": [
+                  {
+                    "attribute_key": "cover",
+                    "content_type": "image/jpeg",
+                    "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
+                    "created_at": "2026-09-07T10:00:00Z",
+                    "filename": "cover.jpg",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    "size": 204800,
+                    "status": "attached",
+                    "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                    "updated_at": "2026-09-07T10:00:00Z"
+                  }
+                ]
               }
             }
           },
@@ -13951,6 +14506,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PresetResponse"
+                },
+                "example": {
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "definition": {
+                    "property": {
+                      "enum": [
+                        "Mint",
+                        "Near Mint",
+                        "VG+"
+                      ],
+                      "title": "Condition",
+                      "type": "string",
+                      "x-menagerist": {
+                        "kind": "choice"
+                      }
+                    }
+                  },
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
+                  "kind": "field",
+                  "label": "Condition",
+                  "updated_at": "2026-08-23T10:14:44.465954Z",
+                  "version": 1
                 }
               }
             },
@@ -14225,8 +14802,33 @@
                   "items": {
                     "$ref": "#/components/schemas/PresetResponse"
                   },
-                  "title": "Response List Presets"
-                }
+                  "title": "Response List Presets",
+                  "description": "Each entry is a `PresetResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "definition": {
+                      "property": {
+                        "enum": [
+                          "Mint",
+                          "Near Mint",
+                          "VG+"
+                        ],
+                        "title": "Condition",
+                        "type": "string",
+                        "x-menagerist": {
+                          "kind": "choice"
+                        }
+                      }
+                    },
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
+                    "kind": "field",
+                    "label": "Condition",
+                    "updated_at": "2026-08-23T10:14:44.465954Z",
+                    "version": 1
+                  }
+                ]
               }
             },
             "headers": {
@@ -14443,6 +15045,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PresetResponse"
+                },
+                "example": {
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "definition": {
+                    "property": {
+                      "enum": [
+                        "Mint",
+                        "Near Mint",
+                        "VG+"
+                      ],
+                      "title": "Condition",
+                      "type": "string",
+                      "x-menagerist": {
+                        "kind": "choice"
+                      }
+                    }
+                  },
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
+                  "kind": "field",
+                  "label": "Condition",
+                  "updated_at": "2026-08-23T10:14:44.465954Z",
+                  "version": 1
                 }
               }
             },
@@ -14692,6 +15316,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PresetResponse"
+                },
+                "example": {
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "definition": {
+                    "property": {
+                      "enum": [
+                        "Mint",
+                        "Near Mint",
+                        "VG+"
+                      ],
+                      "title": "Condition",
+                      "type": "string",
+                      "x-menagerist": {
+                        "kind": "choice"
+                      }
+                    }
+                  },
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
+                  "kind": "field",
+                  "label": "Condition",
+                  "updated_at": "2026-08-23T10:14:44.465954Z",
+                  "version": 1
                 }
               }
             },
@@ -15163,6 +15809,14 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SchedulePreviewResponse"
+                },
+                "example": {
+                  "runs": [
+                    "2026-10-29T03:00:00Z",
+                    "2026-10-30T03:00:00Z",
+                    "2026-10-31T03:00:00Z"
+                  ],
+                  "timezone": "Europe/London"
                 }
               }
             }
@@ -15304,8 +15958,41 @@
                     "$ref": "#/components/schemas/JobResponse"
                   },
                   "type": "array",
-                  "title": "Response List Jobs"
-                }
+                  "title": "Response List Jobs",
+                  "description": "Each entry is a `JobResponse`."
+                },
+                "example": [
+                  {
+                    "active_run": {
+                      "created_at": "2026-10-28T03:00:00Z",
+                      "id": "0198f3a2-7c1e-7a4b-9d2e-5b6c8f1a2b3c",
+                      "job_key": "backup.create",
+                      "scheduled_for": "2026-10-28T03:00:00Z",
+                      "started_at": "2026-10-28T03:00:02Z",
+                      "status": "running"
+                    },
+                    "confirm_required": false,
+                    "description": "Saves a full copy of your collection.",
+                    "job_key": "backup.create",
+                    "lane": "heavy",
+                    "last_run": {
+                      "created_at": "2026-10-28T03:00:00Z",
+                      "finished_at": "2026-10-28T03:01:10Z",
+                      "id": "0198f3a2-7c1e-7a4b-9d2e-5b6c8f1a2b3c",
+                      "job_key": "backup.create",
+                      "scheduled_for": "2026-10-28T03:00:00Z",
+                      "started_at": "2026-10-28T03:00:02Z",
+                      "status": "succeeded"
+                    },
+                    "missed_run": "run_once",
+                    "next_run_at": "2026-10-29T03:00:00Z",
+                    "overlap": "coalesce",
+                    "run_now_allowed": true,
+                    "schedule": "0 3 * * *",
+                    "schedule_key": "backup.schedule",
+                    "title": "Back up everything"
+                  }
+                ]
               }
             }
           },
@@ -15440,8 +16127,20 @@
                   "items": {
                     "$ref": "#/components/schemas/JobRunResponse"
                   },
-                  "title": "Response List Job Runs"
-                }
+                  "title": "Response List Job Runs",
+                  "description": "Each entry is a `JobRunResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-10-28T03:00:00Z",
+                    "finished_at": "2026-10-28T03:01:10Z",
+                    "id": "0198f3a2-7c1e-7a4b-9d2e-5b6c8f1a2b3c",
+                    "job_key": "backup.create",
+                    "scheduled_for": "2026-10-28T03:00:00Z",
+                    "started_at": "2026-10-28T03:00:02Z",
+                    "status": "succeeded"
+                  }
+                ]
               }
             }
           },
@@ -15597,6 +16296,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobRunResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-28T03:00:00Z",
+                  "finished_at": "2026-10-28T03:01:10Z",
+                  "id": "0198f3a2-7c1e-7a4b-9d2e-5b6c8f1a2b3c",
+                  "job_key": "backup.create",
+                  "scheduled_for": "2026-10-28T03:00:00Z",
+                  "started_at": "2026-10-28T03:00:02Z",
+                  "status": "succeeded"
                 }
               }
             }
@@ -15778,7 +16486,8 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Get Settings Schema"
+                  "title": "Response Get Settings Schema",
+                  "description": "A JSON Schema 2020-12 document with one property per setting."
                 },
                 "example": {
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -15928,8 +16637,23 @@
                     "$ref": "#/components/schemas/SettingResponse"
                   },
                   "type": "array",
-                  "title": "Response List Instance Settings"
-                }
+                  "title": "Response List Instance Settings",
+                  "description": "Each entry is a `SettingResponse`."
+                },
+                "example": [
+                  {
+                    "description": "Minimum number of ordinary backups to retain.",
+                    "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
+                    "group": "backup",
+                    "key": "backup.keep_last",
+                    "locked": false,
+                    "restart_required": false,
+                    "source": "instance",
+                    "stored_invalid": false,
+                    "title": "Backups to keep",
+                    "value": 12
+                  }
+                ]
               }
             }
           },
@@ -16059,8 +16783,23 @@
                     "$ref": "#/components/schemas/SettingResponse"
                   },
                   "type": "array",
-                  "title": "Response Update Instance Settings"
-                }
+                  "title": "Response Update Instance Settings",
+                  "description": "Each entry is a `SettingResponse`."
+                },
+                "example": [
+                  {
+                    "description": "Minimum number of ordinary backups to retain.",
+                    "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
+                    "group": "backup",
+                    "key": "backup.keep_last",
+                    "locked": false,
+                    "restart_required": false,
+                    "source": "instance",
+                    "stored_invalid": false,
+                    "title": "Backups to keep",
+                    "value": 12
+                  }
+                ]
               }
             }
           },
@@ -16255,6 +16994,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SettingResponse"
+                },
+                "example": {
+                  "description": "Minimum number of ordinary backups to retain.",
+                  "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
+                  "group": "backup",
+                  "key": "backup.keep_last",
+                  "locked": false,
+                  "restart_required": false,
+                  "source": "instance",
+                  "stored_invalid": false,
+                  "title": "Backups to keep",
+                  "value": 12
                 }
               }
             }
@@ -16638,8 +17389,44 @@
                     "$ref": "#/components/schemas/ExamplePackResponse"
                   },
                   "type": "array",
-                  "title": "Response List Example Packs"
-                }
+                  "title": "Response List Example Packs",
+                  "description": "Each entry is a `ExamplePackResponse`."
+                },
+                "example": [
+                  {
+                    "counts": {
+                      "collections": 2,
+                      "connections": 14,
+                      "item_types": 3,
+                      "items": 12,
+                      "presets": 1,
+                      "relationship_types": 2
+                    },
+                    "description": "Records, artists and signings.",
+                    "id": "vinyl",
+                    "installation": {
+                      "counts": {
+                        "collections": 2,
+                        "connections": 14,
+                        "item_types": 3,
+                        "items": 12,
+                        "presets": 1,
+                        "relationship_types": 2
+                      },
+                      "installed_at": "2026-10-06T10:14:44.465954Z",
+                      "status": "installed"
+                    },
+                    "links_with": [],
+                    "name": "Vinyl and signed items",
+                    "required_by": [
+                      {
+                        "id": "vinyl-extras",
+                        "name": "Vinyl extras"
+                      }
+                    ],
+                    "requires": []
+                  }
+                ]
               }
             },
             "links": {
@@ -16790,6 +17577,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExampleEntitiesResponse"
+                },
+                "example": {
+                  "collection_ids": [
+                    "0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d25"
+                  ],
+                  "item_ids": [
+                    "0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d23"
+                  ],
+                  "item_type_ids": [
+                    "0198f1c2-7b1e-7c3a-9d4e-2f6a8b0c1d24"
+                  ]
                 }
               }
             }
@@ -17146,6 +17944,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InstallResultResponse"
+                },
+                "example": {
+                  "adopted": {
+                    "collections": 0,
+                    "connections": 0,
+                    "item_types": 1,
+                    "items": 1,
+                    "presets": 0,
+                    "relationship_types": 0
+                  },
+                  "created": {
+                    "collections": 2,
+                    "connections": 14,
+                    "item_types": 3,
+                    "items": 12,
+                    "presets": 1,
+                    "relationship_types": 2
+                  },
+                  "linked": 0,
+                  "pack_id": "vinyl"
                 }
               }
             }
@@ -17355,6 +18173,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UninstallResultResponse"
+                },
+                "example": {
+                  "kept": [
+                    {
+                      "kind": "item",
+                      "label": "Blue (my copy)",
+                      "reason": "edited"
+                    }
+                  ],
+                  "pack_id": "vinyl",
+                  "removed": {
+                    "collections": 2,
+                    "connections": 14,
+                    "item_types": 3,
+                    "items": 12,
+                    "presets": 1,
+                    "relationship_types": 2
+                  }
                 }
               }
             }
@@ -17548,7 +18384,8 @@
                     "$ref": "#/components/schemas/CatalogueEntryResponse"
                   },
                   "type": "array",
-                  "title": "Response List Catalogue Entries"
+                  "title": "Response List Catalogue Entries",
+                  "description": "Each entry is a `CatalogueEntryResponse`."
                 },
                 "example": [
                   {
@@ -18972,6 +19809,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CollectionResponse"
+                },
+                "example": {
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "Things to watch soon.",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "item_count": 3,
+                  "item_count_capped": false,
+                  "kind": "manual",
+                  "name": "Weekend watchlist",
+                  "slug": "weekend-watchlist",
+                  "updated_at": "2026-08-23T10:14:44.465954Z",
+                  "visibility": "private",
+                  "warnings": []
                 }
               }
             },
@@ -19299,8 +20149,24 @@
                   "items": {
                     "$ref": "#/components/schemas/CollectionResponse"
                   },
-                  "title": "Response List Collections"
-                }
+                  "title": "Response List Collections",
+                  "description": "Each entry is a `CollectionResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "Things to watch soon.",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "item_count": 3,
+                    "item_count_capped": false,
+                    "kind": "manual",
+                    "name": "Weekend watchlist",
+                    "slug": "weekend-watchlist",
+                    "updated_at": "2026-08-23T10:14:44.465954Z",
+                    "visibility": "private",
+                    "warnings": []
+                  }
+                ]
               }
             },
             "headers": {
@@ -19537,8 +20403,17 @@
                   "items": {
                     "$ref": "#/components/schemas/DeletedCollectionResponse"
                   },
-                  "title": "Response List Deleted Collections"
-                }
+                  "title": "Response List Deleted Collections",
+                  "description": "Each entry is a `DeletedCollectionResponse`."
+                },
+                "example": [
+                  {
+                    "deleted_at": "2026-10-25T09:30:12.104233Z",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "kind": "manual",
+                    "name": "Weekend watchlist"
+                  }
+                ]
               }
             },
             "headers": {
@@ -19757,6 +20632,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CollectionResponse"
+                },
+                "example": {
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "Things to watch soon.",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "item_count": 3,
+                  "item_count_capped": false,
+                  "kind": "manual",
+                  "name": "Weekend watchlist",
+                  "slug": "weekend-watchlist",
+                  "updated_at": "2026-08-23T10:14:44.465954Z",
+                  "visibility": "private",
+                  "warnings": []
                 }
               }
             },
@@ -20023,6 +20911,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CollectionResponse"
+                },
+                "example": {
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "Things to watch soon.",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "item_count": 3,
+                  "item_count_capped": false,
+                  "kind": "manual",
+                  "name": "Weekend watchlist",
+                  "slug": "weekend-watchlist",
+                  "updated_at": "2026-08-23T10:14:44.465954Z",
+                  "visibility": "private",
+                  "warnings": []
                 }
               }
             },
@@ -20499,6 +21400,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CollectionCountResponse"
+                },
+                "example": {
+                  "count": 1234
                 }
               }
             }
@@ -20697,6 +21601,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AddItemsResponse"
+                },
+                "example": {
+                  "added": 2
                 }
               }
             }
@@ -21146,6 +22053,19 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CollectionResponse"
+                },
+                "example": {
+                  "created_at": "2026-08-23T10:14:44.465954Z",
+                  "description": "Things to watch soon.",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                  "item_count": 3,
+                  "item_count_capped": false,
+                  "kind": "manual",
+                  "name": "Weekend watchlist",
+                  "slug": "weekend-watchlist",
+                  "updated_at": "2026-08-23T10:14:44.465954Z",
+                  "visibility": "private",
+                  "warnings": []
                 }
               }
             }
@@ -21648,6 +22568,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
                 }
               }
             }
@@ -21755,6 +22686,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
                 }
               }
             }
@@ -21928,6 +22870,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
                 }
               }
             }
@@ -22109,7 +23062,8 @@
                     "$ref": "#/components/schemas/OwnDeviceResponse"
                   },
                   "type": "array",
-                  "title": "Response List Own Devices"
+                  "title": "Response List Own Devices",
+                  "description": "Each entry is a `OwnDeviceResponse`."
                 },
                 "example": [
                   {
@@ -22435,8 +23389,24 @@
                     "$ref": "#/components/schemas/SessionResponse"
                   },
                   "type": "array",
-                  "title": "Response List Own Sessions"
-                }
+                  "title": "Response List Own Sessions",
+                  "description": "Each entry is a `SessionResponse`."
+                },
+                "example": [
+                  {
+                    "client_ip": "192.0.2.1",
+                    "client_mobile": false,
+                    "client_platform": "Linux",
+                    "created_at": "2026-10-10T12:00:00.000000Z",
+                    "current": true,
+                    "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                    "display_mode": "standalone",
+                    "expires_at": "2026-10-11T12:00:00.000000Z",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                    "last_seen_at": "2026-10-10T12:30:00.000000Z",
+                    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0"
+                  }
+                ]
               }
             },
             "links": {
@@ -22543,6 +23513,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RevokedSessionsResponse"
+                },
+                "example": {
+                  "ended": 2
                 }
               }
             }
@@ -22829,6 +23802,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PermissionsResponse"
+                },
+                "example": {
+                  "permissions": [
+                    "graph:node_type:delete"
+                  ]
                 }
               }
             }
@@ -22959,8 +23937,22 @@
                     "$ref": "#/components/schemas/UserResponse"
                   },
                   "type": "array",
-                  "title": "Response List Users"
-                }
+                  "title": "Response List Users",
+                  "description": "Each entry is a `UserResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-10-10T12:00:00.000000Z",
+                    "disabled": false,
+                    "display_name": "Alice Example",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                    "last_login_at": "2026-10-11T08:30:00.000000Z",
+                    "password_expired": false,
+                    "role": "member",
+                    "updated_at": "2026-10-10T12:00:00.000000Z",
+                    "username": "alice"
+                  }
+                ]
               }
             },
             "links": {
@@ -23076,6 +24068,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
                 }
               }
             },
@@ -23273,6 +24276,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
                 }
               }
             },
@@ -23755,8 +24769,26 @@
                   "items": {
                     "$ref": "#/components/schemas/AdminSessionResponse"
                   },
-                  "title": "Response List Sessions"
-                }
+                  "title": "Response List Sessions",
+                  "description": "Each entry is a `AdminSessionResponse`."
+                },
+                "example": [
+                  {
+                    "client_ip": "192.0.2.1",
+                    "client_mobile": false,
+                    "client_platform": "Linux",
+                    "created_at": "2026-10-10T12:00:00.000000Z",
+                    "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                    "display_mode": "browser",
+                    "display_name": "Alice Example",
+                    "expires_at": "2026-10-11T12:00:00.000000Z",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                    "last_seen_at": "2026-10-10T12:30:00.000000Z",
+                    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+                    "user_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e51",
+                    "username": "alice"
+                  }
+                ]
               }
             },
             "links": {
@@ -24023,6 +25055,11 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GrantablePermissionsResponse"
+                },
+                "example": {
+                  "permissions": [
+                    "graph:item:read"
+                  ]
                 }
               }
             }
@@ -24125,8 +25162,20 @@
                     "$ref": "#/components/schemas/ApiTokenResponse"
                   },
                   "type": "array",
-                  "title": "Response List Api Tokens"
-                }
+                  "title": "Response List Api Tokens",
+                  "description": "Each entry is a `ApiTokenResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-10-10T12:00:00.000000Z",
+                    "expires_at": "2027-01-08T12:00:00.000000Z",
+                    "grants": [
+                      "graph:item:read"
+                    ],
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e60",
+                    "name": "Backup script"
+                  }
+                ]
               }
             },
             "links": {
@@ -24249,6 +25298,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CreatedApiTokenResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "expires_at": "2027-01-08T12:00:00.000000Z",
+                  "grants": [
+                    "graph:item:read"
+                  ],
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e60",
+                  "name": "Backup script",
+                  "token": "mnst_<id>_<secret>"
                 }
               }
             },
@@ -24488,6 +25547,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CreatedApiTokenResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "expires_at": "2027-01-08T12:00:00.000000Z",
+                  "grants": [
+                    "graph:item:read"
+                  ],
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e60",
+                  "name": "Backup script",
+                  "token": "mnst_<id>_<secret>"
                 }
               }
             }
@@ -25031,6 +26100,18 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VersionDetailResponse"
+                },
+                "example": {
+                  "branch": "main",
+                  "build_timestamp": "2026-01-01T00:00:00.000000+00:00",
+                  "commit_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+                  "current_version": "1.2.3",
+                  "dirty": false,
+                  "migration_head": [
+                    "a1b2c3d4e5f6"
+                  ],
+                  "name": "menagerist",
+                  "short_sha": "a1b2c3d"
                 }
               }
             }
@@ -25241,6 +26322,12 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BrowserCheckResponse"
+                },
+                "example": {
+                  "origin": "https://menagerist.example",
+                  "sec_fetch_site": "same-origin",
+                  "seen_origin": "https://menagerist.example",
+                  "status": "pass"
                 }
               }
             }
@@ -25341,6 +26428,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthStatusResponse"
+                },
+                "example": {
+                  "setup_required": true
                 }
               }
             }
@@ -25407,6 +26497,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SetupResponse"
+                },
+                "example": {
+                  "claimed": {
+                    "collections": 2
+                  },
+                  "user": {
+                    "created_at": "2026-10-10T12:00:00.000000Z",
+                    "disabled": false,
+                    "display_name": "Alice Example",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                    "last_login_at": "2026-10-11T08:30:00.000000Z",
+                    "password_expired": false,
+                    "role": "member",
+                    "updated_at": "2026-10-10T12:00:00.000000Z",
+                    "username": "alice"
+                  }
                 }
               }
             }
@@ -25550,6 +26656,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
                 }
               }
             }
@@ -25678,7 +26795,8 @@
             "application/gzip": {
               "schema": {
                 "type": "string",
-                "format": "binary"
+                "format": "binary",
+                "description": "A Menagerist archive: a gzipped tar file."
               }
             }
           },
@@ -25873,6 +26991,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VersionResponse"
+                },
+                "example": {
+                  "current_version": "1.2.3",
+                  "name": "menagerist"
                 }
               }
             }
@@ -25924,6 +27046,30 @@
               "application/manifest+json": {
                 "schema": {
                   "$ref": "#/components/schemas/WebAppManifestResponse"
+                },
+                "example": {
+                  "background_color": "#ffffff",
+                  "categories": [
+                    "productivity"
+                  ],
+                  "description": "A self-hosted platform for organising things.",
+                  "dir": "ltr",
+                  "display": "standalone",
+                  "display_override": [
+                    "standalone",
+                    "minimal-ui"
+                  ],
+                  "icons": [],
+                  "id": "/",
+                  "lang": "en-GB",
+                  "name": "Menagerist",
+                  "orientation": "any",
+                  "scope": "/",
+                  "screenshots": [],
+                  "short_name": "Menagerist",
+                  "shortcuts": [],
+                  "start_url": "/",
+                  "theme_color": "#ffffff"
                 }
               }
             }
@@ -25946,7 +27092,8 @@
             },
             "type": "array",
             "maxItems": 500,
-            "title": "Item Ids"
+            "title": "Item Ids",
+            "description": "The items to put on the collection."
           }
         },
         "additionalProperties": false,
@@ -25989,16 +27136,19 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The session's id."
           },
           "user_id": {
             "type": "string",
             "format": "uuid",
-            "title": "User Id"
+            "title": "User Id",
+            "description": "The id of the account it belongs to."
           },
           "username": {
             "type": "string",
-            "title": "Username"
+            "title": "Username",
+            "description": "That account's sign-in name."
           },
           "display_name": {
             "anyOf": [
@@ -26009,7 +27159,8 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "title": "Display Name",
+            "description": "That account's display name."
           },
           "user_agent": {
             "anyOf": [
@@ -26020,7 +27171,8 @@
                 "type": "null"
               }
             ],
-            "title": "User Agent"
+            "title": "User Agent",
+            "description": "The browser's user agent when it signed in."
           },
           "client_platform": {
             "anyOf": [
@@ -26031,7 +27183,8 @@
                 "type": "null"
               }
             ],
-            "title": "Client Platform"
+            "title": "Client Platform",
+            "description": "The platform the browser reported, if any."
           },
           "client_mobile": {
             "anyOf": [
@@ -26042,7 +27195,8 @@
                 "type": "null"
               }
             ],
-            "title": "Client Mobile"
+            "title": "Client Mobile",
+            "description": "Whether the browser reported a mobile device."
           },
           "client_ip": {
             "anyOf": [
@@ -26053,22 +27207,26 @@
                 "type": "null"
               }
             ],
-            "title": "Client Ip"
+            "title": "Client Ip",
+            "description": "The address the session signed in from."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When the session started."
           },
           "last_seen_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Last Seen At"
+            "title": "Last Seen At",
+            "description": "The session's latest request."
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Expires At"
+            "title": "Expires At",
+            "description": "When the session ends unless used."
           },
           "device_id": {
             "anyOf": [
@@ -26129,28 +27287,33 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The token's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its label."
           },
           "grants": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Grants"
+            "title": "Grants",
+            "description": "The permissions it holds."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Expires At"
+            "title": "Expires At",
+            "description": "When it stops working."
           },
           "last_used_at": {
             "anyOf": [
@@ -26196,7 +27359,8 @@
           "target_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Target Id"
+            "title": "Target Id",
+            "description": "The id of what to attach it to."
           },
           "attribute_key": {
             "anyOf": [
@@ -26206,7 +27370,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The slot it fills, such as `cover`; none for a plain attachment."
           }
         },
         "additionalProperties": false,
@@ -26246,7 +27411,8 @@
         "properties": {
           "count": {
             "type": "integer",
-            "title": "Count"
+            "title": "Count",
+            "description": "How many hold the field."
           }
         },
         "type": "object",
@@ -26265,11 +27431,13 @@
         "properties": {
           "value": {
             "type": "string",
-            "title": "Value"
+            "title": "Value",
+            "description": "A value the field has held."
           },
           "count": {
             "type": "integer",
-            "title": "Count"
+            "title": "Count",
+            "description": "How many items hold it."
           }
         },
         "type": "object",
@@ -26290,7 +27458,8 @@
         "properties": {
           "setup_required": {
             "type": "boolean",
-            "title": "Setup Required"
+            "title": "Setup Required",
+            "description": "Whether the first administrator still has to be created."
           }
         },
         "type": "object",
@@ -26323,28 +27492,34 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The archive's id."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its label."
           },
           "size": {
             "type": "integer",
-            "title": "Size"
+            "title": "Size",
+            "description": "Its size in bytes."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was made."
           },
           "alembic_revision": {
             "type": "string",
-            "title": "Alembic Revision"
+            "title": "Alembic Revision",
+            "description": "The database schema revision it was taken at."
           },
           "app_version": {
             "type": "string",
-            "title": "App Version"
+            "title": "App Version",
+            "description": "The Menagerist version that made it."
           }
         },
         "type": "object",
@@ -27359,12 +28534,14 @@
           "current_password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Current Password"
+            "title": "Current Password",
+            "description": "Your passphrase now."
           },
           "new_password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "New Password"
+            "title": "New Password",
+            "description": "The passphrase to change to."
           }
         },
         "additionalProperties": false,
@@ -27523,15 +28700,18 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The collection's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its name."
           },
           "slug": {
             "type": "string",
-            "title": "Slug"
+            "title": "Slug",
+            "description": "Its short name for links, unique among yours."
           },
           "description": {
             "anyOf": [
@@ -27542,14 +28722,16 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "kind": {
             "$ref": "#/components/schemas/CollectionKind"
           },
           "visibility": {
             "type": "string",
-            "title": "Visibility"
+            "title": "Visibility",
+            "description": "Who can see it; only `private` for now."
           },
           "definition": {
             "anyOf": [
@@ -27586,12 +28768,14 @@
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           }
         },
         "type": "object",
@@ -27657,12 +28841,14 @@
           "name": {
             "type": "string",
             "maxLength": 256,
-            "title": "Name"
+            "title": "Name",
+            "description": "A label to recognise the token by."
           },
           "password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Password"
+            "title": "Password",
+            "description": "Your current passphrase, to confirm it is you."
           },
           "grants": {
             "items": {
@@ -27713,6 +28899,7 @@
             "maxLength": 120,
             "minLength": 1,
             "title": "Label",
+            "description": "A short label for the archive.",
             "default": "manual"
           }
         },
@@ -27731,7 +28918,8 @@
           "name": {
             "type": "string",
             "maxLength": 120,
-            "title": "Name"
+            "title": "Name",
+            "description": "The collection's name."
           },
           "description": {
             "anyOf": [
@@ -27742,7 +28930,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "slug": {
             "anyOf": [
@@ -27819,21 +29008,25 @@
           "source_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Source Id"
+            "title": "Source Id",
+            "description": "The item the connection starts from."
           },
           "target_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Target Id"
+            "title": "Target Id",
+            "description": "The item it goes to."
           },
           "type": {
             "type": "string",
-            "title": "Type"
+            "title": "Type",
+            "description": "The slug of its connection type."
           },
           "attributes": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Attributes"
+            "title": "Attributes",
+            "description": "Its field values, keyed by field key."
           }
         },
         "additionalProperties": false,
@@ -27858,11 +29051,13 @@
         "properties": {
           "slug": {
             "type": "string",
-            "title": "Slug"
+            "title": "Slug",
+            "description": "Its short name, unique among yours; connections refer to it."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name, read from the source item."
           },
           "reverse_label": {
             "anyOf": [
@@ -27873,7 +29068,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reverse Label"
+            "title": "Reverse Label",
+            "description": "Its name read from the target item, such as `owned by`."
           },
           "description": {
             "anyOf": [
@@ -27884,11 +29080,13 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "directional": {
             "type": "boolean",
             "title": "Directional",
+            "description": "Whether the connection has a direction.",
             "default": true
           },
           "attributes_schema": {
@@ -27901,7 +29099,8 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes Schema"
+            "title": "Attributes Schema",
+            "description": "Its fields, as a JSON Schema."
           }
         },
         "additionalProperties": false,
@@ -27927,7 +29126,8 @@
           "source_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Source Id"
+            "title": "Source Id",
+            "description": "The item the connections start from."
           },
           "target_ids": {
             "items": {
@@ -27935,16 +29135,19 @@
               "format": "uuid"
             },
             "type": "array",
-            "title": "Target Ids"
+            "title": "Target Ids",
+            "description": "The items they go to."
           },
           "type": {
             "type": "string",
-            "title": "Type"
+            "title": "Type",
+            "description": "The slug of their connection type."
           },
           "attributes": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Attributes"
+            "title": "Attributes",
+            "description": "Field values given to every new connection."
           }
         },
         "additionalProperties": false,
@@ -27975,7 +29178,8 @@
               "$ref": "#/components/schemas/EdgeResponse"
             },
             "type": "array",
-            "title": "Created"
+            "title": "Created",
+            "description": "The connections made."
           },
           "skipped": {
             "items": {
@@ -27983,7 +29187,8 @@
               "format": "uuid"
             },
             "type": "array",
-            "title": "Skipped"
+            "title": "Skipped",
+            "description": "Targets left alone because they were already connected."
           }
         },
         "type": "object",
@@ -28016,7 +29221,8 @@
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "The item's name."
           },
           "type": {
             "anyOf": [
@@ -28027,7 +29233,8 @@
                 "type": "null"
               }
             ],
-            "title": "Type"
+            "title": "Type",
+            "description": "The slug of its item type; none for an untyped item."
           },
           "description": {
             "anyOf": [
@@ -28038,16 +29245,19 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about the item."
           },
           "attributes": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Attributes"
+            "title": "Attributes",
+            "description": "Its field values, keyed by field key."
           },
           "favourite": {
             "type": "boolean",
             "title": "Favourite",
+            "description": "Whether it is a favourite.",
             "default": false
           },
           "tags": {
@@ -28055,7 +29265,8 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Tags"
+            "title": "Tags",
+            "description": "Its tags."
           },
           "extra_schema": {
             "anyOf": [
@@ -28067,7 +29278,8 @@
                 "type": "null"
               }
             ],
-            "title": "Extra Schema"
+            "title": "Extra Schema",
+            "description": "Fields of its own, beyond its type's, as a JSON Schema."
           }
         },
         "additionalProperties": false,
@@ -28095,11 +29307,13 @@
         "properties": {
           "slug": {
             "type": "string",
-            "title": "Slug"
+            "title": "Slug",
+            "description": "Its short name, unique among yours; items refer to it."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name, for people."
           },
           "description": {
             "anyOf": [
@@ -28110,7 +29324,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "attributes_schema": {
             "anyOf": [
@@ -28122,7 +29337,8 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes Schema"
+            "title": "Attributes Schema",
+            "description": "Its fields, as a JSON Schema."
           },
           "icon": {
             "anyOf": [
@@ -28171,11 +29387,13 @@
         "properties": {
           "kind": {
             "type": "string",
-            "title": "Kind"
+            "title": "Kind",
+            "description": "What it saves: `field`, `field_set` or `choice_list`."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name."
           },
           "description": {
             "anyOf": [
@@ -28186,12 +29404,14 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "definition": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Definition"
+            "title": "Definition",
+            "description": "What is saved; for a `field`, its JSON Schema under `property`."
           }
         },
         "additionalProperties": false,
@@ -28228,17 +29448,20 @@
           "username": {
             "type": "string",
             "maxLength": 64,
-            "title": "Username"
+            "title": "Username",
+            "description": "The sign-in name."
           },
           "display_name": {
             "type": "string",
             "maxLength": 120,
-            "title": "Display Name"
+            "title": "Display Name",
+            "description": "The name shown to people."
           },
           "password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Password"
+            "title": "Password",
+            "description": "An initial passphrase, to change at first sign-in."
           },
           "role": {
             "$ref": "#/components/schemas/Role",
@@ -28268,28 +29491,33 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The token's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its label."
           },
           "grants": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Grants"
+            "title": "Grants",
+            "description": "The permissions it holds."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Expires At"
+            "title": "Expires At",
+            "description": "When it stops working."
           },
           "last_used_at": {
             "anyOf": [
@@ -28343,7 +29571,8 @@
           },
           "message": {
             "type": "string",
-            "title": "Message"
+            "title": "Message",
+            "description": "Why it no longer applies."
           }
         },
         "type": "object",
@@ -28365,11 +29594,13 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The collection's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its name."
           },
           "kind": {
             "$ref": "#/components/schemas/CollectionKind"
@@ -28377,7 +29608,8 @@
           "deleted_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Deleted At"
+            "title": "Deleted At",
+            "description": "When it was deleted."
           }
         },
         "type": "object",
@@ -28409,11 +29641,13 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The item's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its name."
           },
           "type": {
             "anyOf": [
@@ -28424,12 +29658,14 @@
                 "type": "null"
               }
             ],
-            "title": "Type"
+            "title": "Type",
+            "description": "The slug of its item type; null if untyped."
           },
           "deleted_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Deleted At"
+            "title": "Deleted At",
+            "description": "When it was deleted."
           }
         },
         "type": "object",
@@ -28467,26 +29703,31 @@
         "properties": {
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "The copy's name."
           },
           "copy_relationships": {
             "type": "boolean",
             "title": "Copy Relationships",
+            "description": "Also copy the item's connections.",
             "default": false
           },
           "copy_media": {
             "type": "boolean",
             "title": "Copy Media",
+            "description": "Also attach the item's media to the copy.",
             "default": false
           },
           "copy_cover": {
             "type": "boolean",
             "title": "Copy Cover",
+            "description": "Also give the copy the item's cover.",
             "default": false
           },
           "copy_collections": {
             "type": "boolean",
             "title": "Copy Collections",
+            "description": "Also add the copy to the item's collections.",
             "default": true
           }
         },
@@ -28579,36 +29820,43 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The connection's id."
           },
           "source_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Source Id"
+            "title": "Source Id",
+            "description": "The item it starts from."
           },
           "target_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Target Id"
+            "title": "Target Id",
+            "description": "The item it goes to."
           },
           "type": {
             "type": "string",
-            "title": "Type"
+            "title": "Type",
+            "description": "The slug of its connection type."
           },
           "attributes": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Attributes"
+            "title": "Attributes",
+            "description": "Its field values, keyed by field key."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           }
         },
         "type": "object",
@@ -28640,15 +29888,18 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The connection type's id."
           },
           "slug": {
             "type": "string",
-            "title": "Slug"
+            "title": "Slug",
+            "description": "Its short name; connections refer to it."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name, read from the source item."
           },
           "reverse_label": {
             "anyOf": [
@@ -28659,7 +29910,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reverse Label"
+            "title": "Reverse Label",
+            "description": "Its name read from the target item; null if the same."
           },
           "description": {
             "anyOf": [
@@ -28670,11 +29922,13 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "directional": {
             "type": "boolean",
-            "title": "Directional"
+            "title": "Directional",
+            "description": "Whether the connection has a direction."
           },
           "attributes_schema": {
             "anyOf": [
@@ -28686,17 +29940,20 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes Schema"
+            "title": "Attributes Schema",
+            "description": "Its fields, as a JSON Schema."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           }
         },
         "type": "object",
@@ -28748,7 +30005,8 @@
               "format": "uuid"
             },
             "type": "array",
-            "title": "Item Ids"
+            "title": "Item Ids",
+            "description": "Items that example sets own."
           },
           "item_type_ids": {
             "items": {
@@ -28756,7 +30014,8 @@
               "format": "uuid"
             },
             "type": "array",
-            "title": "Item Type Ids"
+            "title": "Item Type Ids",
+            "description": "Item types that example sets own."
           },
           "collection_ids": {
             "items": {
@@ -28764,7 +30023,8 @@
               "format": "uuid"
             },
             "type": "array",
-            "title": "Collection Ids"
+            "title": "Collection Ids",
+            "description": "Collections that example sets own."
           }
         },
         "type": "object",
@@ -28793,15 +30053,18 @@
         "properties": {
           "id": {
             "type": "string",
-            "title": "Id"
+            "title": "Id",
+            "description": "The example set's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its name."
           },
           "description": {
             "type": "string",
-            "title": "Description"
+            "title": "Description",
+            "description": "What it contains, for a person to read."
           },
           "counts": {
             "$ref": "#/components/schemas/PackCountsResponse"
@@ -28841,7 +30104,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Its installation on this server; null if not added."
           }
         },
         "type": "object",
@@ -28922,7 +30186,8 @@
           },
           "member": {
             "type": "string",
-            "title": "Member"
+            "title": "Member",
+            "description": "The file in the archive the finding is about."
           },
           "expected": {
             "anyOf": [
@@ -28933,7 +30198,8 @@
                 "type": "null"
               }
             ],
-            "title": "Expected"
+            "title": "Expected",
+            "description": "What the manifest records, if anything."
           },
           "actual": {
             "anyOf": [
@@ -28944,7 +30210,8 @@
                 "type": "null"
               }
             ],
-            "title": "Actual"
+            "title": "Actual",
+            "description": "What the archive holds, if anything."
           }
         },
         "type": "object",
@@ -29009,7 +30276,8 @@
               ]
             },
             "type": "array",
-            "title": "Permissions"
+            "title": "Permissions",
+            "description": "Permissions a token of yours may hold."
           }
         },
         "type": "object",
@@ -29294,7 +30562,8 @@
         "properties": {
           "pack_id": {
             "type": "string",
-            "title": "Pack Id"
+            "title": "Pack Id",
+            "description": "The example set added."
           },
           "created": {
             "$ref": "#/components/schemas/PackCountsResponse"
@@ -29355,7 +30624,8 @@
                 "type": "null"
               }
             ],
-            "title": "Installed At"
+            "title": "Installed At",
+            "description": "When the set was added; null while it is still being added."
           },
           "counts": {
             "$ref": "#/components/schemas/PackCountsResponse"
@@ -29399,7 +30669,8 @@
         "properties": {
           "key": {
             "type": "string",
-            "title": "Key"
+            "title": "Key",
+            "description": "The field's key."
           },
           "kind": {
             "type": "string",
@@ -29439,7 +30710,8 @@
         "properties": {
           "job_key": {
             "type": "string",
-            "title": "Job Key"
+            "title": "Job Key",
+            "description": "The job's key, such as `backup`."
           },
           "title": {
             "type": "string",
@@ -29462,7 +30734,8 @@
           },
           "run_now_allowed": {
             "type": "boolean",
-            "title": "Run Now Allowed"
+            "title": "Run Now Allowed",
+            "description": "Whether it may be run by hand now, outside its schedule."
           },
           "confirm_required": {
             "type": "boolean",
@@ -29585,11 +30858,13 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The run's id."
           },
           "job_key": {
             "type": "string",
-            "title": "Job Key"
+            "title": "Job Key",
+            "description": "The key of the job it ran."
           },
           "status": {
             "$ref": "#/components/schemas/RunStatus"
@@ -29603,7 +30878,8 @@
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When the run was queued."
           },
           "started_at": {
             "anyOf": [
@@ -29615,7 +30891,8 @@
                 "type": "null"
               }
             ],
-            "title": "Started At"
+            "title": "Started At",
+            "description": "When it started; null while it waits."
           },
           "finished_at": {
             "anyOf": [
@@ -29627,7 +30904,8 @@
                 "type": "null"
               }
             ],
-            "title": "Finished At"
+            "title": "Finished At",
+            "description": "When it finished; null until then."
           },
           "error": {
             "anyOf": [
@@ -29692,15 +30970,18 @@
         "properties": {
           "kind": {
             "type": "string",
-            "title": "Kind"
+            "title": "Kind",
+            "description": "What sort of thing was kept, such as `item`."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name."
           },
           "reason": {
             "type": "string",
-            "title": "Reason"
+            "title": "Reason",
+            "description": "Why it was kept."
           }
         },
         "type": "object",
@@ -29733,12 +31014,14 @@
           "username": {
             "type": "string",
             "maxLength": 64,
-            "title": "Username"
+            "title": "Username",
+            "description": "The account's sign-in name."
           },
           "password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Password"
+            "title": "Password",
+            "description": "The account's passphrase."
           }
         },
         "additionalProperties": false,
@@ -29890,30 +31173,36 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The asset's id."
           },
           "filename": {
             "type": "string",
-            "title": "Filename"
+            "title": "Filename",
+            "description": "Its file name."
           },
           "content_type": {
             "type": "string",
-            "title": "Content Type"
+            "title": "Content Type",
+            "description": "Its media type, such as `image/jpeg`."
           },
           "size": {
             "type": "integer",
-            "title": "Size"
+            "title": "Size",
+            "description": "Its size in bytes."
           },
           "sha256": {
             "type": "string",
-            "title": "Sha256"
+            "title": "Sha256",
+            "description": "The SHA-256 of its bytes, in hex."
           },
           "status": {
             "$ref": "#/components/schemas/MediaStatus"
           },
           "content_url": {
             "type": "string",
-            "title": "Content Url"
+            "title": "Content Url",
+            "description": "Where to download the file."
           },
           "thumbnail_url": {
             "anyOf": [
@@ -29924,17 +31213,20 @@
                 "type": "null"
               }
             ],
-            "title": "Thumbnail Url"
+            "title": "Thumbnail Url",
+            "description": "Where to fetch a WebP thumbnail; null if there is none."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was uploaded."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           }
         },
         "type": "object",
@@ -29972,21 +31264,25 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The attachment's id."
           },
           "asset_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Asset Id"
+            "title": "Asset Id",
+            "description": "The asset attached."
           },
           "target_type": {
             "type": "string",
-            "title": "Target Type"
+            "title": "Target Type",
+            "description": "What it is attached to: `node` or `edge`."
           },
           "target_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Target Id"
+            "title": "Target Id",
+            "description": "The id of what it is attached to."
           },
           "attribute_key": {
             "anyOf": [
@@ -29996,12 +31292,14 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The slot it fills, such as `cover`; null for a plain attachment."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was attached."
           }
         },
         "type": "object",
@@ -30122,30 +31420,36 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The asset's id."
           },
           "filename": {
             "type": "string",
-            "title": "Filename"
+            "title": "Filename",
+            "description": "Its file name."
           },
           "content_type": {
             "type": "string",
-            "title": "Content Type"
+            "title": "Content Type",
+            "description": "Its media type, such as `image/jpeg`."
           },
           "size": {
             "type": "integer",
-            "title": "Size"
+            "title": "Size",
+            "description": "Its size in bytes."
           },
           "sha256": {
             "type": "string",
-            "title": "Sha256"
+            "title": "Sha256",
+            "description": "The SHA-256 of its bytes, in hex."
           },
           "status": {
             "$ref": "#/components/schemas/MediaStatus"
           },
           "content_url": {
             "type": "string",
-            "title": "Content Url"
+            "title": "Content Url",
+            "description": "Where to download the file."
           },
           "thumbnail_url": {
             "anyOf": [
@@ -30156,17 +31460,20 @@
                 "type": "null"
               }
             ],
-            "title": "Thumbnail Url"
+            "title": "Thumbnail Url",
+            "description": "Where to fetch a WebP thumbnail; null if there is none."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was uploaded."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           },
           "attribute_key": {
             "anyOf": [
@@ -30176,7 +31483,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The slot it fills on the item, such as `cover`; null if none."
           }
         },
         "type": "object",
@@ -30216,11 +31524,13 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The item's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its name."
           },
           "type": {
             "anyOf": [
@@ -30231,7 +31541,8 @@
                 "type": "null"
               }
             ],
-            "title": "Type"
+            "title": "Type",
+            "description": "The slug of its item type; null if untyped."
           },
           "description": {
             "anyOf": [
@@ -30242,23 +31553,27 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "attributes": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Attributes"
+            "title": "Attributes",
+            "description": "Its field values, keyed by field key."
           },
           "favourite": {
             "type": "boolean",
-            "title": "Favourite"
+            "title": "Favourite",
+            "description": "Whether it is a favourite."
           },
           "tags": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Tags"
+            "title": "Tags",
+            "description": "Its tags."
           },
           "extra_schema": {
             "anyOf": [
@@ -30270,17 +31585,20 @@
                 "type": "null"
               }
             ],
-            "title": "Extra Schema"
+            "title": "Extra Schema",
+            "description": "Fields of its own, beyond its type's, as a JSON Schema."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           }
         },
         "type": "object",
@@ -30327,7 +31645,8 @@
         "properties": {
           "total": {
             "type": "integer",
-            "title": "Total"
+            "title": "Total",
+            "description": "How many items match."
           },
           "total_capped": {
             "type": "boolean",
@@ -30339,7 +31658,8 @@
               "$ref": "#/components/schemas/QueryWarningResponse"
             },
             "type": "array",
-            "title": "Warnings"
+            "title": "Warnings",
+            "description": "Parts of the query that no longer apply."
           }
         },
         "type": "object",
@@ -30408,7 +31728,8 @@
               "$ref": "#/components/schemas/NodeSearchCountResponse"
             },
             "type": "object",
-            "title": "Counts"
+            "title": "Counts",
+            "description": "Each query's count, under the name it was sent with."
           }
         },
         "type": "object",
@@ -30447,6 +31768,7 @@
             "maximum": 200.0,
             "minimum": 1.0,
             "title": "Limit",
+            "description": "Most items to return on this page.",
             "default": 50
           },
           "cursor": {
@@ -30502,11 +31824,13 @@
               "$ref": "#/components/schemas/NodeResponse"
             },
             "type": "array",
-            "title": "Items"
+            "title": "Items",
+            "description": "This page of matching items."
           },
           "total": {
             "type": "integer",
-            "title": "Total"
+            "title": "Total",
+            "description": "How many items match."
           },
           "total_capped": {
             "type": "boolean",
@@ -30522,14 +31846,16 @@
                 "type": "null"
               }
             ],
-            "title": "Next Cursor"
+            "title": "Next Cursor",
+            "description": "Pass as `cursor` for the next page; null on the last."
           },
           "warnings": {
             "items": {
               "$ref": "#/components/schemas/QueryWarningResponse"
             },
             "type": "array",
-            "title": "Warnings"
+            "title": "Warnings",
+            "description": "Parts of the query that no longer apply."
           }
         },
         "type": "object",
@@ -30606,15 +31932,18 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The item type's id."
           },
           "slug": {
             "type": "string",
-            "title": "Slug"
+            "title": "Slug",
+            "description": "Its short name; items refer to it."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name, for people."
           },
           "description": {
             "anyOf": [
@@ -30625,7 +31954,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "attributes_schema": {
             "anyOf": [
@@ -30637,7 +31967,8 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes Schema"
+            "title": "Attributes Schema",
+            "description": "Its fields, as a JSON Schema."
           },
           "icon": {
             "anyOf": [
@@ -30666,12 +31997,14 @@
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           }
         },
         "type": "object",
@@ -30824,27 +32157,33 @@
         "properties": {
           "presets": {
             "type": "integer",
-            "title": "Presets"
+            "title": "Presets",
+            "description": "Saved fields."
           },
           "relationship_types": {
             "type": "integer",
-            "title": "Relationship Types"
+            "title": "Relationship Types",
+            "description": "Connection types."
           },
           "item_types": {
             "type": "integer",
-            "title": "Item Types"
+            "title": "Item Types",
+            "description": "Item types."
           },
           "items": {
             "type": "integer",
-            "title": "Items"
+            "title": "Items",
+            "description": "Items."
           },
           "connections": {
             "type": "integer",
-            "title": "Connections"
+            "title": "Connections",
+            "description": "Connections between items."
           },
           "collections": {
             "type": "integer",
-            "title": "Collections"
+            "title": "Collections",
+            "description": "Collections."
           }
         },
         "type": "object",
@@ -30873,11 +32212,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "title": "Id"
+            "title": "Id",
+            "description": "The example set's id."
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Its name."
           }
         },
         "type": "object",
@@ -30938,7 +32279,8 @@
               ]
             },
             "type": "array",
-            "title": "Permissions"
+            "title": "Permissions",
+            "description": "The permissions your account holds."
           }
         },
         "type": "object",
@@ -31129,15 +32471,18 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The saved field's id."
           },
           "kind": {
             "type": "string",
-            "title": "Kind"
+            "title": "Kind",
+            "description": "What it saves: `field`, `field_set` or `choice_list`."
           },
           "label": {
             "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name."
           },
           "description": {
             "anyOf": [
@@ -31148,26 +32493,31 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "definition": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Definition"
+            "title": "Definition",
+            "description": "What is saved; for a `field`, its JSON Schema under `property`."
           },
           "version": {
             "type": "integer",
-            "title": "Version"
+            "title": "Version",
+            "description": "Goes up by one each time the settings change."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was created."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When it last changed."
           }
         },
         "type": "object",
@@ -31293,7 +32643,8 @@
           "node_type_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Node Type Id"
+            "title": "Node Type Id",
+            "description": "The item type to move the field to."
           }
         },
         "additionalProperties": false,
@@ -31321,7 +32672,8 @@
                 "type": "null"
               }
             ],
-            "title": "Keep Last"
+            "title": "Keep Last",
+            "description": "Ordinary archives to keep; the setting applies when omitted."
           },
           "older_than_days": {
             "anyOf": [
@@ -31333,7 +32685,8 @@
                 "type": "null"
               }
             ],
-            "title": "Older Than Days"
+            "title": "Older Than Days",
+            "description": "Also keep any archive younger than this many days."
           },
           "pre_migration_keep": {
             "anyOf": [
@@ -31345,11 +32698,13 @@
                 "type": "null"
               }
             ],
-            "title": "Pre Migration Keep"
+            "title": "Pre Migration Keep",
+            "description": "Pre-migration archives to keep; the setting applies when omitted."
           },
           "dry_run": {
             "type": "boolean",
             "title": "Dry Run",
+            "description": "Only report what would be deleted.",
             "default": false
           }
         },
@@ -31373,39 +32728,45 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Deleted"
+            "title": "Deleted",
+            "description": "Ids of the archives deleted, or that would be."
           },
           "kept": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Kept"
+            "title": "Kept",
+            "description": "Ids of the archives kept."
           },
           "freed_bytes": {
             "type": "integer",
-            "title": "Freed Bytes"
+            "title": "Freed Bytes",
+            "description": "Storage reclaimed, in bytes."
           },
           "orphans_removed": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Orphans Removed"
+            "title": "Orphans Removed",
+            "description": "Leftover files with no archive record that were removed."
           },
           "unreadable": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Unreadable"
+            "title": "Unreadable",
+            "description": "Archives that could not be read and were left alone."
           },
           "user_exports_removed": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "User Exports Removed"
+            "title": "User Exports Removed",
+            "description": "Ids of expired personal exports removed."
           }
         },
         "type": "object",
@@ -31436,11 +32797,13 @@
         "properties": {
           "path": {
             "type": "string",
-            "title": "Path"
+            "title": "Path",
+            "description": "Where it is in the query, such as `where.children[0]`."
           },
           "message": {
             "type": "string",
-            "title": "Message"
+            "title": "Message",
+            "description": "Why it no longer applies."
           }
         },
         "type": "object",
@@ -31710,7 +33073,8 @@
           "password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Password"
+            "title": "Password",
+            "description": "A new initial passphrase, to change at next sign-in."
           }
         },
         "additionalProperties": false,
@@ -31730,7 +33094,8 @@
         "properties": {
           "ended": {
             "type": "integer",
-            "title": "Ended"
+            "title": "Ended",
+            "description": "How many other sessions were ended."
           }
         },
         "type": "object",
@@ -31759,7 +33124,8 @@
           "password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Password"
+            "title": "Password",
+            "description": "Your current passphrase, to confirm it is you."
           },
           "expires_in_days": {
             "anyOf": [
@@ -32010,7 +33376,8 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The session's id."
           },
           "user_agent": {
             "anyOf": [
@@ -32021,7 +33388,8 @@
                 "type": "null"
               }
             ],
-            "title": "User Agent"
+            "title": "User Agent",
+            "description": "The browser's user agent when it signed in."
           },
           "client_platform": {
             "anyOf": [
@@ -32032,7 +33400,8 @@
                 "type": "null"
               }
             ],
-            "title": "Client Platform"
+            "title": "Client Platform",
+            "description": "The platform the browser reported, if any."
           },
           "client_mobile": {
             "anyOf": [
@@ -32043,7 +33412,8 @@
                 "type": "null"
               }
             ],
-            "title": "Client Mobile"
+            "title": "Client Mobile",
+            "description": "Whether the browser reported a mobile device."
           },
           "client_ip": {
             "anyOf": [
@@ -32054,22 +33424,26 @@
                 "type": "null"
               }
             ],
-            "title": "Client Ip"
+            "title": "Client Ip",
+            "description": "The address the session signed in from."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When the session started."
           },
           "last_seen_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Last Seen At"
+            "title": "Last Seen At",
+            "description": "The session's latest request."
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Expires At"
+            "title": "Expires At",
+            "description": "When the session ends unless used."
           },
           "device_id": {
             "anyOf": [
@@ -32097,7 +33471,8 @@
           },
           "current": {
             "type": "boolean",
-            "title": "Current"
+            "title": "Current",
+            "description": "Whether this is the session making the request."
           }
         },
         "type": "object",
@@ -32146,7 +33521,8 @@
             },
             "type": "array"
           }
-        ]
+        ],
+        "description": "A setting's value: a flag, number, text or list of text."
       },
       "SettingResponse": {
         "properties": {
@@ -32162,7 +33538,8 @@
           },
           "title": {
             "type": "string",
-            "title": "Title"
+            "title": "Title",
+            "description": "The setting's name, for people."
           },
           "description": {
             "anyOf": [
@@ -32173,7 +33550,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "What it does; null if the title says enough."
           },
           "value": {
             "$ref": "#/components/schemas/SettingJson",
@@ -32262,17 +33640,20 @@
           "username": {
             "type": "string",
             "maxLength": 64,
-            "title": "Username"
+            "title": "Username",
+            "description": "The administrator's sign-in name."
           },
           "display_name": {
             "type": "string",
             "maxLength": 120,
-            "title": "Display Name"
+            "title": "Display Name",
+            "description": "The name shown to people."
           },
           "password": {
             "type": "string",
             "maxLength": 1024,
-            "title": "Password"
+            "title": "Password",
+            "description": "The administrator's passphrase."
           }
         },
         "additionalProperties": false,
@@ -32337,14 +33718,16 @@
           "file": {
             "type": "string",
             "contentMediaType": "application/octet-stream",
-            "title": "File"
+            "title": "File",
+            "description": "The file to upload."
           }
         },
         "type": "object",
         "required": [
           "file"
         ],
-        "title": "StageMediaBody"
+        "title": "StageMediaBody",
+        "description": "The multipart form for `stage_media`."
       },
       "SystemPermission": {
         "type": "string",
@@ -32368,7 +33751,8 @@
         "properties": {
           "pack_id": {
             "type": "string",
-            "title": "Pack Id"
+            "title": "Pack Id",
+            "description": "The example set removed."
           },
           "removed": {
             "$ref": "#/components/schemas/PackCountsResponse"
@@ -32378,7 +33762,8 @@
               "$ref": "#/components/schemas/KeptEntityResponse"
             },
             "type": "array",
-            "title": "Kept"
+            "title": "Kept",
+            "description": "What was left in place, and why."
           }
         },
         "type": "object",
@@ -32422,7 +33807,8 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "Name",
+            "description": "The collection's name."
           },
           "description": {
             "anyOf": [
@@ -32433,7 +33819,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "definition": {
             "anyOf": [
@@ -32498,7 +33885,8 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes"
+            "title": "Attributes",
+            "description": "Its field values, keyed by field key; replaces them all."
           }
         },
         "additionalProperties": false,
@@ -32524,7 +33912,8 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name, read from the source item."
           },
           "reverse_label": {
             "anyOf": [
@@ -32535,7 +33924,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reverse Label"
+            "title": "Reverse Label",
+            "description": "Its name read from the target item."
           },
           "description": {
             "anyOf": [
@@ -32546,7 +33936,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "directional": {
             "anyOf": [
@@ -32557,7 +33948,8 @@
                 "type": "null"
               }
             ],
-            "title": "Directional"
+            "title": "Directional",
+            "description": "Whether the connection has a direction."
           },
           "attributes_schema": {
             "anyOf": [
@@ -32569,7 +33961,8 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes Schema"
+            "title": "Attributes Schema",
+            "description": "Its fields, as a JSON Schema; replaces them all."
           }
         },
         "additionalProperties": false,
@@ -32588,7 +33981,8 @@
           "display_name": {
             "type": "string",
             "maxLength": 120,
-            "title": "Display Name"
+            "title": "Display Name",
+            "description": "The name shown to people."
           }
         },
         "additionalProperties": false,
@@ -32608,7 +34002,8 @@
         "properties": {
           "filename": {
             "type": "string",
-            "title": "Filename"
+            "title": "Filename",
+            "description": "The new file name."
           }
         },
         "additionalProperties": false,
@@ -32635,7 +34030,8 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "Name",
+            "description": "The item's name."
           },
           "type": {
             "anyOf": [
@@ -32646,7 +34042,8 @@
                 "type": "null"
               }
             ],
-            "title": "Type"
+            "title": "Type",
+            "description": "The slug of its item type; null makes it untyped."
           },
           "description": {
             "anyOf": [
@@ -32657,7 +34054,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about the item."
           },
           "attributes": {
             "anyOf": [
@@ -32669,7 +34067,8 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes"
+            "title": "Attributes",
+            "description": "Its field values, keyed by field key; replaces them all."
           },
           "favourite": {
             "anyOf": [
@@ -32680,7 +34079,8 @@
                 "type": "null"
               }
             ],
-            "title": "Favourite"
+            "title": "Favourite",
+            "description": "Whether it is a favourite."
           },
           "tags": {
             "anyOf": [
@@ -32694,7 +34094,8 @@
                 "type": "null"
               }
             ],
-            "title": "Tags"
+            "title": "Tags",
+            "description": "Its tags; replaces them all."
           },
           "extra_schema": {
             "anyOf": [
@@ -32706,7 +34107,8 @@
                 "type": "null"
               }
             ],
-            "title": "Extra Schema"
+            "title": "Extra Schema",
+            "description": "Fields of its own, beyond its type's, as a JSON Schema."
           }
         },
         "additionalProperties": false,
@@ -32734,7 +34136,8 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name, for people."
           },
           "description": {
             "anyOf": [
@@ -32745,7 +34148,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "attributes_schema": {
             "anyOf": [
@@ -32757,7 +34161,8 @@
                 "type": "null"
               }
             ],
-            "title": "Attributes Schema"
+            "title": "Attributes Schema",
+            "description": "Its fields, as a JSON Schema; replaces them all."
           },
           "icon": {
             "anyOf": [
@@ -32806,7 +34211,8 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "Label",
+            "description": "Its name."
           },
           "description": {
             "anyOf": [
@@ -32817,7 +34223,8 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Description",
+            "description": "Free text about it."
           },
           "definition": {
             "anyOf": [
@@ -32829,7 +34236,8 @@
                 "type": "null"
               }
             ],
-            "title": "Definition"
+            "title": "Definition",
+            "description": "What is saved; a change bumps `version`."
           }
         },
         "additionalProperties": false,
@@ -32881,7 +34289,8 @@
                 "type": "null"
               }
             ],
-            "title": "Display Name"
+            "title": "Display Name",
+            "description": "The name shown to people."
           },
           "role": {
             "anyOf": [
@@ -32891,7 +34300,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The account's role."
           },
           "disabled": {
             "anyOf": [
@@ -32902,7 +34312,8 @@
                 "type": "null"
               }
             ],
-            "title": "Disabled"
+            "title": "Disabled",
+            "description": "Whether the account is blocked from signing in."
           }
         },
         "additionalProperties": false,
@@ -32922,7 +34333,8 @@
           "file": {
             "type": "string",
             "contentMediaType": "application/octet-stream",
-            "title": "File"
+            "title": "File",
+            "description": "The file to upload."
           },
           "target_type": {
             "$ref": "#/components/schemas/AttachmentTarget"
@@ -32930,7 +34342,8 @@
           "target_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Target Id"
+            "title": "Target Id",
+            "description": "The id of what to attach it to."
           },
           "attribute_key": {
             "anyOf": [
@@ -32940,7 +34353,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The slot it fills, such as `cover`; none for a plain one."
           }
         },
         "type": "object",
@@ -32949,28 +34363,33 @@
           "target_type",
           "target_id"
         ],
-        "title": "UploadAndAttachMediaBody"
+        "title": "UploadAndAttachMediaBody",
+        "description": "The multipart form for `upload_and_attach_media`."
       },
       "UserExportResponse": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The export's id."
           },
           "size": {
             "type": "integer",
-            "title": "Size"
+            "title": "Size",
+            "description": "Its size in bytes."
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When it was made."
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Expires At"
+            "title": "Expires At",
+            "description": "When it is deleted."
           }
         },
         "type": "object",
@@ -32996,26 +34415,31 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "title": "Id"
+            "title": "Id",
+            "description": "The account's id."
           },
           "username": {
             "type": "string",
-            "title": "Username"
+            "title": "Username",
+            "description": "The sign-in name."
           },
           "display_name": {
             "type": "string",
-            "title": "Display Name"
+            "title": "Display Name",
+            "description": "The name shown to people."
           },
           "role": {
             "$ref": "#/components/schemas/Role"
           },
           "password_expired": {
             "type": "boolean",
-            "title": "Password Expired"
+            "title": "Password Expired",
+            "description": "Whether the passphrase must be changed at the next sign-in."
           },
           "disabled": {
             "type": "boolean",
-            "title": "Disabled"
+            "title": "Disabled",
+            "description": "Whether the account is blocked from signing in."
           },
           "last_login_at": {
             "anyOf": [
@@ -33046,12 +34470,14 @@
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When the account was created."
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When the account last changed."
           }
         },
         "type": "object",
@@ -33088,7 +34514,8 @@
               "$ref": "#/components/schemas/FindingResponse"
             },
             "type": "array",
-            "title": "Findings"
+            "title": "Findings",
+            "description": "Everything wrong with the archive; empty if it is sound."
           }
         },
         "type": "object",
@@ -33452,23 +34879,28 @@
         ],
         "properties": {
           "type": {
+            "description": "A URI naming the kind of problem; `about:blank` when the status says it all.",
             "title": "Type",
             "type": "string"
           },
           "title": {
+            "description": "The kind of problem, the same for every occurrence.",
             "title": "Title",
             "type": "string"
           },
           "status": {
+            "description": "The HTTP status code.",
             "title": "Status",
             "type": "integer"
           },
-          "detail": {
-            "title": "Detail",
+          "instance": {
+            "description": "The URL of the request that failed.",
+            "title": "Instance",
             "type": "string"
           },
-          "instance": {
-            "title": "Instance",
+          "detail": {
+            "description": "What went wrong, for a person to read.",
+            "title": "Detail",
             "type": "string"
           },
           "errors": {
@@ -33487,6 +34919,7 @@
               }
             ],
             "default": null,
+            "description": "For a validation error, the offending fields and what is wrong.",
             "title": "Errors"
           }
         },
@@ -33494,68 +34927,118 @@
           "type",
           "title",
           "status",
-          "detail",
-          "instance"
+          "instance",
+          "detail"
         ],
         "title": "ProblemDetail",
         "type": "object"
       },
+      "FieldIssue": {
+        "description": "One field of a request that could not be accepted.",
+        "examples": [
+          {
+            "loc": [
+              "body",
+              "name"
+            ],
+            "msg": "Field required",
+            "type": "missing"
+          }
+        ],
+        "properties": {
+          "type": {
+            "description": "Machine-readable kind of failure.",
+            "title": "Type",
+            "type": "string"
+          },
+          "loc": {
+            "description": "Where the value is: `body`, `query`, `path` or `header`, then the field names and indexes.",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "description": "What is wrong, for a person to read.",
+            "title": "Msg",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "loc",
+          "msg"
+        ],
+        "title": "FieldIssue",
+        "type": "object"
+      },
       "ValidationProblem": {
-        "type": "object",
-        "title": "ValidationProblem",
+        "description": "An RFC 9457 problem for a request that could not be parsed.\n\n`detail` has one entry per offending field, in FastAPI's shape, which the\nweb client reads.",
+        "examples": [
+          {
+            "detail": [
+              {
+                "loc": [
+                  "body",
+                  "name"
+                ],
+                "msg": "Field required",
+                "type": "missing"
+              }
+            ],
+            "instance": "https://menagerist.example/api/v1/nodes",
+            "status": 422,
+            "title": "Unprocessable Content",
+            "type": "about:blank"
+          }
+        ],
+        "properties": {
+          "type": {
+            "description": "A URI naming the kind of problem; `about:blank` when the status says it all.",
+            "title": "Type",
+            "type": "string"
+          },
+          "title": {
+            "description": "The kind of problem, the same for every occurrence.",
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "description": "The HTTP status code.",
+            "title": "Status",
+            "type": "integer"
+          },
+          "instance": {
+            "description": "The URL of the request that failed.",
+            "title": "Instance",
+            "type": "string"
+          },
+          "detail": {
+            "description": "One entry per field that could not be accepted.",
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
         "required": [
           "type",
           "title",
           "status",
-          "detail",
-          "instance"
+          "instance",
+          "detail"
         ],
-        "properties": {
-          "type": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer"
-          },
-          "detail": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": [
-                "type",
-                "loc",
-                "msg"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string"
-                },
-                "loc": {
-                  "type": "array",
-                  "items": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      }
-                    ]
-                  }
-                },
-                "msg": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "instance": {
-            "type": "string"
-          }
-        }
+        "title": "ValidationProblem",
+        "type": "object"
       }
     },
     "securitySchemes": {

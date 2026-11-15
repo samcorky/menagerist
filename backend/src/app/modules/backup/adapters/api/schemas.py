@@ -18,7 +18,12 @@ class CreateBackupRequest(RequestModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [{"label": "manual"}]})
 
-    label: str = Field(default="manual", min_length=1, max_length=120)
+    label: str = Field(
+        description="A short label for the archive.",
+        default="manual",
+        min_length=1,
+        max_length=120,
+    )
 
     def to_command(self) -> CreateBackupCommand:
         """Translate validated request values into a use-case command."""
@@ -43,12 +48,14 @@ class BackupResponse(BaseModel):
             ]
         },
     )
-    id: UUID
-    label: str
-    size: int
-    created_at: datetime
-    alembic_revision: str
-    app_version: str
+    id: UUID = Field(description="The archive's id.")
+    label: str = Field(description="Its label.")
+    size: int = Field(description="Its size in bytes.")
+    created_at: datetime = Field(description="When it was made.")
+    alembic_revision: str = Field(
+        description="The database schema revision it was taken at."
+    )
+    app_version: str = Field(description="The Menagerist version that made it.")
 
 
 class UserExportResponse(BaseModel):
@@ -66,10 +73,10 @@ class UserExportResponse(BaseModel):
             ]
         }
     )
-    id: UUID
-    size: int
-    created_at: datetime
-    expires_at: datetime
+    id: UUID = Field(description="The export's id.")
+    size: int = Field(description="Its size in bytes.")
+    created_at: datetime = Field(description="When it was made.")
+    expires_at: datetime = Field(description="When it is deleted.")
 
     @classmethod
     def from_export(cls, export: UserExport) -> UserExportResponse:
@@ -99,9 +106,9 @@ class FindingResponse(BaseModel):
         },
     )
     kind: FindingKind
-    member: str
-    expected: str | None
-    actual: str | None
+    member: str = Field(description="The file in the archive the finding is about.")
+    expected: str | None = Field(description="What the manifest records, if anything.")
+    actual: str | None = Field(description="What the archive holds, if anything.")
 
 
 class VerificationResponse(BaseModel):
@@ -110,7 +117,9 @@ class VerificationResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True, json_schema_extra={"examples": [{"findings": []}]}
     )
-    findings: list[FindingResponse]
+    findings: list[FindingResponse] = Field(
+        description="Everything wrong with the archive; empty if it is sound."
+    )
 
 
 class PruneBackupsRequest(RequestModel):
@@ -129,10 +138,24 @@ class PruneBackupsRequest(RequestModel):
         }
     )
 
-    keep_last: int | None = Field(default=None, ge=0)
-    older_than_days: int | None = Field(default=None, ge=0)
-    pre_migration_keep: int | None = Field(default=None, ge=0)
-    dry_run: bool = False
+    keep_last: int | None = Field(
+        description="Ordinary archives to keep; the setting applies when omitted.",
+        default=None,
+        ge=0,
+    )
+    older_than_days: int | None = Field(
+        description="Also keep any archive younger than this many days.",
+        default=None,
+        ge=0,
+    )
+    pre_migration_keep: int | None = Field(
+        description="Pre-migration archives to keep; the setting applies when omitted.",
+        default=None,
+        ge=0,
+    )
+    dry_run: bool = Field(
+        default=False, description="Only report what would be deleted."
+    )
 
     def to_command(self) -> PruneBackupsCommand:
         """Translate validated request values into a use-case command."""
@@ -164,9 +187,17 @@ class PruneResponse(BaseModel):
             ]
         },
     )
-    deleted: list[str]
-    kept: list[str]
-    freed_bytes: int
-    orphans_removed: list[str]
-    unreadable: list[str]
-    user_exports_removed: list[str]
+    deleted: list[str] = Field(
+        description="Ids of the archives deleted, or that would be."
+    )
+    kept: list[str] = Field(description="Ids of the archives kept.")
+    freed_bytes: int = Field(description="Storage reclaimed, in bytes.")
+    orphans_removed: list[str] = Field(
+        description="Leftover files with no archive record that were removed."
+    )
+    unreadable: list[str] = Field(
+        description="Archives that could not be read and were left alone."
+    )
+    user_exports_removed: list[str] = Field(
+        description="Ids of expired personal exports removed."
+    )

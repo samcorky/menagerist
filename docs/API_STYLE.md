@@ -14,7 +14,7 @@ The conventions follow the [IBM API Handbook](https://cloud.ibm.com/docs/api-han
 | Breaking changes            | `api-breaking-changes` workflow | A removed or narrowed operation, field or status                                 |
 | **Style lint (this guide)** | `poe lint-schema`               | The IBM rules, with the divergences below                                        |
 
-`poe lint-schema` runs in CI as "API schema style". Errors always fail, and every rule except the three documentation ones is an error. Warnings are a ratchet: [`scripts/api-lint/baseline.json`](../scripts/api-lint/baseline.json) records the count per rule, and a rule may not gain findings. After fixing some, run `poe lint-schema-baseline` and commit the lower counts. The ruleset is [`scripts/api-lint/.spectral.yaml`](../scripts/api-lint/.spectral.yaml); switching a rule off needs a reason in that file and, if it is a convention, a line here. An exception for a single schema or path goes under `overrides` in the same file, so the rule still guards everything else.
+`poe lint-schema` runs in CI as "API schema style". Errors always fail, and every rule is now an error. Warnings are a ratchet for any rule added later at `warn`: [`scripts/api-lint/baseline.json`](../scripts/api-lint/baseline.json) records the count per rule, and a rule may not gain findings. After fixing some, run `poe lint-schema-baseline` and commit the lower counts. The ruleset is [`scripts/api-lint/.spectral.yaml`](../scripts/api-lint/.spectral.yaml); switching a rule off needs a reason in that file and, if it is a convention, a line here. An exception for a single schema or path goes under `overrides` in the same file, so the rule still guards everything else.
 
 When a rule goes over its baseline the failure also lists the new findings by rule and schema path. The baseline holds only counts, so "new" means a finding that is not in the committed `openapi.json` on `origin/main` (or `main`); if neither ref exists, as in a shallow clone, it lists every warning of the rules that went over instead, up to 40 lines. To see every finding, run the validator directly:
 
@@ -84,12 +84,8 @@ A list route returns a bare array (`response_model=list[PresetResponse]`), never
 | Google AIP-158 | `page_token` / `page_size`         | `after` / `limit` + `Link` header                  | Keyset on a time-ordered id                                 |
 | Google (JSON)  | lowerCamelCase                     | snake_case                                         | Matches the Python models and IBM                           |
 
-## Open findings
-
-The remaining warnings are documentation: property and schema descriptions (`ibm-property-description`, `ibm-schema-description`) and success examples (`ibm-success-response-example`), added as routes are touched. The baseline holds their counts; when one reaches zero, raise it to `error`.
-
 ## Adding or changing an endpoint
 
 1. Follow the naming and status rules above and the [route checklist](../backend/README.md#route-naming).
-2. Run `poe dump-schema`, then `poe lint-schema`. A new route must not add warnings: describe its parameters, properties and schemas, and give its responses examples. A parameter without a description is an error, and so is a DELETE with a body (use query parameters). For the ones that recur (`after`, `limit`, `node_id` and the other ids, a field's `key`) use the aliases in `entrypoints/api/shared/http/parameters.py`.
+2. Run `poe dump-schema`, then `poe lint-schema`. A new route must not add findings: describe its parameters, properties and schemas with `description=`, and give each response model an example in `json_schema_extra`, which `openapi_examples.py` copies onto every success response that returns it. A parameter without a description is an error, and so is a DELETE with a body (use query parameters). For the ones that recur (`after`, `limit`, `node_id` and the other ids, a field's `key`) use the aliases in `entrypoints/api/shared/http/parameters.py`.
 3. If the lint rejects something that is right for this API, change `.spectral.yaml` with a comment saying why, and add a row to the table above.

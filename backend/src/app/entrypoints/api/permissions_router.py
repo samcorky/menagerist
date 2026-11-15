@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.dependencies import (
@@ -24,7 +24,9 @@ class PermissionsResponse(BaseModel):
         json_schema_extra={"examples": [{"permissions": ["graph:node_type:delete"]}]}
     )
 
-    permissions: list[Permission]
+    permissions: list[Permission] = Field(
+        description="The permissions your account holds."
+    )
 
 
 @router.get(

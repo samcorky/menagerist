@@ -15,7 +15,7 @@ from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.modules.backup.adapters.api.router import ARCHIVE_BODY
+from app.modules.backup.adapters.api.router import ARCHIVE_BODY, ARCHIVE_SCHEMA
 from app.modules.backup.adapters.api.schemas import BackupResponse, UserExportResponse
 from app.modules.backup.adapters.api.user_dependencies import (
     get_delete_user_export,
@@ -122,6 +122,7 @@ async def list_user_exports(
 @router.get(
     "/exports/{export_id}/download",
     operation_id="download_user_export",
+    response_class=Response,
     responses={
         **error_response(
             BackupNotFoundError,
@@ -129,9 +130,7 @@ async def list_user_exports(
         ),
         200: {
             "description": "The caller's personal archive.",
-            "content": {
-                "application/gzip": {"schema": {"type": "string", "format": "binary"}}
-            },
+            "content": {"application/gzip": {"schema": ARCHIVE_SCHEMA}},
         },
     },
 )

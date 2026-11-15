@@ -78,12 +78,15 @@ public_router = APIRouter(
     prefix="/backups", tags=["Backups"], route_class=PermissionAwareRoute
 )
 
+ARCHIVE_SCHEMA = {
+    "type": "string",
+    "format": "binary",
+    "description": "A Menagerist archive: a gzipped tar file.",
+}
 ARCHIVE_BODY = {
     "requestBody": {
         "required": True,
-        "content": {
-            "application/gzip": {"schema": {"type": "string", "format": "binary"}}
-        },
+        "content": {"application/gzip": {"schema": ARCHIVE_SCHEMA}},
     }
 }
 ADMIN_RESPONSES: dict[int | str, dict[str, Any]] = error_response(
@@ -246,14 +249,13 @@ async def verify_backup(
 @router.get(
     "/{backup_id}/download",
     operation_id="download_backup",
+    response_class=Response,
     responses={
         **ADMIN_RESPONSES,
         **_BACKUP_NOT_FOUND,
         200: {
             "description": "The compressed backup archive.",
-            "content": {
-                "application/gzip": {"schema": {"type": "string", "format": "binary"}}
-            },
+            "content": {"application/gzip": {"schema": ARCHIVE_SCHEMA}},
         },
     },
 )

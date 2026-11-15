@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AttributeUsageResponse(BaseModel):
@@ -6,4 +6,4 @@ class AttributeUsageResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [{"count": 12}]})
 
-    count: int
+    count: int = Field(description="How many hold the field.")

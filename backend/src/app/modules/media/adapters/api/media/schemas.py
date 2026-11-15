@@ -31,8 +31,11 @@ class AttachMediaRequest(RequestModel):
     model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
 
     target_type: AttachmentTarget
-    target_id: uuid.UUID
-    attribute_key: AttachmentKey | None = None
+    target_id: uuid.UUID = Field(description="The id of what to attach it to.")
+    attribute_key: AttachmentKey | None = Field(
+        default=None,
+        description="The slot it fills, such as `cover`; none for a plain attachment.",
+    )
 
     def to_command(self, asset_id: uuid.UUID) -> AttachMediaCommand:
         """Convert this request into an `AttachMediaCommand` for `asset_id`."""
@@ -107,7 +110,7 @@ class UpdateMediaRequest(RequestModel):
         json_schema_extra={"examples": [{"filename": "front page"}]}
     )
 
-    filename: str
+    filename: str = Field(description="The new file name.")
 
     def to_command(self, asset_id: uuid.UUID) -> UpdateMediaCommand:
         """Convert this request into an `UpdateMediaCommand` for `asset_id`."""
@@ -133,16 +136,18 @@ class MediaAssetResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE]})
 
-    id: uuid.UUID
-    filename: str
-    content_type: str
-    size: int
-    sha256: str
+    id: uuid.UUID = Field(description="The asset's id.")
+    filename: str = Field(description="Its file name.")
+    content_type: str = Field(description="Its media type, such as `image/jpeg`.")
+    size: int = Field(description="Its size in bytes.")
+    sha256: str = Field(description="The SHA-256 of its bytes, in hex.")
     status: MediaStatus
-    content_url: str
-    thumbnail_url: str | None
-    created_at: datetime
-    updated_at: datetime
+    content_url: str = Field(description="Where to download the file.")
+    thumbnail_url: str | None = Field(
+        description="Where to fetch a WebP thumbnail; null if there is none."
+    )
+    created_at: datetime = Field(description="When it was uploaded.")
+    updated_at: datetime = Field(description="When it last changed.")
 
     @classmethod
     def from_domain(cls, asset: MediaAsset) -> MediaAssetResponse:
@@ -172,17 +177,21 @@ class NodeMediaItemResponse(BaseModel):
         }
     )
 
-    id: uuid.UUID
-    filename: str
-    content_type: str
-    size: int
-    sha256: str
+    id: uuid.UUID = Field(description="The asset's id.")
+    filename: str = Field(description="Its file name.")
+    content_type: str = Field(description="Its media type, such as `image/jpeg`.")
+    size: int = Field(description="Its size in bytes.")
+    sha256: str = Field(description="The SHA-256 of its bytes, in hex.")
     status: MediaStatus
-    content_url: str
-    thumbnail_url: str | None
-    created_at: datetime
-    updated_at: datetime
-    attribute_key: AttachmentKey | None
+    content_url: str = Field(description="Where to download the file.")
+    thumbnail_url: str | None = Field(
+        description="Where to fetch a WebP thumbnail; null if there is none."
+    )
+    created_at: datetime = Field(description="When it was uploaded.")
+    updated_at: datetime = Field(description="When it last changed.")
+    attribute_key: AttachmentKey | None = Field(
+        description="The slot it fills on the item, such as `cover`; null if none."
+    )
 
     @classmethod
     def from_domain(cls, item: NodeMediaItem) -> NodeMediaItemResponse:
@@ -209,12 +218,14 @@ class MediaAttachmentResponse(BaseModel):
         }
     )
 
-    id: uuid.UUID
-    asset_id: uuid.UUID
-    target_type: str
-    target_id: uuid.UUID
-    attribute_key: AttachmentKey | None
-    created_at: datetime
+    id: uuid.UUID = Field(description="The attachment's id.")
+    asset_id: uuid.UUID = Field(description="The asset attached.")
+    target_type: str = Field(description="What it is attached to: `node` or `edge`.")
+    target_id: uuid.UUID = Field(description="The id of what it is attached to.")
+    attribute_key: AttachmentKey | None = Field(
+        description="The slot it fills, such as `cover`; null for a plain attachment."
+    )
+    created_at: datetime = Field(description="When it was attached.")
 
     @classmethod
     def from_domain(cls, attachment: MediaAttachment) -> MediaAttachmentResponse:

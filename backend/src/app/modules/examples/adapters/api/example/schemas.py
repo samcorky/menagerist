@@ -50,12 +50,12 @@ class PackCountsResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_COUNTS_EXAMPLE]})
 
-    presets: int
-    relationship_types: int
-    item_types: int
-    items: int
-    connections: int
-    collections: int
+    presets: int = Field(description="Saved fields.")
+    relationship_types: int = Field(description="Connection types.")
+    item_types: int = Field(description="Item types.")
+    items: int = Field(description="Items.")
+    connections: int = Field(description="Connections between items.")
+    collections: int = Field(description="Collections.")
 
     @classmethod
     def from_domain(cls, counts: PackCounts) -> PackCountsResponse:
@@ -95,7 +95,9 @@ class InstallationResponse(BaseModel):
     )
 
     status: InstallationStatus
-    installed_at: datetime | None
+    installed_at: datetime | None = Field(
+        description="When the set was added; null while it is still being added."
+    )
     counts: PackCountsResponse
 
 
@@ -106,8 +108,8 @@ class PackRefResponse(BaseModel):
         json_schema_extra={"examples": [{"id": "games", "name": "Video games"}]}
     )
 
-    id: str
-    name: str
+    id: str = Field(description="The example set's id.")
+    name: str = Field(description="Its name.")
 
     @classmethod
     def from_summary(cls, summary: PackSummary) -> PackRefResponse:
@@ -141,9 +143,9 @@ class ExamplePackResponse(BaseModel):
         },
     )
 
-    id: str
-    name: str
-    description: str
+    id: str = Field(description="The example set's id.")
+    name: str = Field(description="Its name.")
+    description: str = Field(description="What it contains, for a person to read.")
     counts: PackCountsResponse
     requires: list[PackRefResponse] = Field(
         default=[], description="Sets this one needs added first."
@@ -161,7 +163,9 @@ class ExamplePackResponse(BaseModel):
             + "They never block adding or removing."
         ),
     )
-    installation: InstallationResponse | None
+    installation: InstallationResponse | None = Field(
+        description="Its installation on this server; null if not added."
+    )
 
     @classmethod
     def from_status(cls, status: ExamplePackStatus) -> ExamplePackResponse:
@@ -203,7 +207,7 @@ class InstallResultResponse(BaseModel):
         }
     )
 
-    pack_id: str
+    pack_id: str = Field(description="The example set added.")
     created: PackCountsResponse
     adopted: PackCountsResponse
     linked: int = Field(
@@ -278,9 +282,9 @@ class KeptEntityResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_KEPT_EXAMPLE]})
 
-    kind: str
-    label: str
-    reason: str
+    kind: str = Field(description="What sort of thing was kept, such as `item`.")
+    label: str = Field(description="Its name.")
+    reason: str = Field(description="Why it was kept.")
 
     @classmethod
     def from_domain(cls, kept: KeptEntity) -> KeptEntityResponse:
@@ -303,9 +307,11 @@ class UninstallResultResponse(BaseModel):
         }
     )
 
-    pack_id: str
+    pack_id: str = Field(description="The example set removed.")
     removed: PackCountsResponse
-    kept: list[KeptEntityResponse]
+    kept: list[KeptEntityResponse] = Field(
+        description="What was left in place, and why."
+    )
 
     @classmethod
     def from_domain(cls, result: UninstallResult) -> UninstallResultResponse:
@@ -332,9 +338,13 @@ class ExampleEntitiesResponse(BaseModel):
         }
     )
 
-    item_ids: list[uuid.UUID]
-    item_type_ids: list[uuid.UUID]
-    collection_ids: list[uuid.UUID]
+    item_ids: list[uuid.UUID] = Field(description="Items that example sets own.")
+    item_type_ids: list[uuid.UUID] = Field(
+        description="Item types that example sets own."
+    )
+    collection_ids: list[uuid.UUID] = Field(
+        description="Collections that example sets own."
+    )
 
     @classmethod
     def from_domain(cls, entities: ExampleEntities) -> ExampleEntitiesResponse:
