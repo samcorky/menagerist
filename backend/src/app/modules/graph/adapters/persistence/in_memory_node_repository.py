@@ -13,6 +13,7 @@ from app.modules.graph.adapters.persistence.text_match import fold, text_matches
 from app.modules.graph.application.field_kinds import KIND_OPERATORS
 from app.modules.graph.application.schema_meta import NAMESPACE
 from app.modules.graph.domain.query import ItemFieldUse, SearchHit, TypeCount
+from app.modules.graph.domain.reach import Reached
 
 if TYPE_CHECKING:
     import builtins
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
+    from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
 
@@ -74,6 +76,92 @@ class InMemoryNodeRepository:
             if far is not None and not far.is_deleted and scope.covers(far.owner_id):
                 pairs.append((edge, far))
         return pairs
+
+    def reached(
+        self,
+        node_id: uuid.UUID,
+        *,
+        relationship: str,
+        direction: ReachDirection,
+        max_depth: int,
+        scope: ContentFilter,
+    ) -> builtins.list[Node]:
+        """The items `reach` finds from `node_id`, for the in-memory evaluator."""
+        return [
+            self._nodes[found.node_id]
+            for found in self._walk(
+                node_id,
+                relationship=relationship,
+                direction=direction,
+                max_depth=max_depth,
+                scope=scope,
+            )
+        ]
+
+    async def reach(
+        self,
+        start_id: uuid.UUID,
+        *,
+        relationship: str,
+        direction: ReachDirection,
+        max_depth: int,
+        scope: ContentFilter,
+    ) -> builtins.list[Reached]:
+        """Items reachable from `start_id` by `relationship`, breadth-first."""
+        return self._walk(
+            start_id,
+            relationship=relationship,
+            direction=direction,
+            max_depth=max_depth,
+            scope=scope,
+        )
+
+    def _walk(
+        self,
+        start_id: uuid.UUID,
+        *,
+        relationship: str,
+        direction: ReachDirection,
+        max_depth: int,
+        scope: ContentFilter,
+    ) -> builtins.list[Reached]:
+        """The twin of the Postgres walk.
+
+        A visited set stops loops, so each item is reported once at its
+        shallowest depth.
+        """
+        seen = {start_id}
+        frontier = [start_id]
+        found: builtins.list[Reached] = []
+        for depth in range(1, max_depth + 1):
+            reached: builtins.list[uuid.UUID] = []
+            for edge in self._edges.values():
+                if (
+                    edge.is_deleted
+                    or edge.type != relationship
+                    or not scope.covers(edge.owner_id)
+                ):
+                    continue
+                near, far = (
+                    (edge.source_id, edge.target_id)
+                    if direction == "out"
+                    else (edge.target_id, edge.source_id)
+                )
+                item = self._nodes.get(far)
+                if (
+                    near in frontier
+                    and far not in seen
+                    and item is not None
+                    and not item.is_deleted
+                    and scope.covers(item.owner_id)
+                ):
+                    seen.add(far)
+                    reached.append(far)
+            found.extend(Reached(node_id=n, depth=depth) for n in sorted(reached))
+            frontier = reached
+            if not frontier:
+                break
+        return found
 
     def _visible(self, scope: ContentFilter) -> builtins.list[Node]:
         """The one visibility rule: live nodes the `scope` covers.

@@ -36,6 +36,7 @@ from app.modules.graph.adapters.persistence.query_sql import (
     order_by,
     sort_expressions,
 )
+from app.modules.graph.adapters.persistence.reach_sql import walk
 from app.modules.graph.adapters.persistence.search_sql import (
     has_matching_row,
     like_pattern,
@@ -52,6 +53,7 @@ from app.modules.graph.domain.query import (
     TypeCount,
     walk_conditions,
 )
+from app.modules.graph.domain.reach import Reached
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
@@ -64,6 +66,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
+    from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
 
@@ -385,6 +388,38 @@ class SqlAlchemyNodeRepository:
         if model is None:
             return None
         return (await self._viewed([_to_domain(model)], scope))[0]
+
+    async def reach(
+        self,
+        start_id: uuid.UUID,
+        *,
+        relationship: str,
+        direction: ReachDirection,
+        max_depth: int,
+        scope: ContentFilter,
+    ) -> builtins.list[Reached]:
+        """Items reachable from `start_id` by `relationship`, as a recursive walk.
+
+        A recursive CTE cannot see the items it has already visited, so loops
+        are bounded by `max_depth` and the outer query keeps each item's
+        shallowest depth.
+        """
+        logger.debug("reaching items", start_id=start_id, relationship=relationship)
+        steps = walk(
+            start_id,
+            relationship=relationship,
+            direction=direction,
+            max_depth=max_depth,
+            scope=scope,
+        )
+        shallowest = func.min(steps.c.depth)
+        rows = await self._session.execute(
+            select(steps.c.node_id, shallowest)
+            .where(steps.c.node_id != start_id)
+            .group_by(steps.c.node_id)
+            .order_by(shallowest, steps.c.node_id)
+        )
+        return [Reached(node_id=row[0], depth=row[1]) for row in rows]
 
     async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
         """Count live nodes in `scope` per item type; untyped is one NULL row."""
