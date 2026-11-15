@@ -15,6 +15,7 @@ if TYPE_CHECKING:
         SearchHit,
         TypeCount,
     )
+    from app.modules.graph.domain.reach import ReachDirection, Reached
     from app.shared_kernel.content_filter import ContentFilter
 
 
@@ -147,6 +148,25 @@ class NodeRepository(Protocol):
         `resolved` narrows by a query (a smart collection), `type`, `favourite`
         (the scope's person's own) and `ids` as `list` does; an empty `ids`
         matches nothing.
+        """
+        ...
+
+    async def reach(
+        self,
+        start_id: uuid.UUID,
+        *,
+        relationship: str,
+        direction: ReachDirection,
+        max_depth: int,
+        scope: ContentFilter,
+    ) -> builtins.list[Reached]:
+        """Items reachable from `start_id` by `relationship` within `max_depth` hops.
+
+        `out` follows connections where the current item is the source, `in`
+        where it is the target. Only live connections and live items in `scope`
+        are walked, so a deleted or unseen item ends that branch. Each item is
+        reported once, at its shallowest depth; `start_id` itself never is.
+        Ordered by depth, then id.
         """
         ...
 

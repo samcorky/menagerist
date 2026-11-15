@@ -148,7 +148,22 @@ class EdgeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     """ORM row for an edge - the storage shape, kept separate from `domain.Edge`."""
 
     __tablename__ = "edges"
-    __table_args__ = (Index("ix_edges_owner_id_id", "owner_id", "id"),)
+    # The live-only (type, end) indexes serve the multi-hop walk in `reach`.
+    __table_args__ = (
+        Index("ix_edges_owner_id_id", "owner_id", "id"),
+        Index(
+            "ix_edges_live_type_source_id",
+            "type",
+            "source_id",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_edges_live_type_target_id",
+            "type",
+            "target_id",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("nodes.id"), index=True)
     target_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("nodes.id"), index=True)
