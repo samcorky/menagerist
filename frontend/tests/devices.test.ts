@@ -199,10 +199,29 @@ describe('describeDevice and the display mode', () => {
 	const iphone =
 		'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
-	it('says installed app for a standalone session', () => {
+	it('leads with App for a standalone session', () => {
 		const result = describeDevice({ userAgent: iphone, displayMode: 'standalone' });
-		expect(result.label).toBe('Safari on iOS, installed app');
+		expect(result.label).toBe('App on iOS (Safari)');
 		expect(result.kind).toBe('phone');
+	});
+
+	it('names the platform from Client Hints for the installed app', () => {
+		const android =
+			'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Mobile Safari/537.36';
+		const result = describeDevice({
+			userAgent: android,
+			platform: 'Android',
+			mobile: true,
+			displayMode: 'standalone'
+		});
+		expect(result.label).toBe('App on Android (Chrome)');
+	});
+
+	it('still reads sensibly when little is known about the installed app', () => {
+		expect(describeDevice({ displayMode: 'standalone' }).label).toBe('App');
+		expect(describeDevice({ platform: 'Android', displayMode: 'standalone' }).label).toBe(
+			'App on Android'
+		);
 	});
 
 	it('says nothing more for a browser tab or an older session', () => {
@@ -241,7 +260,7 @@ function device(overrides: Partial<OwnDeviceResponse> = {}): OwnDeviceResponse {
 describe('deviceRow', () => {
 	it('describes a remembered browser from its newest session', () => {
 		expect(deviceRow(device())).toEqual({
-			label: 'Firefox on Linux, installed app',
+			label: 'App on Linux (Firefox)',
 			kind: 'desktop',
 			key: 'd1',
 			userAgent: device().user_agent,
