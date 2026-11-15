@@ -23,13 +23,13 @@ logger = structlog.get_logger()
 
 @dataclass(kw_only=True)
 class ExportPresetsQuery:
-    """Request to export the presets with `ids` as a pack."""
+    """Request to export the presets with `ids` for a file."""
 
     ids: list[uuid.UUID] = field(default_factory=list)
 
 
 class ExportPresets(QueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]]):
-    """Fetch the presets to put in a pack, in the order requested."""
+    """Fetch the presets to write to a file, in the order requested."""
 
     access: ClassVar[Access] = Content(PresetPermission.PRESET_READ)
 
@@ -37,11 +37,11 @@ class ExportPresets(QueryHandler[PresetRepos, ExportPresetsQuery, list[Preset]])
         """Return the presets for `query.ids`, or raise on the first missing one.
 
         :raises PresetNotFoundError: an id does not resolve to a live preset.
-        :raises ValidationError: more ids than a pack may hold.
+        :raises ValidationError: more ids than an export may hold.
         """
         if len(query.ids) > MAX_PACK_ITEMS:
             raise InvalidPresetDefinitionError(
-                f"a pack may hold at most {MAX_PACK_ITEMS} presets"
+                f"an export may hold at most {MAX_PACK_ITEMS} presets"
             )
         presets: list[Preset] = []
         for preset_id in query.ids:

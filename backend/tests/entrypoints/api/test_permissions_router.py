@@ -34,6 +34,8 @@ CONTENT = [
     "media:item:write",
     "presets:preset:read",
     "presets:preset:write",
+    "transfer:bundle:import",
+    "transfer:bundle:read",
 ]
 ADMIN = [
     "backup:archive:create",

@@ -12,3 +12,8 @@ def content_hash(content: Mapping[str, Any]) -> str:
         content, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def preset_key(kind: str, label: str, definition: Mapping[str, Any]) -> str:
+    """Return the hash that makes two presets "the same": kind, label, definition."""
+    return content_hash({"kind": kind, "label": label, "definition": definition})

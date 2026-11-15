@@ -133,6 +133,9 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "system.GetVersionDetail": "system:diagnostics:read",
     "system.RunBrowserCheck": "system:diagnostics:read",
     "system.CheckForUpdates": "system:release:check",
+    "transfer.ExportBundle": "transfer:bundle:read",
+    "transfer.ImportBundle": "transfer:bundle:import",
+    "transfer.PlanBundleImport": "transfer:bundle:import",
 }
 
 # Permissions are never renamed: a grant stored under a name must keep meaning
@@ -179,6 +182,8 @@ EXPECTED_CATALOGUE: frozenset[str] = frozenset(
         "settings:instance:write",
         "system:diagnostics:read",
         "system:release:check",
+        "transfer:bundle:import",
+        "transfer:bundle:read",
     }
 )
 
@@ -219,6 +224,6 @@ def test_every_non_admin_permission_is_a_member_permission(name: str) -> None:
 
 
 def test_catalogue_is_pinned() -> None:
-    """The permission catalogue (21 admin, 16 member) only changes deliberately."""
+    """The permission catalogue (17 admin-only, 24 member) changes deliberately."""
     assert {p.value for p in ALL_PERMISSIONS} == EXPECTED_CATALOGUE
-    assert len(EXPECTED_CATALOGUE) == 39
+    assert len(EXPECTED_CATALOGUE) == 41

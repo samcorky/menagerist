@@ -234,7 +234,7 @@ CANARIES = (
 PUBLIC = "public: no content, no session"
 OWN_SESSION = "acts on the caller's own session or account"
 VOCABULARY = "shared vocabulary: every member reads and edits item/relationship types"
-EXPORT_BY_IDS = "needs an ids query; checked in the export test below"
+EXPORT_BY_IDS = "needs a preset_ids query; checked in the export test below"
 CREATES_OWN = "references no existing content; creates content owned by the caller"
 
 RECENTLY_DELETED = "own deleted rows only, empty in the seed; two-user router tests"
@@ -350,8 +350,9 @@ ALLOWED: dict[Route, str] = {
     ("POST", "/api/v1/edge-types"): VOCABULARY,
     ("PATCH", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
     ("POST", "/api/v1/presets"): CREATES_OWN,
-    ("POST", "/api/v1/presets/import"): CREATES_OWN,
-    ("GET", "/api/v1/presets/export"): EXPORT_BY_IDS,
+    ("POST", "/api/v1/bundles/import"): CREATES_OWN,
+    ("POST", "/api/v1/bundles/import/plan"): CREATES_OWN,
+    ("GET", "/api/v1/bundles/export"): EXPORT_BY_IDS,
     ("POST", "/api/v1/nodes"): CREATES_OWN,
     ("POST", "/api/v1/collections"): CREATES_OWN,
     ("POST", "/api/v1/tokens"): CREATES_OWN,
@@ -1590,12 +1591,13 @@ def test_user_b_cannot_export_user_as_preset(world: World) -> None:
     seed = world.seed()
     bob = world.act_as(BOB)
 
-    foreign = bob.get("/api/v1/presets/export", params={"ids": seed.preset})
-    unknown = bob.get("/api/v1/presets/export", params={"ids": str(uuid.uuid7())})
-    own = world.act_as(ALICE).get("/api/v1/presets/export", params={"ids": seed.preset})
+    url = "/api/v1/bundles/export"
+    foreign = bob.get(url, params={"preset_ids": seed.preset})
+    unknown = bob.get(url, params={"preset_ids": str(uuid.uuid7())})
+    own = world.act_as(ALICE).get(url, params={"preset_ids": seed.preset})
 
     assert foreign.status_code == 404, foreign.text
     assert _shape(foreign) == _shape(unknown)
     assert "Alpha genres" not in foreign.text
     assert own.status_code == 200, own.text
-    assert [i["label"] for i in own.json()["items"]] == ["Alpha genres"]
+    assert [i["label"] for i in own.json()["presets"]] == ["Alpha genres"]

@@ -42,14 +42,14 @@ def _countries() -> list[BundlePreset]:
 
 
 def _presets(value: object, where: str) -> tuple[BundlePreset, ...]:
-    block = _object(value, f"{where} presets")
-    if block.get("generated") == "iso-countries":
-        return tuple(_countries())
-    if "generated" in block:
-        raise InvalidEntryError(f"{where} names an unknown generated list")
-    items = block.get("items")
-    if not isinstance(items, list):
-        raise InvalidEntryError(f"{where} presets need an 'items' array")
+    """Read an entry's presets: a list of them, or a generated list by name."""
+    if isinstance(value, list):
+        items = value
+    else:
+        block = _object(value, f"{where} presets")
+        if block.get("generated") == "iso-countries":
+            return tuple(_countries())
+        raise InvalidEntryError(f"{where} presets must be a list or a generated list")
     return tuple(
         BundlePreset(
             ref=f"preset-{n}",

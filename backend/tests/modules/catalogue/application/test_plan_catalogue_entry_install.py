@@ -18,7 +18,7 @@ from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 
 if TYPE_CHECKING:
-    from tests.modules.catalogue.conftest import Shared
+    from tests.modules.conftest import Shared
 
 ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 GUARD = InMemoryAccessGuard()
@@ -46,9 +46,9 @@ async def test_a_fresh_person_would_create_everything(shared: Shared) -> None:
     assert plan.ready
     assert len(plan.entities) == 10
     assert plan.with_action(PlanAction.CREATE) == plan.entities
-    assert [e.kind for e in plan.entities[:6]] == [EntityKind.ITEM_TYPE] * 6
-    assert [e.kind for e in plan.entities[6:]] == [EntityKind.RELATIONSHIP_TYPE] * 4
-    assert (plan.entities[0].ref, plan.entities[0].label) == ("person", "Person")
+    assert [e.kind for e in plan.entities[:4]] == [EntityKind.RELATIONSHIP_TYPE] * 4
+    assert [e.kind for e in plan.entities[4:]] == [EntityKind.ITEM_TYPE] * 6
+    assert (plan.entities[4].ref, plan.entities[4].label) == ("person", "Person")
 
 
 async def test_a_taken_type_name_is_unchanged_with_the_reason(shared: Shared) -> None:
@@ -64,8 +64,8 @@ async def test_a_taken_type_name_is_unchanged_with_the_reason(shared: Shared) ->
 
     assert plan.ready
     assert [(e.kind, e.ref) for e in unchanged] == [
-        (EntityKind.ITEM_TYPE, entry.item_types[0].ref),
         (EntityKind.RELATIONSHIP_TYPE, entry.relationship_types[0].ref),
+        (EntityKind.ITEM_TYPE, entry.item_types[0].ref),
     ]
     assert {e.reason for e in unchanged} == {"You already have one with this name."}
 

@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
-from app.modules.catalogue.application.entry_plan import plan_entry
 from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.catalogue.domain.errors import CatalogueEntryNotFoundError
 from app.modules.catalogue.ports.entry_catalogue import EntryCatalogue  # noqa: TC001
-from app.modules.transfer.domain.plan import Plan
+from app.modules.transfer.application.pipeline import plan_bundle
+from app.modules.transfer.domain.plan import ClashPolicy, Plan
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
 
@@ -55,4 +55,6 @@ class PlanCatalogueEntryInstall(UseCase[PlanCatalogueEntryInstallQuery, Plan]):
             raise CatalogueEntryNotFoundError(
                 f"Catalogue entry '{request.entry_id}' not found"
             )
-        return await plan_entry(entry, self._presets, self._graph)
+        return await plan_bundle(
+            entry.bundle(), self._presets, self._graph, clash=ClashPolicy.SKIP
+        )

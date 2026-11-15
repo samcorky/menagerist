@@ -69,6 +69,7 @@ from app.modules.system.adapters.api.router import (
     public_router as public_system_router,
     router as system_router,
 )
+from app.modules.transfer.adapters.api.bundle.router import router as bundle_router
 from app.platform.app_info import load_app_info
 from app.platform.config import get_api_settings
 from app.platform.logging_config import configure_logging
@@ -108,6 +109,7 @@ api_v1_router.include_router(settings_router)
 api_v1_router.include_router(search_router)
 api_v1_router.include_router(example_router)
 api_v1_router.include_router(catalogue_router)
+api_v1_router.include_router(bundle_router)
 api_v1_router.include_router(collection_router)
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(me_router)

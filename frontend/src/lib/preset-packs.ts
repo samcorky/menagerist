@@ -2,11 +2,18 @@ import { generateFieldKey } from '$lib/field-key';
 import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 import { withPropMeta } from '$lib/schema-meta';
 import {
-	exportPresets,
+	exportBundle,
 	listPresets,
-	type PackResponse,
+	type BundleFileResponse,
+	type BundlePresetEntry,
 	type PresetResponse
 } from '$lib/api/client';
+
+/** The `menagerist-bundle` file format, version 1: saved fields, lists and groups. */
+export const BUNDLE_FORMAT = 'menagerist-bundle';
+
+/** A bundle file of presets, as exported and as read back for import. */
+export type PresetBundle = BundleFileResponse;
 
 /** The server takes at most this many ids per export request. */
 export const EXPORT_CHUNK = 200;
@@ -31,20 +38,23 @@ export async function fetchAllPresets(): Promise<PresetResponse[]> {
 	}
 }
 
-/** Export the given presets as one pack, in chunks the server accepts. */
-export async function exportPack(presets: PresetResponse[]): Promise<PackResponse> {
-	const items: PackResponse['items'] = [];
+/**
+ * Export the given presets as one bundle file, in chunks the server accepts. Each
+ * preset's ref is its id, so chunks never clash.
+ */
+export async function exportPresetBundle(presets: PresetResponse[]): Promise<PresetBundle> {
+	const all: BundlePresetEntry[] = [];
 	for (let i = 0; i < presets.length; i += EXPORT_CHUNK) {
 		const ids = presets.slice(i, i + EXPORT_CHUNK).map((p) => p.id);
-		const result = await exportPresets({ query: { ids } });
+		const result = await exportBundle({ query: { preset_ids: ids } });
 		if (result.error || !result.data) throw result.error ?? new Error('Could not export presets');
-		items.push(...result.data.items);
+		all.push(...result.data.presets);
 	}
-	return { format: 'menagerist-presets', version: 1, items };
+	return { format: BUNDLE_FORMAT, version: 1, presets: all };
 }
 
-/** Parse a pack file's text, checking only the envelope. The server validates the rest. */
-export function parsePackText(text: string): PackResponse {
+/** Parse a bundle file's text, checking only the envelope. The server validates the rest. */
+export function parseBundleText(text: string): PresetBundle {
 	let data: unknown;
 	try {
 		data = JSON.parse(text);
@@ -54,17 +64,20 @@ export function parsePackText(text: string): PackResponse {
 	if (
 		typeof data !== 'object' ||
 		data === null ||
-		(data as { format?: unknown }).format !== 'menagerist-presets' ||
-		!Array.isArray((data as { items?: unknown }).items)
+		(data as { format?: unknown }).format !== BUNDLE_FORMAT ||
+		!Array.isArray((data as { presets?: unknown }).presets)
 	) {
-		throw new Error("This isn't a Menagerist presets file");
+		throw new Error("This isn't a Menagerist saved fields file");
 	}
-	return data as PackResponse;
+	return data as PresetBundle;
 }
 
-/** Trigger a browser download of a pack as a JSON file. */
-export function downloadPack(pack: PackResponse, filename = 'menagerist-presets.json'): void {
-	const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' });
+/** Trigger a browser download of a bundle as a JSON file. */
+export function downloadBundle(
+	bundle: PresetBundle,
+	filename = 'menagerist-saved-fields.json'
+): void {
+	const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
 	const url = URL.createObjectURL(blob);
 	const anchor = document.createElement('a');
 	anchor.href = url;
@@ -76,9 +89,9 @@ export function downloadPack(pack: PackResponse, filename = 'menagerist-presets.
 /** The kind a section holds. Its import and export only handle presets of this kind. */
 export type PackSectionKind = PresetResponse['kind'];
 
-/** A message when a pack holds presets of other kinds, or null when every item fits the section. */
-export function packKindMismatch(pack: PackResponse, kind: PackSectionKind): string | null {
-	const others = pack.items.filter((item) => item.kind !== kind).length;
+/** A message when a bundle holds presets of other kinds, or null when every one fits the section. */
+export function bundleKindMismatch(bundle: PresetBundle, kind: PackSectionKind): string | null {
+	const others = bundle.presets.filter((preset) => preset.kind !== kind).length;
 	if (others === 0) return null;
 	return `${others} ${others === 1 ? 'item in this file is' : 'items in this file are'} not ${kindNoun(kind, others)}`;
 }

@@ -11,7 +11,8 @@ import type {
 	PresetPermission,
 	SchedulingPermission,
 	SettingsPermission,
-	SystemPermission
+	SystemPermission,
+	TransferPermission
 } from '$lib/api/generated/types.gen';
 
 /** Every permission the backend can report. */
@@ -26,7 +27,8 @@ export type Permission =
 	| PresetPermission
 	| SchedulingPermission
 	| SettingsPermission
-	| SystemPermission;
+	| SystemPermission
+	| TransferPermission;
 
 export const LOGIN_PATH = '/login';
 export const SETUP_PATH = '/setup';

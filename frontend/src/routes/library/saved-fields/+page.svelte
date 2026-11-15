@@ -21,7 +21,7 @@
 	import {
 		createPreset,
 		deletePreset,
-		importPresets,
+		importBundle,
 		listPresets,
 		type PresetResponse
 	} from '$lib/api/client';
@@ -38,12 +38,12 @@
 	import PresetExample from '$lib/components/preset-example.svelte';
 	import {
 		canEditOptions,
-		downloadPack,
-		exportPack,
+		downloadBundle,
+		exportPresetBundle,
 		fetchAllPresets,
 		kindNoun,
-		packKindMismatch,
-		parsePackText,
+		bundleKindMismatch,
+		parseBundleText,
 		presetFilename,
 		type PackSectionKind
 	} from '$lib/preset-packs';
@@ -269,10 +269,8 @@
 
 		busy = true;
 		try {
-			const pack = parsePackText(await file.text());
-			const result = await importPresets({
-				body: { format: pack.format, version: pack.version, items: pack.items }
-			});
+			const bundle = parseBundleText(await file.text());
+			const result = await importBundle({ body: bundle });
 			if (result.error || !result.data) {
 				toast.error("Couldn't import", { description: errorMessage(result.error) });
 				return;
@@ -302,7 +300,7 @@
 		busy = true;
 		try {
 			const all = await fetchAllPresets();
-			downloadPack(await exportPack(all));
+			downloadBundle(await exportPresetBundle(all));
 		} catch (error) {
 			toast.error("Couldn't export", { description: failureMessage(error) });
 		} finally {
@@ -319,7 +317,7 @@
 				toast('Nothing to export');
 				return;
 			}
-			downloadPack(await exportPack(presets), sectionFilenames[kind]);
+			downloadBundle(await exportPresetBundle(presets), sectionFilenames[kind]);
 		} catch (error) {
 			toast.error("Couldn't export", { description: failureMessage(error) });
 		} finally {
@@ -334,15 +332,13 @@
 
 		sectionBusy = true;
 		try {
-			const pack = parsePackText(await file.text());
-			const mismatch = packKindMismatch(pack, kind);
+			const bundle = parseBundleText(await file.text());
+			const mismatch = bundleKindMismatch(bundle, kind);
 			if (mismatch) {
 				toast.error("Can't import here", { description: mismatch });
 				return;
 			}
-			const result = await importPresets({
-				body: { format: pack.format, version: pack.version, items: pack.items }
-			});
+			const result = await importBundle({ body: bundle });
 			if (result.error || !result.data) {
 				toast.error("Couldn't import", { description: errorMessage(result.error) });
 				return;
@@ -372,7 +368,7 @@
 		if (sectionBusy) return;
 		sectionBusy = true;
 		try {
-			downloadPack(await exportPack([preset]), presetFilename(preset.label));
+			downloadBundle(await exportPresetBundle([preset]), presetFilename(preset.label));
 		} catch (error) {
 			toast.error("Couldn't export", { description: failureMessage(error) });
 		} finally {

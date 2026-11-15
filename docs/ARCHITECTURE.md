@@ -36,7 +36,7 @@ backend/src/app/
 │   ├── media/       # attachments and images
 │   ├── search/      # one ranked search over items, collections, item types, settings and scheduled tasks, answered by sources bridged from the owning modules
 │   ├── system/      # health, readiness, version (public: minimal; detail needs system:diagnostics:read)
-│   └── transfer/    # the neutral bundle vocabulary and target ports that example packs (and later importers) install through
+│   └── transfer/    # the import pipeline: bundles, codecs for file formats, one planner and the target ports every import goes through
 ├── shared_kernel/   # Actor, access stances and guard, ContentFilter, error base types, UoW protocol, use case bases
 ├── platform/        # database engine, session factory, logging (one plausible implementation each)
 └── alembic/         # migrations - one environment for all modules

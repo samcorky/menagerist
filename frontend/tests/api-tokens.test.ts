@@ -28,7 +28,9 @@ const GRANTABLE = [
 	'examples:pack:read',
 	'examples:pack:install',
 	'catalogue:entry:read',
-	'catalogue:entry:install'
+	'catalogue:entry:install',
+	'transfer:bundle:read',
+	'transfer:bundle:import'
 ];
 
 describe('AREAS', () => {
@@ -40,7 +42,8 @@ describe('AREAS', () => {
 			'Media',
 			'Presets',
 			'Example packs',
-			'Catalogue'
+			'Catalogue',
+			'Files'
 		]);
 		for (const area of AREAS) {
 			expect(area.label).not.toContain(':');
@@ -68,7 +71,8 @@ describe('presets', () => {
 			'media:item:read',
 			'presets:preset:read',
 			'examples:pack:read',
-			'catalogue:entry:read'
+			'catalogue:entry:read',
+			'transfer:bundle:read'
 		]);
 	});
 
@@ -135,7 +139,7 @@ describe('describeGrants', () => {
 	it('never shows a raw permission', () => {
 		expect(describeGrants(GRANTABLE)).not.toContain(':');
 		expect(describeGrants(GRANTABLE)).toBe(
-			'Read and write items, item types, collections, media, presets, example packs and catalogue'
+			'Read and write items, item types, collections, media, presets, example packs, catalogue and files'
 		);
 	});
 

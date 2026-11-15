@@ -77,6 +77,22 @@ class PresetTarget(Protocol):
         """Say, in order, whether the person already has an identical preset."""
         ...
 
+    async def check(self, presets: Sequence[BundlePreset]) -> None:
+        """Refuse the presets if `ensure` would refuse them; nothing is stored.
+
+        Raises:
+            ValidationError: a preset is malformed, or there are too many.
+        """
+        ...
+
+    async def read(self, preset_ids: Sequence[uuid.UUID]) -> list[BundlePreset]:
+        """Return the person's presets with `preset_ids`, in order; `ref` is the id.
+
+        Raises:
+            NotFoundError: an id is not one of the person's live presets.
+        """
+        ...
+
     async def inspect(self, preset_id: uuid.UUID) -> Inspection | None:
         """Return the preset as it is now, or `None` if it is gone."""
         ...

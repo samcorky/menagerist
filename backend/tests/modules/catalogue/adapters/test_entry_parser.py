@@ -15,18 +15,14 @@ def _preset_entry() -> dict[str, Any]:
         "title": "Grades",
         "description": "d",
         "section": "choice_list",
-        "presets": {
-            "format": "menagerist-presets",
-            "version": 1,
-            "items": [
-                {
-                    "kind": "choice_list",
-                    "label": "Grades",
-                    "description": None,
-                    "definition": {"options": ["A"]},
-                }
-            ],
-        },
+        "presets": [
+            {
+                "kind": "choice_list",
+                "label": "Grades",
+                "description": None,
+                "definition": {"options": ["A"]},
+            }
+        ],
     }
 
 
