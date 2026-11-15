@@ -315,6 +315,24 @@ async def test_items_travel_with_their_type_and_connections(shared: Shared) -> N
     assert imported.json()["created"] == 7
 
 
+async def test_a_repeated_item_id_is_written_once(shared: Shared) -> None:
+    """The same item asked for twice is exported once."""
+    ids, _ = await _alices_records(shared)
+
+    file = _export_items(shared, [ids[0], ids[0], ids[1]])
+
+    assert [i["ref"] for i in file["items"]] == [str(ids[0]), str(ids[1])]
+
+
+def test_export_refuses_more_items_than_a_file_can_hold(shared: Shared) -> None:
+    """The cap is checked on the request, before anything is read."""
+    ids = [str(uuid.uuid7()) for _ in range(501)]
+
+    response = _client(shared).get("/api/v1/bundles/export", params={"item_ids": ids})
+
+    assert response.status_code == 422
+
+
 async def test_a_taken_type_without_the_items_fields_stops_the_import(
     shared: Shared,
 ) -> None:

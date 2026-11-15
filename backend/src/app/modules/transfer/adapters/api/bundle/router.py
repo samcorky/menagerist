@@ -32,7 +32,7 @@ from app.modules.transfer.application.bundle_files import (
     ImportBundle,
     PlanBundleImport,
 )
-from app.modules.transfer.domain.bundle import BUNDLE_FORMAT
+from app.modules.transfer.domain.bundle import BUNDLE_FORMAT, MAX_ITEMS
 from app.modules.transfer.domain.errors import InvalidBundleError
 from app.shared_kernel.actor import Actor
 
@@ -125,6 +125,7 @@ async def export_bundle(
     item_ids: Annotated[
         list[uuid.UUID] | None,
         Query(
+            max_length=MAX_ITEMS,
             description="The items to export, with their types, the saved lists "
             + "those use, and the connections that join two of the items."
         ),

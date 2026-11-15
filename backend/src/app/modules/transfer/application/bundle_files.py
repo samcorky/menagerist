@@ -135,8 +135,9 @@ class ExportBundle(_FileUseCase, UseCase[ExportBundleQuery, dict[str, Any]]):
             or request.item_ids
         ):
             raise InvalidBundleError("Choose something to export.")
-        items = await self._graph.read_items(request.item_ids)
-        connections = await self._graph.read_connections(request.item_ids)
+        item_ids = list(dict.fromkeys(request.item_ids))
+        items = await self._graph.read_items(item_ids)
+        connections = await self._graph.read_connections(item_ids)
         # Items and connections bring the types they use, so the file stands alone.
         item_types = await self._graph.read_item_types(
             _with_ids(request.item_type_ids, (i.type_ref for i in items))
