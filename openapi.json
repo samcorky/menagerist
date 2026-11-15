@@ -13381,409 +13381,6 @@
         "x-required-permission": "presets:preset:read"
       }
     },
-    "/api/v1/presets/export": {
-      "get": {
-        "tags": [
-          "v1",
-          "Presets"
-        ],
-        "summary": "Export Presets",
-        "description": "Export the presets with `ids` as a `menagerist-presets` pack.\n\n**Requires permission:** `presets:preset:read`",
-        "operationId": "export_presets",
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "ids",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "minItems": 1,
-              "title": "Ids"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PackResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Returned when a preset's `kind` or `definition` is malformed.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "example": {
-                  "type": "about:blank",
-                  "title": "InvalidPresetDefinitionError",
-                  "status": 400,
-                  "detail": "a field preset needs a 'property' object",
-                  "instance": "https://menagerist.example/api/v1/presets/export"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "not_signed_in": {
-                    "summary": "Not signed in",
-                    "value": {
-                      "type": "unauthenticated",
-                      "title": "SessionRequiredError",
-                      "status": 401,
-                      "detail": "Sign in to continue.",
-                      "instance": "https://menagerist.example/api/v1/presets/export"
-                    }
-                  },
-                  "setup_required": {
-                    "summary": "No account exists yet",
-                    "value": {
-                      "type": "setup_required",
-                      "title": "SetupRequiredError",
-                      "status": 401,
-                      "detail": "Create the first account to continue.",
-                      "instance": "https://menagerist.example/api/v1/presets/export"
-                    }
-                  },
-                  "invalid_token": {
-                    "summary": "Bearer token not valid",
-                    "value": {
-                      "type": "invalid_token",
-                      "title": "InvalidApiTokenError",
-                      "status": 401,
-                      "detail": "The access token is not valid.",
-                      "instance": "https://menagerist.example/api/v1/presets/export"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "permission_refused": {
-                    "summary": "Permission refused",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "ForbiddenError",
-                      "status": 403,
-                      "detail": "You do not have permission to do that.",
-                      "instance": "https://menagerist.example/api/v1/presets/export"
-                    }
-                  },
-                  "password_expired": {
-                    "summary": "Password must be changed",
-                    "value": {
-                      "type": "password_expired",
-                      "title": "PasswordExpiredError",
-                      "status": 403,
-                      "detail": "Change your password to continue.",
-                      "instance": "https://menagerist.example/api/v1/presets/export"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "A field is missing or has the wrong type.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblem"
-                },
-                "example": {
-                  "type": "about:blank",
-                  "title": "Unprocessable Content",
-                  "status": 422,
-                  "detail": [
-                    {
-                      "type": "missing",
-                      "loc": [
-                        "body",
-                        "name"
-                      ],
-                      "msg": "Field required"
-                    }
-                  ],
-                  "instance": "https://menagerist.example/api/v1/presets/export"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "internal_error": {
-                    "summary": "Server error",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Internal Server Error",
-                      "status": 500,
-                      "detail": "An unexpected error occurred.",
-                      "instance": "https://menagerist.example/api/v1/presets/export"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-required-permission": "presets:preset:read"
-      }
-    },
-    "/api/v1/presets/import": {
-      "post": {
-        "tags": [
-          "v1",
-          "Presets"
-        ],
-        "summary": "Import Presets",
-        "description": "Import a pack. Presets already present (same content) are skipped.\n\n**Requires permission:** `presets:preset:write`",
-        "operationId": "import_presets",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PackRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportPresetsResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Returned when a preset's `kind` or `definition` is malformed.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "example": {
-                  "type": "about:blank",
-                  "title": "InvalidPresetDefinitionError",
-                  "status": 400,
-                  "detail": "a field preset needs a 'property' object",
-                  "instance": "https://menagerist.example/api/v1/presets/import"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "not_signed_in": {
-                    "summary": "Not signed in",
-                    "value": {
-                      "type": "unauthenticated",
-                      "title": "SessionRequiredError",
-                      "status": 401,
-                      "detail": "Sign in to continue.",
-                      "instance": "https://menagerist.example/api/v1/presets/import"
-                    }
-                  },
-                  "setup_required": {
-                    "summary": "No account exists yet",
-                    "value": {
-                      "type": "setup_required",
-                      "title": "SetupRequiredError",
-                      "status": 401,
-                      "detail": "Create the first account to continue.",
-                      "instance": "https://menagerist.example/api/v1/presets/import"
-                    }
-                  },
-                  "invalid_token": {
-                    "summary": "Bearer token not valid",
-                    "value": {
-                      "type": "invalid_token",
-                      "title": "InvalidApiTokenError",
-                      "status": 401,
-                      "detail": "The access token is not valid.",
-                      "instance": "https://menagerist.example/api/v1/presets/import"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "permission_refused": {
-                    "summary": "Permission refused",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "ForbiddenError",
-                      "status": 403,
-                      "detail": "You do not have permission to do that.",
-                      "instance": "https://menagerist.example/api/v1/presets/import"
-                    }
-                  },
-                  "csrf_failed": {
-                    "summary": "Request not from this site",
-                    "value": {
-                      "type": "csrf_failed",
-                      "title": "CsrfError",
-                      "status": 403,
-                      "detail": "This request was not sent from this site's own pages.",
-                      "instance": "https://menagerist.example/api/v1/presets/import"
-                    }
-                  },
-                  "password_expired": {
-                    "summary": "Password must be changed",
-                    "value": {
-                      "type": "password_expired",
-                      "title": "PasswordExpiredError",
-                      "status": 403,
-                      "detail": "Change your password to continue.",
-                      "instance": "https://menagerist.example/api/v1/presets/import"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "A field is missing or has the wrong type.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationProblem"
-                },
-                "example": {
-                  "type": "about:blank",
-                  "title": "Unprocessable Content",
-                  "status": 422,
-                  "detail": [
-                    {
-                      "type": "missing",
-                      "loc": [
-                        "body",
-                        "name"
-                      ],
-                      "msg": "Field required"
-                    }
-                  ],
-                  "instance": "https://menagerist.example/api/v1/presets/import"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests recently; wait for `Retry-After` seconds.",
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds to wait before trying again.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "example": {
-                  "type": "about:blank",
-                  "title": "RateLimitedError",
-                  "status": 429,
-                  "detail": "Too many requests. Try again later.",
-                  "instance": "https://menagerist.example/api/v1/presets/import"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "internal_error": {
-                    "summary": "Server error",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Internal Server Error",
-                      "status": 500,
-                      "detail": "An unexpected error occurred.",
-                      "instance": "https://menagerist.example/api/v1/presets/import"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "x-required-permission": "presets:preset:write"
-      }
-    },
     "/api/v1/presets/{preset_id}": {
       "get": {
         "tags": [
@@ -17376,6 +16973,662 @@
           }
         },
         "x-required-permission": "catalogue:entry:install"
+      }
+    },
+    "/api/v1/bundles/import/plan": {
+      "post": {
+        "tags": [
+          "v1",
+          "Bundles"
+        ],
+        "summary": "Plan Bundle Import",
+        "description": "See what importing a file would do, without importing anything.\n\nEach thing in the file is `create`, or `unchanged` with the reason: you already\nhave one the same, it repeats one earlier in the file, or the name is taken. A\nfile the import would refuse is refused here in the same way.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "plan_bundle_import",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BundleFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPlanResponse"
+                },
+                "example": {
+                  "ready": true,
+                  "blockers": [],
+                  "entities": [
+                    {
+                      "kind": "preset",
+                      "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
+                      "label": "Condition grades",
+                      "action": "unchanged",
+                      "reason": "You already have one the same."
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a bundle file or its content is malformed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidBundleError",
+                  "status": 400,
+                  "detail": "presets[0] needs definition, kind",
+                  "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import/plan"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/bundles/import": {
+      "post": {
+        "tags": [
+          "v1",
+          "Bundles"
+        ],
+        "summary": "Import Bundle",
+        "description": "Import a file, such as a `menagerist-bundle` of saved fields.\n\nWhat you already have is skipped and counted. This does exactly what\n`POST /bundles/import/plan` says it will.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "import_bundle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BundleFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultResponse"
+                },
+                "example": {
+                  "created": 1,
+                  "skipped": 1,
+                  "presets_created": 1,
+                  "presets_skipped": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a bundle file or its content is malformed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidBundleError",
+                  "status": 400,
+                  "detail": "presets[0] needs definition, kind",
+                  "instance": "https://menagerist.example/api/v1/bundles/import"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/bundles/import"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/bundles/import"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/bundles/import"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/bundles/export": {
+      "get": {
+        "tags": [
+          "v1",
+          "Bundles"
+        ],
+        "summary": "Export Bundle",
+        "description": "Export saved lists, fields or groups as a file you can import again.\n\nIn a `menagerist-bundle` file each preset's `ref` is its id, so the same preset\nhas the same ref in every file.\n\n**Requires permission:** `transfer:bundle:read`",
+        "operationId": "export_bundle",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "preset_ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "minItems": 1,
+              "description": "The saved lists, fields or groups to export.",
+              "title": "Preset Ids"
+            },
+            "description": "The saved lists, fields or groups to export."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The file format to write.",
+              "examples": [
+                "menagerist-bundle"
+              ],
+              "default": "menagerist-bundle",
+              "title": "Format"
+            },
+            "description": "The file format to write."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleFileResponse"
+                },
+                "example": {
+                  "format": "menagerist-bundle",
+                  "version": 1,
+                  "presets": [
+                    {
+                      "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
+                      "kind": "choice_list",
+                      "label": "Condition grades",
+                      "definition": {
+                        "options": [
+                          "Mint",
+                          "Near Mint",
+                          "Good"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/export"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/export"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/bundles/export"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/bundles/export"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/bundles/export"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/bundles/export"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/bundles/export"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:read"
       }
     },
     "/api/v1/collections": {
@@ -24808,6 +25061,173 @@
           }
         ]
       },
+      "BundleFile": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "The file format, such as `menagerist-bundle`.",
+            "examples": [
+              "menagerist-bundle"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "The version of that format.",
+            "examples": [
+              1
+            ]
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/BundlePresetEntry"
+            },
+            "type": "array",
+            "title": "Presets",
+            "description": "The saved lists, fields and groups."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "format",
+          "version"
+        ],
+        "title": "BundleFile",
+        "description": "A bundle file to import. `format` says which reader takes it.\n\nA `menagerist-bundle` file has `version` 1 and the presets it holds.",
+        "examples": [
+          {
+            "format": "menagerist-bundle",
+            "presets": [
+              {
+                "definition": {
+                  "options": [
+                    "Mint",
+                    "Near Mint",
+                    "Good"
+                  ]
+                },
+                "kind": "choice_list",
+                "label": "Condition grades",
+                "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+              }
+            ],
+            "version": 1
+          }
+        ]
+      },
+      "BundleFileResponse": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "description": "The file format, such as `menagerist-bundle`."
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "The version of that format."
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/BundlePresetEntry"
+            },
+            "type": "array",
+            "title": "Presets",
+            "description": "The saved lists, fields and groups; each `ref` is its id."
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "version",
+          "presets"
+        ],
+        "title": "BundleFileResponse",
+        "description": "A bundle file as exported, ready to save and import again.",
+        "examples": [
+          {
+            "format": "menagerist-bundle",
+            "presets": [
+              {
+                "definition": {
+                  "options": [
+                    "Mint",
+                    "Near Mint",
+                    "Good"
+                  ]
+                },
+                "kind": "choice_list",
+                "label": "Condition grades",
+                "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+              }
+            ],
+            "version": 1
+          }
+        ]
+      },
+      "BundlePresetEntry": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its id within the file; an export uses the id."
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "`field`, `field_set` or `choice_list`."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Its name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What it is for."
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition",
+            "description": "Its definition, by kind."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref",
+          "kind",
+          "label",
+          "definition"
+        ],
+        "title": "BundlePresetEntry",
+        "description": "One saved list, field or field group in a `menagerist-bundle` file.",
+        "examples": [
+          {
+            "definition": {
+              "options": [
+                "Mint",
+                "Near Mint",
+                "Good"
+              ]
+            },
+            "kind": "choice_list",
+            "label": "Condition grades",
+            "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+          }
+        ]
+      },
       "CatalogueEntryResponse": {
         "properties": {
           "id": {
@@ -26628,6 +27048,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/SettingsPermission"
+                },
+                {
+                  "$ref": "#/components/schemas/TransferPermission"
                 }
               ]
             },
@@ -26714,27 +27137,91 @@
         "title": "IdentityPermission",
         "description": "Permissions for managing other people's accounts.\n\nValues read `<module>:<resource>:<action>`."
       },
-      "ImportPresetsResponse": {
+      "ImportPlanResponse": {
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "title": "Ready",
+            "description": "Whether importing would go ahead."
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/PlanBlockerResponse"
+            },
+            "type": "array",
+            "title": "Blockers",
+            "description": "Problems with the whole file that stop the import."
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedEntityResponse"
+            },
+            "type": "array",
+            "title": "Entities",
+            "description": "Everything in the file, in the order importing makes it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ready",
+          "blockers",
+          "entities"
+        ],
+        "title": "ImportPlanResponse",
+        "description": "What importing a file would do, worked out without writing anything.",
+        "examples": [
+          {
+            "blockers": [],
+            "entities": [
+              {
+                "action": "unchanged",
+                "kind": "preset",
+                "label": "Condition grades",
+                "reason": "You already have one the same.",
+                "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+              }
+            ],
+            "ready": true
+          }
+        ]
+      },
+      "ImportResultResponse": {
         "properties": {
           "created": {
             "type": "integer",
-            "title": "Created"
+            "title": "Created",
+            "description": "Everything added."
           },
           "skipped": {
             "type": "integer",
-            "title": "Skipped"
+            "title": "Skipped",
+            "description": "Everything you already had, so left as it is."
+          },
+          "presets_created": {
+            "type": "integer",
+            "title": "Presets Created",
+            "description": "Saved lists, fields or groups added."
+          },
+          "presets_skipped": {
+            "type": "integer",
+            "title": "Presets Skipped",
+            "description": "Saved lists, fields or groups you already had."
           }
         },
         "type": "object",
         "required": [
           "created",
-          "skipped"
+          "skipped",
+          "presets_created",
+          "presets_skipped"
         ],
-        "title": "ImportPresetsResponse",
-        "description": "How many presets an import created and how many were skipped as repeats.",
+        "title": "ImportResultResponse",
+        "description": "What importing a file created, and what you already had.",
         "examples": [
           {
             "created": 1,
+            "presets_created": 1,
+            "presets_skipped": 1,
             "skipped": 1
           }
         ]
@@ -28423,100 +28910,6 @@
           }
         ]
       },
-      "PackRequest": {
-        "properties": {
-          "format": {
-            "type": "string",
-            "title": "Format"
-          },
-          "version": {
-            "type": "integer",
-            "title": "Version"
-          },
-          "items": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "format",
-          "version"
-        ],
-        "title": "PackRequest",
-        "description": "A pack of presets to import: the `menagerist-presets` envelope.",
-        "examples": [
-          {
-            "format": "menagerist-presets",
-            "items": [
-              {
-                "definition": {
-                  "options": [
-                    "Mint",
-                    "Near Mint",
-                    "Good"
-                  ]
-                },
-                "kind": "choice_list",
-                "label": "Condition grades"
-              }
-            ],
-            "version": 1
-          }
-        ]
-      },
-      "PackResponse": {
-        "properties": {
-          "format": {
-            "type": "string",
-            "title": "Format"
-          },
-          "version": {
-            "type": "integer",
-            "title": "Version"
-          },
-          "items": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "format",
-          "version",
-          "items"
-        ],
-        "title": "PackResponse",
-        "description": "A pack of presets as exported, using the same envelope as `PackRequest`.",
-        "examples": [
-          {
-            "format": "menagerist-presets",
-            "items": [
-              {
-                "definition": {
-                  "options": [
-                    "Mint",
-                    "Near Mint",
-                    "Good"
-                  ]
-                },
-                "kind": "choice_list",
-                "label": "Condition grades"
-              }
-            ],
-            "version": 1
-          }
-        ]
-      },
       "PermissionsResponse": {
         "properties": {
           "permissions": {
@@ -28554,6 +28947,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/SettingsPermission"
+                },
+                {
+                  "$ref": "#/components/schemas/TransferPermission"
                 }
               ]
             },
@@ -29975,6 +30371,15 @@
         "title": "SystemPermission",
         "description": "Permissions for operational detail the public probes leave out.\n\nValues read `<module>:<resource>:<action>`."
       },
+      "TransferPermission": {
+        "type": "string",
+        "enum": [
+          "transfer:bundle:read",
+          "transfer:bundle:import"
+        ],
+        "title": "TransferPermission",
+        "description": "Permissions for importing and exporting bundle files.\n\nExporting a file is `BUNDLE_READ`, so a read-only token can export. The\ntargets underneath still check the permission for each kind of thing a bundle\nholds, such as saving presets."
+      },
       "UninstallResultResponse": {
         "properties": {
           "pack_id": {
@@ -31255,6 +31660,10 @@
     {
       "name": "Catalogue",
       "description": "Endpoints for adding ready-made saved fields and types."
+    },
+    {
+      "name": "Bundles",
+      "description": "Endpoints for importing and exporting files of saved fields."
     },
     {
       "name": "Collections",

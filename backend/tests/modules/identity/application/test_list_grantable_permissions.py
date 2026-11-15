@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 EXPECTED = sorted(p.value for p in TOKEN_GRANTABLE_PERMISSIONS)
 
 
-async def test_a_member_sees_the_fourteen_grantable_content_permissions(
+async def test_a_member_sees_the_sixteen_grantable_content_permissions(
     cases: Cases, make_user: MakeUser, actor_for: ActorFor
 ) -> None:
     """Backup export and import are not offered."""
@@ -28,7 +28,7 @@ async def test_a_member_sees_the_fourteen_grantable_content_permissions(
     )
 
     assert listed == EXPECTED
-    assert len(listed) == 14
+    assert len(listed) == 16
     assert not any(p.startswith("backup:") for p in listed)
 
 

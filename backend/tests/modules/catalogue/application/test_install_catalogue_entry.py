@@ -25,7 +25,7 @@ from app.shared_kernel.errors import ForbiddenError
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
-    from tests.modules.catalogue.conftest import Shared
+    from tests.modules.conftest import Shared
 
 ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))

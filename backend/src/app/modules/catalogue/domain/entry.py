@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from app.modules.catalogue.domain.errors import InvalidEntryError
 from app.modules.transfer.domain.bundle import (
+    Bundle,
     BundleItemType,
     BundlePreset,
     BundleRelationshipType,
@@ -39,3 +40,12 @@ class CatalogueEntry:
             raise InvalidEntryError(f"entry '{self.id}' has nothing to install")
         if self.presets and types:
             raise InvalidEntryError(f"entry '{self.id}' mixes presets with types")
+
+    def bundle(self) -> Bundle:
+        """Return what the entry installs, as a bundle to plan and apply."""
+        return Bundle(
+            id=self.id,
+            presets=self.presets,
+            relationship_types=self.relationship_types,
+            item_types=self.item_types,
+        )

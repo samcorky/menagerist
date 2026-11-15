@@ -1,57 +1,38 @@
-"""Pack envelope for export and import, and the content hash that spots repeats."""
+"""The checks a preset passes before it is imported."""
 
-import hashlib
 import json
 from typing import Any
 
+from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.errors import InvalidPresetDefinitionError
 from app.modules.presets.domain.preset import VALID_KINDS
 
-PACK_FORMAT = "menagerist-presets"
-PACK_VERSION = 1
 MAX_PACK_ITEMS = 200
 MAX_LABEL_LENGTH = 200
 MAX_DESCRIPTION_LENGTH = 2000
 MAX_DEFINITION_BYTES = 64 * 1024
 
 
-def content_hash(kind: str, label: str, definition: dict[str, Any]) -> str:
-    """Return a stable hash of a preset's kind, label and definition.
+def check_presets(items: list[dict[str, Any]]) -> None:
+    """Check every preset to import, so one bad preset refuses them all.
 
-    Two presets with the same content hash are treated as the same preset on import.
+    :raises InvalidPresetDefinitionError: too many presets, or one is malformed.
     """
-    canonical = json.dumps(
-        {"kind": kind, "label": label, "definition": definition},
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def check_pack_envelope(
-    pack_format: str, pack_version: int, items: list[dict[str, Any]]
-) -> None:
-    """Reject a pack whose envelope or size is not one this server accepts.
-
-    :raises InvalidPresetDefinitionError: unknown format or version, or too many items.
-    """
-    if pack_format != PACK_FORMAT:
-        raise InvalidPresetDefinitionError(f"format must be '{PACK_FORMAT}'")
-    if pack_version != PACK_VERSION:
-        raise InvalidPresetDefinitionError(f"unsupported pack version {pack_version}")
     if len(items) > MAX_PACK_ITEMS:
         raise InvalidPresetDefinitionError(
-            f"a pack may hold at most {MAX_PACK_ITEMS} presets"
+            f"an import may hold at most {MAX_PACK_ITEMS} presets"
         )
+    for item in items:
+        check_pack_item(item)
+        check_definition(item["kind"], item["definition"])
 
 
 def check_pack_item(item: dict[str, Any]) -> None:
-    """Check one pack item's kind, label, description and size limits.
+    """Check one preset's kind, label, description and size limits.
 
     The definition's shape is checked separately by `check_definition`.
 
-    :raises InvalidPresetDefinitionError: when the item is malformed or oversized.
+    :raises InvalidPresetDefinitionError: when the preset is malformed or oversized.
     """
     kind = item.get("kind")
     if kind not in VALID_KINDS:

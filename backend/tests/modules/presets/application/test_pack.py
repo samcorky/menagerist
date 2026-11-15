@@ -14,17 +14,14 @@ from app.modules.presets.application.import_presets import (
     ImportPresets,
     ImportPresetsCommand,
 )
-from app.modules.presets.application.pack import (
-    MAX_DEFINITION_BYTES,
-    MAX_PACK_ITEMS,
-    content_hash,
-)
+from app.modules.presets.application.pack import MAX_DEFINITION_BYTES, MAX_PACK_ITEMS
 from app.modules.presets.domain.errors import (
     InvalidPresetDefinitionError,
     PresetNotFoundError,
 )
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.transfer.application.content_hash import preset_key
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
@@ -56,9 +53,7 @@ async def test_import_creates_new_presets_with_fresh_ids() -> None:
     """Imported items become new presets owned by the importer."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
     result = await _importer(repos).handle(
-        ImportPresetsCommand(
-            pack_format="menagerist-presets", pack_version=1, items=[_item()]
-        ),
+        ImportPresetsCommand(items=[_item()]),
         SYSTEM_ACTOR,
     )
 
@@ -72,9 +67,7 @@ async def test_import_creates_new_presets_with_fresh_ids() -> None:
 async def test_import_skips_content_already_present() -> None:
     """Importing the same pack twice creates nothing the second time."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
-    command = ImportPresetsCommand(
-        pack_format="menagerist-presets", pack_version=1, items=[_item(), _item()]
-    )
+    command = ImportPresetsCommand(items=[_item(), _item()])
     first = await _importer(repos).handle(command, SYSTEM_ACTOR)
     second = await _importer(repos).handle(command, SYSTEM_ACTOR)
 
@@ -87,8 +80,6 @@ async def test_import_rejects_the_whole_pack_when_one_item_is_bad() -> None:
     """A malformed item stops the pack before anything is stored."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
     command = ImportPresetsCommand(
-        pack_format="menagerist-presets",
-        pack_version=1,
         items=[_item(), _item(kind="mystery")],
     )
 
@@ -97,22 +88,10 @@ async def test_import_rejects_the_whole_pack_when_one_item_is_bad() -> None:
     assert await repos.presets.list(scope=EVERYONE, after=None, limit=10) == []
 
 
-@pytest.mark.parametrize(
-    ("pack_format", "pack_version", "items"),
-    [
-        ("other-format", 1, []),
-        ("menagerist-presets", 2, []),
-        ("menagerist-presets", 1, [_item() for _ in range(MAX_PACK_ITEMS + 1)]),
-    ],
-)
-async def test_import_rejects_bad_envelopes(
-    pack_format: str, pack_version: int, items: list[dict[str, object]]
-) -> None:
-    """Unknown format, unknown version and oversized packs are refused."""
+async def test_import_rejects_more_presets_than_it_may_hold() -> None:
+    """An oversized import is refused."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
-    command = ImportPresetsCommand(
-        pack_format=pack_format, pack_version=pack_version, items=items
-    )
+    command = ImportPresetsCommand(items=[_item() for _ in range(MAX_PACK_ITEMS + 1)])
 
     with pytest.raises(InvalidPresetDefinitionError):
         await _importer(repos).handle(command, SYSTEM_ACTOR)
@@ -131,9 +110,7 @@ async def test_import_rejects_bad_envelopes(
 async def test_import_rejects_bad_items(override: dict[str, object]) -> None:
     """Blank or oversized labels, bad descriptions and definitions are refused."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
-    command = ImportPresetsCommand(
-        pack_format="menagerist-presets", pack_version=1, items=[_item(**override)]
-    )
+    command = ImportPresetsCommand(items=[_item(**override)])
 
     with pytest.raises(InvalidPresetDefinitionError):
         await _importer(repos).handle(command, SYSTEM_ACTOR)
@@ -168,11 +145,11 @@ async def test_export_rejects_a_missing_id() -> None:
         )
 
 
-def test_content_hash_ignores_key_order_but_not_content() -> None:
-    """The hash is stable under key reordering and changes when content changes."""
-    a = content_hash("choice_list", "A", {"options": ["x"], "z": 1})
-    b = content_hash("choice_list", "A", {"z": 1, "options": ["x"]})
-    c = content_hash("choice_list", "B", {"options": ["x"], "z": 1})
+def test_preset_key_ignores_key_order_but_not_content() -> None:
+    """The key is stable under key reordering and changes when content changes."""
+    a = preset_key("choice_list", "A", {"options": ["x"], "z": 1})
+    b = preset_key("choice_list", "A", {"z": 1, "options": ["x"]})
+    c = preset_key("choice_list", "B", {"options": ["x"], "z": 1})
 
     assert a == b
     assert a != c
@@ -205,8 +182,6 @@ async def test_import_detects_repeats_beyond_the_first_page() -> None:
 
     result = await _importer(repos).handle(
         ImportPresetsCommand(
-            pack_format="menagerist-presets",
-            pack_version=1,
             items=[_item(label=existing_label, definition=_GRADES)],
         ),
         SYSTEM_ACTOR,
@@ -225,8 +200,6 @@ async def test_import_reports_an_id_for_every_item_including_repeats() -> None:
 
     result = await _importer(repos).handle(
         ImportPresetsCommand(
-            pack_format="menagerist-presets",
-            pack_version=1,
             items=[
                 _item(label="Grades", definition=_GRADES),
                 _item(label="Formats", definition={"options": ["LP"]}),

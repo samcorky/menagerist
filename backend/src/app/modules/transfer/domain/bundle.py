@@ -9,6 +9,11 @@ from app.modules.transfer.domain.errors import InvalidBundleError
 
 PRESET_MARKER = "$preset"
 
+# The envelope of a bundle file a person exports and imports. Version 1 carries
+# presets only; types, items and collections join it in later versions.
+BUNDLE_FORMAT = "menagerist-bundle"
+BUNDLE_VERSION = 1
+
 
 COVER_STYLES = ("sleeve", "poster", "box", "card")
 
@@ -156,3 +161,32 @@ class BundleCollection:
     description: str | None = None
     item_refs: tuple[str, ...] = ()
     definition: Mapping[str, Any] | None = None
+
+
+@dataclass(kw_only=True, frozen=True, eq=False)
+class Bundle:
+    """What one import or install brings in, whatever its source.
+
+    A source (a file, a catalogue entry) is decoded into a bundle, which is then
+    planned and applied the same way. Refs are unique within each kind.
+    """
+
+    id: str
+    presets: tuple[BundlePreset, ...] = ()
+    relationship_types: tuple[BundleRelationshipType, ...] = ()
+    item_types: tuple[BundleItemType, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Reject two entities of one kind sharing a ref.
+
+        Raises:
+            InvalidBundleError: if a ref repeats within a kind.
+        """
+        for name, specs in (
+            ("preset", self.presets),
+            ("relationship type", self.relationship_types),
+            ("item type", self.item_types),
+        ):
+            refs = [s.ref for s in specs]
+            if len(set(refs)) != len(refs):
+                raise InvalidBundleError(f"each {name} needs its own ref")

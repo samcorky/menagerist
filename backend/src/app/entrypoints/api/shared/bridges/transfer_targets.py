@@ -101,6 +101,10 @@ from app.modules.presets.application.delete_preset import (
     DeletePreset,
     DeletePresetCommand,
 )
+from app.modules.presets.application.export_presets import (
+    ExportPresets,
+    ExportPresetsQuery,
+)
 from app.modules.presets.application.import_presets import (
     ImportPresets,
     ImportPresetsCommand,
@@ -109,7 +113,7 @@ from app.modules.presets.application.match_presets import (
     MatchPresets,
     MatchPresetsQuery,
 )
-from app.modules.presets.application.pack import PACK_FORMAT, PACK_VERSION
+from app.modules.presets.application.pack import check_presets
 from app.modules.presets.domain.errors import PresetInUseError, PresetNotFoundError
 from app.modules.presets.domain.preset import Preset  # noqa: TC001
 from app.modules.presets.ports.preset_usage import PresetUsage
@@ -454,6 +458,18 @@ def _resolved(
 # ---- the targets ----
 
 
+def _preset_items(presets: Sequence[BundlePreset]) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": p.kind,
+            "label": p.label,
+            "description": p.description,
+            "definition": copy.deepcopy(p.definition),
+        }
+        for p in presets
+    ]
+
+
 class PresetPackTarget:
     """Implements `PresetTarget` with the presets use cases.
 
@@ -472,19 +488,7 @@ class PresetPackTarget:
         """Create each preset unless an identical one exists."""
         if not presets:
             return []
-        command = ImportPresetsCommand(
-            pack_format=PACK_FORMAT,
-            pack_version=PACK_VERSION,
-            items=[
-                {
-                    "kind": p.kind,
-                    "label": p.label,
-                    "description": p.description,
-                    "definition": copy.deepcopy(p.definition),
-                }
-                for p in presets
-            ],
-        )
+        command = ImportPresetsCommand(items=_preset_items(presets))
         result = await ImportPresets(self._stores.uow(), self._access).handle(
             command, self._actor
         )
@@ -515,6 +519,27 @@ class PresetPackTarget:
             return await MatchPresets(repos, self._access).handle(
                 MatchPresetsQuery(items=items), self._actor
             )
+
+    async def check(self, presets: Sequence[BundlePreset]) -> None:
+        """Refuse the presets as `ImportPresets` would; nothing is stored."""
+        check_presets(_preset_items(presets))
+
+    async def read(self, preset_ids: Sequence[uuid.UUID]) -> list[BundlePreset]:
+        """Return the person's presets with `preset_ids`, each `ref` its id."""
+        async with self._stores.read() as repos:
+            found = await ExportPresets(repos, self._access).handle(
+                ExportPresetsQuery(ids=list(preset_ids)), self._actor
+            )
+        return [
+            BundlePreset(
+                ref=str(p.id),
+                kind=p.kind,
+                label=p.label,
+                description=p.description,
+                definition=copy.deepcopy(p.definition),
+            )
+            for p in found
+        ]
 
     async def inspect(self, preset_id: uuid.UUID) -> Inspection | None:
         """Return the preset as it is now, or `None` if it is gone."""

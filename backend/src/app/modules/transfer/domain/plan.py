@@ -16,6 +16,17 @@ class PlanAction(StrEnum):
     CONFLICT = "conflict"
 
 
+class ClashPolicy(StrEnum):
+    """What planning does with a type whose name the person already uses.
+
+    `SKIP` keeps theirs and plans the type `unchanged`; `CONFLICT` plans it as a
+    conflict, which stops the bundle being applied.
+    """
+
+    SKIP = "skip"
+    CONFLICT = "conflict"
+
+
 @dataclass(kw_only=True, frozen=True, eq=False)
 class PlannedEntity:
     """One entity of the bundle and what applying the plan would do with it."""

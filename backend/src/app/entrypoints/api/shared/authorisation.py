@@ -8,6 +8,7 @@ from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.media.application.permissions import MediaPermission
 from app.modules.presets.application.permissions import PresetPermission
+from app.modules.transfer.application.permissions import TransferPermission
 from app.shared_kernel.errors import ForbiddenError
 
 if TYPE_CHECKING:
@@ -37,6 +38,8 @@ CONTENT_PERMISSIONS: frozenset[Permission] = frozenset(
         ExamplePermission.PACK_INSTALL,
         CataloguePermission.ENTRY_READ,
         CataloguePermission.ENTRY_INSTALL,
+        TransferPermission.BUNDLE_READ,
+        TransferPermission.BUNDLE_IMPORT,
         BackupPermission.EXPORT_OWN_DATA,
         BackupPermission.IMPORT_OWN_DATA,
     }

@@ -13,9 +13,7 @@ from app.modules.presets.adapters.persistence.unit_of_work import (
 )
 from app.modules.presets.application.create_preset import CreatePreset
 from app.modules.presets.application.delete_preset import DeletePreset
-from app.modules.presets.application.export_presets import ExportPresets
 from app.modules.presets.application.get_preset import GetPreset
-from app.modules.presets.application.import_presets import ImportPresets
 from app.modules.presets.application.list_presets import ListPresets
 from app.modules.presets.application.update_preset import UpdatePreset
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
@@ -82,17 +80,3 @@ def get_delete_preset_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeletePreset:
     return DeletePreset(uow, guard, usage)
-
-
-def get_export_presets_use_case(
-    repos: Annotated[PresetRepos, Depends(get_preset_repos)],
-    guard: Annotated[AccessGuard, Depends(get_access_guard)],
-) -> ExportPresets:
-    return ExportPresets(repos, guard)
-
-
-def get_import_presets_use_case(
-    uow: Annotated[PresetUnitOfWork, Depends(get_preset_uow)],
-    guard: Annotated[AccessGuard, Depends(get_access_guard)],
-) -> ImportPresets:
-    return ImportPresets(uow, guard)

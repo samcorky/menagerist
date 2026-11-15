@@ -3,26 +3,22 @@
   "title": "Condition grades",
   "description": "Mint through Poor, for rating the state of something you own.",
   "section": "choice_list",
-  "presets": {
-    "format": "menagerist-presets",
-    "version": 1,
-    "items": [
-      {
-        "kind": "choice_list",
-        "label": "Condition grades",
-        "description": null,
-        "definition": {
-          "options": [
-            "Mint",
-            "Near Mint",
-            "Excellent",
-            "Very Good",
-            "Good",
-            "Fair",
-            "Poor"
-          ]
-        }
+  "presets": [
+    {
+      "kind": "choice_list",
+      "label": "Condition grades",
+      "description": null,
+      "definition": {
+        "options": [
+          "Mint",
+          "Near Mint",
+          "Excellent",
+          "Very Good",
+          "Good",
+          "Fair",
+          "Poor"
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

@@ -9,3 +9,11 @@ class InvalidBundleError(ValidationError):
 
 class InvalidRunStateError(ConflictError):
     """Raised when a run is asked to make an impossible change."""
+
+
+class BundleConflictError(ConflictError):
+    """Raised when a bundle is applied although its plan has conflicts."""
+
+
+class UnknownFormatError(ValidationError):
+    """Raised when no codec reads or writes the named format."""

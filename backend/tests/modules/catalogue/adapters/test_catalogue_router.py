@@ -15,7 +15,7 @@ from app.shared_kernel.actor import Actor
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
-    from tests.modules.catalogue.conftest import Shared
+    from tests.modules.conftest import Shared
 
 ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
