@@ -32,6 +32,20 @@ rules:
   ibm-string-attributes: off
   ibm-integer-attributes: off
   ibm-array-attributes: off
+  # Operation ids are `verb_noun` with the domain's verbs (`revoke_session`,
+  # `install_example_pack`); IBM derives them from the path (`create_node-type`).
+  ibm-operationid-naming-convention: off
+  # Errors are RFC 9457 problems (`errors` only on validation, no `trace`), and the
+  # health probes follow draft-inadarei-api-health-check.
+  ibm-error-response-schemas: off
+  # OpenAPI 3.1 is JSON Schema 2020-12: `$ref` may have siblings, and `const` and
+  # `contentMediaType` are valid keywords.
+  no-$ref-siblings: off
+  ibm-schema-keywords: off
+  # The health probes and the web app manifest sit outside the versioned `/api/v1`.
+  ibm-major-version-in-path: off
+  # Self-hosted: each instance has its own origin, so there is no server to name.
+  oas3-api-servers: off
 
   # --- Fixed, and kept that way -----------------------------------------------------
   # Recurring parameters take their description from entrypoints/api/shared/http/parameters.py.
@@ -41,10 +55,68 @@ rules:
   # A failed If-Match answers with a problem body, like every other 4xx.
   ibm-request-and-response-content: error
 
-  # --- Findings to fix, then raise to "error" ---------------------------------------
-  ibm-enum-casing-convention: warn
-  ibm-property-casing-convention: warn
-  ibm-required-array-properties-in-response: warn
-  ibm-schema-keywords: warn
-  no-$ref-siblings: warn
-  ibm-accept-and-return-models: warn
+  # Contract findings that are now zero; the exceptions are scoped in `overrides`.
+  ibm-enum-casing-convention: error
+  ibm-property-casing-convention: error
+  ibm-required-array-properties-in-response: error
+  ibm-accept-and-return-models: error
+  ibm-dont-require-merge-patch-properties: error
+  ibm-use-date-based-format: error
+  ibm-resource-response-consistency: error
+  ibm-content-contains-schema: error
+  ibm-no-operation-requestbody: error
+  oas3-unused-component: error
+
+  # --- Documentation, added as routes are touched (#303) ------------------------------
+  ibm-property-description: warn
+  ibm-schema-description: warn
+  ibm-success-response-example: warn
+
+# Exceptions for single schemas or paths, so each rule still guards everything else.
+overrides:
+  # Permissions are scope-style `module:resource:action` strings with snake_case
+  # parts, like OAuth scopes. A new module's permission enum joins this list.
+  - files:
+      - "**#/components/schemas/BackupPermission"
+      - "**#/components/schemas/CataloguePermission"
+      - "**#/components/schemas/CollectionPermission"
+      - "**#/components/schemas/ExamplePermission"
+      - "**#/components/schemas/GraphPermission"
+      - "**#/components/schemas/IdentityPermission"
+      - "**#/components/schemas/MediaPermission"
+      - "**#/components/schemas/PresetPermission"
+      - "**#/components/schemas/SchedulingPermission"
+      - "**#/components/schemas/SettingsPermission"
+      - "**#/components/schemas/SystemPermission"
+      - "**#/components/schemas/TransferPermission"
+    rules:
+      ibm-enum-casing-convention: "off"
+  # draft-inadarei-api-health-check names these properties in camelCase.
+  - files: ["**#/components/schemas/CheckObservation"]
+    rules:
+      ibm-property-casing-convention: "off"
+  # A preset file's entries are also read on import, where a missing list means empty.
+  - files:
+      - "**#/components/schemas/BundleCollectionEntry"
+      - "**#/components/schemas/BundleItemEntry"
+    rules:
+      ibm-required-array-properties-in-response: "off"
+  # Each of these PATCH bodies has one field, and that field is the change.
+  - files:
+      - "**#/components/schemas/UpdateMeRequest"
+      - "**#/components/schemas/UpdateMediaRequest"
+      - "**#/components/schemas/UpdateSettingsRequest"
+    rules:
+      ibm-dont-require-merge-patch-properties: "off"
+  # `created` is a count of what an import added, not a date.
+  - files: ["**#/components/schemas/ImportResultResponse"]
+    rules:
+      ibm-use-date-based-format: "off"
+  # The settings schema is a JSON Schema document, and the instance settings are a
+  # list that PATCH returns in the same shape as GET.
+  - files: ["**#/paths/~1api~1v1~1settings~1schema"]
+    rules:
+      ibm-accept-and-return-models: "off"
+  - files: ["**#/paths/~1api~1v1~1settings~1instance"]
+    rules:
+      ibm-resource-response-consistency: "off"

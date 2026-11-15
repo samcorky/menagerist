@@ -201,7 +201,7 @@
 	async function removeCover(asset: NodeMediaItemResponse) {
 		const result = await clearMediaCover({
 			path: { asset_id: asset.id },
-			body: { target_type: 'node', target_id: nodeId }
+			query: { target_type: 'node', target_id: nodeId }
 		});
 		if (result.error) {
 			toast.error('Failed to remove cover', { description: errorMessage(result.error) });

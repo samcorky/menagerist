@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.media.application.attach_media import AttachMediaCommand
 from app.modules.media.application.clear_media_cover import ClearMediaCoverCommand
@@ -45,13 +45,16 @@ class AttachMediaRequest(RequestModel):
 
 
 class DetachMediaRequest(RequestModel):
-    """Request body identifying the attachment to remove for a given asset."""
+    """Query parameters identifying the attachment to remove for a given asset."""
 
     model_config = ConfigDict(json_schema_extra={"examples": [_ATTACHMENT_EXAMPLE]})
 
-    target_type: AttachmentTarget
-    target_id: uuid.UUID
-    attribute_key: AttachmentKey | None = None
+    target_type: AttachmentTarget = Field(description="What the asset is attached to.")
+    target_id: uuid.UUID = Field(description="The id of what it is attached to.")
+    attribute_key: AttachmentKey | None = Field(
+        default=None,
+        description="The slot it fills, such as `cover`; none for a plain attachment.",
+    )
 
     def to_command(self, asset_id: uuid.UUID) -> DetachMediaCommand:
         """Convert this request into a `DetachMediaCommand` for `asset_id`."""
@@ -64,7 +67,7 @@ class DetachMediaRequest(RequestModel):
 
 
 class CoverRequest(RequestModel):
-    """Request body identifying the target whose cover to set or clear."""
+    """The target whose cover to set (a body) or clear (query parameters)."""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -77,8 +80,8 @@ class CoverRequest(RequestModel):
         }
     )
 
-    target_type: AttachmentTarget
-    target_id: uuid.UUID
+    target_type: AttachmentTarget = Field(description="What the asset is attached to.")
+    target_id: uuid.UUID = Field(description="The id of what it is attached to.")
 
     def to_set_command(self, asset_id: uuid.UUID) -> SetMediaCoverCommand:
         """Convert this request into a `SetMediaCoverCommand` for `asset_id`."""

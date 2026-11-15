@@ -107,11 +107,9 @@ def test_other_user_gets_404_on_every_asset_route(world: _World) -> None:
     assert bob.patch(url, json={"filename": "mine"}).status_code == 404
     assert bob.post(f"{url}/promote").status_code == 404
     assert bob.post(f"{url}/orphan").status_code == 404
-    assert bob.request("DELETE", f"{url}/attachments", json=body).status_code == 404
+    assert bob.delete(f"{url}/attachments", params=body).status_code == 404
     assert bob.post(f"{url}/attachments/cover", json=body).status_code == 404
-    assert (
-        bob.request("DELETE", f"{url}/attachments/cover", json=body).status_code == 404
-    )
+    assert bob.delete(f"{url}/attachments/cover", params=body).status_code == 404
     assert bob.delete(url).status_code == 404
     assert world.act_as(ALICE).get(url).status_code == 200
     assert world.act_as(ALICE).get(f"{url}/content").content == TINY_JPEG
@@ -212,3 +210,18 @@ def test_uploads_are_owned_by_the_uploader(world: _World) -> None:
 
     assert world.act_as(ALICE).get(f"{BASE}/{asset_id}").status_code == 200
     assert world.act_as(BOB).get(f"{BASE}/{asset_id}").status_code == 404
+
+
+def test_owner_clears_a_cover_and_detaches_by_query_parameters(world: _World) -> None:
+    """The two DELETE routes name the attachment in the query, not a body."""
+    item = world.item(ALICE)
+    alice = world.act_as(ALICE)
+    asset_id = _stage(alice)
+    assert _attach(alice, asset_id, item).status_code == 201  # type: ignore[attr-defined]
+    url = f"{BASE}/{asset_id}/attachments"
+    target = {"target_type": "node", "target_id": str(item)}
+    assert alice.post(f"{url}/cover", json=target).status_code == 200
+
+    assert alice.delete(f"{url}/cover", params=target).status_code == 204
+    assert alice.delete(url, params=target).status_code == 204
+    assert alice.delete(url, params=target).status_code == 404

@@ -14,7 +14,7 @@ The conventions follow the [IBM API Handbook](https://cloud.ibm.com/docs/api-han
 | Breaking changes            | `api-breaking-changes` workflow | A removed or narrowed operation, field or status                                 |
 | **Style lint (this guide)** | `poe lint-schema`               | The IBM rules, with the divergences below                                        |
 
-`poe lint-schema` runs in CI as "API schema style". Errors always fail. Warnings are a ratchet: [`scripts/api-lint/baseline.json`](../scripts/api-lint/baseline.json) records the count per rule, and a rule may not gain findings. After fixing some, run `poe lint-schema-baseline` and commit the lower counts. The ruleset is [`scripts/api-lint/.spectral.yaml`](../scripts/api-lint/.spectral.yaml); switching a rule off needs a reason in that file and, if it is a convention, a line here.
+`poe lint-schema` runs in CI as "API schema style". Errors always fail, and every rule except the three documentation ones is an error. Warnings are a ratchet: [`scripts/api-lint/baseline.json`](../scripts/api-lint/baseline.json) records the count per rule, and a rule may not gain findings. After fixing some, run `poe lint-schema-baseline` and commit the lower counts. The ruleset is [`scripts/api-lint/.spectral.yaml`](../scripts/api-lint/.spectral.yaml); switching a rule off needs a reason in that file and, if it is a convention, a line here. An exception for a single schema or path goes under `overrides` in the same file, so the rule still guards everything else.
 
 When a rule goes over its baseline the failure also lists the new findings by rule and schema path. The baseline holds only counts, so "new" means a finding that is not in the committed `openapi.json` on `origin/main` (or `main`); if neither ref exists, as in a shallow clone, it lists every warning of the rules that went over instead, up to 40 lines. To see every finding, run the validator directly:
 
@@ -59,7 +59,7 @@ IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}
 
 Request bodies are named Pydantic models, with multipart uploads as the one exception: see [Request bodies](../backend/README.md#request-bodies-named-pydantic-models-not-form-fields). Operation ids are `verb_noun` (`list_nodes`, `get_node`, `count_nodes`, `restore_node`). A name that reads as a number (`count_*`) returns a number.
 
-A list route returns a bare array (`response_model=list[PresetResponse]`), never an object wrapping one, and its operation id is `list_<plural>` (`list_presets`, `list_example_packs`). An install route is `install_<noun>` (`install_example_pack`). Do not wrap a list or rename an operation to silence an IBM rule: match the existing routes and raise that rule's count in `scripts/api-lint/baseline.json`, as the existing routes already do.
+A list route returns a bare array (`response_model=list[PresetResponse]`), never an object wrapping one, and its operation id is `list_<plural>` (`list_presets`, `list_example_packs`). An install route is `install_<noun>` (`install_example_pack`). IBM's rules for list envelopes and path-derived operation ids are off, so match the existing routes rather than IBM's suggestions.
 
 ## Where we differ from the sources
 
@@ -73,6 +73,12 @@ A list route returns a bare array (`response_model=list[PresetResponse]`), never
 | IBM            | `...Prototype` / `...Patch` request schema names | `XxxRequest`                  | Names the generated client's types; see the backend README  |
 | IBM            | Shared path parameters on the path item | Declared on each operation                    | How FastAPI emits them                                      |
 | IBM            | Dictionaries with one value type   | Free-form JSON for field values, preset definitions and search queries | Field types validate them, not the schema |
+| IBM            | Operation ids derived from the path | `verb_noun` with the domain's verbs (`revoke_session`) | Names the generated client's functions               |
+| IBM            | `errors` and `trace` on every error | RFC 9457; `errors` only on validation              | The standard's shape; a trace would leak internals          |
+| IBM            | snake_case enum values             | Permissions are `module:resource:action`           | Scope-style, like OAuth scopes; each part is snake_case     |
+| IBM            | No `const`, no `$ref` siblings     | Both allowed                                       | Valid OpenAPI 3.1 (JSON Schema 2020-12)                     |
+| IBM            | A `servers` entry                  | None                                               | Self-hosted: each instance has its own origin               |
+| IETF health draft | camelCase health properties     | Kept on the probes (`componentType`)               | Follows draft-inadarei-api-health-check                     |
 | Google AIP-136 | `:verb` custom methods             | `/verb` sub-resources                              | Ids are uuid7; no slug paths to clash with                  |
 | Google AIP-193 | `google.rpc.Status` errors         | RFC 9457                                           | HTTP-native                                                 |
 | Google AIP-158 | `page_token` / `page_size`         | `after` / `limit` + `Link` header                  | Keyset on a time-ordered id                                 |
@@ -80,19 +86,10 @@ A list route returns a bare array (`response_model=list[PresetResponse]`), never
 
 ## Open findings
 
-The remaining warnings are the backlog the ratchet works down. The ones that are real API decisions rather than documentation gaps:
-
-- **Enum casing** (`ibm-enum-casing-convention`): some enum values are not snake_case.
-- **Property casing** (`ibm-property-casing-convention`): a few camelCase properties such as `componentType`.
-- **Operation ids** (`ibm-operationid-naming-convention`): for example `list_user_exports` served from `/me/exports`.
-- **DELETE with a body** (`ibm-no-operation-requestbody`): detaching media takes the node ids in a request body.
-- **Untyped content** (`ibm-content-contains-schema`): the health 503s and the binary media downloads declare no schema.
-- **Descriptions and examples** (`ibm-property-description`, `ibm-schema-description`, `ibm-success-response-example`): documentation, added as routes are touched.
-
-Treat the numbers in the baseline as the source of truth; this list only names the themes.
+The remaining warnings are documentation: property and schema descriptions (`ibm-property-description`, `ibm-schema-description`) and success examples (`ibm-success-response-example`), added as routes are touched. The baseline holds their counts; when one reaches zero, raise it to `error`.
 
 ## Adding or changing an endpoint
 
 1. Follow the naming and status rules above and the [route checklist](../backend/README.md#route-naming).
-2. Run `poe dump-schema`, then `poe lint-schema`. A new route must not add warnings: describe its parameters, properties and schemas, and give its responses examples. A parameter without a description is an error. For the ones that recur (`after`, `limit`, `node_id` and the other ids, a field's `key`) use the aliases in `entrypoints/api/shared/http/parameters.py`.
+2. Run `poe dump-schema`, then `poe lint-schema`. A new route must not add warnings: describe its parameters, properties and schemas, and give its responses examples. A parameter without a description is an error, and so is a DELETE with a body (use query parameters). For the ones that recur (`after`, `limit`, `node_id` and the other ids, a field's `key`) use the aliases in `entrypoints/api/shared/http/parameters.py`.
 3. If the lint rejects something that is right for this API, change `.spectral.yaml` with a comment saying why, and add a row to the table above.
