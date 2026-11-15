@@ -1,7 +1,5 @@
 {
   "ibm-accept-and-return-models": 1,
-  "ibm-avoid-repeating-path-parameters": 27,
-  "ibm-collection-array-property": 27,
   "ibm-content-contains-schema": 4,
   "ibm-dont-require-merge-patch-properties": 3,
   "ibm-enum-casing-convention": 41,
@@ -20,7 +18,6 @@
   "ibm-schema-keywords": 4,
   "ibm-success-response-example": 95,
   "ibm-use-date-based-format": 2,
-  "ibm-well-defined-dictionaries": 13,
   "no-$ref-siblings": 2,
   "oas3-api-servers": 1,
   "oas3-unused-component": 1

@@ -49,7 +49,7 @@ A list returns a **bare JSON array**, and paging lives in headers, in the style 
 - `Link: <url>; rel="next"` (RFC 8288) is present while there is another page and absent on the last.
 - `Total-Count` is the number of items matching the filters, with `Total-Count-Capped: true` when a search stopped counting at its cap and the number is a lower bound.
 
-IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}`). We keep arrays because the headers carry everything the envelope would and the generated client stays simple. `ibm-no-array-responses` and `ibm-collection-array-property` follow from this and are off or tolerated. Changing it later would be a breaking change to every list endpoint.
+IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}`). We keep arrays because the headers carry everything the envelope would and the generated client stays simple. `ibm-no-array-responses` and `ibm-collection-array-property` follow from this and are off. Changing it later would be a breaking change to every list endpoint.
 
 ## Conditional requests
 
@@ -71,6 +71,8 @@ A list route returns a bare array (`response_model=list[PresetResponse]`), never
 | IBM            | No hyphen in path segments         | `node-types`, `edge-types` only                    | Pinned by `HYPHENATED_SEGMENTS`                             |
 | IBM            | Bounds and formats on every scalar | Only where they carry meaning                      | Generated noise; add `ge`/`le`/`max_length` for real limits |
 | IBM            | `...Prototype` / `...Patch` request schema names | `XxxRequest`                  | Names the generated client's types; see the backend README  |
+| IBM            | Shared path parameters on the path item | Declared on each operation                    | How FastAPI emits them                                      |
+| IBM            | Dictionaries with one value type   | Free-form JSON for field values, preset definitions and search queries | Field types validate them, not the schema |
 | Google AIP-136 | `:verb` custom methods             | `/verb` sub-resources                              | Ids are uuid7; no slug paths to clash with                  |
 | Google AIP-193 | `google.rpc.Status` errors         | RFC 9457                                           | HTTP-native                                                 |
 | Google AIP-158 | `page_token` / `page_size`         | `after` / `limit` + `Link` header                  | Keyset on a time-ordered id                                 |
@@ -84,6 +86,9 @@ The remaining warnings are the backlog the ratchet works down. The ones that are
 - **Property casing** (`ibm-property-casing-convention`): a few camelCase properties such as `componentType`.
 - **Precondition headers** (`ibm-precondition-headers`): declare `If-Match` and `If-None-Match` on the operations that honour them.
 - **Operation ids** (`ibm-operationid-naming-convention`): for example `list_user_exports` served from `/me/exports`.
+- **412 bodies** (`ibm-request-and-response-content`): a failed `If-Match` returns 412 with an empty body, not `application/problem+json`.
+- **DELETE with a body** (`ibm-no-operation-requestbody`): detaching media takes the node ids in a request body.
+- **Untyped content** (`ibm-content-contains-schema`): the health 503s and the binary media downloads declare no schema.
 - **Descriptions and examples** (`ibm-property-description`, `ibm-parameter-description`, `ibm-schema-description`, `ibm-success-response-example`): documentation, added as routes are touched.
 
 Treat the numbers in the baseline as the source of truth; this list only names the themes.

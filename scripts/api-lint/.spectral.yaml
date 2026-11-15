@@ -6,7 +6,14 @@ extends: "@ibm-cloud/openapi-ruleset"
 rules:
   # --- Deliberate divergences (off) -------------------------------------------------
   # Lists are bare arrays; paging is keyset (`after`/`limit`) with `Link` and `Total-Count` headers.
+  # The envelope's named array property follows from that, so it is off too.
   ibm-no-array-responses: off
+  ibm-collection-array-property: off
+  # FastAPI declares path parameters on each operation, not once on the path item.
+  ibm-avoid-repeating-path-parameters: off
+  # Field values, preset definitions, search queries and the settings JSON Schema are
+  # free-form JSON by design; field types validate them, not the OpenAPI schema.
+  ibm-well-defined-dictionaries: off
   # Errors are RFC 9457 `application/problem+json`, not `application/json`.
   ibm-error-content-type-is-json: off
   # FastAPI answers invalid payloads with 422 and the generated client depends on it.
