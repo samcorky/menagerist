@@ -1,0 +1,69 @@
+{
+  "id": "storage-locations",
+  "title": "Storage locations",
+  "description": "Rooms, shelves, boxes and drawers that hold your things and each other, so you can always find where something is.",
+  "section": "starter_types",
+  "itemTypes": [
+    {
+      "slug": "location",
+      "label": "Location",
+      "description": "Somewhere things are kept: a room, a shelf, a box. Put one inside another with Located in.",
+      "icon": "archive",
+      "colour": "amber",
+      "attributesSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Room",
+              "Shelf",
+              "Box",
+              "Drawer",
+              "Cabinet"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kind"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "kind"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "relationshipTypes": [
+    {
+      "slug": "located-in",
+      "label": "Located in",
+      "reverseLabel": "Contains",
+      "description": null,
+      "directional": true
+    }
+  ]
+}
