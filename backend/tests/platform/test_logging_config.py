@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 _NAMED_LOGGERS = (
+    "httpcore2",
+    "httpx2",
     "alembic.runtime.migration",
     "alembic.runtime.plugins",
     "markdown_it",
@@ -278,3 +280,11 @@ def test_json_output_is_left_to_the_json_encoder(
     out = capsys.readouterr().out
     assert json.loads(out)["event"] == "saw \x1b[0m"
     assert r"\u001b[0m" in out
+
+
+@pytest.mark.parametrize("name", ["httpcore2", "httpx2"])
+def test_http_client_loggers_are_quietened(name: str) -> None:
+    """The HTTP client's wire-level and signed-URL logs stay out of the output."""
+    configure_logging()
+
+    assert logging.getLogger(name).level == logging.WARNING
