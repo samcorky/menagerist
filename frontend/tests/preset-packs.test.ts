@@ -65,7 +65,7 @@ describe('bundleKindMismatch', () => {
 
 	it('names how many items do not fit a list section', () => {
 		expect(bundleKindMismatch(pack(['choice_list', 'field']), 'choice_list')).toBe(
-			'1 item in this file is not list'
+			'1 item in this file is not a list'
 		);
 		expect(bundleKindMismatch(pack(['field', 'field_set']), 'choice_list')).toBe(
 			'2 items in this file are not lists'
