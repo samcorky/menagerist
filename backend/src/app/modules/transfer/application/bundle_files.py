@@ -14,7 +14,8 @@ from app.modules.transfer.application.pipeline import (
     apply_bundle,
     plan_bundle,
 )
-from app.modules.transfer.domain.bundle import BUNDLE_FORMAT, Bundle
+from app.modules.transfer.domain.bundle import BUNDLE_FORMAT, Bundle, preset_refs
+from app.modules.transfer.domain.errors import InvalidBundleError
 from app.modules.transfer.domain.plan import ClashPolicy, Plan
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
@@ -36,9 +37,14 @@ class BundleFileRequest:
 
 @dataclass(kw_only=True)
 class ExportBundleQuery:
-    """The presets to write to a file, and the format to write it in."""
+    """What to write to a file, and the format to write it in.
+
+    The saved lists, fields and groups the types use are written too.
+    """
 
     preset_ids: list[uuid.UUID] = field(default_factory=list)
+    item_type_ids: list[uuid.UUID] = field(default_factory=list)
+    relationship_type_ids: list[uuid.UUID] = field(default_factory=list)
     format: str = BUNDLE_FORMAT
 
 
@@ -106,17 +112,41 @@ class ImportBundle(_FileUseCase, UseCase[BundleFileRequest, AppliedBundle]):
 
 
 class ExportBundle(_FileUseCase, UseCase[ExportBundleQuery, dict[str, Any]]):
-    """Write the person's presets with the ids given as a file.
+    """Write the person's presets and types with the ids given as a file.
+
+    A type's saved lists come with it, so the file can be imported on its own.
 
     Raises:
         UnknownFormatError: no codec writes the format asked for.
-        NotFoundError: an id is not one of the person's presets.
+        InvalidBundleError: there is nothing to export.
+        NotFoundError: an id is not one of the person's own.
     """
 
     access: ClassVar[Access] = Requires(TransferPermission.BUNDLE_READ)
 
     async def _handle(self, request: ExportBundleQuery, actor: Actor) -> dict[str, Any]:
-        """Read the presets and encode them."""
+        """Read the types, then the presets they use and those asked for, and encode."""
         codec = self._codecs.get(request.format)
-        presets = await self._presets.read(request.preset_ids)
-        return codec.encode(Bundle(id=codec.format, presets=tuple(presets)))
+        if not (
+            request.preset_ids or request.item_type_ids or request.relationship_type_ids
+        ):
+            raise InvalidBundleError("Choose something to export.")
+        item_types = await self._graph.read_item_types(request.item_type_ids)
+        relationship_types = await self._graph.read_relationship_types(
+            request.relationship_type_ids
+        )
+        wanted = {str(i): i for i in request.preset_ids}
+        schemas = [t.attributes_schema for t in item_types]
+        schemas += [r.attributes_schema for r in relationship_types]
+        for schema in schemas:
+            for ref in sorted(preset_refs(schema)):
+                wanted.setdefault(ref, uuid.UUID(ref))
+        presets = await self._presets.read(list(wanted.values()))
+        return codec.encode(
+            Bundle(
+                id=codec.format,
+                presets=tuple(presets),
+                relationship_types=tuple(relationship_types),
+                item_types=tuple(item_types),
+            )
+        )

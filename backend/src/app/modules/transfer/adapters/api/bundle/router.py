@@ -105,15 +105,23 @@ async def import_bundle(
     "/export",
     response_model=BundleFileResponse,
     operation_id="export_bundle",
-    responses={200: _example(BUNDLE_EXAMPLE)},
+    responses={200: _example(BUNDLE_EXAMPLE), **_INVALID},
 )
 async def export_bundle(
     use_case: Annotated[ExportBundle, Depends(get_export_bundle_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     preset_ids: Annotated[
-        list[uuid.UUID],
-        Query(min_length=1, description="The saved lists, fields or groups to export."),
-    ],
+        list[uuid.UUID] | None,
+        Query(description="The saved lists, fields or groups to export."),
+    ] = None,
+    item_type_ids: Annotated[
+        list[uuid.UUID] | None,
+        Query(description="The item types to export, with the saved lists they use."),
+    ] = None,
+    relationship_type_ids: Annotated[
+        list[uuid.UUID] | None,
+        Query(description="The connection types to export."),
+    ] = None,
     file_format: Annotated[
         str,
         Query(
@@ -123,11 +131,19 @@ async def export_bundle(
         ),
     ] = BUNDLE_FORMAT,
 ) -> dict[str, Any]:
-    """Export saved lists, fields or groups as a file you can import again.
+    """Export saved lists, fields, groups and types as a file you can import again.
 
-    In a `menagerist-bundle` file each preset's `ref` is its id, so the same preset
-    has the same ref in every file.
+    Choose at least one of the three kinds. In a `menagerist-bundle` file each
+    `ref` is the id, so the same thing has the same ref in every file. An item
+    type brings the saved lists its fields use, so the file imports on its own;
+    the file is `version` 2.
     """
     return await use_case.handle(
-        ExportBundleQuery(preset_ids=preset_ids, format=file_format), actor
+        ExportBundleQuery(
+            preset_ids=preset_ids or [],
+            item_type_ids=item_type_ids or [],
+            relationship_type_ids=relationship_type_ids or [],
+            format=file_format,
+        ),
+        actor,
     )

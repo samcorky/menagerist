@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 BUNDLE_EXAMPLE: dict[str, Any] = {
     "format": "menagerist-bundle",
-    "version": 1,
+    "version": 2,
     "presets": [
         {
             "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
@@ -25,6 +25,30 @@ BUNDLE_EXAMPLE: dict[str, Any] = {
             "label": "Condition grades",
             "description": None,
             "definition": {"options": ["Mint", "Near Mint", "Good"]},
+        }
+    ],
+    "relationship_types": [],
+    "item_types": [
+        {
+            "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+            "slug": "record",
+            "label": "Record",
+            "description": None,
+            "attributes_schema": {
+                "type": "object",
+                "properties": {
+                    "condition": {
+                        "type": "string",
+                        "title": "Condition",
+                        "x-menagerist": {
+                            "kind": "choice",
+                            "list": {"$preset": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"},
+                        },
+                    }
+                },
+            },
+            "icon": None,
+            "colour": None,
         }
     ],
 }
@@ -44,10 +68,54 @@ class BundlePresetEntry(BaseModel):
     definition: dict[str, Any] = Field(description="Its definition, by kind.")
 
 
+_SCHEMA_DESCRIPTION = (
+    "Its fields. A field that uses a saved list names it as "
+    + '`{"$preset": ref}`, where `ref` is a preset in the same file.'
+)
+
+
+class BundleItemTypeEntry(BaseModel):
+    """One item type in a `menagerist-bundle` file of version 2."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ref: str = Field(description="Its id within the file; an export uses the id.")
+    slug: str = Field(description="Its short name, as used in URLs.")
+    label: str = Field(description="Its name.")
+    description: str | None = Field(default=None, description="What it is for.")
+    attributes_schema: dict[str, Any] | None = Field(
+        default=None,
+        description=_SCHEMA_DESCRIPTION,
+    )
+    icon: str | None = Field(default=None, description="Its icon name.")
+    colour: str | None = Field(default=None, description="Its colour name.")
+
+
+class BundleRelationshipTypeEntry(BaseModel):
+    """One connection type in a `menagerist-bundle` file of version 2."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ref: str = Field(description="Its id within the file; an export uses the id.")
+    slug: str = Field(description="Its short name, as used in URLs.")
+    label: str = Field(description="Its name.")
+    reverse_label: str | None = Field(
+        default=None, description="Its name read from the other end."
+    )
+    description: str | None = Field(default=None, description="What it is for.")
+    directional: bool = Field(
+        default=True, description="Whether it reads one way, not both."
+    )
+    attributes_schema: dict[str, Any] | None = Field(
+        default=None, description="Its fields, as an item type's are."
+    )
+
+
 class BundleFile(RequestModel):
     """A bundle file to import. `format` says which reader takes it.
 
-    A `menagerist-bundle` file has `version` 1 and the presets it holds.
+    A `menagerist-bundle` file has `version` 1 and the presets it holds, or
+    `version` 2, which can also hold connection types and item types.
     """
 
     model_config = ConfigDict(json_schema_extra={"examples": [BUNDLE_EXAMPLE]})
@@ -59,6 +127,14 @@ class BundleFile(RequestModel):
     version: int = Field(description="The version of that format.", examples=[1])
     presets: list[BundlePresetEntry] = Field(
         default_factory=list, description="The saved lists, fields and groups."
+    )
+    relationship_types: list[BundleRelationshipTypeEntry] = Field(
+        default_factory=list,
+        description="The connection types; from version 2.",
+    )
+    item_types: list[BundleItemTypeEntry] = Field(
+        default_factory=list,
+        description="The item types, with their saved lists in `presets`; version 2.",
     )
 
     def data(self) -> dict[str, Any]:
@@ -75,6 +151,12 @@ class BundleFileResponse(BaseModel):
     version: int = Field(description="The version of that format.")
     presets: list[BundlePresetEntry] = Field(
         description="The saved lists, fields and groups; each `ref` is its id."
+    )
+    relationship_types: list[BundleRelationshipTypeEntry] = Field(
+        description="The connection types exported."
+    )
+    item_types: list[BundleItemTypeEntry] = Field(
+        description="The item types exported."
     )
 
 

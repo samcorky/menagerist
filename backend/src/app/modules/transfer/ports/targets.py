@@ -121,6 +121,29 @@ class GraphTarget(Protocol):
         """Create the item type, resolving `$preset` markers with `presets`."""
         ...
 
+    async def read_item_types(
+        self, type_ids: Sequence[uuid.UUID]
+    ) -> list[BundleItemType]:
+        """Return the person's item types with `type_ids`, in order; `ref` is the id.
+
+        A field that uses a saved list names it as a `$preset` marker whose ref is
+        the list's id, so a bundle that holds the list can resolve it again.
+
+        Raises:
+            NotFoundError: an id is not one of the person's live item types.
+        """
+        ...
+
+    async def read_relationship_types(
+        self, type_ids: Sequence[uuid.UUID]
+    ) -> list[BundleRelationshipType]:
+        """Return the person's relationship types with `type_ids`, as item types are.
+
+        Raises:
+            NotFoundError: an id is not one of the person's live relationship types.
+        """
+        ...
+
     async def create_item(self, spec: BundleItem, *, type_slug: str) -> Created:
         """Create the item under the item type `type_slug`."""
         ...
