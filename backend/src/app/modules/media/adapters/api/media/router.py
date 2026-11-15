@@ -7,12 +7,16 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.content_sniffing import sniff_and_rechain
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
 )
+from app.entrypoints.api.shared.http.parameters import AssetId, NodeId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -205,7 +209,7 @@ async def upload_and_attach_media(
     operation_id="list_node_media",
 )
 async def list_node_media(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[ListNodeMedia, Depends(get_list_node_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> list[NodeMediaItemResponse]:
@@ -233,10 +237,10 @@ async def list_node_media(
     },
 )
 async def get_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> MediaAssetResponse | Response:
     """Fetch a media asset's metadata by id."""
     asset = await use_case.handle(GetMediaQuery(asset_id=asset_id), actor)
@@ -261,11 +265,11 @@ async def get_media(
     },
 )
 async def update_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: UpdateMediaRequest,
     get_use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     update_use_case: Annotated[UpdateMedia, Depends(get_update_media_use_case)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> MediaAssetResponse | Response:
     """Update the media asset's editable filename."""
@@ -290,7 +294,7 @@ async def update_media(
     },
 )
 async def stream_media_content(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     request: Request,
     get_use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
@@ -340,7 +344,7 @@ async def stream_media_content(
     },
 )
 async def stream_media_thumbnail(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     request: Request,
     get_use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
@@ -391,7 +395,7 @@ async def stream_media_thumbnail(
     },
 )
 async def attach_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: AttachMediaRequest,
     use_case: Annotated[AttachMedia, Depends(get_attach_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -413,7 +417,7 @@ async def attach_media(
     },
 )
 async def detach_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: DetachMediaRequest,
     use_case: Annotated[DetachMedia, Depends(get_detach_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -442,7 +446,7 @@ async def detach_media(
     },
 )
 async def set_media_cover(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: CoverRequest,
     use_case: Annotated[SetMediaCover, Depends(get_set_media_cover_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -464,7 +468,7 @@ async def set_media_cover(
     },
 )
 async def clear_media_cover(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: CoverRequest,
     use_case: Annotated[ClearMediaCover, Depends(get_clear_media_cover_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -489,7 +493,7 @@ async def clear_media_cover(
     },
 )
 async def promote_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[PromoteMedia, Depends(get_promote_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> MediaAssetResponse:
@@ -511,7 +515,7 @@ async def promote_media(
     },
 )
 async def orphan_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[OrphanMedia, Depends(get_orphan_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> MediaAssetResponse:
@@ -530,7 +534,7 @@ async def orphan_media(
     ),
 )
 async def delete_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[DeleteMedia, Depends(get_delete_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:

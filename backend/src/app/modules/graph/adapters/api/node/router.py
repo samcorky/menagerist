@@ -7,11 +7,21 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_next_header,
+)
+from app.entrypoints.api.shared.http.parameters import (
+    PAGE_LIMIT_DESCRIPTION,
+    FieldKey,
+    NodeId,
+    PageAfter,
+    PageLimit,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
@@ -182,9 +192,13 @@ _Q_DESCRIPTION += " removed fields and fields excluded from search are not searc
 class NodeFilters:
     """Query parameters that choose which items a list or count covers."""
 
-    type: str | None = None
+    type: Annotated[
+        str | None, Query(description="Keep items of the item type with this slug.")
+    ] = None
     q: Annotated[str | None, Query(description=_Q_DESCRIPTION)] = None
-    favourite: bool | None = None
+    favourite: Annotated[
+        bool | None, Query(description="Keep only favourites, or only the rest.")
+    ] = None
     collection: Annotated[
         uuid.UUID | None,
         Query(
@@ -311,8 +325,8 @@ async def list_deleted_nodes(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: uuid.UUID | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    after: PageAfter = None,
+    limit: Annotated[int, Query(ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)] = 50,
 ) -> list[DeletedNodeResponse]:
     """List your deleted items, newest deleted first.
 
@@ -420,10 +434,10 @@ async def count_node_types(
     },
 )
 async def get_node(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[GetNode, Depends(get_get_node_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> NodeResponse | Response:
     """Fetch a single node by id."""
     node = await use_case.handle(GetNodeQuery(node_id=node_id), actor)
@@ -471,7 +485,7 @@ async def get_node(
     },
 )
 async def list_node_contents(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[ListItemContents, Depends(get_list_item_contents_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
@@ -483,8 +497,8 @@ async def list_node_contents(
     depth: Annotated[
         int, Query(description="How many steps to follow, from 1 to 25.")
     ] = 1,
-    after: uuid.UUID | None = None,
-    limit: int = 50,
+    after: PageAfter = None,
+    limit: PageLimit = 50,
 ) -> list[NodeContentsEntryResponse]:
     """List the items this item holds, nearest first.
 
@@ -542,7 +556,7 @@ async def list_node_contents(
     },
 )
 async def list_node_path(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[GetItemPath, Depends(get_get_item_path_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     relationship: Annotated[
@@ -583,8 +597,8 @@ async def list_nodes(
     request: Request,
     response: Response,
     filters: NodeFiltersDep,
-    after: uuid.UUID | None = None,
-    limit: int = 50,
+    after: PageAfter = None,
+    limit: PageLimit = 50,
 ) -> list[NodeResponse]:
     """List node, paginated by id."""
     result = await use_case.handle(
@@ -623,11 +637,11 @@ async def list_nodes(
     },
 )
 async def update_node(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     payload: UpdateNodeRequest,
     get_usecase: Annotated[GetNode, Depends(get_get_node_use_case)],
     update_usecase: Annotated[UpdateNode, Depends(get_update_node_use_case)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> NodeResponse | Response:
     """Update a node's editable fields."""
@@ -658,8 +672,8 @@ async def update_node(
     },
 )
 async def promote_extra_schema_field(
-    node_id: uuid.UUID,
-    key: str,
+    node_id: NodeId,
+    key: FieldKey,
     payload: PromoteExtraSchemaFieldRequest,
     use_case: Annotated[
         PromoteExtraSchemaField, Depends(get_promote_extra_schema_field_use_case)
@@ -686,7 +700,7 @@ async def promote_extra_schema_field(
     ),
 )
 async def delete_node(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[DeleteNode, Depends(get_delete_node_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
@@ -713,7 +727,7 @@ async def delete_node(
     },
 )
 async def restore_node(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[RestoreNode, Depends(get_restore_node_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> NodeResponse:
@@ -738,7 +752,7 @@ async def restore_node(
     ),
 )
 async def duplicate_node(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     payload: DuplicateNodeRequest,
     use_case: Annotated[DuplicateNode, Depends(get_duplicate_node_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -764,7 +778,7 @@ async def duplicate_node(
     ),
 )
 async def purge_node(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[PurgeDeletedNode, Depends(get_purge_deleted_node_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:

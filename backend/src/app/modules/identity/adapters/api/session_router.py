@@ -1,8 +1,9 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
+from app.entrypoints.api.shared.http.parameters import SessionId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.dependencies import (
@@ -47,7 +48,9 @@ _ADMIN_ONLY = {
 async def list_sessions(
     use_case: Annotated[ListSessions, Depends(get_list_sessions_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
-    user_id: uuid.UUID | None = None,
+    user_id: Annotated[
+        uuid.UUID | None, Query(description="Keep the sessions of this user.")
+    ] = None,
 ) -> list[AdminSessionResponse]:
     """List active sessions for all users or a specific user. Administrators only."""
     listings = await use_case.handle(ListSessionsQuery(user_id=user_id), actor)
@@ -67,7 +70,7 @@ async def list_sessions(
     },
 )
 async def revoke_session(
-    session_id: uuid.UUID,
+    session_id: SessionId,
     use_case: Annotated[RevokeSession, Depends(get_revoke_session_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
     current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],

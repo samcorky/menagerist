@@ -1,10 +1,10 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.parameters import ExportId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -136,7 +136,7 @@ async def list_user_exports(
     },
 )
 async def download_user_export(
-    export_id: UUID,
+    export_id: ExportId,
     use_case: Annotated[OpenUserExport, Depends(get_open_user_export)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> StreamingResponse:
@@ -164,7 +164,7 @@ async def download_user_export(
     ),
 )
 async def delete_user_export(
-    export_id: UUID,
+    export_id: ExportId,
     use_case: Annotated[DeleteUserExport, Depends(get_delete_user_export)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> Response:

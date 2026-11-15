@@ -666,8 +666,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The backup's id.",
               "title": "Backup Id"
-            }
+            },
+            "description": "The backup's id."
           }
         ],
         "responses": {
@@ -821,8 +823,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The backup's id.",
               "title": "Backup Id"
-            }
+            },
+            "description": "The backup's id."
           }
         ],
         "responses": {
@@ -980,8 +984,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The backup's id.",
               "title": "Backup Id"
-            }
+            },
+            "description": "The backup's id."
           }
         ],
         "responses": {
@@ -1402,8 +1408,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The export's id.",
               "title": "Export Id"
-            }
+            },
+            "description": "The export's id."
           }
         ],
         "responses": {
@@ -1576,8 +1584,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The export's id.",
               "title": "Export Id"
-            }
+            },
+            "description": "The export's id."
           }
         ],
         "responses": {
@@ -2187,8 +2197,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -2196,9 +2208,11 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           },
           {
             "name": "type",
@@ -2213,8 +2227,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep items of the item type with this slug.",
               "title": "Type"
-            }
+            },
+            "description": "Keep items of the item type with this slug."
           },
           {
             "name": "q",
@@ -2247,8 +2263,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep only favourites, or only the rest.",
               "title": "Favourite"
-            }
+            },
+            "description": "Keep only favourites, or only the rest."
           },
           {
             "name": "collection",
@@ -3098,8 +3116,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -3109,9 +3129,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           }
         ],
         "responses": {
@@ -3316,8 +3338,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep items of the item type with this slug.",
               "title": "Type"
-            }
+            },
+            "description": "Keep items of the item type with this slug."
           },
           {
             "name": "q",
@@ -3350,8 +3374,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep only favourites, or only the rest.",
               "title": "Favourite"
-            }
+            },
+            "description": "Keep only favourites, or only the rest."
           },
           {
             "name": "collection",
@@ -3558,8 +3584,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep items of the item type with this slug.",
               "title": "Type"
-            }
+            },
+            "description": "Keep items of the item type with this slug."
           },
           {
             "name": "q",
@@ -3592,8 +3620,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep only favourites, or only the rest.",
               "title": "Favourite"
-            }
+            },
+            "description": "Keep only favourites, or only the rest."
           },
           {
             "name": "collection",
@@ -3926,8 +3956,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
           }
         ],
         "responses": {
@@ -4173,8 +4223,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ETag you last read; 412 if the resource has changed.",
+              "title": "If-Match"
+            },
+            "description": "The ETag you last read; 412 if the resource has changed."
           }
         ],
         "requestBody": {
@@ -4446,8 +4516,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           }
         ],
         "responses": {
@@ -4632,8 +4704,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           },
           {
             "name": "relationship",
@@ -4672,8 +4746,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -4681,9 +4757,11 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           }
         ],
         "responses": {
@@ -4894,8 +4972,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           },
           {
             "name": "relationship",
@@ -5121,8 +5201,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           },
           {
             "name": "key",
@@ -5130,8 +5212,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The field's key in the item details.",
               "title": "Key"
-            }
+            },
+            "description": "The field's key in the item details."
           }
         ],
         "requestBody": {
@@ -5350,8 +5434,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           }
         ],
         "responses": {
@@ -5560,8 +5646,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           }
         ],
         "requestBody": {
@@ -5760,8 +5848,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           }
         ],
         "responses": {
@@ -6172,8 +6262,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -6181,9 +6273,11 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           },
           {
             "name": "node_id",
@@ -6199,8 +6293,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep connections to or from the item with this id.",
               "title": "Node Id"
-            }
+            },
+            "description": "Keep connections to or from the item with this id."
           }
         ],
         "responses": {
@@ -6608,8 +6704,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection's id.",
               "title": "Edge Id"
-            }
+            },
+            "description": "The connection's id."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
           }
         ],
         "responses": {
@@ -6827,8 +6943,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection's id.",
               "title": "Edge Id"
-            }
+            },
+            "description": "The connection's id."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ETag you last read; 412 if the resource has changed.",
+              "title": "If-Match"
+            },
+            "description": "The ETag you last read; 412 if the resource has changed."
           }
         ],
         "requestBody": {
@@ -7055,8 +7191,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection's id.",
               "title": "Edge Id"
-            }
+            },
+            "description": "The connection's id."
           }
         ],
         "responses": {
@@ -7460,8 +7598,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -7469,9 +7609,11 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           }
         ],
         "responses": {
@@ -7671,8 +7813,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item type's id.",
               "title": "Node Type Id"
-            }
+            },
+            "description": "The item type's id."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
           }
         ],
         "responses": {
@@ -7890,8 +8052,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item type's id.",
               "title": "Node Type Id"
-            }
+            },
+            "description": "The item type's id."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ETag you last read; 412 if the resource has changed.",
+              "title": "If-Match"
+            },
+            "description": "The ETag you last read; 412 if the resource has changed."
           }
         ],
         "requestBody": {
@@ -8115,8 +8297,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item type's id.",
               "title": "Node Type Id"
-            }
+            },
+            "description": "The item type's id."
           }
         ],
         "responses": {
@@ -8266,8 +8450,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item type's id.",
               "title": "Node Type Id"
-            }
+            },
+            "description": "The item type's id."
           },
           {
             "name": "key",
@@ -8275,8 +8461,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The field's key in the item details.",
               "title": "Key"
-            }
+            },
+            "description": "The field's key in the item details."
           },
           {
             "name": "value",
@@ -8291,8 +8479,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Count only items where the field holds this value.",
               "title": "Value"
-            }
+            },
+            "description": "Count only items where the field holds this value."
           },
           {
             "name": "sub_key",
@@ -8307,8 +8497,10 @@
                   "type": "null"
                 }
               ],
+              "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field.",
               "title": "Sub Key"
-            }
+            },
+            "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field."
           }
         ],
         "responses": {
@@ -8490,8 +8682,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item type's id.",
               "title": "Node Type Id"
-            }
+            },
+            "description": "The item type's id."
           },
           {
             "name": "key",
@@ -8499,8 +8693,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The field's key in the item details.",
               "title": "Key"
-            }
+            },
+            "description": "The field's key in the item details."
           },
           {
             "name": "q",
@@ -8515,8 +8711,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep values containing this text, ignoring case.",
               "title": "Q"
-            }
+            },
+            "description": "Keep values containing this text, ignoring case."
           },
           {
             "name": "limit",
@@ -8524,9 +8722,11 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "description": "Most rows to return on this page.",
               "default": 20,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           }
         ],
         "responses": {
@@ -8709,8 +8909,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item type's id.",
               "title": "Node Type Id"
-            }
+            },
+            "description": "The item type's id."
           },
           {
             "name": "key",
@@ -8718,8 +8920,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The field's key in the item details.",
               "title": "Key"
-            }
+            },
+            "description": "The field's key in the item details."
           },
           {
             "name": "sub_key",
@@ -8734,8 +8938,10 @@
                   "type": "null"
                 }
               ],
+              "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field.",
               "title": "Sub Key"
-            }
+            },
+            "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field."
           }
         ],
         "responses": {
@@ -9104,8 +9310,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -9113,9 +9321,11 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           }
         ],
         "responses": {
@@ -9315,8 +9525,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection type's id.",
               "title": "Edge Type Id"
-            }
+            },
+            "description": "The connection type's id."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
           }
         ],
         "responses": {
@@ -9534,8 +9764,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection type's id.",
               "title": "Edge Type Id"
-            }
+            },
+            "description": "The connection type's id."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ETag you last read; 412 if the resource has changed.",
+              "title": "If-Match"
+            },
+            "description": "The ETag you last read; 412 if the resource has changed."
           }
         ],
         "requestBody": {
@@ -9759,8 +10009,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection type's id.",
               "title": "Edge Type Id"
-            }
+            },
+            "description": "The connection type's id."
           }
         ],
         "responses": {
@@ -9927,8 +10179,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection type's id.",
               "title": "Edge Type Id"
-            }
+            },
+            "description": "The connection type's id."
           },
           {
             "name": "key",
@@ -9936,8 +10190,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The field's key in the item details.",
               "title": "Key"
-            }
+            },
+            "description": "The field's key in the item details."
           },
           {
             "name": "value",
@@ -9952,8 +10208,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Count only connections where the field holds this value.",
               "title": "Value"
-            }
+            },
+            "description": "Count only connections where the field holds this value."
           },
           {
             "name": "sub_key",
@@ -9968,8 +10226,10 @@
                   "type": "null"
                 }
               ],
+              "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field.",
               "title": "Sub Key"
-            }
+            },
+            "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field."
           }
         ],
         "responses": {
@@ -10148,8 +10408,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The connection type's id.",
               "title": "Edge Type Id"
-            }
+            },
+            "description": "The connection type's id."
           },
           {
             "name": "key",
@@ -10157,8 +10419,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The field's key in the item details.",
               "title": "Key"
-            }
+            },
+            "description": "The field's key in the item details."
           },
           {
             "name": "sub_key",
@@ -10173,8 +10437,10 @@
                   "type": "null"
                 }
               ],
+              "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field.",
               "title": "Sub Key"
-            }
+            },
+            "description": "A column of the table field named by `key`. When given, the operation applies to that column in each row, not the whole field."
           }
         ],
         "responses": {
@@ -10903,8 +11169,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
           }
         ],
         "responses": {
@@ -11178,8 +11464,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ETag you last read; 412 if the resource has changed.",
+              "title": "If-Match"
+            },
+            "description": "The ETag you last read; 412 if the resource has changed."
           }
         ],
         "requestBody": {
@@ -11479,8 +11785,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "responses": {
@@ -11665,8 +11973,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "responses": {
@@ -11847,8 +12157,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "responses": {
@@ -12054,8 +12366,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "requestBody": {
@@ -12289,8 +12603,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "requestBody": {
@@ -12485,8 +12801,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "requestBody": {
@@ -12703,8 +13021,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "requestBody": {
@@ -12899,8 +13219,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "responses": {
@@ -13109,8 +13431,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The media asset's id.",
               "title": "Asset Id"
-            }
+            },
+            "description": "The media asset's id."
           }
         ],
         "responses": {
@@ -13319,8 +13643,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Node Id"
-            }
+            },
+            "description": "The item's id."
           }
         ],
         "responses": {
@@ -13708,8 +14034,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -13717,9 +14045,11 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           },
           {
             "name": "kind",
@@ -13734,8 +14064,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep saved fields of this field type.",
               "title": "Kind"
-            }
+            },
+            "description": "Keep saved fields of this field type."
           },
           {
             "name": "q",
@@ -13750,8 +14082,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep saved fields whose label contains this text.",
               "title": "Q"
-            }
+            },
+            "description": "Keep saved fields whose label contains this text."
           }
         ],
         "responses": {
@@ -13951,8 +14285,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The saved field's id.",
               "title": "Preset Id"
-            }
+            },
+            "description": "The saved field's id."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
           }
         ],
         "responses": {
@@ -14170,8 +14524,28 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The saved field's id.",
               "title": "Preset Id"
-            }
+            },
+            "description": "The saved field's id."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ETag you last read; 412 if the resource has changed.",
+              "title": "If-Match"
+            },
+            "description": "The ETag you last read; 412 if the resource has changed."
           }
         ],
         "requestBody": {
@@ -14415,8 +14789,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The saved field's id.",
               "title": "Preset Id"
-            }
+            },
+            "description": "The saved field's id."
           }
         ],
         "responses": {
@@ -14893,8 +15269,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The job's key, such as `backup`.",
               "title": "Job Key"
-            }
+            },
+            "description": "The job's key, such as `backup`."
           },
           {
             "name": "limit",
@@ -15065,8 +15443,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The job's key, such as `backup`.",
               "title": "Job Key"
-            }
+            },
+            "description": "The job's key, such as `backup`."
           }
         ],
         "responses": {
@@ -15224,14 +15604,39 @@
         "summary": "Get Settings Schema",
         "description": "Describe the instance settings as a JSON Schema document.\n\nProperties are keyed by setting key and carry `x-menagerist` hints for rendering.\nThe document only changes between releases, so it carries an `ETag`.\n\n**Requires permission:** `settings:instance:read`",
         "operationId": "get_settings_schema",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Get Settings Schema"
                 },
                 "example": {
@@ -15247,6 +15652,14 @@
                     }
                   },
                   "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Version of the schema, for `If-None-Match`.",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -15303,6 +15716,32 @@
               }
             }
           },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/settings/schema"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -15326,11 +15765,6 @@
             }
           }
         },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
         "x-required-permission": "settings:instance:read"
       }
     },
@@ -15667,8 +16101,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The setting's key.",
               "title": "Key"
-            }
+            },
+            "description": "The setting's key."
           }
         ],
         "responses": {
@@ -16556,8 +16992,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The example set's id.",
               "title": "Pack Id"
-            }
+            },
+            "description": "The example set's id."
           }
         ],
         "responses": {
@@ -16763,8 +17201,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The example set's id.",
               "title": "Pack Id"
-            }
+            },
+            "description": "The example set's id."
           }
         ],
         "responses": {
@@ -18632,8 +19072,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -18643,9 +19085,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           },
           {
             "name": "item_id",
@@ -18661,8 +19105,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep collections holding this item.",
               "title": "Item Id"
-            }
+            },
+            "description": "Keep collections holding this item."
           },
           {
             "name": "q",
@@ -18920,8 +19366,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
               "title": "After"
-            }
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
           },
           {
             "name": "limit",
@@ -18931,9 +19379,11 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
+              "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
-            }
+            },
+            "description": "Most rows to return on this page."
           }
         ],
         "responses": {
@@ -19139,6 +19589,24 @@
               "title": "Collection Id"
             },
             "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
           }
         ],
         "responses": {
@@ -19377,6 +19845,24 @@
               "title": "Collection Id"
             },
             "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The ETag you last read; 412 if the resource has changed.",
+              "title": "If-Match"
+            },
+            "description": "The ETag you last read; 412 if the resource has changed."
           }
         ],
         "requestBody": {
@@ -20272,8 +20758,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The item's id.",
               "title": "Item Id"
-            }
+            },
+            "description": "The item's id."
           },
           {
             "name": "collection_id",
@@ -20490,8 +20978,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The deleted collection's id.",
               "title": "Collection Id"
-            }
+            },
+            "description": "The deleted collection's id."
           }
         ],
         "responses": {
@@ -20697,8 +21187,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The deleted collection's id.",
               "title": "Collection Id"
-            }
+            },
+            "description": "The deleted collection's id."
           }
         ],
         "responses": {
@@ -22012,8 +22504,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The session's id.",
               "title": "Session Id"
-            }
+            },
+            "description": "The session's id."
           }
         ],
         "responses": {
@@ -22601,8 +23095,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The user's id.",
               "title": "User Id"
-            }
+            },
+            "description": "The user's id."
           }
         ],
         "requestBody": {
@@ -22784,8 +23280,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The user's id.",
               "title": "User Id"
-            }
+            },
+            "description": "The user's id."
           }
         ],
         "requestBody": {
@@ -22944,8 +23442,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The user's id.",
               "title": "User Id"
-            }
+            },
+            "description": "The user's id."
           }
         ],
         "responses": {
@@ -23084,8 +23584,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Keep the sessions of this user.",
               "title": "User Id"
-            }
+            },
+            "description": "Keep the sessions of this user."
           }
         ],
         "responses": {
@@ -23220,8 +23722,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The session's id.",
               "title": "Session Id"
-            }
+            },
+            "description": "The session's id."
           }
         ],
         "responses": {
@@ -23806,8 +24310,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The API token's id.",
               "title": "Token Id"
-            }
+            },
+            "description": "The API token's id."
           }
         ],
         "requestBody": {
@@ -24022,8 +24528,10 @@
             "schema": {
               "type": "string",
               "format": "uuid",
+              "description": "The API token's id.",
               "title": "Token Id"
-            }
+            },
+            "description": "The API token's id."
           }
         ],
         "responses": {

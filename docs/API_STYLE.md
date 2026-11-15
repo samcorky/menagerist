@@ -53,7 +53,7 @@ IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}
 
 ## Conditional requests
 
-`GET` responses carry a weak `ETag` (see [Weak ETags](DECISIONS.md#weak-etags-to-survive-a-compressing-proxy-open-question-76)), `If-None-Match` returns 304, and `PATCH` honours `If-Match` and answers 412. The headers are not yet declared as parameters in `openapi.json`, which is what `ibm-precondition-headers` reports.
+`GET` responses carry a weak `ETag` (see [Weak ETags](DECISIONS.md#weak-etags-to-survive-a-compressing-proxy-open-question-76)), `If-None-Match` returns 304, and `PATCH` honours `If-Match` and answers 412. A route takes `ConditionalGetDep` or `ConditionalPatchDep`, which declare `If-None-Match` or `If-Match` as parameters so they appear in `openapi.json` and the generated client. The date forms, `If-Modified-Since` and `If-Unmodified-Since`, are honoured but not declared, so the contract steers clients to ETags as IBM recommends.
 
 ## Request bodies, names and models
 
@@ -84,17 +84,16 @@ The remaining warnings are the backlog the ratchet works down. The ones that are
 
 - **Enum casing** (`ibm-enum-casing-convention`): some enum values are not snake_case.
 - **Property casing** (`ibm-property-casing-convention`): a few camelCase properties such as `componentType`.
-- **Precondition headers** (`ibm-precondition-headers`): declare `If-Match` and `If-None-Match` on the operations that honour them.
 - **Operation ids** (`ibm-operationid-naming-convention`): for example `list_user_exports` served from `/me/exports`.
 - **412 bodies** (`ibm-request-and-response-content`): a failed `If-Match` returns 412 with an empty body, not `application/problem+json`.
 - **DELETE with a body** (`ibm-no-operation-requestbody`): detaching media takes the node ids in a request body.
 - **Untyped content** (`ibm-content-contains-schema`): the health 503s and the binary media downloads declare no schema.
-- **Descriptions and examples** (`ibm-property-description`, `ibm-parameter-description`, `ibm-schema-description`, `ibm-success-response-example`): documentation, added as routes are touched.
+- **Descriptions and examples** (`ibm-property-description`, `ibm-schema-description`, `ibm-success-response-example`): documentation, added as routes are touched.
 
 Treat the numbers in the baseline as the source of truth; this list only names the themes.
 
 ## Adding or changing an endpoint
 
 1. Follow the naming and status rules above and the [route checklist](../backend/README.md#route-naming).
-2. Run `poe dump-schema`, then `poe lint-schema`. A new route must not add warnings: describe its parameters, properties and schemas, and give its responses examples.
+2. Run `poe dump-schema`, then `poe lint-schema`. A new route must not add warnings: describe its parameters, properties and schemas, and give its responses examples. A parameter without a description is an error. For the ones that recur (`after`, `limit`, `node_id` and the other ids, a field's `key`) use the aliases in `entrypoints/api/shared/http/parameters.py`.
 3. If the lint rejects something that is right for this API, change `.spectral.yaml` with a comment saying why, and add a row to the table above.

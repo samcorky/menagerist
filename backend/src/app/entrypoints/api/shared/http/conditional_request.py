@@ -8,6 +8,7 @@ from starlette.responses import Response
 from app.shared_kernel.etag import ETaggable, etag_from_entity
 
 from .http_headers import http_date, parse_http_date
+from .parameters import IfMatch, IfNoneMatch  # noqa: TC001 - FastAPI resolves these at runtime
 
 
 def _unweak(value: str) -> str:
@@ -93,10 +94,27 @@ class ConditionalRequest:
         self._res.headers["Last-Modified"] = http_date(entity.updated_at)
 
 
-def get_conditional_request(request: Request, response: Response) -> ConditionalRequest:
-    """FastAPI dependency that provides a ConditionalRequest for the current request."""
+# The header parameters only declare the headers in OpenAPI, so clients see them;
+# `ConditionalRequest` reads the values from the request itself.
+
+
+def get_conditional_get(
+    request: Request,
+    response: Response,
+    if_none_match: IfNoneMatch = None,
+) -> ConditionalRequest:
+    """Provide a ConditionalRequest for a GET that can answer 304."""
     return ConditionalRequest(request, response)
 
 
-# Convenience alias for Annotated injection
-ConditionalRequestDep = Annotated[ConditionalRequest, Depends(get_conditional_request)]
+def get_conditional_patch(
+    request: Request,
+    response: Response,
+    if_match: IfMatch = None,
+) -> ConditionalRequest:
+    """Provide a ConditionalRequest for a PATCH that can answer 412."""
+    return ConditionalRequest(request, response)
+
+
+ConditionalGetDep = Annotated[ConditionalRequest, Depends(get_conditional_get)]
+ConditionalPatchDep = Annotated[ConditionalRequest, Depends(get_conditional_patch)]
