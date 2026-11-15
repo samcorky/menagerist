@@ -42,7 +42,7 @@ test('shows where an item sits and what it holds', async ({ page, request }) => 
 	await trail.getByRole('link', { name: box.name }).click();
 
 	// The box holds the bag; the shed's list also reaches the bag through the box.
-	await expect(page.getByRole('heading', { name: box.name })).toBeVisible();
+	await expect(page).toHaveURL(new RegExp(box.id));
 	const inBox = page.getByRole('list', { name: 'Inside this item' });
 	await expect(inBox.getByRole('link')).toHaveText([bag.name]);
 
