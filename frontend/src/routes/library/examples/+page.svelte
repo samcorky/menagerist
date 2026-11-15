@@ -100,6 +100,8 @@
 			return;
 		}
 		plan = result.data;
+		// A plan that cannot go ahead may mean this page is stale, so show the truth.
+		if (!result.data.ready) await refreshPacks();
 	}
 
 	function closePreview(open: boolean) {
