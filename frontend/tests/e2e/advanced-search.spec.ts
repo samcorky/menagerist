@@ -415,7 +415,7 @@ test('filter items by a field on any item type: own fields and type fields with 
 	const dialog = await openFilters(page);
 
 	await dialog.getByRole('combobox', { name: 'Condition 1, field' }).click();
-	await page.getByPlaceholder('Search fields…').fill(`Per-item fields ${label}`);
+	await page.getByPlaceholder('Search fields…').fill(`Any item type ${label}`);
 	await page.getByRole('option', { name: label, exact: true }).click();
 	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'is' });
 	await dialog.getByLabel('Condition 1, value').fill('oak');
@@ -460,7 +460,7 @@ test('filter items by a per-item number field with at least', async ({ page, req
 	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
 	const dialog = await openFilters(page);
 	await dialog.getByRole('combobox', { name: 'Condition 1, field' }).click();
-	await page.getByPlaceholder('Search fields…').fill(`Per-item fields ${label}`);
+	await page.getByPlaceholder('Search fields…').fill(`Any item type ${label}`);
 	await page.getByRole('option', { name: label, exact: true }).click();
 	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'is at least' });
 	await dialog.getByLabel('Condition 1, value').fill('10');
@@ -470,7 +470,7 @@ test('filter items by a per-item number field with at least', async ({ page, req
 	await expect(itemLink(page, names.big)).toBeVisible();
 	await expect(itemLink(page, names.small)).toHaveCount(0);
 	await expect(page.getByRole('list', { name: 'Active filters' })).toContainText(
-		`Per-item field › ${label}`
+		`Any item type › ${label}`
 	);
 });
 

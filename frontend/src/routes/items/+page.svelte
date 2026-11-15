@@ -28,14 +28,14 @@
 	import { toast } from 'svelte-sonner';
 	import type { CollectionResponse, NodeResponse, NodeTypeResponse } from '$lib/api/client';
 	import { fetchAllNodeTypes } from '$lib/node-types';
-	import { fetchItemFields, type ItemField } from '$lib/item-fields';
+	import { fetchItemFields, fetchSavedFields, type ItemField } from '$lib/item-fields';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
 	import QueryChips from '$lib/components/query-chips.svelte';
 	import SaveSmartCollectionDialog from '$lib/components/save-smart-collection-dialog.svelte';
 	import { conditionNumbers, queryKey, type BuilderError } from '$lib/query/builder';
 	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
-	import { buildCatalogue, summaryLookup } from '$lib/query/fields';
+	import { buildCatalogue, summaryLookup, type SavedField } from '$lib/query/fields';
 	import {
 		combinePrefix,
 		createFilterWriter,
@@ -147,12 +147,15 @@
 	const canSave = $derived(narrowFilterCount(filter, saveBasics) > 0);
 	let categoriesLoaded = $state(false);
 	let itemFields = $state<ItemField[] | null>(null);
+	let savedFields = $state<SavedField[] | null>(null);
 	let collectionsFailed = $state(false);
 	let allCollections = $state<{ id: string; name: string }[] | null>(null);
 	const countLine = $derived(
 		totalLine(total, totalCapped, { loading, appending: loading && items.length > 0 })
 	);
-	const catalogue = $derived(buildCatalogue(allCategories, categoriesLoaded, itemFields));
+	const catalogue = $derived(
+		buildCatalogue(allCategories, categoriesLoaded, itemFields, savedFields)
+	);
 	const connections = new ConnectionLookups();
 	const lookup = $derived(
 		summaryLookup(catalogue, collectionNameLookup(allCollections), connections.summary)
@@ -361,6 +364,9 @@
 			}),
 			fetchItemFields().then((fields) => {
 				itemFields = fields;
+			}),
+			fetchSavedFields().then((fields) => {
+				savedFields = fields;
 			}),
 			loadCollections()
 		]);

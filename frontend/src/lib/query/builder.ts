@@ -2,11 +2,17 @@ import { decodeQuery, encodeQuery } from './codec';
 import {
 	findField,
 	findItemField,
+	findSavedField,
 	ITEM_FIELDS_CAP,
 	itemFieldGroup,
 	itemFieldInfo,
 	itemFieldSubject,
 	parseItemFieldSubject,
+	parseSavedFieldSubject,
+	SAVED_FIELDS_CAP,
+	SAVED_FIELDS_LABEL,
+	savedFieldInfos,
+	savedFieldSubject,
 	type Catalogue,
 	type FieldInfo
 } from './fields';
@@ -125,6 +131,7 @@ export function subjectOf(c: Condition): string {
 	switch (c.kind) {
 		case 'field':
 			if (isBlank(c)) return 'blank';
+			if (c.origin !== undefined) return savedFieldSubject(c.origin, c.sub_key);
 			return c.field_kind !== undefined
 				? itemFieldSubject(c.field_kind, c.key ?? '')
 				: fieldSubject(c.type ?? '', c.key ?? '', c.sub_key);
@@ -135,9 +142,10 @@ export function subjectOf(c: Condition): string {
 	}
 }
 
-/** The field a row is about. A per-item field is read from the row's own kind. */
+/** The field a row is about. A field on any item type is read from the row's own kind. */
 export function fieldOf(c: Condition, catalogue: Catalogue): FieldInfo | undefined {
 	if (c.kind !== 'field' || isBlank(c)) return undefined;
+	if (c.origin !== undefined) return findSavedField(catalogue, c.origin, c.sub_key);
 	if (c.field_kind !== undefined) return itemFieldInfo(catalogue, c.field_kind, c.key ?? '');
 	return findField(catalogue, c.type ?? '', c.key ?? '', c.sub_key);
 }
@@ -174,6 +182,18 @@ export function conditionFor(subject: string, catalogue: Catalogue): Condition {
 		return operatorsForKind(item.kind).length > 0
 			? { kind: 'field', field_kind: item.kind, key: item.key, op: operatorsForKind(item.kind)[0] }
 			: blankCondition();
+	}
+	const saved = parseSavedFieldSubject(subject);
+	if (saved) {
+		const field = findSavedField(catalogue, saved.origin, saved.subKey);
+		if (!field) return blankCondition();
+		const out: FieldCondition = {
+			kind: 'field',
+			origin: saved.origin,
+			op: operatorsForKind(field.kind)[0] ?? '='
+		};
+		if (saved.subKey) out.sub_key = saved.subKey;
+		return out;
 	}
 	const ref = parseFieldSubject(subject);
 	const field = ref ? findField(catalogue, ref.type, ref.key, ref.subKey) : undefined;
@@ -860,11 +880,14 @@ export const STALE_CONNECTION_MESSAGE =
 export const NO_ITEM_FIELD_MESSAGE = 'No item has this field.';
 /** The same wording, lower-cased for the field picker's trigger. */
 export const NO_ITEM_FIELD_NOTE = 'no item has this field';
+export const GONE_SAVED_FIELD_MESSAGE = 'This saved field was removed.';
+export const GONE_SAVED_FIELD_NOTE = 'removed';
 
 /** What to say about a field row that cannot be matched. */
 export function missingFieldMessage(c: Condition): string {
 	if (c.kind === 'collection') return STALE_COLLECTION_MESSAGE;
 	if (c.kind === 'connection') return STALE_CONNECTION_MESSAGE;
+	if (c.kind === 'field' && c.origin !== undefined) return GONE_SAVED_FIELD_MESSAGE;
 	return c.kind === 'field' && c.field_kind !== undefined
 		? NO_ITEM_FIELD_MESSAGE
 		: STALE_FIELD_MESSAGE;
@@ -915,6 +938,13 @@ export type FieldStatus = 'ok' | 'loading' | 'missing' | 'archived';
 export function fieldStatus(c: Condition, catalogue: Catalogue): FieldStatus {
 	if (c.kind !== 'field' || isBlank(c)) return 'ok';
 	if (!catalogue.loaded) return 'loading';
+	if (c.origin !== undefined) {
+		const listed =
+			catalogue.savedFields === null ||
+			catalogue.savedFields.length >= SAVED_FIELDS_CAP ||
+			findSavedField(catalogue, c.origin, c.sub_key);
+		return listed ? 'ok' : 'missing';
+	}
 	if (c.field_kind !== undefined) {
 		// An unread listing, or one cut off at the server's cap, says nothing either way.
 		const listed =
@@ -928,7 +958,17 @@ export function fieldStatus(c: Condition, catalogue: Catalogue): FieldStatus {
 	return field.archived ? 'archived' : 'ok';
 }
 
-/** The "Per-item fields" options for the field picker; searchable by group name and label. */
+/** The "Saved fields" options for the field picker, columns included. */
+export function savedFieldPickerItems(catalogue: Catalogue): ComboboxItem[] {
+	return savedFieldInfos(catalogue).map((f) => ({
+		value: savedFieldSubject(f.origin ?? '', f.subKey),
+		label: f.label,
+		group: SAVED_FIELDS_LABEL,
+		selectedLabel: `${SAVED_FIELDS_LABEL} › ${f.label}`
+	}));
+}
+
+/** The "Any item type" options for the field picker; searchable by group name and label. */
 export function itemFieldPickerItems(catalogue: Catalogue): ComboboxItem[] {
 	const group = itemFieldGroup(catalogue);
 	if (!group) return [];
@@ -940,14 +980,14 @@ export function itemFieldPickerItems(catalogue: Catalogue): ComboboxItem[] {
 	}));
 }
 
-/** Path keys of per-item rows whose field no item has; the server does not flag these. */
+/** Path keys of rows on any item type or a saved field that reach nothing; the server does not flag these. */
 export function missingItemFieldPaths(query: Query, catalogue: Catalogue): Set<string> {
 	const out = new Set<string>();
 	if (!query.where) return out;
 	for (const { condition, path } of conditionsIn(query.where, [], true)) {
 		if (
 			condition.kind === 'field' &&
-			condition.field_kind !== undefined &&
+			(condition.field_kind !== undefined || condition.origin !== undefined) &&
 			fieldStatus(condition, catalogue) === 'missing'
 		)
 			out.add(pathKey(path));

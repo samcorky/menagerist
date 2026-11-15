@@ -58,12 +58,8 @@
 	const DATE_PROP: JsonSchemaProperty = { title: 'Date', type: 'string', format: 'date' };
 
 	const field = $derived(fieldOf(condition, view.catalogue));
-	// A per-item choice field has no option list to pick from, so its values are typed.
-	const typedChoice = $derived(
-		condition.kind === 'field' &&
-			condition.field_kind !== undefined &&
-			(field?.kind === 'choice' || field?.kind === 'multichoice')
-	);
+	// A choice field with no option list to pick from takes typed values.
+	const typedChoice = $derived(condition.kind === 'field' && field?.typedChoice === true);
 	const shape = $derived.by(() => {
 		if (condition.kind !== 'field' || !field) return 'none';
 		const base = valueShape(field.kind, condition.op);
