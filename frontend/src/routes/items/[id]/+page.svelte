@@ -58,6 +58,9 @@
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import { retypeImpact } from '$lib/retype';
 	import ItemCollections from '$lib/components/item-collections.svelte';
+	import ItemContents from '$lib/components/item-contents.svelte';
+	import ItemPath from '$lib/components/item-path.svelte';
+	import { reachChoices } from '$lib/item-reach';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import CoverPlaceholder from '$lib/components/cover-placeholder.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
@@ -94,6 +97,10 @@
 	let typePickerKey = $state(0);
 	let nodesById = $derived(new Map(otherNodes.map((candidate) => [candidate.id, candidate])));
 	let edgeTypesById = $derived(new Map(edgeTypes.map((et) => [et.slug, et])));
+	// Where this item sits and what it holds, along relationships that have a direction.
+	let reach = $derived(reachChoices(nodeId, edges, edgeTypes));
+	// Changes when a connection is added or removed, so the trail and contents fetch again.
+	let reachKey = $derived(edges.map((e) => e.id).join());
 	let nodeSchema = $derived(
 		(nodeTypes.find((nt) => nt.slug === node?.type)
 			?.attributes_schema as AttributesSchema | null) ?? null
@@ -708,6 +715,9 @@
 				</div>
 
 				<div data-testid="item-main" class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
+					{#if node && reach.inside.length > 0}
+						<ItemPath nodeId={node.id} choices={reach.inside} refreshKey={reachKey} />
+					{/if}
 					{#if draft && node}
 						<DraftRestore
 							notes={draft.base === node.updated_at
@@ -955,6 +965,9 @@
 					data-testid="item-side"
 					class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-2 2xl:col-start-3 2xl:row-start-1"
 				>
+					{#if node && reach.contents.length > 0}
+						<ItemContents nodeId={node.id} choices={reach.contents} refreshKey={reachKey} />
+					{/if}
 					<Card.Root>
 						<Card.Header>
 							<Card.Title class="font-heading">Connected to</Card.Title>
