@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 BUNDLE_EXAMPLE: dict[str, Any] = {
     "format": "menagerist-bundle",
-    "version": 2,
+    "version": 3,
     "presets": [
         {
             "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
@@ -59,6 +59,43 @@ BUNDLE_EXAMPLE: dict[str, Any] = {
             },
             "icon": None,
             "colour": None,
+        }
+    ],
+    "items": [
+        {
+            "ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+            "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+            "name": "Kind of Blue",
+            "description": None,
+            "attributes": {"condition": "Near Mint"},
+            "tags": ["jazz"],
+            "extra_schema": None,
+        },
+        {
+            "ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+            "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+            "name": "A Love Supreme",
+            "description": None,
+            "attributes": {},
+            "tags": [],
+            "extra_schema": None,
+        },
+    ],
+    "connections": [
+        {
+            "source_ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+            "target_ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+            "type_ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+            "attributes": {},
+        }
+    ],
+    "collections": [
+        {
+            "ref": "01978c3e-f6a7-7b2c-9d4e-8b5c6d7e8f91",
+            "name": "Jazz shelf",
+            "description": None,
+            "item_refs": ["01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57"],
+            "definition": None,
         }
     ],
 }
@@ -127,11 +164,73 @@ class BundleRelationshipTypeEntry(BaseModel):
     )
 
 
+class BundleItemEntry(BaseModel):
+    """One item in a `menagerist-bundle` file of version 3."""
+
+    model_config = ConfigDict(
+        extra="forbid", json_schema_extra={"examples": [BUNDLE_EXAMPLE["items"][0]]}
+    )
+
+    ref: str = Field(description="Its id within the file; an export uses the id.")
+    type_ref: str | None = Field(
+        default=None,
+        description="The `ref` of its item type in the same file; none for no type.",
+    )
+    name: str = Field(description="Its name.")
+    description: str | None = Field(default=None, description="Its notes.")
+    attributes: dict[str, Any] = Field(
+        default_factory=dict, description="Its field values, by field key."
+    )
+    tags: list[str] = Field(default_factory=list, description="Its tags.")
+    extra_schema: dict[str, Any] | None = Field(
+        default=None, description="Fields only this item has."
+    )
+
+
+class BundleConnectionEntry(BaseModel):
+    """One connection between two items in a `menagerist-bundle` file."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [BUNDLE_EXAMPLE["connections"][0]]},
+    )
+
+    source_ref: str = Field(description="The `ref` of the item it starts from.")
+    target_ref: str = Field(description="The `ref` of the item it points to.")
+    type_ref: str = Field(description="The `ref` of its connection type.")
+    attributes: dict[str, Any] = Field(
+        default_factory=dict, description="Its field values, by field key."
+    )
+
+
+class BundleCollectionEntry(BaseModel):
+    """One collection in a `menagerist-bundle` file of version 3.
+
+    It has either `item_refs` (a manual collection) or a `definition` (a smart one).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [BUNDLE_EXAMPLE["collections"][0]]},
+    )
+
+    ref: str = Field(description="Its id within the file; an export uses the id.")
+    name: str = Field(description="Its name.")
+    description: str | None = Field(default=None, description="What it is for.")
+    item_refs: list[str] = Field(
+        default_factory=list, description="The `ref`s of the items in a manual one."
+    )
+    definition: dict[str, Any] | None = Field(
+        default=None, description="The rule of a smart collection."
+    )
+
+
 class BundleFile(RequestModel):
     """A bundle file to import. `format` says which reader takes it.
 
-    A `menagerist-bundle` file has `version` 1 and the presets it holds, or
-    `version` 2, which can also hold connection types and item types.
+    A `menagerist-bundle` file has `version` 1 and the presets it holds,
+    `version` 2, which can also hold connection types and item types, or
+    `version` 3, which can also hold items, connections and collections.
     """
 
     model_config = ConfigDict(json_schema_extra={"examples": [BUNDLE_EXAMPLE]})
@@ -151,6 +250,15 @@ class BundleFile(RequestModel):
     item_types: list[BundleItemTypeEntry] = Field(
         default_factory=list,
         description="The item types, with their saved lists in `presets`; version 2.",
+    )
+    items: list[BundleItemEntry] = Field(
+        default_factory=list, description="The items; from version 3."
+    )
+    connections: list[BundleConnectionEntry] = Field(
+        default_factory=list, description="The connections between items; version 3."
+    )
+    collections: list[BundleCollectionEntry] = Field(
+        default_factory=list, description="The collections; from version 3."
     )
 
     def data(self) -> dict[str, Any]:
@@ -173,6 +281,13 @@ class BundleFileResponse(BaseModel):
     )
     item_types: list[BundleItemTypeEntry] = Field(
         description="The item types exported."
+    )
+    items: list[BundleItemEntry] = Field(description="The items exported.")
+    connections: list[BundleConnectionEntry] = Field(
+        description="The connections between the items exported."
+    )
+    collections: list[BundleCollectionEntry] = Field(
+        description="The collections exported."
     )
 
 

@@ -136,7 +136,7 @@ async def export_bundle(
     Choose at least one of the three kinds. In a `menagerist-bundle` file each
     `ref` is the id, so the same thing has the same ref in every file. An item
     type brings the saved lists its fields use, so the file imports on its own;
-    the file is `version` 2.
+    the file is `version` 3.
     """
     return await use_case.handle(
         ExportBundleQuery(

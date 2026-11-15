@@ -144,7 +144,7 @@ class GraphTarget(Protocol):
         """
         ...
 
-    async def create_item(self, spec: BundleItem, *, type_slug: str) -> Created:
+    async def create_item(self, spec: BundleItem, *, type_slug: str | None) -> Created:
         """Create the item under the item type `type_slug`."""
         ...
 

@@ -43,7 +43,7 @@ test('exports an item type with the list its field uses', async ({ page, request
 			item_types: { ref: string }[];
 			presets: { ref: string; label: string }[];
 		};
-		expect(body.version).toBe(2);
+		expect(body.version).toBe(3);
 		expect(body.item_types.map((t) => t.ref)).toEqual([typeId]);
 		expect(body.presets.map((p) => [p.ref, p.label])).toEqual([[listId, listLabel]]);
 	} finally {

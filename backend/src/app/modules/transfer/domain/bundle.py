@@ -10,12 +10,20 @@ from app.modules.transfer.domain.errors import InvalidBundleError
 PRESET_MARKER = "$preset"
 
 # The envelope of a bundle file a person exports and imports. Version 1 carries
-# presets only; version 2 adds relationship types and item types. Items and
-# collections join it in later versions.
+# presets only; version 2 adds relationship types and item types; version 3 adds
+# items, connections and collections. Export always writes the latest.
 BUNDLE_FORMAT = "menagerist-bundle"
-BUNDLE_VERSION = 2
+BUNDLE_VERSION = 3
 PRESETS_ONLY_VERSION = 1
+TYPES_VERSION = 2
 
+
+# What one bundle may hold, whatever its source. Example packs have the same.
+MAX_ITEMS = 500
+MAX_CONNECTIONS = 2000
+MAX_COLLECTIONS = 100
+# Mirrors the collections module's name limit; transfer must not import it.
+MAX_COLLECTION_NAME = 120
 
 COVER_STYLES = ("sleeve", "poster", "box", "card")
 
@@ -43,6 +51,31 @@ def split_ref(ref: str) -> tuple[str | None, str]:
     if not REF_PATTERN.match(pack_id) or not REF_PATTERN.match(local):
         raise InvalidBundleError(f"ref '{ref}' {REF_RULE} on both sides of the colon")
     return pack_id, local
+
+
+def unportable_condition(node: object, path: str = "") -> tuple[str, str] | None:
+    """Return the path and reason of the first condition a bundle cannot carry.
+
+    Walks a smart collection's definition generically, as the graph query model
+    is not this module's to import. A condition on another collection and a
+    connection to one particular item name ids that a bundle cannot know.
+    """
+    if isinstance(node, dict):
+        kind = node.get("kind")
+        if kind == "collection":
+            return path, "a collection condition cannot be in a bundle"
+        if kind == "connection" and "item" in node:
+            return path, "a connection to one item cannot be in a bundle"
+        children = [(f"{path}.{k}" if path else str(k), v) for k, v in node.items()]
+    elif isinstance(node, list):
+        children = [(f"{path}[{i}]", v) for i, v in enumerate(node)]
+    else:
+        return None
+    for child_path, child in children:
+        found = unportable_condition(child, child_path)
+        if found is not None:
+            return found
+    return None
 
 
 def _is_marker(value: dict[str, Any]) -> bool:
@@ -129,11 +162,11 @@ class BundleItemType:
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class BundleItem:
-    """An item (a node) the pack creates."""
+    """An item (a node) the pack creates; `type_ref` is `None` for an untyped item."""
 
     ref: str
-    type_ref: str
     name: str
+    type_ref: str | None = None
     description: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
     tags: tuple[str, ...] = ()
@@ -197,3 +230,26 @@ class Bundle:
             refs = [s.ref for s in specs]
             if len(set(refs)) != len(refs):
                 raise InvalidBundleError(f"each {name} needs its own ref")
+        self._check_size()
+        self._check_collections()
+
+    def _check_size(self) -> None:
+        for name, count, limit in (
+            ("items", len(self.items), MAX_ITEMS),
+            ("connections", len(self.connections), MAX_CONNECTIONS),
+            ("collections", len(self.collections), MAX_COLLECTIONS),
+        ):
+            if count > limit:
+                raise InvalidBundleError(f"a bundle may hold at most {limit} {name}")
+
+    def _check_collections(self) -> None:
+        for collection in self.collections:
+            if not 1 <= len(collection.name.strip()) <= MAX_COLLECTION_NAME:
+                raise InvalidBundleError(
+                    f"collection '{collection.ref}' needs a name of "
+                    + f"1 to {MAX_COLLECTION_NAME} characters"
+                )
+            if len(set(collection.item_refs)) != len(collection.item_refs):
+                raise InvalidBundleError(
+                    f"collection '{collection.ref}' lists an item twice"
+                )

@@ -272,3 +272,14 @@ async def test_a_collection_of_items_never_made_is_refused(shared: Shared) -> No
 
     with pytest.raises(InvalidBundleError, match="names items that were not created"):
         await apply_bundle(plan, bundle, t.presets, t.graph)
+
+
+async def test_an_item_with_no_type_is_created_with_none(shared: Shared) -> None:
+    """A bundle may hold an item that has no item type."""
+    t = shared.targets(ALICE)
+    bundle = Bundle(id="b", items=(BundleItem(ref="loose", name="Loose end"),))
+    plan = await _plan(t, bundle)
+
+    applied = await apply_bundle(plan, bundle, t.presets, t.graph)
+
+    assert applied.created[EntityKind.ITEM] == 1

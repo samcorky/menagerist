@@ -17978,7 +17978,7 @@
           "Bundles"
         ],
         "summary": "Export Bundle",
-        "description": "Export saved lists, fields, groups and types as a file you can import again.\n\nChoose at least one of the three kinds. In a `menagerist-bundle` file each\n`ref` is the id, so the same thing has the same ref in every file. An item\ntype brings the saved lists its fields use, so the file imports on its own;\nthe file is `version` 2.\n\n**Requires permission:** `transfer:bundle:read`",
+        "description": "Export saved lists, fields, groups and types as a file you can import again.\n\nChoose at least one of the three kinds. In a `menagerist-bundle` file each\n`ref` is the id, so the same thing has the same ref in every file. An item\ntype brings the saved lists its fields use, so the file imports on its own;\nthe file is `version` 3.\n\n**Requires permission:** `transfer:bundle:read`",
         "operationId": "export_bundle",
         "security": [
           {
@@ -18081,7 +18081,7 @@
                 },
                 "example": {
                   "format": "menagerist-bundle",
-                  "version": 2,
+                  "version": 3,
                   "presets": [
                     {
                       "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
@@ -18125,6 +18125,43 @@
                           }
                         }
                       }
+                    }
+                  ],
+                  "items": [
+                    {
+                      "ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+                      "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+                      "name": "Kind of Blue",
+                      "attributes": {
+                        "condition": "Near Mint"
+                      },
+                      "tags": [
+                        "jazz"
+                      ]
+                    },
+                    {
+                      "ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+                      "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+                      "name": "A Love Supreme",
+                      "attributes": {},
+                      "tags": []
+                    }
+                  ],
+                  "connections": [
+                    {
+                      "source_ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+                      "target_ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+                      "type_ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+                      "attributes": {}
+                    }
+                  ],
+                  "collections": [
+                    {
+                      "ref": "01978c3e-f6a7-7b2c-9d4e-8b5c6d7e8f91",
+                      "name": "Jazz shelf",
+                      "item_refs": [
+                        "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57"
+                      ]
                     }
                   ]
                 }
@@ -25704,6 +25741,112 @@
           }
         ]
       },
+      "BundleCollectionEntry": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its id within the file; an export uses the id."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Its name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What it is for."
+          },
+          "item_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Refs",
+            "description": "The `ref`s of the items in a manual one."
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition",
+            "description": "The rule of a smart collection."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref",
+          "name"
+        ],
+        "title": "BundleCollectionEntry",
+        "description": "One collection in a `menagerist-bundle` file of version 3.\n\nIt has either `item_refs` (a manual collection) or a `definition` (a smart one).",
+        "examples": [
+          {
+            "item_refs": [
+              "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57"
+            ],
+            "name": "Jazz shelf",
+            "ref": "01978c3e-f6a7-7b2c-9d4e-8b5c6d7e8f91"
+          }
+        ]
+      },
+      "BundleConnectionEntry": {
+        "properties": {
+          "source_ref": {
+            "type": "string",
+            "title": "Source Ref",
+            "description": "The `ref` of the item it starts from."
+          },
+          "target_ref": {
+            "type": "string",
+            "title": "Target Ref",
+            "description": "The `ref` of the item it points to."
+          },
+          "type_ref": {
+            "type": "string",
+            "title": "Type Ref",
+            "description": "The `ref` of its connection type."
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes",
+            "description": "Its field values, by field key."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_ref",
+          "target_ref",
+          "type_ref"
+        ],
+        "title": "BundleConnectionEntry",
+        "description": "One connection between two items in a `menagerist-bundle` file.",
+        "examples": [
+          {
+            "attributes": {},
+            "source_ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+            "target_ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+            "type_ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62"
+          }
+        ]
+      },
       "BundleFile": {
         "properties": {
           "format": {
@@ -25745,6 +25888,30 @@
             "type": "array",
             "title": "Item Types",
             "description": "The item types, with their saved lists in `presets`; version 2."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BundleItemEntry"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The items; from version 3."
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/BundleConnectionEntry"
+            },
+            "type": "array",
+            "title": "Connections",
+            "description": "The connections between items; version 3."
+          },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/BundleCollectionEntry"
+            },
+            "type": "array",
+            "title": "Collections",
+            "description": "The collections; from version 3."
           }
         },
         "additionalProperties": false,
@@ -25754,9 +25921,26 @@
           "version"
         ],
         "title": "BundleFile",
-        "description": "A bundle file to import. `format` says which reader takes it.\n\nA `menagerist-bundle` file has `version` 1 and the presets it holds, or\n`version` 2, which can also hold connection types and item types.",
+        "description": "A bundle file to import. `format` says which reader takes it.\n\nA `menagerist-bundle` file has `version` 1 and the presets it holds,\n`version` 2, which can also hold connection types and item types, or\n`version` 3, which can also hold items, connections and collections.",
         "examples": [
           {
+            "collections": [
+              {
+                "item_refs": [
+                  "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57"
+                ],
+                "name": "Jazz shelf",
+                "ref": "01978c3e-f6a7-7b2c-9d4e-8b5c6d7e8f91"
+              }
+            ],
+            "connections": [
+              {
+                "attributes": {},
+                "source_ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+                "target_ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+                "type_ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62"
+              }
+            ],
             "format": "menagerist-bundle",
             "item_types": [
               {
@@ -25778,6 +25962,26 @@
                 "label": "Record",
                 "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
                 "slug": "record"
+              }
+            ],
+            "items": [
+              {
+                "attributes": {
+                  "condition": "Near Mint"
+                },
+                "name": "Kind of Blue",
+                "ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+                "tags": [
+                  "jazz"
+                ],
+                "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41"
+              },
+              {
+                "attributes": {},
+                "name": "A Love Supreme",
+                "ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+                "tags": [],
+                "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41"
               }
             ],
             "presets": [
@@ -25803,7 +26007,7 @@
                 "slug": "wrote"
               }
             ],
-            "version": 2
+            "version": 3
           }
         ]
       },
@@ -25842,6 +26046,30 @@
             "type": "array",
             "title": "Item Types",
             "description": "The item types exported."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BundleItemEntry"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The items exported."
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/BundleConnectionEntry"
+            },
+            "type": "array",
+            "title": "Connections",
+            "description": "The connections between the items exported."
+          },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/BundleCollectionEntry"
+            },
+            "type": "array",
+            "title": "Collections",
+            "description": "The collections exported."
           }
         },
         "type": "object",
@@ -25850,12 +26078,32 @@
           "version",
           "presets",
           "relationship_types",
-          "item_types"
+          "item_types",
+          "items",
+          "connections",
+          "collections"
         ],
         "title": "BundleFileResponse",
         "description": "A bundle file as exported, ready to save and import again.",
         "examples": [
           {
+            "collections": [
+              {
+                "item_refs": [
+                  "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57"
+                ],
+                "name": "Jazz shelf",
+                "ref": "01978c3e-f6a7-7b2c-9d4e-8b5c6d7e8f91"
+              }
+            ],
+            "connections": [
+              {
+                "attributes": {},
+                "source_ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+                "target_ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+                "type_ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62"
+              }
+            ],
             "format": "menagerist-bundle",
             "item_types": [
               {
@@ -25877,6 +26125,26 @@
                 "label": "Record",
                 "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
                 "slug": "record"
+              }
+            ],
+            "items": [
+              {
+                "attributes": {
+                  "condition": "Near Mint"
+                },
+                "name": "Kind of Blue",
+                "ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+                "tags": [
+                  "jazz"
+                ],
+                "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41"
+              },
+              {
+                "attributes": {},
+                "name": "A Love Supreme",
+                "ref": "01978c3e-d4e5-7f19-8c3a-7a4b5c6d7e80",
+                "tags": [],
+                "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41"
               }
             ],
             "presets": [
@@ -25902,7 +26170,93 @@
                 "slug": "wrote"
               }
             ],
-            "version": 2
+            "version": 3
+          }
+        ]
+      },
+      "BundleItemEntry": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its id within the file; an export uses the id."
+          },
+          "type_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Ref",
+            "description": "The `ref` of its item type in the same file; none for no type."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Its name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Its notes."
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes",
+            "description": "Its field values, by field key."
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Its tags."
+          },
+          "extra_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Schema",
+            "description": "Fields only this item has."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref",
+          "name"
+        ],
+        "title": "BundleItemEntry",
+        "description": "One item in a `menagerist-bundle` file of version 3.",
+        "examples": [
+          {
+            "attributes": {
+              "condition": "Near Mint"
+            },
+            "name": "Kind of Blue",
+            "ref": "01978c3e-b1c2-7e08-a9d4-6f3b2c1d0e57",
+            "tags": [
+              "jazz"
+            ],
+            "type_ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41"
           }
         ]
       },

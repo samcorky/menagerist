@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from app.modules.transfer.domain.bundle import (
+    MAX_COLLECTION_NAME,
+    MAX_CONNECTIONS,
+    MAX_ITEMS,
     REF_PATTERN,
     REF_RULE,
     Bundle,
@@ -17,11 +20,8 @@ if TYPE_CHECKING:
 
 MAX_PRESETS = 50
 MAX_TYPES = 50
-MAX_ITEMS = 500
-MAX_CONNECTIONS = 2000
 
-# Mirrors the collections module's name limit; examples must not import it.
-_MAX_COLLECTION_NAME = 120
+_MAX_COLLECTION_NAME = MAX_COLLECTION_NAME
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -131,8 +131,8 @@ class ExamplePack(Bundle):
             if external is not None:
                 found.add((kind, *external))
 
-        for item in self.items:
-            add(EntityKind.ITEM_TYPE, item.type_ref)
+        for type_ref in (i.type_ref for i in self.items if i.type_ref is not None):
+            add(EntityKind.ITEM_TYPE, type_ref)
         for c in self.connections:
             add(EntityKind.ITEM, c.source_ref)
             add(EntityKind.ITEM, c.target_ref)
@@ -225,6 +225,8 @@ class ExamplePack(Bundle):
         item_refs = {i.ref for i in self.items}
         relationship_refs = {t.ref for t in self.relationship_types}
         for item in self.items:
+            if item.type_ref is None:
+                raise InvalidBundleError(f"item '{item.ref}' needs a type")
             if self._external(item.type_ref) is None and (
                 item.type_ref not in item_type_refs
             ):

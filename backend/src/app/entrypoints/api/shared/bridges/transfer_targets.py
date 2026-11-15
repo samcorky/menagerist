@@ -688,7 +688,7 @@ class GraphPackTarget:
                 )
         return found
 
-    async def create_item(self, spec: BundleItem, *, type_slug: str) -> Created:
+    async def create_item(self, spec: BundleItem, *, type_slug: str | None) -> Created:
         """Create the item under `type_slug`."""
         command = CreateNodeCommand(
             name=spec.name,
