@@ -178,6 +178,12 @@ def configure_logging(
     # markdown-it (pulled in by rich for CLI help) logs every parsing rule at DEBUG.
     logging.getLogger("markdown_it").setLevel(logging.WARNING)
 
+    # httpcore2 traces every connection phase at DEBUG, and httpx2 logs each
+    # request URL at INFO, including signed query strings. Outbound hops are
+    # already logged without the query by `app.platform.outbound_http`.
+    logging.getLogger("httpcore2").setLevel(logging.WARNING)
+    logging.getLogger("httpx2").setLevel(logging.WARNING)
+
     logging.getLogger("sqlalchemy.engine").setLevel(settings.sqlalchemy_level.value)
 
 
