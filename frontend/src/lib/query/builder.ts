@@ -24,6 +24,7 @@ import {
 	FAR_END,
 	isGroup,
 	MAX_COLLECTION_IDS,
+	MAX_CONNECTION_DEPTH,
 	MAX_TEXT_LENGTH,
 	type Condition,
 	type Group,
@@ -292,18 +293,49 @@ export function withConnectionRelationship(
 	relationship: RelationshipChoice | null
 ): Condition {
 	if (c.kind !== 'connection') return c;
-	const { relationship: _old, direction, ...rest } = c;
+	const { relationship: _old, direction, depth: _depth, ...rest } = c;
 	if (!relationship) return direction === undefined ? rest : { ...rest, direction };
-	return relationship.directional && direction !== undefined
-		? { ...rest, relationship: relationship.slug, direction }
-		: { ...rest, relationship: relationship.slug };
+	if (!relationship.directional || direction === undefined)
+		return { ...rest, relationship: relationship.slug };
+	return {
+		...rest,
+		relationship: relationship.slug,
+		direction,
+		...(c.depth === undefined ? {} : { depth: c.depth })
+	};
 }
 
 /** `any` leaves out the condition's `direction`. */
 export function withConnectionDirection(c: Condition, direction: 'out' | 'in' | 'any'): Condition {
 	if (c.kind !== 'connection') return c;
-	const { direction: _old, ...rest } = c;
-	return direction === 'any' ? rest : { ...rest, direction };
+	const { direction: _old, depth: _depth, ...rest } = c;
+	if (direction === 'any') return rest;
+	return { ...rest, direction, ...(c.depth === undefined ? {} : { depth: c.depth }) };
+}
+
+/** How far a connection row follows its relationship. */
+export const DEPTH_CHOICES = [
+	{ value: 1, label: 'Directly linked' },
+	{ value: MAX_CONNECTION_DEPTH, label: 'Any depth' }
+] as const;
+
+/** Whether the row can reach through several steps: a directional relationship, one way. */
+export function canChooseDepth(
+	c: Condition,
+	relationship: RelationshipChoice | null | undefined
+): boolean {
+	return (
+		c.kind === 'connection' &&
+		!!relationship?.directional &&
+		(c.direction === 'out' || c.direction === 'in')
+	);
+}
+
+/** Set how many steps a row follows; one step (the default) leaves the key out. */
+export function withConnectionDepth(c: Condition, depth: number): Condition {
+	if (c.kind !== 'connection') return c;
+	const { depth: _old, ...rest } = c;
+	return depth > 1 ? { ...rest, depth } : rest;
 }
 
 export function withConnectionItem(c: Condition, item: string): Condition {

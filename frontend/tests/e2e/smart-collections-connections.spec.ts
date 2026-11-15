@@ -337,3 +337,52 @@ test('another user cannot open a smart collection that has a connection conditio
 	expect((await b.request.get(`/api/v1/nodes?collection=${smart.id}`)).status()).toBe(404);
 	await b.context.close();
 });
+
+test('finds what is inside a box at any depth', async ({ page, request }) => {
+	const suffix = uniqueName('x').replace(/\W+/g, '');
+	const label = `Contains ${suffix}`;
+	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+	const res = await request.post('/api/v1/edge-types', {
+		data: { slug, label, reverse_label: `Inside ${suffix}`, directional: true }
+	});
+	expect(res.status(), await res.text()).toBe(201);
+	edgeTypeIds.push(((await res.json()) as { id: string }).id);
+	const shed = await makeItem(request, `Shed${suffix}`);
+	const box = await makeItem(request, `Box${suffix}`);
+	const bag = await makeItem(request, `Bag${suffix}`);
+	for (const [outer, inner] of [
+		[shed, box],
+		[box, bag]
+	]) {
+		const edge = await request.post('/api/v1/edges', {
+			data: { source_id: outer.id, target_id: inner.id, type: slug }
+		});
+		expect(edge.status(), await edge.text()).toBe(201);
+	}
+
+	await page.goto('/items');
+	await page.getByRole('button', { name: /^Filters/ }).click();
+	const dialog = await addConnectionRow(page);
+	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'Is connected to' });
+	await dialog.getByRole('combobox', { name: 'Condition 1, item' }).click();
+	await page.getByPlaceholder('Search items…').fill(shed.name);
+	await page.getByRole('option', { name: new RegExp(shed.name) }).click();
+	await dialog
+		.getByLabel('Condition 1, relationship')
+		.selectOption({ label: `${label} / Inside ${suffix}` });
+	await dialog.getByLabel('Condition 1, direction').selectOption({ label: 'To this item' });
+
+	// Directly linked: the box only.
+	await expect(link(page, box.name)).toBeVisible();
+	await expect(link(page, bag.name)).toHaveCount(0);
+
+	// Any depth reaches the bag through the box; the shed itself is never listed.
+	await dialog.getByLabel('Condition 1, how far').selectOption({ label: 'Any depth' });
+	await expect(link(page, bag.name)).toBeVisible();
+	await expect(link(page, box.name)).toBeVisible();
+	await expect(link(page, shed.name)).toHaveCount(0);
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await expect(
+		page.getByRole('list', { name: 'Active filters' }).getByText(/at any depth/)
+	).toBeVisible();
+});
