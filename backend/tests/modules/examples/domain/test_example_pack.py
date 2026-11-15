@@ -5,8 +5,6 @@ from typing import Any
 import pytest
 
 from app.modules.examples.domain.pack import (
-    MAX_CONNECTIONS,
-    MAX_ITEMS,
     MAX_PRESETS,
     MAX_TYPES,
     ExamplePack,
@@ -14,6 +12,8 @@ from app.modules.examples.domain.pack import (
 )
 from app.modules.transfer.domain.bundle import (
     COVER_STYLES,
+    MAX_CONNECTIONS,
+    MAX_ITEMS,
     BundleCollection,
     BundleConnection,
     BundleCover,

@@ -18,6 +18,13 @@ PRESETS_ONLY_VERSION = 1
 TYPES_VERSION = 2
 
 
+# What one bundle may hold, whatever its source. Example packs have the same.
+MAX_ITEMS = 500
+MAX_CONNECTIONS = 2000
+MAX_COLLECTIONS = 100
+# Mirrors the collections module's name limit; transfer must not import it.
+MAX_COLLECTION_NAME = 120
+
 COVER_STYLES = ("sleeve", "poster", "box", "card")
 
 
@@ -223,3 +230,26 @@ class Bundle:
             refs = [s.ref for s in specs]
             if len(set(refs)) != len(refs):
                 raise InvalidBundleError(f"each {name} needs its own ref")
+        self._check_size()
+        self._check_collections()
+
+    def _check_size(self) -> None:
+        for name, count, limit in (
+            ("items", len(self.items), MAX_ITEMS),
+            ("connections", len(self.connections), MAX_CONNECTIONS),
+            ("collections", len(self.collections), MAX_COLLECTIONS),
+        ):
+            if count > limit:
+                raise InvalidBundleError(f"a bundle may hold at most {limit} {name}")
+
+    def _check_collections(self) -> None:
+        for collection in self.collections:
+            if not 1 <= len(collection.name.strip()) <= MAX_COLLECTION_NAME:
+                raise InvalidBundleError(
+                    f"collection '{collection.ref}' needs a name of "
+                    + f"1 to {MAX_COLLECTION_NAME} characters"
+                )
+            if len(set(collection.item_refs)) != len(collection.item_refs):
+                raise InvalidBundleError(
+                    f"collection '{collection.ref}' lists an item twice"
+                )

@@ -1,6 +1,87 @@
 import pytest
 
-from app.modules.transfer.domain.bundle import unportable_condition
+from app.modules.transfer.domain.bundle import (
+    MAX_COLLECTION_NAME,
+    MAX_COLLECTIONS,
+    MAX_CONNECTIONS,
+    MAX_ITEMS,
+    Bundle,
+    BundleCollection,
+    BundleConnection,
+    BundleItem,
+    unportable_condition,
+)
+from app.modules.transfer.domain.errors import InvalidBundleError
+
+
+def _items(count: int) -> tuple[BundleItem, ...]:
+    return tuple(BundleItem(ref=f"i{n}", type_ref="t", name="x") for n in range(count))
+
+
+def test_a_bundle_at_its_limits_is_accepted() -> None:
+    """The limits are inclusive."""
+    items = _items(MAX_ITEMS)
+    connection = BundleConnection(source_ref="i0", target_ref="i1", type_ref="r")
+    collections = tuple(
+        BundleCollection(ref=f"c{n}", name="x", item_refs=("i0",))
+        for n in range(MAX_COLLECTIONS)
+    )
+
+    bundle = Bundle(
+        id="b",
+        items=items,
+        connections=(connection,) * MAX_CONNECTIONS,
+        collections=collections,
+    )
+
+    assert len(bundle.items) == MAX_ITEMS
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"items": _items(MAX_ITEMS + 1)}, "at most 500 items"),
+        (
+            {
+                "connections": (
+                    BundleConnection(source_ref="a", target_ref="b", type_ref="r"),
+                )
+                * (MAX_CONNECTIONS + 1)
+            },
+            "at most 2000 connections",
+        ),
+        (
+            {
+                "collections": tuple(
+                    BundleCollection(ref=f"c{n}", name="x")
+                    for n in range(MAX_COLLECTIONS + 1)
+                )
+            },
+            "at most 100 collections",
+        ),
+    ],
+)
+def test_a_bundle_over_a_limit_is_refused(
+    kwargs: dict[str, tuple[object, ...]], message: str
+) -> None:
+    """A bundle cannot hold more than the limits, whatever its source."""
+    with pytest.raises(InvalidBundleError, match=message):
+        Bundle(id="b", **kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("name", ["", "   ", "x" * (MAX_COLLECTION_NAME + 1)])
+def test_a_collection_needs_a_name_of_a_usable_length(name: str) -> None:
+    """The name limits are the collections module's."""
+    with pytest.raises(InvalidBundleError, match="needs a name of 1 to 120"):
+        Bundle(id="b", collections=(BundleCollection(ref="c", name=name),))
+
+
+def test_a_collection_may_not_list_an_item_twice() -> None:
+    """A repeated item ref is a mistake in the file."""
+    collection = BundleCollection(ref="c", name="x", item_refs=("a", "a"))
+
+    with pytest.raises(InvalidBundleError, match="lists an item twice"):
+        Bundle(id="b", collections=(collection,))
 
 
 @pytest.mark.parametrize(

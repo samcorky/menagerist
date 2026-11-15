@@ -355,6 +355,22 @@ def test_a_malformed_version_three_file_is_refused(
         CODEC.decode(data)
 
 
+def test_a_file_with_too_many_items_is_refused() -> None:
+    """The limits every bundle has apply to a file too."""
+    items = [_item(ref=f"i{n}") for n in range(501)]
+
+    with pytest.raises(InvalidBundleError, match="at most 500 items"):
+        CODEC.decode(_v3(items=items, connections=[], collections=[]))
+
+
+def test_a_collection_listing_an_item_twice_is_refused() -> None:
+    """A repeated item in a file's collection is a mistake."""
+    data = _v3(collections=[_collection(item_refs=["blue", "blue"])])
+
+    with pytest.raises(InvalidBundleError, match="lists an item twice"):
+        CODEC.decode(data)
+
+
 def test_a_type_may_leave_out_what_is_optional() -> None:
     """Only `ref`, `slug` and `label` are needed; a connection type reads one way."""
     bundle = CODEC.decode(

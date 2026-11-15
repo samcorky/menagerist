@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from app.modules.transfer.domain.bundle import (
+    MAX_COLLECTION_NAME,
+    MAX_CONNECTIONS,
+    MAX_ITEMS,
     REF_PATTERN,
     REF_RULE,
     Bundle,
@@ -17,11 +20,8 @@ if TYPE_CHECKING:
 
 MAX_PRESETS = 50
 MAX_TYPES = 50
-MAX_ITEMS = 500
-MAX_CONNECTIONS = 2000
 
-# Mirrors the collections module's name limit; examples must not import it.
-_MAX_COLLECTION_NAME = 120
+_MAX_COLLECTION_NAME = MAX_COLLECTION_NAME
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
