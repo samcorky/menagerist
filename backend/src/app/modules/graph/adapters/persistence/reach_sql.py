@@ -63,7 +63,9 @@ def walk(
     `start` is an item id, or a column of the enclosing query (pass `nested`
     for that, so the CTE is written inside the subquery that correlates to it).
     A recursive CTE cannot see what it has already visited, so loops are cut by
-    `max_depth` and a caller keeps each item's smallest depth. The start item
+    `max_depth` and a caller keeps each item's smallest depth. `UNION` drops a
+    repeated `(node_id, depth)` row as it is produced, so the work is bounded by
+    items times `max_depth` however many routes lead to one item. The start item
     can appear again through a loop; callers leave it out.
     """
     first = _hop(relationship, direction, scope)
@@ -86,4 +88,4 @@ def walk(
         )
         .where(then.usable, steps.c.depth < max_depth)
     )
-    return steps.union_all(onward)
+    return steps.union(onward)
