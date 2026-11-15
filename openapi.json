@@ -34893,14 +34893,14 @@
             "title": "Status",
             "type": "integer"
           },
-          "detail": {
-            "description": "What went wrong, for a person to read.",
-            "title": "Detail",
-            "type": "string"
-          },
           "instance": {
             "description": "The URL of the request that failed.",
             "title": "Instance",
+            "type": "string"
+          },
+          "detail": {
+            "description": "What went wrong, for a person to read.",
+            "title": "Detail",
             "type": "string"
           },
           "errors": {
@@ -34927,77 +34927,118 @@
           "type",
           "title",
           "status",
-          "detail",
-          "instance"
+          "instance",
+          "detail"
         ],
         "title": "ProblemDetail",
         "type": "object"
       },
+      "FieldIssue": {
+        "description": "One field of a request that could not be accepted.",
+        "examples": [
+          {
+            "loc": [
+              "body",
+              "name"
+            ],
+            "msg": "Field required",
+            "type": "missing"
+          }
+        ],
+        "properties": {
+          "type": {
+            "description": "Machine-readable kind of failure.",
+            "title": "Type",
+            "type": "string"
+          },
+          "loc": {
+            "description": "Where the value is: `body`, `query`, `path` or `header`, then the field names and indexes.",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "description": "What is wrong, for a person to read.",
+            "title": "Msg",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "loc",
+          "msg"
+        ],
+        "title": "FieldIssue",
+        "type": "object"
+      },
       "ValidationProblem": {
-        "type": "object",
-        "title": "ValidationProblem",
-        "description": "An RFC 9457 problem for a request that could not be parsed, with one entry in `detail` per offending field.",
+        "description": "An RFC 9457 problem for a request that could not be parsed.\n\n`detail` has one entry per offending field, in FastAPI's shape, which the\nweb client reads.",
+        "examples": [
+          {
+            "detail": [
+              {
+                "loc": [
+                  "body",
+                  "name"
+                ],
+                "msg": "Field required",
+                "type": "missing"
+              }
+            ],
+            "instance": "https://menagerist.example/api/v1/nodes",
+            "status": 422,
+            "title": "Unprocessable Content",
+            "type": "about:blank"
+          }
+        ],
+        "properties": {
+          "type": {
+            "description": "A URI naming the kind of problem; `about:blank` when the status says it all.",
+            "title": "Type",
+            "type": "string"
+          },
+          "title": {
+            "description": "The kind of problem, the same for every occurrence.",
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "description": "The HTTP status code.",
+            "title": "Status",
+            "type": "integer"
+          },
+          "instance": {
+            "description": "The URL of the request that failed.",
+            "title": "Instance",
+            "type": "string"
+          },
+          "detail": {
+            "description": "One entry per field that could not be accepted.",
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
         "required": [
           "type",
           "title",
           "status",
-          "detail",
-          "instance"
+          "instance",
+          "detail"
         ],
-        "properties": {
-          "type": {
-            "type": "string",
-            "description": "A URI naming the kind of problem; `about:blank` when the status says it all."
-          },
-          "title": {
-            "type": "string",
-            "description": "The kind of problem, the same for every occurrence."
-          },
-          "status": {
-            "type": "integer",
-            "description": "The HTTP status code."
-          },
-          "detail": {
-            "type": "array",
-            "description": "One entry per field that could not be accepted.",
-            "items": {
-              "type": "object",
-              "required": [
-                "type",
-                "loc",
-                "msg"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "description": "Machine-readable kind of failure."
-                },
-                "loc": {
-                  "type": "array",
-                  "description": "Where the value is: `body`, `query`, `path` or `header`, then the field names and indexes.",
-                  "items": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "integer"
-                      }
-                    ]
-                  }
-                },
-                "msg": {
-                  "type": "string",
-                  "description": "What is wrong, for a person to read."
-                }
-              }
-            }
-          },
-          "instance": {
-            "type": "string",
-            "description": "The URL of the request that failed."
-          }
-        }
+        "title": "ValidationProblem",
+        "type": "object"
       }
     },
     "securitySchemes": {

@@ -10,18 +10,18 @@ examples cite its own URL as the `instance`, not one shared route.
 import copy
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.entrypoints.api.shared.http.problem_response import (
     INSTANCE_PLACEHOLDER,
-    PROBLEM_INSTANCE_DESCRIPTION,
     PROBLEM_JSON,
-    PROBLEM_STATUS_DESCRIPTION,
-    PROBLEM_TITLE_DESCRIPTION,
-    PROBLEM_TYPE_DESCRIPTION,
     ProblemDetail,
+    ValidationProblem,
     problem_example,
 )
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 _API_PREFIX = "/api/v1"
 _UNSAFE_METHODS = frozenset({"post", "put", "patch", "delete"})
@@ -55,51 +55,11 @@ _UNPROCESSABLE = {
 }
 
 
-def _validation_problem_schema() -> dict[str, Any]:
-    """Schema of the 422 body: `detail` lists the offending fields, not text."""
-    return {
-        "type": "object",
-        "title": "ValidationProblem",
-        "description": (
-            "An RFC 9457 problem for a request that could not be parsed, with one"
-            + " entry in `detail` per offending field."
-        ),
-        "required": ["type", "title", "status", "detail", "instance"],
-        "properties": {
-            "type": {"type": "string", "description": PROBLEM_TYPE_DESCRIPTION},
-            "title": {"type": "string", "description": PROBLEM_TITLE_DESCRIPTION},
-            "status": {"type": "integer", "description": PROBLEM_STATUS_DESCRIPTION},
-            "detail": {
-                "type": "array",
-                "description": "One entry per field that could not be accepted.",
-                "items": {
-                    "type": "object",
-                    "required": ["type", "loc", "msg"],
-                    "properties": {
-                        "type": {
-                            "type": "string",
-                            "description": "Machine-readable kind of failure.",
-                        },
-                        "loc": {
-                            "type": "array",
-                            "description": (
-                                "Where the value is: `body`, `query`, `path` or"
-                                + " `header`, then the field names and indexes."
-                            ),
-                            "items": {
-                                "anyOf": [{"type": "string"}, {"type": "integer"}]
-                            },
-                        },
-                        "msg": {
-                            "type": "string",
-                            "description": "What is wrong, for a person to read.",
-                        },
-                    },
-                },
-            },
-            "instance": {"type": "string", "description": PROBLEM_INSTANCE_DESCRIPTION},
-        },
-    }
+def _add_model_schema(schemas: dict[str, Any], model: type[BaseModel]) -> None:
+    """Register `model` and the models it nests as component schemas."""
+    schema = model.model_json_schema(ref_template="#/components/schemas/{model}")
+    schemas.update(schema.pop("$defs", {}))
+    schemas[model.__name__] = schema
 
 
 def _problem(
@@ -294,8 +254,9 @@ def add_error_responses(openapi_schema: dict[str, Any]) -> None:
     """
     components = openapi_schema.setdefault("components", {})
     schemas = components.setdefault("schemas", {})
-    schemas.setdefault("ProblemDetail", ProblemDetail.model_json_schema())
-    schemas["ValidationProblem"] = _validation_problem_schema()
+    if "ProblemDetail" not in schemas:
+        _add_model_schema(schemas, ProblemDetail)
+    _add_model_schema(schemas, ValidationProblem)
     for path, item in openapi_schema.get("paths", {}).items():
         if not path.startswith(_API_PREFIX):
             continue
