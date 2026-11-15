@@ -4432,6 +4432,20 @@
           },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PreconditionFailedError",
+                  "status": 412,
+                  "detail": "The resource has changed since you read it. Fetch it again for its current ETag.",
+                  "instance": "https://menagerist.example/api/v1/nodes/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            },
             "headers": {
               "ETag": {
                 "description": "Current ETag of the resource.",
@@ -7107,6 +7121,20 @@
           },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PreconditionFailedError",
+                  "status": 412,
+                  "detail": "The resource has changed since you read it. Fetch it again for its current ETag.",
+                  "instance": "https://menagerist.example/api/v1/edges/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            },
             "headers": {
               "ETag": {
                 "description": "Current ETag of the resource.",
@@ -8216,6 +8244,20 @@
           },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PreconditionFailedError",
+                  "status": 412,
+                  "detail": "The resource has changed since you read it. Fetch it again for its current ETag.",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            },
             "headers": {
               "ETag": {
                 "description": "Current ETag of the resource.",
@@ -9928,6 +9970,20 @@
           },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PreconditionFailedError",
+                  "status": 412,
+                  "detail": "The resource has changed since you read it. Fetch it again for its current ETag.",
+                  "instance": "https://menagerist.example/api/v1/edge-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            },
             "headers": {
               "ETag": {
                 "description": "Current ETag of the resource.",
@@ -11701,6 +11757,20 @@
           },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PreconditionFailedError",
+                  "status": 412,
+                  "detail": "The resource has changed since you read it. Fetch it again for its current ETag.",
+                  "instance": "https://menagerist.example/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            },
             "headers": {
               "ETag": {
                 "description": "Current ETag of the resource.",
@@ -14705,6 +14775,20 @@
           },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PreconditionFailedError",
+                  "status": 412,
+                  "detail": "The resource has changed since you read it. Fetch it again for its current ETag.",
+                  "instance": "https://menagerist.example/api/v1/presets/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            },
             "headers": {
               "ETag": {
                 "description": "Current ETag of the resource.",
@@ -20053,6 +20137,20 @@
           },
           "412": {
             "description": "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PreconditionFailedError",
+                  "status": 412,
+                  "detail": "The resource has changed since you read it. Fetch it again for its current ETag.",
+                  "instance": "https://menagerist.example/api/v1/collections/collection_id"
+                }
+              }
+            },
             "headers": {
               "ETag": {
                 "description": "Current ETag of the resource.",

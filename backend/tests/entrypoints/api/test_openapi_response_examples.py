@@ -89,17 +89,14 @@ def test_descriptions_are_not_raw_docstrings(schema: dict[str, Any]) -> None:
 
 
 def test_error_responses_have_body_examples(schema: dict[str, Any]) -> None:
-    """Every 4xx and 5xx response has its own example (412 has no body).
+    """Every 4xx and 5xx response has its own example.
 
     Swagger falls back to the schema example otherwise, whatever the status.
     """
     bad = [
         label
         for label, _p, _m, code, response in _responses(schema)
-        if code.isdigit()
-        and int(code) >= 400
-        and code != "412"
-        and not _has_example(response)
+        if code.isdigit() and int(code) >= 400 and not _has_example(response)
     ]
     assert bad == []
 

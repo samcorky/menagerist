@@ -1,5 +1,6 @@
 """Unit tests for validator precedence in `ConditionalRequest`."""
 
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -9,6 +10,7 @@ from starlette.responses import Response
 
 from app.entrypoints.api.shared.http.conditional_request import ConditionalRequest
 from app.entrypoints.api.shared.http.http_headers import http_date
+from app.entrypoints.api.shared.http.problem_response import PRECONDITION_FAILED_DETAIL
 from app.shared_kernel.etag import etag_from_entity
 
 _UPDATED = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
@@ -31,6 +33,10 @@ def _cond(**headers: str) -> ConditionalRequest:
     scope = {
         "type": "http",
         "method": "GET",
+        "scheme": "http",
+        "server": ("testserver", 80),
+        "path": "/api/v1/nodes/1",
+        "query_string": b"",
         "headers": [
             (k.replace("_", "-").lower().encode(), v.encode())
             for k, v in headers.items()
@@ -89,6 +95,23 @@ def test_patch_if_unmodified_since_alone_still_412_when_stale() -> None:
 
     assert result is not None
     assert result.status_code == 412
+
+
+def test_patch_stale_if_match_is_a_problem_412_with_the_etag() -> None:
+    """A stale If-Match gets a problem body, like every other 4xx, and the ETag."""
+    result = _cond(If_Match=_STALE_ETAG).check_patch(_ENTITY)
+
+    assert result is not None
+    assert result.status_code == 412
+    assert result.headers["ETag"] == _ETAG
+    assert result.media_type == "application/problem+json"
+    assert json.loads(bytes(result.body)) == {
+        "type": "about:blank",
+        "title": "PreconditionFailedError",
+        "status": 412,
+        "detail": PRECONDITION_FAILED_DETAIL,
+        "instance": "http://testserver/api/v1/nodes/1",
+    }
 
 
 def test_get_if_modified_since_is_ignored_when_dates_do_not_cover_the_body() -> None:
