@@ -1,4 +1,7 @@
-"""An in-memory world: real targets over in-memory repositories, a shipped catalogue."""
+"""An in-memory world: real targets over in-memory repositories, a shipped catalogue.
+
+The catalogue and transfer tests both install through these targets.
+"""
 
 import uuid
 from dataclasses import dataclass

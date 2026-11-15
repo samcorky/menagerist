@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	canEditOptions,
-	packKindMismatch,
-	parsePackText,
+	bundleKindMismatch,
+	parseBundleText,
 	presetExampleSchema,
 	presetFilename
 } from '../src/lib/preset-packs';
@@ -28,43 +28,46 @@ describe('canEditOptions', () => {
 	});
 });
 
-describe('parsePackText', () => {
-	it('accepts a menagerist-presets pack', () => {
-		const pack = parsePackText('{"format":"menagerist-presets","version":1,"items":[]}');
-		expect(pack.items).toEqual([]);
+describe('parseBundleText', () => {
+	it('accepts a menagerist-bundle file', () => {
+		const bundle = parseBundleText('{"format":"menagerist-bundle","version":1,"presets":[]}');
+		expect(bundle.presets).toEqual([]);
 	});
 
 	it('rejects text that is not JSON', () => {
-		expect(() => parsePackText('not json')).toThrow("isn't valid JSON");
+		expect(() => parseBundleText('not json')).toThrow("isn't valid JSON");
 	});
 
-	it('rejects JSON that is not a presets pack', () => {
-		expect(() => parsePackText('{"format":"other","items":[]}')).toThrow(
-			"isn't a Menagerist presets file"
+	it('rejects JSON that is not a bundle file, the old presets format included', () => {
+		expect(() => parseBundleText('{"format":"other","presets":[]}')).toThrow(
+			"isn't a Menagerist saved fields file"
 		);
-		expect(() => parsePackText('{"format":"menagerist-presets"}')).toThrow(
-			"isn't a Menagerist presets file"
+		expect(() => parseBundleText('{"format":"menagerist-presets","version":1,"items":[]}')).toThrow(
+			"isn't a Menagerist saved fields file"
+		);
+		expect(() => parseBundleText('{"format":"menagerist-bundle"}')).toThrow(
+			"isn't a Menagerist saved fields file"
 		);
 	});
 });
 
-describe('packKindMismatch', () => {
+describe('bundleKindMismatch', () => {
 	const pack = (kinds: string[]) =>
 		({
-			format: 'menagerist-presets',
+			format: 'menagerist-bundle',
 			version: 1,
-			items: kinds.map((kind) => ({ kind, label: 'x', definition: {} }))
+			presets: kinds.map((kind, n) => ({ ref: `p-${n}`, kind, label: 'x', definition: {} }))
 		}) as never;
 
 	it('is null when every item matches the section', () => {
-		expect(packKindMismatch(pack(['choice_list', 'choice_list']), 'choice_list')).toBeNull();
+		expect(bundleKindMismatch(pack(['choice_list', 'choice_list']), 'choice_list')).toBeNull();
 	});
 
 	it('names how many items do not fit a list section', () => {
-		expect(packKindMismatch(pack(['choice_list', 'field']), 'choice_list')).toBe(
+		expect(bundleKindMismatch(pack(['choice_list', 'field']), 'choice_list')).toBe(
 			'1 item in this file is not list'
 		);
-		expect(packKindMismatch(pack(['field', 'field_set']), 'choice_list')).toBe(
+		expect(bundleKindMismatch(pack(['field', 'field_set']), 'choice_list')).toBe(
 			'2 items in this file are not lists'
 		);
 	});

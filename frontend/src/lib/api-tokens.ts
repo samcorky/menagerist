@@ -43,6 +43,12 @@ export const AREAS: TokenArea[] = [
 		label: 'Catalogue',
 		read: ['catalogue:entry:read'],
 		write: ['catalogue:entry:install']
+	},
+	{
+		id: 'files',
+		label: 'Files',
+		read: ['transfer:bundle:read'],
+		write: ['transfer:bundle:import']
 	}
 ];
 

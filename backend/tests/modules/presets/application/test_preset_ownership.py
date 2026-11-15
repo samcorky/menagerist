@@ -128,9 +128,7 @@ async def test_export_cannot_reach_another_persons_preset() -> None:
 async def test_import_deduplicates_per_owner() -> None:
     """Importing a pack another person already has still creates your own copy."""
     repos = PresetRepos(presets=InMemoryPresetRepository())
-    command = ImportPresetsCommand(
-        pack_format="menagerist-presets", pack_version=1, items=[dict(_ITEM)]
-    )
+    command = ImportPresetsCommand(items=[dict(_ITEM)])
 
     first = await ImportPresets(InMemoryUnitOfWork(repos), GUARD).handle(command, ALICE)
     second = await ImportPresets(InMemoryUnitOfWork(repos), GUARD).handle(command, BOB)

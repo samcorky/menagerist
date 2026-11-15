@@ -4,15 +4,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
-from app.modules.presets.application.pack import (
-    check_pack_envelope,
-    check_pack_item,
-    content_hash,
-)
+from app.modules.presets.application.pack import check_presets
 from app.modules.presets.application.permissions import PresetPermission
-from app.modules.presets.application.preset_definitions import check_definition
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetUnitOfWork
+from app.modules.transfer.application.content_hash import preset_key
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
@@ -28,10 +24,8 @@ _PAGE_SIZE = 100
 
 @dataclass(kw_only=True)
 class ImportPresetsCommand:
-    """A pack of presets to import. Items get new ids; nothing is overwritten."""
+    """Presets to import. They get new ids; nothing is overwritten."""
 
-    pack_format: str
-    pack_version: int
     items: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -45,7 +39,7 @@ class ImportedPreset:
 
 @dataclass(kw_only=True)
 class ImportPresetsResult:
-    """What a pack import did: counts, plus the preset for each item in pack order."""
+    """What an import did: counts, plus the preset for each item, in order."""
 
     created: int
     skipped: int
@@ -55,9 +49,10 @@ class ImportPresetsResult:
 class ImportPresets(
     CommandHandler[PresetUnitOfWork, ImportPresetsCommand, ImportPresetsResult]
 ):
-    """Import a pack, skipping any preset whose content the person already has.
+    """Import presets, skipping any whose content the person already has.
 
-    The whole pack is checked before anything is stored, so one bad item rejects it all.
+    All of them are checked before anything is stored, so one bad item rejects them
+    all. Files reach this through the `transfer` preset target.
     """
 
     access: ClassVar[Access] = Content(PresetPermission.PRESET_WRITE)
@@ -66,16 +61,13 @@ class ImportPresets(
         self, command: ImportPresetsCommand, actor: Actor
     ) -> ImportPresetsResult:
         """Validate `command` and store the presets it holds that are new."""
-        check_pack_envelope(command.pack_format, command.pack_version, command.items)
-        for item in command.items:
-            check_pack_item(item)
-            check_definition(item["kind"], item["definition"])
+        check_presets(command.items)
 
         async with self._uow as repos:
             seen = await existing_hashes(repos.presets, ContentFilter.of(actor.id))
             items: list[ImportedPreset] = []
             for item in command.items:
-                digest = content_hash(item["kind"], item["label"], item["definition"])
+                digest = preset_key(item["kind"], item["label"], item["definition"])
                 if digest in seen:
                     items.append(ImportedPreset(id=seen[digest], created=False))
                     continue
@@ -106,7 +98,7 @@ async def existing_hashes(
     while True:
         page = await repos.list(scope=scope, after=after, limit=_PAGE_SIZE)
         for preset in page:
-            digest = content_hash(preset.kind, preset.label, preset.definition)
+            digest = preset_key(preset.kind, preset.label, preset.definition)
             hashes[digest] = preset.id
         if len(page) < _PAGE_SIZE:
             return hashes

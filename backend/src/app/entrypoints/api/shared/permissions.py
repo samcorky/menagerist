@@ -12,6 +12,7 @@ from app.modules.presets.application.permissions import PresetPermission
 from app.modules.scheduling.application.permissions import SchedulingPermission
 from app.modules.settings.application.permissions import SettingsPermission
 from app.modules.system.application.permissions import SystemPermission
+from app.modules.transfer.application.permissions import TransferPermission
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -30,6 +31,7 @@ Permission = (
     | SystemPermission
     | SchedulingPermission
     | SettingsPermission
+    | TransferPermission
 )
 
 ALL_PERMISSIONS: frozenset[Permission] = frozenset(
@@ -45,6 +47,7 @@ ALL_PERMISSIONS: frozenset[Permission] = frozenset(
         SystemPermission,
         SchedulingPermission,
         SettingsPermission,
+        TransferPermission,
     )
 )
 

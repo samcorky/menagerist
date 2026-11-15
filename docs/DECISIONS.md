@@ -1478,7 +1478,17 @@ Two more jobs finish the picture. `media.remove_stray_files` (`RemoveStrayMediaF
 - The install plans again rather than taking a plan from the client, so nothing a client sends can widen what is applied. A plan can go stale between the dry run and the install; the install's own plan is the one that counts.
 - Only `create`, `unchanged` and `conflict` exist. "To update" and "no longer in the source" arrive with importing a source again (#234), and CSV import (#238) gets its own planner producing the same `Plan`.
 - Applying still records each entity as it is made, so a failure part-way is undone as before.
-- The catalogue plans the same way (#450): `plan_entry` marks each preset or type `create` or `unchanged` (an identical preset, or a taken name), the install applies it, and `GET /catalogue/{entry_id}/installation/plan` (`PlanCatalogueEntryInstall`, `catalogue:entry:install`) is its dry run. A taken name is skipped, not a conflict, so a catalogue plan is always ready; it still has `ready` and `blockers` so one preview can show either plan. The list's "present" count is the plan's `unchanged` count.
+- The catalogue plans the same way (#450), with `GET /catalogue/{entry_id}/installation/plan` (`PlanCatalogueEntryInstall`, `catalogue:entry:install`) as its dry run. A taken name is skipped, not a conflict, so a catalogue plan is always ready; it still has `ready` and `blockers` so one preview can show either plan. The list's "present" count is the plan's `unchanged` count. Since #454 it plans through the shared pipeline below.
+
+**One import pipeline (#454, 2026-11-15).** Every import is decoded into a neutral `Bundle`, planned by one `plan_bundle` and applied by one `apply_bundle`, in `transfer`. Sources differ only in how they are decoded and in a policy, not in their own planners.
+
+- A codec turns a file into a bundle and back (`BundleCodec`); a `CodecRegistry` maps format ids to codecs and is a plain mapping filled at the composition root, not the plugin system of #240. The first codec is the `menagerist-bundle` file, `{format, version: 1, presets: [{ref, kind, label, description, definition}]}`. The CSV import (#238) is meant to be the next codec.
+- `menagerist-bundle` replaces `menagerist-presets`, which is no longer read. The product is in alpha with one user, so there is no compatibility path. The format is public: it is what people save and import again, and types, items and collections are to join it in later versions.
+- An exported preset's `ref` is its id, so the same preset has the same ref in every file; chunked exports cannot clash, and later source links (#233) can key on it.
+- `ClashPolicy` holds what differs between sources: a taken type name is `unchanged` under `SKIP` (the catalogue, files) and a `conflict` under `CONFLICT` (example packs, once they move over). Example packs keep `plan_install` for now; their ledger, `requires`, `links` and covers make them the last to move.
+- Planning calls `PresetTarget.check` first, so the dry run refuses a file just as importing would. A repeat of an earlier preset in the same bundle is `unchanged`, as importing makes it once.
+- The routes are `POST /bundles/import/plan`, `POST /bundles/import` and `GET /bundles/export?preset_ids=`. They need `transfer:bundle:import` and `transfer:bundle:read` (export is reading, so read-only tokens can export); the targets still check the presets and types permissions underneath. The old `/presets/import` and `/presets/export` are gone.
+- "The same preset" is one formula, `preset_key` in `transfer`, which the presets module now uses rather than its own copy. Preset hashes are worked out each time, not stored, so moving it needed no migration.
 
 ## Presets belong to a person (2026-11-13)
 
@@ -1503,7 +1513,7 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 
 **Choices that are not obvious:**
 
-- The catalogue installs through the `transfer` targets, as the signed-in person: the preset target runs the existing `menagerist-presets` import, and the graph target creates types by slug. It has no persistence, ports of its own beyond the entry catalogue, or ledger, and it never touches `examples`. So nothing it installs carries the "Example" marker, and there is no uninstall: what was installed is deleted like anything else.
+- The catalogue installs through the `transfer` targets, as the signed-in person: the preset target runs the presets module's import, and the graph target creates types by slug. It has no persistence, ports of its own beyond the entry catalogue, or ledger, and it never touches `examples`. So nothing it installs carries the "Example" marker, and there is no uninstall: what was installed is deleted like anything else.
 - "Installed" is worked out from content: a preset's content hash, a type's slug. An entry reads as installed only while all of it is there. If the catalogue's content later changes (Countries is rebuilt from `shared/data/iso-data.json`), the entry reads as not installed and offers a fresh copy. That is accepted.
 - Collisions are skipped, not merged: an identical preset or a taken slug is skipped and counted, and a same-named preset with different content installs alongside the existing one.
 - Entries keep a stable `id` written in their JSON, not derived from the title, so later source links (#233) can key on it. Permissions are `catalogue:entry:read` and `catalogue:entry:install`; both are token-grantable.

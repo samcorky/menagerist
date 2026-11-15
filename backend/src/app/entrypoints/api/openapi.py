@@ -48,6 +48,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for adding ready-made saved fields and types.",
     },
     {
+        "name": "Bundles",
+        "description": "Endpoints for importing and exporting files of saved fields.",
+    },
+    {
         "name": "Collections",
         "description": "Endpoints for managing collections of graphs.",
     },

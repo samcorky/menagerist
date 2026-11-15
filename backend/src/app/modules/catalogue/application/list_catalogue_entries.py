@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
-from app.modules.catalogue.application.entry_plan import plan_entry
 from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.catalogue.domain.entry import CatalogueEntry
 from app.modules.catalogue.ports.entry_catalogue import EntryCatalogue  # noqa: TC001
-from app.modules.transfer.domain.plan import PlanAction
+from app.modules.transfer.application.pipeline import plan_bundle
+from app.modules.transfer.domain.plan import ClashPolicy, PlanAction
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
 
@@ -38,7 +38,7 @@ async def count_present(
     entry: CatalogueEntry, presets: PresetTarget, graph: GraphTarget
 ) -> EntryStatus:
     """Count how many of the entry's presets or types the person already has."""
-    plan = await plan_entry(entry, presets, graph)
+    plan = await plan_bundle(entry.bundle(), presets, graph, clash=ClashPolicy.SKIP)
     present = len(plan.with_action(PlanAction.UNCHANGED))
     return EntryStatus(entry=entry, present=present, total=len(plan.entities))
 
