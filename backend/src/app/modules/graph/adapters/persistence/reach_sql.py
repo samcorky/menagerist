@@ -1,18 +1,46 @@
 """The recursive SQL walk behind `NodeRepository.reach` and multi-hop conditions."""
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
-from sqlalchemy import and_, literal, select, true
+from sqlalchemy import and_, func, literal, select, text, true
+from sqlalchemy.exc import DBAPIError
 
 from app.modules.graph.adapters.persistence.models import EdgeModel, NodeModel
+from app.modules.graph.domain.reach import ReachTooLargeError
 
 if TYPE_CHECKING:
     import uuid
 
-    from sqlalchemy import CTE, ColumnElement, FromClause
+    from sqlalchemy import CTE, ColumnElement, FromClause, Result
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.sql import Executable
 
     from app.modules.graph.domain.reach import ReachDirection
     from app.shared_kernel.content_filter import ContentFilter
+
+
+# How long a multi-hop statement may run before Postgres cancels it.
+WALK_TIMEOUT_MS = 5_000
+_QUERY_CANCELED = "57014"
+
+
+async def execute_walk(session: AsyncSession, stmt: Executable) -> Result[Any]:
+    """Run a statement holding a recursive walk under a time limit.
+
+    The limit lasts for this statement only. A cancelled statement becomes a
+    `ReachTooLargeError`, since the person can fix it by asking for less.
+    """
+    await session.execute(
+        select(func.set_config("statement_timeout", str(WALK_TIMEOUT_MS), True))
+    )
+    try:
+        result = await session.execute(stmt)
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) == _QUERY_CANCELED:
+            raise ReachTooLargeError from exc
+        raise
+    await session.execute(text("SET LOCAL statement_timeout = DEFAULT"))
+    return result
 
 
 class _Hop(NamedTuple):

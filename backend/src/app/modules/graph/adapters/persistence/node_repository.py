@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy import (
@@ -36,7 +36,7 @@ from app.modules.graph.adapters.persistence.query_sql import (
     order_by,
     sort_expressions,
 )
-from app.modules.graph.adapters.persistence.reach_sql import walk
+from app.modules.graph.adapters.persistence.reach_sql import execute_walk, walk
 from app.modules.graph.adapters.persistence.search_sql import (
     has_matching_row,
     like_pattern,
@@ -45,8 +45,10 @@ from app.modules.graph.adapters.persistence.search_sql import (
 )
 from app.modules.graph.application.field_kinds import KIND_OPERATORS
 from app.modules.graph.application.schema_meta import NAMESPACE
+from app.modules.graph.domain import reach as reach_rules
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import (
+    ConnectionCondition,
     ItemFieldUse,
     SearchHit,
     TextCondition,
@@ -62,8 +64,9 @@ if TYPE_CHECKING:
     import uuid
     from collections.abc import Mapping, Sequence
 
-    from sqlalchemy import ColumnElement
+    from sqlalchemy import ColumnElement, Result
     from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.sql import Executable
 
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
     from app.modules.graph.domain.reach import ReachDirection
@@ -130,6 +133,13 @@ def _has_text(resolved: ResolvedQuery) -> bool:
     )
 
 
+def _has_deep_connection(resolved: ResolvedQuery) -> bool:
+    return any(
+        isinstance(c, ConnectionCondition) and c.depth > 1
+        for _, c in walk_conditions(resolved.query.where)
+    )
+
+
 async def _jit_off_for_text(session: AsyncSession, *, has_text: bool) -> None:
     """Turn JIT off for the rest of the transaction when a text search runs.
 
@@ -148,6 +158,14 @@ class SqlAlchemyNodeRepository:
     ) -> None:
         self._session = session
         self._external = external
+
+    async def _run(
+        self, stmt: Executable, resolved: ResolvedQuery | None
+    ) -> Result[Any]:
+        """Execute a query, under the walk time limit when it follows several hops."""
+        if resolved is not None and _has_deep_connection(resolved):
+            return await execute_walk(self._session, stmt)
+        return await self._session.execute(stmt)
 
     async def _viewed(
         self, nodes: builtins.list[Node], scope: ContentFilter
@@ -289,7 +307,7 @@ class SqlAlchemyNodeRepository:
             stmt = stmt.where(after_clause(resolved, exprs, after))
         stmt = stmt.order_by(*order_by(resolved, exprs)).limit(limit)
         await _jit_off_for_text(self._session, has_text=_has_text(resolved))
-        rows = (await self._session.execute(stmt)).all()
+        rows = (await self._run(stmt, resolved)).all()
         nodes = await self._viewed([_to_domain(row[0]) for row in rows], scope)
         return [
             SearchHit(node=node, sort_values=tuple(row[1:]))
@@ -312,8 +330,7 @@ class SqlAlchemyNodeRepository:
             matches = matches.limit(limit)
         stmt = select(func.count()).select_from(matches.subquery())
         await _jit_off_for_text(self._session, has_text=_has_text(resolved))
-        result = await self._session.execute(stmt)
-        return result.scalar_one()
+        return int((await self._run(stmt, resolved)).scalar_one())
 
     async def count(
         self,
@@ -383,7 +400,7 @@ class SqlAlchemyNodeRepository:
             self._session, has_text=resolved is not None and _has_text(resolved)
         )
         model = (
-            await self._session.execute(stmt.order_by(func.random()).limit(1))
+            await self._run(stmt.order_by(func.random()).limit(1), resolved)
         ).scalar_one_or_none()
         if model is None:
             return None
@@ -412,14 +429,19 @@ class SqlAlchemyNodeRepository:
             max_depth=max_depth,
             scope=scope,
         )
-        shallowest = func.min(steps.c.depth)
-        rows = await self._session.execute(
+        shallowest = func.min(steps.c.depth).label("depth")
+        rows = await execute_walk(
+            self._session,
             select(steps.c.node_id, shallowest)
             .where(steps.c.node_id != start_id)
             .group_by(steps.c.node_id)
             .order_by(shallowest, steps.c.node_id)
+            .limit(reach_rules.MAX_REACHED + 1),
         )
-        return [Reached(node_id=row[0], depth=row[1]) for row in rows]
+        found = [Reached(node_id=row.node_id, depth=row.depth) for row in rows]
+        if len(found) > reach_rules.MAX_REACHED:
+            raise reach_rules.ReachTooLargeError
+        return found
 
     async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
         """Count live nodes in `scope` per item type; untyped is one NULL row."""
