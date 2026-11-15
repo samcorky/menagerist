@@ -4,6 +4,7 @@
 	import { Download, Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import {
 		listNodes,
@@ -18,6 +19,8 @@
 	import { slugify } from '$lib/utils.js';
 	import { loadExampleIds } from '$lib/examples';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
@@ -56,6 +59,9 @@
 	let confirmTarget = $state<NodeTypeResponse | null>(null);
 	let deletingId = $state<string | null>(null);
 	let exportingId = $state<string | null>(null);
+	const selectedIds = new SvelteSet<string>();
+	// Read from the list so a type that has gone leaves the selection.
+	const selected = $derived(categories.filter((c) => selectedIds.has(c.id)));
 
 	async function fetchPage(after?: string) {
 		loading = true;
@@ -76,18 +82,31 @@
 		loading = false;
 	}
 
-	/** Save the type, with the lists it uses, as a file someone else can import. */
-	async function handleExport(cat: NodeTypeResponse) {
+	/** Save the types, with the lists they use, as one file someone else can import. */
+	async function exportTypes(types: NodeTypeResponse[], filename: string) {
 		if (exportingId) return;
-		exportingId = cat.id;
+		exportingId = types[0].id;
 		try {
-			downloadBundle(await exportTypeBundle(cat.id), presetFilename(cat.label));
+			downloadBundle(await exportTypeBundle(types.map((t) => t.id)), filename);
 		} catch (error) {
 			const description = error instanceof Error ? error.message : errorMessage(error);
 			toast.error("Couldn't export", { description });
 		} finally {
 			exportingId = null;
 		}
+	}
+
+	const handleExport = (cat: NodeTypeResponse) => exportTypes([cat], presetFilename(cat.label));
+
+	function setSelected(id: string, on: boolean) {
+		if (on) selectedIds.add(id);
+		else selectedIds.delete(id);
+	}
+
+	async function exportSelected() {
+		if (selected.length === 0) return;
+		await exportTypes(selected, presetFilename('Item types'));
+		selectedIds.clear();
 	}
 
 	function sentinel(node: HTMLElement) {
@@ -289,10 +308,43 @@
 	{:else if loadFailed}
 		<LoadFailed what="your item types" onretry={() => void fetchPage()} />
 	{:else}
+		{#if selected.length > 0}
+			<div
+				class="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card px-3 py-2"
+			>
+				<p class="text-sm text-muted-foreground">
+					{selected.length === 1 ? '1 item type' : `${selected.length} item types`} selected. The saved
+					fields they use come with them.
+				</p>
+				<div class="flex gap-2">
+					<Button
+						variant="outline"
+						class="pointer-coarse:h-11"
+						disabled={exportingId !== null}
+						onclick={() => selectedIds.clear()}
+					>
+						Clear
+					</Button>
+					<Button
+						class="pointer-coarse:h-11"
+						disabled={exportingId !== null}
+						onclick={exportSelected}
+					>
+						<Download data-icon="inline-start" />
+						Export {selected.length === 1 ? 'item type' : `${selected.length} item types`}
+					</Button>
+				</div>
+			</div>
+		{/if}
 		{#if shown.length > 0}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each shown as cat (cat.id)}
 					<li class="flex items-center gap-3 px-3 py-2">
+						<Checkbox
+							aria-label="Select {cat.label}"
+							checked={selectedIds.has(cat.id)}
+							onCheckedChange={(on) => setSelected(cat.id, on)}
+						/>
 						<TypeIcon
 							icon={cat.icon}
 							colour={cat.colour}

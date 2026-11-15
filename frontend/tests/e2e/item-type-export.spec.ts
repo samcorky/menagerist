@@ -51,3 +51,41 @@ test('exports an item type with the list its field uses', async ({ page, request
 		await request.delete(`/api/v1/presets/${listId}`);
 	}
 });
+
+/** Several item types can be picked and saved as one file. */
+test('exports the selected item types together', async ({ page, request }) => {
+	const labels = [uniqueName('Record'), uniqueName('Sleeve'), uniqueName('Poster')];
+	const ids: string[] = [];
+	for (const label of labels) {
+		const res = await request.post('/api/v1/node-types', {
+			data: {
+				label,
+				slug: label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+				attributes_schema: { type: 'object', properties: {} }
+			}
+		});
+		expect(res.status(), await res.text()).toBe(201);
+		ids.push(((await res.json()) as { id: string }).id);
+	}
+
+	try {
+		await page.goto('/library/item-types');
+		await page.getByRole('checkbox', { name: `Select ${labels[0]}` }).click();
+		await page.getByRole('checkbox', { name: `Select ${labels[2]}` }).click();
+		await expect(page.getByText('2 item types selected')).toBeVisible();
+
+		const download = page.waitForEvent('download');
+		await page.getByRole('button', { name: 'Export 2 item types' }).click();
+		const file = await download;
+
+		expect(file.suggestedFilename()).toBe('Item types.json');
+		const path = await file.path();
+		const body = JSON.parse(await (await import('node:fs/promises')).readFile(path, 'utf8')) as {
+			item_types: { ref: string }[];
+		};
+		expect(body.item_types.map((t) => t.ref).sort()).toEqual([ids[0], ids[2]].sort());
+		await expect(page.getByText('2 item types selected')).toHaveCount(0);
+	} finally {
+		for (const id of ids) await request.delete(`/api/v1/node-types/${id}`);
+	}
+});
