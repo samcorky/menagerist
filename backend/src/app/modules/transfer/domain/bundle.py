@@ -10,11 +10,12 @@ from app.modules.transfer.domain.errors import InvalidBundleError
 PRESET_MARKER = "$preset"
 
 # The envelope of a bundle file a person exports and imports. Version 1 carries
-# presets only; version 2 adds relationship types and item types. Items and
-# collections join it in later versions.
+# presets only; version 2 adds relationship types and item types; version 3 adds
+# items, connections and collections. Export always writes the latest.
 BUNDLE_FORMAT = "menagerist-bundle"
-BUNDLE_VERSION = 2
+BUNDLE_VERSION = 3
 PRESETS_ONLY_VERSION = 1
+TYPES_VERSION = 2
 
 
 COVER_STYLES = ("sleeve", "poster", "box", "card")
@@ -43,6 +44,31 @@ def split_ref(ref: str) -> tuple[str | None, str]:
     if not REF_PATTERN.match(pack_id) or not REF_PATTERN.match(local):
         raise InvalidBundleError(f"ref '{ref}' {REF_RULE} on both sides of the colon")
     return pack_id, local
+
+
+def unportable_condition(node: object, path: str = "") -> tuple[str, str] | None:
+    """Return the path and reason of the first condition a bundle cannot carry.
+
+    Walks a smart collection's definition generically, as the graph query model
+    is not this module's to import. A condition on another collection and a
+    connection to one particular item name ids that a bundle cannot know.
+    """
+    if isinstance(node, dict):
+        kind = node.get("kind")
+        if kind == "collection":
+            return path, "a collection condition cannot be in a bundle"
+        if kind == "connection" and "item" in node:
+            return path, "a connection to one item cannot be in a bundle"
+        children = [(f"{path}.{k}" if path else str(k), v) for k, v in node.items()]
+    elif isinstance(node, list):
+        children = [(f"{path}[{i}]", v) for i, v in enumerate(node)]
+    else:
+        return None
+    for child_path, child in children:
+        found = unportable_condition(child, child_path)
+        if found is not None:
+            return found
+    return None
 
 
 def _is_marker(value: dict[str, Any]) -> bool:

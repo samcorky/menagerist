@@ -11,6 +11,7 @@ from app.modules.transfer.domain.bundle import (
     BundleItemType,
     BundlePreset,
     BundleRelationshipType,
+    unportable_condition,
 )
 from app.modules.transfer.domain.errors import InvalidBundleError
 
@@ -264,40 +265,9 @@ def _parse_link(c: Mapping[str, Any]) -> PackLink:
     )
 
 
-def _unportable(node: object, path: str) -> tuple[str, str] | None:
-    """Return the path and reason of the first condition a pack cannot carry.
-
-    Walks the JSON generically: `examples` cannot import the graph query model.
-    A `collection` condition and a connection `item` name ids a pack cannot know.
-    """
-    if isinstance(node, dict):
-        reason = _unportable_reason(node)
-        if reason is not None:
-            return path, reason
-        children = [(f"{path}.{k}" if path else str(k), v) for k, v in node.items()]
-    elif isinstance(node, list):
-        children = [(f"{path}[{i}]", v) for i, v in enumerate(node)]
-    else:
-        return None
-    for child_path, child in children:
-        found = _unportable(child, child_path)
-        if found is not None:
-            return found
-    return None
-
-
-def _unportable_reason(node: dict[str, Any]) -> str | None:
-    kind = node.get("kind")
-    if kind == "collection":
-        return "a collection condition cannot be in a pack"
-    if kind == "connection" and "item" in node:
-        return "a connection to one item cannot be in a pack"
-    return None
-
-
 def _parse_definition(raw: object, ref: str) -> dict[str, Any]:
     definition = _dict(raw, "definition")
-    found = _unportable(definition, "")
+    found = unportable_condition(definition)
     if found is not None:
         path, reason = found
         raise InvalidBundleError(f"collection '{ref}' definition at '{path}': {reason}")

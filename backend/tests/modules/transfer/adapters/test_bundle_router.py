@@ -84,7 +84,7 @@ def test_plan_import_and_export_round_trip(shared: Shared) -> None:
     assert (second.json()["created"], second.json()["skipped"]) == (0, 1)
     assert exported.status_code == 200
     body = exported.json()
-    assert (body["format"], body["version"]) == ("menagerist-bundle", 2)
+    assert (body["format"], body["version"]) == ("menagerist-bundle", 3)
     assert (body["relationship_types"], body["item_types"]) == ([], [])
     assert [p["ref"] for p in body["presets"]] == ids
     assert [e["action"] for e in replanned.json()["entities"]] == ["unchanged"]
@@ -180,7 +180,7 @@ async def test_an_item_type_travels_with_the_lists_it_uses(shared: Shared) -> No
 
     assert exported.status_code == 200
     file = exported.json()
-    assert file["version"] == 2
+    assert file["version"] == 3
     assert [p["ref"] for p in file["presets"]] == [list_id]
     assert [t["ref"] for t in file["item_types"]] == [str(record.entity_id)]
     assert file["item_types"][0]["attributes_schema"]["properties"]["condition"][

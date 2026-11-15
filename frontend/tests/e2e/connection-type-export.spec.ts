@@ -28,7 +28,7 @@ test('exports a connection type from its row', async ({ page, request }) => {
 			version: number;
 			relationship_types: { ref: string }[];
 		};
-		expect(body.version).toBe(2);
+		expect(body.version).toBe(3);
 		expect(body.relationship_types.map((t) => t.ref)).toEqual([id]);
 	} finally {
 		await request.delete(`/api/v1/edge-types/${id}`);

@@ -52,10 +52,13 @@ export async function exportPresetBundle(presets: PresetResponse[]): Promise<Pre
 	}
 	return {
 		format: BUNDLE_FORMAT,
-		version: 2,
+		version: 3,
 		presets: all,
 		relationship_types: [],
-		item_types: []
+		item_types: [],
+		items: [],
+		connections: [],
+		collections: []
 	};
 }
 
