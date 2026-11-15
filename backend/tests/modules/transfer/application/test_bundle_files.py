@@ -14,8 +14,9 @@ from app.modules.transfer.application.bundle_files import (
     PlanBundleImport,
 )
 from app.modules.transfer.application.codecs import CodecRegistry
+from app.modules.transfer.domain.bundle import MAX_ITEMS, BundleCollection
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.domain.errors import UnknownFormatError
+from app.modules.transfer.domain.errors import InvalidBundleError, UnknownFormatError
 from app.modules.transfer.domain.plan import PlanAction
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
@@ -117,3 +118,29 @@ async def test_an_unknown_format_is_refused_both_ways(shared: Shared) -> None:
         await _export(shared, ALICE).handle(
             ExportBundleQuery(preset_ids=[uuid.uuid7()], format="csv"), ALICE
         )
+
+
+class _BigCollection:
+    """A collection target whose one collection holds more items than a file can."""
+
+    async def read_collections(
+        self, collection_ids: Any  # noqa: ANN401
+    ) -> list[BundleCollection]:
+        return [
+            BundleCollection(
+                ref=str(collection_ids[0]),
+                name="Everything",
+                item_refs=tuple(str(uuid.uuid7()) for _ in range(MAX_ITEMS + 1)),
+            )
+        ]
+
+
+async def test_a_collection_with_too_many_items_is_refused_before_reading(
+    shared: Shared,
+) -> None:
+    """The cap counts the items a collection brings, before any are read."""
+    t = shared.targets(ALICE)
+    export = ExportBundle(GUARD, CODECS, t.presets, t.graph, _BigCollection())  # type: ignore[arg-type]
+
+    with pytest.raises(InvalidBundleError, match="at most 500 items"):
+        await export.handle(ExportBundleQuery(collection_ids=[uuid.uuid7()]), ALICE)

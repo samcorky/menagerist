@@ -17,6 +17,7 @@ from app.modules.transfer.application.pipeline import (
 )
 from app.modules.transfer.domain.bundle import (
     BUNDLE_FORMAT,
+    MAX_ITEMS,
     Bundle,
     preset_refs,
     unportable_condition,
@@ -165,6 +166,11 @@ class ExportBundle(_FileUseCase, UseCase[ExportBundleQuery, dict[str, Any]]):
         item_ids = _with_ids(
             request.item_ids, (ref for c in collections for ref in c.item_refs)
         )
+        if len(item_ids) > MAX_ITEMS:
+            raise InvalidBundleError(
+                f"A file holds at most {MAX_ITEMS} items; this export has "
+                + f"{len(item_ids)}. Choose fewer items or collections."
+            )
         items = await self._graph.read_items(item_ids)
         connections = await self._graph.read_connections(item_ids)
         # Items and connections bring the types they use, so the file stands alone.
