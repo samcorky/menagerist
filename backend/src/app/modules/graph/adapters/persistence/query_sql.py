@@ -486,9 +486,7 @@ def _linked(
     )
 
 
-def _deep(
-    condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv
-) -> _Bool:
+def _deep(condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv) -> _Bool:
     """The item has (a matching) far item within `depth` hops of one relationship.
 
     `to` is answered from the other end: the items that reach `item` by `out`
