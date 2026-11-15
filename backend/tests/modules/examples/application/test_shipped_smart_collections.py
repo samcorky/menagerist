@@ -198,17 +198,27 @@ async def test_a_pack_smart_collection_goes_with_the_pack_and_comes_back(
     assert before != []
 
 
+async def test_the_wishlist_is_everything_marked_wanted(
+    make_world: MakeWorld,
+) -> None:
+    """The former hand-built list, now Status is Wanted on any item type."""
+    rig = await _rig(make_world, "games")
+    await rig.install("games")
+
+    assert await rig.matches("Wishlist") == ["Gilded Moth", "Saltmarsh Express"]
+
+
 async def test_the_other_games_collections_stay_manual(
     make_world: MakeWorld,
 ) -> None:
-    """Only the collection with an honest rule in the pack's data converted."""
+    """Only collections with an honest rule in the pack's data converted."""
     rig = await _rig(make_world, "games")
     await rig.install("games")
 
     kinds = {name: kind for name, (kind, _) in (await rig.collections()).items()}
 
     assert kinds == {
-        "Wishlist": CollectionKind.MANUAL,
+        "Wishlist": CollectionKind.DYNAMIC,
         "Games for two": CollectionKind.MANUAL,
         "Family game night": CollectionKind.MANUAL,
         "Still to try": CollectionKind.DYNAMIC,

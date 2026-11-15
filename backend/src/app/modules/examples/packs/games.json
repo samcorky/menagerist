@@ -166,21 +166,86 @@
               "kind": "choice"
             }
           },
-          "price_paid": {
-            "title": "Price paid",
-            "type": "object",
-            "properties": {
-              "value": {
-                "title": "Value",
-                "type": "number"
-              },
-              "currency": {
-                "title": "Currency",
-                "type": "string"
+          "status": {
+            "title": "Status",
+            "type": "string",
+            "enum": [
+              "Owned",
+              "Wanted"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "acquisition": {
+            "title": "Acquisition",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "title": "Date",
+                  "type": "string",
+                  "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+                  "x-menagerist": {
+                    "kind": "partialdate"
+                  }
+                },
+                "price": {
+                  "title": "Price",
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "title": "Value",
+                      "type": "number"
+                    },
+                    "currency": {
+                      "title": "Currency",
+                      "type": "string"
+                    }
+                  },
+                  "x-menagerist": {
+                    "kind": "money"
+                  }
+                },
+                "source": {
+                  "title": "Source",
+                  "type": "string",
+                  "x-menagerist": {
+                    "kind": "text"
+                  }
+                },
+                "how": {
+                  "title": "How",
+                  "type": "string",
+                  "enum": [
+                    "Bought",
+                    "Gift",
+                    "Inherited",
+                    "Traded"
+                  ],
+                  "x-menagerist": {
+                    "kind": "choice"
+                  }
+                },
+                "notes": {
+                  "title": "Notes",
+                  "type": "string",
+                  "x-menagerist": {
+                    "kind": "longtext"
+                  }
+                }
               }
             },
             "x-menagerist": {
-              "kind": "money"
+              "kind": "group",
+              "columns": [
+                "date",
+                "price",
+                "source",
+                "how",
+                "notes"
+              ]
             }
           },
           "complete": {
@@ -239,7 +304,10 @@
               "key": "condition"
             },
             {
-              "key": "price_paid"
+              "key": "status"
+            },
+            {
+              "key": "acquisition"
             },
             {
               "key": "complete"
@@ -420,10 +488,6 @@
         "weight": "Medium",
         "rating": 5,
         "condition": "Good",
-        "price_paid": {
-          "value": 34.99,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -442,7 +506,19 @@
             "done": true
           }
         ],
-        "notes": "Our go-to. Plays well solo on a quiet evening."
+        "notes": "Our go-to. Plays well solo on a quiet evening.",
+        "acquisition": [
+          {
+            "date": "2021-03",
+            "price": {
+              "value": 34.99,
+              "currency": "GBP"
+            },
+            "source": "The Dice Tower shop",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -462,10 +538,6 @@
         "weight": "Medium",
         "rating": 4,
         "condition": "Good",
-        "price_paid": {
-          "value": 27.5,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -484,7 +556,19 @@
             "done": true
           }
         ],
-        "notes": "The dice tray is worth the extra few quid."
+        "notes": "The dice tray is worth the extra few quid.",
+        "acquisition": [
+          {
+            "date": "2022-11",
+            "price": {
+              "value": 27.5,
+              "currency": "GBP"
+            },
+            "source": "Car boot sale",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -503,10 +587,6 @@
         "weight": "Light",
         "rating": 4,
         "condition": "New",
-        "price_paid": {
-          "value": 19.99,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -525,7 +605,19 @@
             "done": true
           }
         ],
-        "notes": "Best with six or more and a pot of tea."
+        "notes": "Best with six or more and a pot of tea.",
+        "acquisition": [
+          {
+            "date": "2022",
+            "price": {
+              "value": 19.99,
+              "currency": "GBP"
+            },
+            "source": "Online",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -544,10 +636,6 @@
         "weight": "Heavy",
         "rating": 5,
         "condition": "Worn",
-        "price_paid": {
-          "value": 42.0,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -566,7 +654,19 @@
             "done": true
           }
         ],
-        "notes": "Rulebook lost in a house move; we play from the online copy."
+        "notes": "Rulebook lost in a house move; we play from the online copy.",
+        "acquisition": [
+          {
+            "date": "2023-06-14",
+            "price": {
+              "value": 42.0,
+              "currency": "GBP"
+            },
+            "source": "Games caf\u00e9",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -584,10 +684,6 @@
         ],
         "weight": "Heavy",
         "condition": "New",
-        "price_paid": {
-          "value": 18.0,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -606,7 +702,19 @@
             "done": true
           }
         ],
-        "notes": "Still in its shrink-wrap."
+        "notes": "Still in its shrink-wrap.",
+        "acquisition": [
+          {
+            "date": "2024-02",
+            "price": {
+              "value": 18.0,
+              "currency": "GBP"
+            },
+            "source": "The Dice Tower shop",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -625,10 +733,6 @@
         "weight": "Light",
         "rating": 4,
         "condition": "Good",
-        "price_paid": {
-          "value": 9.99,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -647,7 +751,19 @@
             "done": true
           }
         ],
-        "notes": "Lives in the coat pocket for trains."
+        "notes": "Lives in the coat pocket for trains.",
+        "acquisition": [
+          {
+            "date": "2021-03",
+            "price": {
+              "value": 9.99,
+              "currency": "GBP"
+            },
+            "source": "Car boot sale",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -665,10 +781,6 @@
         ],
         "weight": "Medium",
         "condition": "New",
-        "price_paid": {
-          "value": 39.99,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -687,7 +799,19 @@
             "done": true
           }
         ],
-        "notes": "Bought myself a Christmas present; one game so far, not sure yet."
+        "notes": "Bought myself a Christmas present; one game so far, not sure yet.",
+        "acquisition": [
+          {
+            "date": "2022-11",
+            "price": {
+              "value": 39.99,
+              "currency": "GBP"
+            },
+            "source": "Online",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -705,10 +829,6 @@
         ],
         "weight": "Light",
         "condition": "Good",
-        "price_paid": {
-          "value": 12.0,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -727,7 +847,19 @@
             "done": true
           }
         ],
-        "notes": "A charity shop find that hasn't hit the table yet."
+        "notes": "A charity shop find that hasn't hit the table yet.",
+        "acquisition": [
+          {
+            "date": "2022",
+            "price": {
+              "value": 12.0,
+              "currency": "GBP"
+            },
+            "source": "Games caf\u00e9",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -744,7 +876,8 @@
           "Deck building"
         ],
         "weight": "Medium",
-        "notes": "Wanted: lovely art, and the solo mode gets good reviews."
+        "notes": "Wanted: lovely art, and the solo mode gets good reviews.",
+        "status": "Wanted"
       }
     },
     {
@@ -762,7 +895,8 @@
           "Set collection"
         ],
         "weight": "Light",
-        "notes": "Wanted: it looks like Tea Clipper Race with trains."
+        "notes": "Wanted: it looks like Tea Clipper Race with trains.",
+        "status": "Wanted"
       }
     },
     {
@@ -1025,11 +1159,22 @@
     {
       "ref": "wishlist",
       "name": "Wishlist",
-      "description": "Games not on the shelf yet.",
-      "items": [
-        "gilded-moth",
-        "saltmarsh-express"
-      ]
+      "description": "Everything marked Wanted, of any item type.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "field_kind": "choice",
+              "key": "status",
+              "op": "=",
+              "value": "Wanted"
+            }
+          ]
+        }
+      }
     },
     {
       "ref": "games-for-two",

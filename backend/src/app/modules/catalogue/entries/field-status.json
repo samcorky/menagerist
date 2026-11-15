@@ -1,0 +1,26 @@
+{
+  "id": "field-status",
+  "title": "Status",
+  "description": "Owned or wanted, so a wishlist sits next to what you have.",
+  "section": "field",
+  "presets": [
+    {
+      "kind": "field",
+      "label": "Status",
+      "description": null,
+      "definition": {
+        "property": {
+          "title": "Status",
+          "type": "string",
+          "enum": [
+            "Owned",
+            "Wanted"
+          ],
+          "x-menagerist": {
+            "kind": "choice"
+          }
+        }
+      }
+    }
+  ]
+}
