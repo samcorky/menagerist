@@ -9,6 +9,7 @@ from app.shared_kernel.etag import ETaggable, etag_from_entity
 
 from .http_headers import http_date, parse_http_date
 from .parameters import IfMatch, IfNoneMatch  # noqa: TC001 - FastAPI resolves these at runtime
+from .problem_response import precondition_failed_response
 
 
 def _unweak(value: str) -> str:
@@ -76,7 +77,7 @@ class ConditionalRequest:
         etag = etag_from_entity(current, extra)
 
         if if_match and if_match != "*" and _unweak(if_match) != _unweak(etag):
-            return Response(status_code=412, headers={"ETag": etag})
+            return precondition_failed_response(str(self._req.url), etag)
 
         # RFC 9110 13.1.4: If-Unmodified-Since is ignored when If-Match is sent.
         if if_unmodified_since and not if_match:
@@ -84,7 +85,7 @@ class ConditionalRequest:
             utc_updated = current.updated_at.astimezone(UTC)
             # Compare at second resolution. RFC 1123 omits sub-second precision.
             if since and utc_updated.replace(microsecond=0) > since.astimezone(UTC):
-                return Response(status_code=412, headers={"ETag": etag})
+                return precondition_failed_response(str(self._req.url), etag)
 
         return None
 

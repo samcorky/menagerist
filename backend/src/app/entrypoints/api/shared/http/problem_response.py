@@ -112,6 +112,28 @@ def problem_response(
     }
 
 
+PRECONDITION_FAILED_TITLE = "PreconditionFailedError"
+PRECONDITION_FAILED_DETAIL = (
+    "The resource has changed since you read it. Fetch it again for its current ETag."
+)
+
+
+def precondition_failed_response(instance: str, etag: str) -> JSONResponse:
+    """Answer a failed `If-Match` or `If-Unmodified-Since` with 412 and the ETag."""
+    return JSONResponse(
+        status_code=412,
+        media_type=PROBLEM_JSON,
+        content={
+            "type": "about:blank",
+            "title": PRECONDITION_FAILED_TITLE,
+            "status": 412,
+            "detail": PRECONDITION_FAILED_DETAIL,
+            "instance": instance,
+        },
+        headers={"ETag": etag},
+    )
+
+
 def _status_for(error_type: type[DomainError]) -> int:
     return next(
         status

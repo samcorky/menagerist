@@ -53,7 +53,7 @@ IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}
 
 ## Conditional requests
 
-`GET` responses carry a weak `ETag` (see [Weak ETags](DECISIONS.md#weak-etags-to-survive-a-compressing-proxy-open-question-76)), `If-None-Match` returns 304, and `PATCH` honours `If-Match` and answers 412. A route takes `ConditionalGetDep` or `ConditionalPatchDep`, which declare `If-None-Match` or `If-Match` as parameters so they appear in `openapi.json` and the generated client. The date forms, `If-Modified-Since` and `If-Unmodified-Since`, are honoured but not declared, so the contract steers clients to ETags as IBM recommends.
+`GET` responses carry a weak `ETag` (see [Weak ETags](DECISIONS.md#weak-etags-to-survive-a-compressing-proxy-open-question-76)), `If-None-Match` returns 304, and `PATCH` honours `If-Match` and answers 412 with a problem body and the current `ETag`. A route takes `ConditionalGetDep` or `ConditionalPatchDep`, which declare `If-None-Match` or `If-Match` as parameters so they appear in `openapi.json` and the generated client. The date forms, `If-Modified-Since` and `If-Unmodified-Since`, are honoured but not declared, so the contract steers clients to ETags as IBM recommends.
 
 ## Request bodies, names and models
 
@@ -85,7 +85,6 @@ The remaining warnings are the backlog the ratchet works down. The ones that are
 - **Enum casing** (`ibm-enum-casing-convention`): some enum values are not snake_case.
 - **Property casing** (`ibm-property-casing-convention`): a few camelCase properties such as `componentType`.
 - **Operation ids** (`ibm-operationid-naming-convention`): for example `list_user_exports` served from `/me/exports`.
-- **412 bodies** (`ibm-request-and-response-content`): a failed `If-Match` returns 412 with an empty body, not `application/problem+json`.
 - **DELETE with a body** (`ibm-no-operation-requestbody`): detaching media takes the node ids in a request body.
 - **Untyped content** (`ibm-content-contains-schema`): the health 503s and the binary media downloads declare no schema.
 - **Descriptions and examples** (`ibm-property-description`, `ibm-schema-description`, `ibm-success-response-example`): documentation, added as routes are touched.

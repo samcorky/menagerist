@@ -38,6 +38,8 @@ rules:
   ibm-parameter-description: error
   # ConditionalGetDep and ConditionalPatchDep declare If-None-Match and If-Match.
   ibm-precondition-headers: error
+  # A failed If-Match answers with a problem body, like every other 4xx.
+  ibm-request-and-response-content: error
 
   # --- Findings to fix, then raise to "error" ---------------------------------------
   ibm-enum-casing-convention: warn
