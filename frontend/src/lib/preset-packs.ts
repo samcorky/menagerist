@@ -59,9 +59,9 @@ export async function exportPresetBundle(presets: PresetResponse[]): Promise<Pre
 	};
 }
 
-/** Export one item type, with the saved lists its fields use, as a bundle file. */
-export async function exportTypeBundle(typeId: string): Promise<PresetBundle> {
-	const result = await exportBundle({ query: { item_type_ids: [typeId] } });
+/** Export item types, with the saved lists their fields use, as one bundle file. */
+export async function exportTypeBundle(typeIds: string[]): Promise<PresetBundle> {
+	const result = await exportBundle({ query: { item_type_ids: typeIds } });
 	if (result.error || !result.data) throw result.error ?? new Error('Could not export the type');
 	return result.data;
 }
