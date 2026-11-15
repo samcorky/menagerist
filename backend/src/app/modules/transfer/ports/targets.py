@@ -221,6 +221,17 @@ class CollectionTarget(Protocol):
         """
         ...
 
+    async def read_collections(
+        self, collection_ids: Sequence[uuid.UUID]
+    ) -> list[BundleCollection]:
+        """Return the person's collections with `collection_ids`, each `ref` its id.
+
+        A manual collection lists its live items in `item_refs` (their ids); a smart
+        one keeps its `definition` as stored. A collection that is not the person's
+        raises `NotFoundError`.
+        """
+        ...
+
     async def inspect(self, collection_id: uuid.UUID) -> Inspection | None:
         """Return the collection as it is now, or `None` if it is gone."""
         ...

@@ -43,17 +43,17 @@ FILE: dict[str, Any] = {
 
 def _plan(shared: Shared, actor: Actor) -> PlanBundleImport:
     t = shared.targets(actor)
-    return PlanBundleImport(GUARD, CODECS, t.presets, t.graph)
+    return PlanBundleImport(GUARD, CODECS, t.presets, t.graph, t.collections)
 
 
 def _import(shared: Shared, actor: Actor) -> ImportBundle:
     t = shared.targets(actor)
-    return ImportBundle(GUARD, CODECS, t.presets, t.graph)
+    return ImportBundle(GUARD, CODECS, t.presets, t.graph, t.collections)
 
 
 def _export(shared: Shared, actor: Actor) -> ExportBundle:
     t = shared.targets(actor)
-    return ExportBundle(GUARD, CODECS, t.presets, t.graph)
+    return ExportBundle(GUARD, CODECS, t.presets, t.graph, t.collections)
 
 
 async def _ids(shared: Shared, actor: Actor) -> list[uuid.UUID]:

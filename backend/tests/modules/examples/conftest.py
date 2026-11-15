@@ -131,6 +131,21 @@ class InMemoryCollectionTarget:
         self.collections[coll.id] = coll
         return Created(entity_id=coll.id, content=_collection_content(coll))
 
+    async def read_collections(
+        self, collection_ids: Sequence[uuid.UUID]
+    ) -> list[BundleCollection]:
+        """Return the stored collections with `collection_ids`."""
+        return [
+            BundleCollection(
+                ref=str(c.id),
+                name=c.name,
+                description=c.description,
+                item_refs=() if c.definition else tuple(str(m) for m in c.members),
+                definition=c.definition,
+            )
+            for c in (self.collections[i] for i in collection_ids)
+        ]
+
     async def inspect(self, collection_id: uuid.UUID) -> Inspection | None:
         """Return the collection as it is now, or `None` if gone."""
         coll = self.collections.get(collection_id)

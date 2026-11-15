@@ -38,6 +38,10 @@ from app.modules.collections.application.create_collection import (
     CreateCollection,
     CreateCollectionCommand,
 )
+from app.modules.collections.application.get_collection import (
+    GetCollection,
+    GetCollectionQuery,
+)
 from app.modules.collections.application.purge_collection import (
     PurgeCollection,
     PurgeCollectionCommand,
@@ -46,6 +50,7 @@ from app.modules.collections.application.purge_item_memberships import (
     PurgeItemMemberships,
     PurgeItemMembershipsCommand,
 )
+from app.modules.collections.domain.errors import CollectionNotFoundError
 from app.modules.collections.ports.definition_checker import DefinitionChecker
 from app.modules.collections.ports.item_lookup import ItemLookup
 from app.modules.collections.ports.unit_of_work import (
@@ -1014,6 +1019,48 @@ class CollectionPackTarget:
         if inspection is None:  # pragma: no cover - only if deleted concurrently
             raise RuntimeError(f"Collection {collection.id} vanished after creation")
         return Created(entity_id=collection.id, content=inspection.content)
+
+    async def read_collections(
+        self, collection_ids: Sequence[uuid.UUID]
+    ) -> list[BundleCollection]:
+        """Return the person's collections with `collection_ids`, each `ref` its id."""
+        found: list[BundleCollection] = []
+        for collection_id in collection_ids:
+            async with (
+                self._stores.read() as repos,
+                self._stores.items() as items,
+                self._stores.checker() as checker,
+            ):
+                # Raises if it is not the person's own, as for every other kind.
+                await GetCollection(repos, self._access, items, checker).handle(
+                    GetCollectionQuery(collection_id=collection_id), self._actor
+                )
+                collection = await repos.collections.get(
+                    collection_id, scope=self._scope
+                )
+                if collection is None:  # pragma: no cover - guarded just above
+                    raise CollectionNotFoundError(f"Collection {collection_id} gone")
+                stored = await repos.memberships.item_ids(
+                    collection_id, scope=self._scope
+                )
+                live = await items.live_ids(list(stored), self._scope)
+            is_smart = collection.definition is not None
+            found.append(
+                BundleCollection(
+                    ref=str(collection.id),
+                    name=collection.name,
+                    description=collection.description,
+                    item_refs=(
+                        () if is_smart else tuple(sorted(str(i) for i in live))
+                    ),
+                    definition=(
+                        copy.deepcopy(dict(collection.definition))
+                        if collection.definition is not None
+                        else None
+                    ),
+                )
+            )
+        return found
 
     async def inspect(self, collection_id: uuid.UUID) -> Inspection | None:
         """Return the collection as it is now, or `None` if it is gone.

@@ -5,12 +5,14 @@ from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
 from app.entrypoints.api.shared.bridges.transfer_targets import (
+    get_collection_pack_target,
     get_graph_pack_target,
     get_preset_pack_target,
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.presets.adapters.api.dependencies import get_preset_repos
 from app.modules.transfer.domain.bundle import (
+    BundleCollection,
     BundleConnection,
     BundleItem,
     BundleItemType,
@@ -19,11 +21,12 @@ from app.modules.transfer.domain.bundle import (
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
-    from tests.modules.conftest import Shared
+    from tests.modules.conftest import Shared, Targets
 
 ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
@@ -47,6 +50,7 @@ def _client(shared: Shared, actor: Actor = ALICE) -> TestClient:
     targets = shared.targets(actor)
     app.dependency_overrides[get_preset_pack_target] = lambda: targets.presets
     app.dependency_overrides[get_graph_pack_target] = lambda: targets.graph
+    app.dependency_overrides[get_collection_pack_target] = lambda: targets.collections
     app.dependency_overrides[get_preset_repos] = lambda: shared.preset_repos
     app.dependency_overrides[get_current_actor] = lambda: actor
     return TestClient(app)
@@ -313,6 +317,120 @@ async def test_items_travel_with_their_type_and_connections(shared: Shared) -> N
     assert (kinds.count("item"), kinds.count("connection")) == (3, 1)
     assert imported.status_code == 200
     assert imported.json()["created"] == 7
+
+
+_SMART: dict[str, Any] = {
+    "v": 1,
+    "where": {"op": "and", "children": [{"kind": "type", "in": ["record"]}]},
+}
+
+
+async def _alices_collections(
+    shared: Shared,
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, list[uuid.UUID]]:
+    """Make a manual, a portable smart and an unportable smart collection."""
+    ids, outside = await _alices_records(shared)
+    collections = _alice_targets(shared).collections
+    manual = await collections.create_collection(
+        BundleCollection(ref="m", name="Jazz", description="Blue notes"),
+        item_ids=[ids[0], ids[1]],
+    )
+    smart = await collections.create_collection(
+        BundleCollection(
+            ref="s",
+            name="Records",
+            definition=_SMART,
+        ),
+        item_ids=[],
+    )
+    tied = await collections.create_collection(
+        BundleCollection(
+            ref="t",
+            name="Tied to one",
+            definition={
+                "v": 1,
+                "where": {
+                    "op": "and",
+                    "children": [
+                        {
+                            "kind": "connection",
+                            "mode": "to",
+                            "relationship": "by",
+                            "direction": "out",
+                            "item": str(outside),
+                        }
+                    ],
+                },
+            },
+        ),
+        item_ids=[],
+    )
+    return manual.entity_id, smart.entity_id, tied.entity_id, ids
+
+
+def _alice_targets(shared: Shared) -> Targets:
+    return shared.targets(ALICE)
+
+
+async def test_a_collection_travels_with_its_items_and_imports(shared: Shared) -> None:
+    """A manual collection brings its items; a smart one keeps its conditions."""
+    manual, smart, _, ids = await _alices_collections(shared)
+
+    response = _client(shared).get(
+        "/api/v1/bundles/export",
+        params={"collection_ids": [str(manual), str(smart)]},
+    )
+
+    assert response.status_code == 200
+    file = response.json()
+    assert [(c["name"], c["item_refs"]) for c in file["collections"]] == [
+        ("Jazz", [str(i) for i in sorted(ids[:2])]),
+        ("Records", []),
+    ]
+    assert file["collections"][1]["definition"] == _SMART
+    assert {i["ref"] for i in file["items"]} == {str(i) for i in ids[:2]}
+    assert [t["slug"] for t in file["item_types"]] == ["record"]
+
+    bob = _client(shared, BOB)
+    plan = bob.post("/api/v1/bundles/import/plan", json=file)
+    imported = bob.post("/api/v1/bundles/import", json=file)
+
+    assert plan.json()["ready"] is True
+    assert imported.status_code == 200
+    kinds = [e["kind"] for e in plan.json()["entities"]]
+    assert kinds.count("collection") == 2
+    listed = await _bobs_collection_names(shared)
+    assert listed == ["Jazz", "Records"]
+
+
+async def _bobs_collection_names(shared: Shared) -> list[str]:
+    found = await shared.collection_repos.collections.list(
+        scope=ContentFilter(user_id=BOB.id), after=None, limit=50
+    )
+    return sorted(c.name for c in found)
+
+
+async def test_a_collection_that_cannot_travel_is_refused(shared: Shared) -> None:
+    """A connection to one item would behave differently once imported."""
+    _, _, tied, _ = await _alices_collections(shared)
+
+    response = _client(shared).get(
+        "/api/v1/bundles/export", params={"collection_ids": str(tied)}
+    )
+
+    assert response.status_code == 400
+    assert "Tied to one" in response.json()["detail"]
+
+
+async def test_a_collection_that_is_not_yours_is_not_found(shared: Shared) -> None:
+    """Another person's collection cannot be exported."""
+    manual, _, _, _ = await _alices_collections(shared)
+
+    response = _client(shared, BOB).get(
+        "/api/v1/bundles/export", params={"collection_ids": str(manual)}
+    )
+
+    assert response.status_code == 404
 
 
 async def test_a_repeated_item_id_is_written_once(shared: Shared) -> None:

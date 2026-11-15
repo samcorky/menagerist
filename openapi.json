@@ -17978,7 +17978,7 @@
           "Bundles"
         ],
         "summary": "Export Bundle",
-        "description": "Export saved lists, fields, groups, types and items as a file to import again.\n\nChoose at least one of the four kinds. In a `menagerist-bundle` file each\n`ref` is the id, so the same thing has the same ref in every file. A type\nbrings the saved lists its fields use, and an item brings its type and the\nconnections between the items chosen, so the file imports on its own; the file\nis `version` 3. At most 500 items can be exported at once.\n\n**Requires permission:** `transfer:bundle:read`",
+        "description": "Export saved lists, types, items and collections as a file to import again.\n\nChoose at least one of the five kinds. In a `menagerist-bundle` file each\n`ref` is the id, so the same thing has the same ref in every file. A type\nbrings the saved lists its fields use, an item brings its type and the\nconnections between the items chosen, and a manual collection brings its items,\nso the file imports on its own; the file is `version` 3. At most 500 items can\nbe exported at once.\n\n**Requires permission:** `transfer:bundle:read`",
         "operationId": "export_bundle",
         "security": [
           {
@@ -18077,6 +18077,29 @@
               "title": "Item Ids"
             },
             "description": "The items to export, with their types, the saved lists those use, and the connections that join two of the items."
+          },
+          {
+            "name": "collection_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The collections to export. A manual collection brings its items; a smart one keeps its conditions.",
+              "title": "Collection Ids"
+            },
+            "description": "The collections to export. A manual collection brings its items; a smart one keeps its conditions."
           },
           {
             "name": "format",
