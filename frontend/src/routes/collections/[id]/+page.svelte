@@ -8,6 +8,7 @@
 	import { page } from '$app/state';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
+		Download,
 		EyeOff,
 		LayoutGrid,
 		Library,
@@ -35,6 +36,7 @@
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import { downloadBundle, exportCollectionBundle, presetFilename } from '$lib/preset-packs';
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { fetchItemFields, type ItemField } from '$lib/item-fields';
 	import NarrowedBar from '$lib/components/narrowed-bar.svelte';
@@ -272,6 +274,21 @@
 
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
+	let exporting = $state(false);
+
+	/** Save the collection, with its items when it is a manual one, as a file to import again. */
+	async function handleExport() {
+		if (!collection || exporting) return;
+		exporting = true;
+		try {
+			downloadBundle(await exportCollectionBundle(collection.id), presetFilename(collection.name));
+		} catch (error) {
+			const description = error instanceof Error ? error.message : errorMessage(error);
+			toast.error("Couldn't export", { description });
+		} finally {
+			exporting = false;
+		}
+	}
 	let deleteTrigger: HTMLElement | null = null;
 
 	const nameHint = $derived(validateCollectionName(editName));
@@ -1021,6 +1038,9 @@
 					<SurpriseButton collection={collection.id} />
 					<IconButton label="Edit" variant="outline" onclick={openEdit}>
 						<Pencil />
+					</IconButton>
+					<IconButton label="Export" variant="outline" onclick={handleExport}>
+						<Download />
 					</IconButton>
 					<IconButton label="Delete" variant="outline" onclick={openDelete}>
 						<Trash2 />
