@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -10,6 +11,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
+from app.modules.graph.application.field_scope_expansion import expand_field_scopes
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import Cursor, ResolvedQuery, parse_query
@@ -42,7 +44,7 @@ SCHEMAS: dict[str, dict[str, Any]] = {
     "part": {
         "type": "object",
         "properties": {
-            "stock": {"type": "number"},
+            "stock": {"type": "number", "x-menagerist": {"origin": {"preset": "p-n"}}},
             "reorder_at": {"type": "number"},
             "old_reorder": {"type": "number", "x-menagerist": {"archived": True}},
             "price": {"type": "object", "x-menagerist": {"kind": "money"}},
@@ -63,7 +65,10 @@ SCHEMAS: dict[str, dict[str, Any]] = {
     "game": {
         "type": "object",
         "properties": {
-            "weight": {"type": "number", "x-menagerist": {"kind": "number"}},
+            "weight": {
+                "type": "number",
+                "x-menagerist": {"kind": "number", "origin": {"preset": "p-n"}},
+            },
         },
     },
 }
@@ -241,6 +246,7 @@ async def _seed(repo: NodeRepository) -> NodeRepository:
 
 def _resolve(raw: dict[str, Any]) -> ResolvedQuery:
     query = parse_query(raw)
+    query = replace(query, where=expand_field_scopes(query.where, SCHEMAS))
     resolution = resolve_fields(query, SCHEMAS)
     return ResolvedQuery(
         query=query,
@@ -722,9 +728,37 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
         set(),
     ),
     (
-        "per-item key equal to a type key matches only the item's own field",
+        "any-type key reaches the type field and the item's own field",
         _where(_p("number", "weight", "=", 5)),
-        {"Reel"},
+        {"Chess", "Reel"},
+    ),
+    (
+        "any-type key of another kind skips that field",
+        _where(_p("text", "weight", "=", "5")),
+        set(),
+    ),
+    (
+        "any-type column reaches table fields",
+        _where(
+            {"kind": "field", "field_kind": "number", "key": "bom", "sub_key": "qty"}
+            | {"op": "=", "value": 2}
+        ),
+        {"Resistor"},
+    ),
+    (
+        "saved field reaches its copies whatever their key",
+        _where({"kind": "field", "origin": "p-n", "op": ">=", "value": 5}),
+        {"Chess", "Capacitor"},
+    ),
+    (
+        "saved field not equal is scoped to its copies",
+        _where({"kind": "field", "origin": "p-n", "op": "!=", "value": 5}),
+        {"Resistor", "Capacitor"},
+    ),
+    (
+        "saved field nobody uses matches nothing",
+        _where({"kind": "field", "origin": "p-none", "op": "empty"}),
+        set(),
     ),
     (
         "type field still matches only its type",
@@ -732,9 +766,9 @@ CASES: list[tuple[str, dict[str, Any], set[str]]] = [
         {"Chess"},
     ),
     (
-        "per-item not equal ignores the type's field of the same name",
+        "any-type not equal is scoped to items with the field",
         _where(_p("number", "weight", "!=", 9)),
-        {"Reel"},
+        {"Chess", "Reel"},
     ),
     (
         "per-item inside or beside a type condition",

@@ -151,32 +151,34 @@ function hasReference(value: Value | undefined): boolean {
 	return items.some((item) => isRec(item) && 'ref' in item);
 }
 
-/** A field condition names an item type or a field kind, never both (as on the server). */
+/** A field condition names one of an item type, a field kind or a saved field (as on the server). */
 function fieldCondition(data: Rec): Condition | null {
-	const key = str(data.key);
 	const op = data.op;
-	if (key === null || typeof op !== 'string' || !OPERATORS.has(op)) return null;
-	// A null type or sub_key means none, as on the server.
-	const hasType = data.type !== undefined && data.type !== null;
-	const hasKind = data.field_kind !== undefined && data.field_kind !== null;
-	if (hasType === hasKind) return null;
-	const out: Extract<Condition, { kind: 'field' }> = { kind: 'field', key, op };
-	if (hasType) {
-		const type = str(data.type);
-		if (type === null) return null;
-		out.type = type;
+	if (typeof op !== 'string' || !OPERATORS.has(op)) return null;
+	// A null type, field_kind, origin or sub_key means none, as on the server.
+	const named = (['type', 'field_kind', 'origin'] as const).filter(
+		(name) => data[name] !== undefined && data[name] !== null
+	);
+	if (named.length !== 1) return null;
+	const scope = named[0];
+	const scoped = str(data[scope]);
+	if (scoped === null) return null;
+	const out: Extract<Condition, { kind: 'field' }> = { kind: 'field', op, [scope]: scoped };
+	if (scope === 'field_kind' && operatorsForKind(scoped).length === 0) return null;
+	if (scope === 'origin') {
+		if (data.key !== undefined && data.key !== null) return null;
 	} else {
-		const kind = str(data.field_kind);
-		if (kind === null || operatorsForKind(kind).length === 0) return null;
-		out.field_kind = kind;
+		const key = str(data.key);
+		if (key === null) return null;
+		out.key = key;
 	}
 	if (data.sub_key !== undefined && data.sub_key !== null) {
 		const sub = str(data.sub_key);
-		if (sub === null || hasKind) return null;
+		if (sub === null) return null;
 		out.sub_key = sub;
 	}
 	const value = comparisonValue(op, data);
-	if (value === null || (hasKind && hasReference(value))) return null;
+	if (value === null || (scope !== 'type' && hasReference(value))) return null;
 	if (value !== undefined) out.value = value;
 	return out;
 }

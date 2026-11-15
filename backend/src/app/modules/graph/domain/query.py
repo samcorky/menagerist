@@ -234,17 +234,24 @@ class DateCondition:
 
 @dataclass(frozen=True, kw_only=True)
 class FieldCondition:
-    """Compare a field of one item type, or a per-item field by its kind.
+    """Compare a field of one item type, of any item by key and kind, or by origin.
 
-    `type` addresses a field of an item type; `field_kind` addresses a field an
-    item declares in its own overlay. Exactly one is set. `sub_key` addresses a
-    table column and is only valid with `type`.
+    Exactly one of `type`, `field_kind` and `origin` is set. `type` addresses a
+    field of one item type. `field_kind` addresses field `key` of that kind on
+    any item, from its type or its own overlay. `origin` addresses every type
+    field copied from that saved field, so `key` is empty. `sub_key` addresses a
+    table column.
+
+    `field_kind` and `origin` are expanded into `type` leaves before resolution
+    (`expand_field_scopes`); a `field_kind` leaf that remains afterwards stands
+    for the item's own overlay, which has no table columns.
     """
 
     key: str
     op: str
     type: str | None = None
     field_kind: str | None = None
+    origin: str | None = None
     value: Operand | None = None
     sub_key: str | None = None
 
@@ -691,33 +698,41 @@ def _field(data: Mapping[str, object], path: str) -> FieldCondition:
     if not isinstance(op, str) or op not in _OPERATORS:
         msg = "Unknown operator."
         raise InvalidQueryError(msg, path=path)
-    raw_type = data.get("type")
-    raw_kind = data.get("field_kind")
-    if raw_type is not None and raw_kind is not None:
-        msg = "Name an item type or a field kind, not both."
+    named = [name for name in _FIELD_SCOPES if data.get(name) is not None]
+    if len(named) != 1:
+        msg = "Name one of an item type, a field kind or a saved field."
         raise InvalidQueryError(msg, path=path)
-    if raw_type is None and raw_kind is None:
-        msg = "Name an item type or a field kind."
-        raise InvalidQueryError(msg, path=path)
-    if raw_kind is None:
-        field_type: str | None = _string(raw_type, path, name="type")
-        field_kind = None
-    else:
-        field_type = None
-        field_kind = _string(raw_kind, path, name="field_kind")
+    scope = named[0]
     sub_key = data.get("sub_key")
     value = _value(op, data, path)
-    if field_kind is not None and (sub_key is not None or _has_reference(value)):
-        msg = "A per-item field has no column and cannot be compared with a field."
+    if scope != "type" and _has_reference(value):
+        msg = "Only a field of one item type can be compared with a field."
         raise InvalidQueryError(msg, path=path)
+    if scope == "origin":
+        if data.get("key") is not None:
+            msg = "A saved field names no key."
+            raise InvalidQueryError(msg, path=path)
+        key = ""
+    else:
+        key = _string(data.get("key"), path, name="key")
     return FieldCondition(
-        type=field_type,
-        field_kind=field_kind,
-        key=_string(data.get("key"), path, name="key"),
+        type=_string(data["type"], path, name="type") if scope == "type" else None,
+        field_kind=(
+            _string(data["field_kind"], path, name="field_kind")
+            if scope == "field_kind"
+            else None
+        ),
+        origin=(
+            _string(data["origin"], path, name="origin") if scope == "origin" else None
+        ),
+        key=key,
         sub_key=None if sub_key is None else _string(sub_key, path, name="sub_key"),
         op=op,
         value=value,
     )
+
+
+_FIELD_SCOPES: Final = ("type", "field_kind", "origin")
 
 
 _CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
@@ -733,7 +748,9 @@ _CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
         {"kind", "mode", "relationship", "direction", "item", "where", "depth"}
     ),
     "date": frozenset({"kind", "on", "op", "value"}),
-    "field": frozenset({"kind", "type", "field_kind", "key", "sub_key", "op", "value"}),
+    "field": frozenset(
+        {"kind", "type", "field_kind", "origin", "key", "sub_key", "op", "value"}
+    ),
 }
 _GROUP_KEYS: Final = frozenset({"op", "children"})
 _QUERY_KEYS: Final = frozenset({"v", "where", "sort"})

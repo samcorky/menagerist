@@ -117,8 +117,8 @@ function fieldFormat(c: Extract<Condition, { kind: 'field' }>, lookup: SummaryLo
 			try {
 				const text =
 					c.field_kind !== undefined
-						? lookup.formatItemValue?.(c.field_kind, c.key, operand)
-						: lookup.formatValue?.(c.type ?? '', c.key, c.sub_key, operand);
+						? lookup.formatItemValue?.(c.field_kind, c.key ?? '', operand)
+						: lookup.formatValue?.(c.type ?? '', c.key ?? '', c.sub_key, operand);
 				if (typeof text === 'string') return text;
 			} catch {
 				// fall back to the default text
@@ -144,13 +144,15 @@ function describeField(c: Extract<Condition, { kind: 'field' }>, lookup: Summary
 	let field: string;
 	let kind: string | null | undefined;
 	if (itemKind !== undefined) {
-		field = safe(() => lookup.itemFieldLabel?.(itemKind, c.key)) || c.key;
+		field = safe(() => lookup.itemFieldLabel?.(itemKind, c.key ?? '')) || (c.key ?? '');
 		kind = itemKind;
 	} else {
-		const label = lookup.fieldLabel(c.type ?? '', c.key);
-		const sub = subKey ? safe(() => lookup.subFieldLabel?.(c.type ?? '', c.key, subKey)) : null;
+		const label = lookup.fieldLabel(c.type ?? '', c.key ?? '');
+		const sub = subKey
+			? safe(() => lookup.subFieldLabel?.(c.type ?? '', c.key ?? '', subKey))
+			: null;
 		field = subKey ? (sub ?? `${label} › ${subKey}`) : label;
-		kind = safe(() => lookup.fieldKind?.(c.type ?? '', c.key, c.sub_key));
+		kind = safe(() => lookup.fieldKind?.(c.type ?? '', c.key ?? '', c.sub_key));
 	}
 	const head =
 		itemKind === undefined
