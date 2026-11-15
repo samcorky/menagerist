@@ -9,7 +9,7 @@ import {
 	type PresetResponse
 } from '$lib/api/client';
 
-/** The `menagerist-bundle` file format, version 1: saved fields, lists and groups. */
+/** The `menagerist-bundle` file format: saved fields, lists and groups, and item types. */
 export const BUNDLE_FORMAT = 'menagerist-bundle';
 
 /** A bundle file of presets, as exported and as read back for import. */
@@ -50,7 +50,20 @@ export async function exportPresetBundle(presets: PresetResponse[]): Promise<Pre
 		if (result.error || !result.data) throw result.error ?? new Error('Could not export presets');
 		all.push(...result.data.presets);
 	}
-	return { format: BUNDLE_FORMAT, version: 1, presets: all };
+	return {
+		format: BUNDLE_FORMAT,
+		version: 2,
+		presets: all,
+		relationship_types: [],
+		item_types: []
+	};
+}
+
+/** Export one item type, with the saved lists its fields use, as a bundle file. */
+export async function exportTypeBundle(typeId: string): Promise<PresetBundle> {
+	const result = await exportBundle({ query: { item_type_ids: [typeId] } });
+	if (result.error || !result.data) throw result.error ?? new Error('Could not export the type');
+	return result.data;
 }
 
 /** Parse a bundle file's text, checking only the envelope. The server validates the rest. */

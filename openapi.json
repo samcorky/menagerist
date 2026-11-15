@@ -17978,7 +17978,7 @@
           "Bundles"
         ],
         "summary": "Export Bundle",
-        "description": "Export saved lists, fields or groups as a file you can import again.\n\nIn a `menagerist-bundle` file each preset's `ref` is its id, so the same preset\nhas the same ref in every file.\n\n**Requires permission:** `transfer:bundle:read`",
+        "description": "Export saved lists, fields, groups and types as a file you can import again.\n\nChoose at least one of the three kinds. In a `menagerist-bundle` file each\n`ref` is the id, so the same thing has the same ref in every file. An item\ntype brings the saved lists its fields use, so the file imports on its own;\nthe file is `version` 2.\n\n**Requires permission:** `transfer:bundle:read`",
         "operationId": "export_bundle",
         "security": [
           {
@@ -17992,18 +17992,68 @@
           {
             "name": "preset_ids",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "minItems": 1,
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "description": "The saved lists, fields or groups to export.",
               "title": "Preset Ids"
             },
             "description": "The saved lists, fields or groups to export."
+          },
+          {
+            "name": "item_type_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The item types to export, with the saved lists they use.",
+              "title": "Item Type Ids"
+            },
+            "description": "The item types to export, with the saved lists they use."
+          },
+          {
+            "name": "relationship_type_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The connection types to export.",
+              "title": "Relationship Type Ids"
+            },
+            "description": "The connection types to export."
           },
           {
             "name": "format",
@@ -18031,7 +18081,7 @@
                 },
                 "example": {
                   "format": "menagerist-bundle",
-                  "version": 1,
+                  "version": 2,
                   "presets": [
                     {
                       "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
@@ -18045,7 +18095,55 @@
                         ]
                       }
                     }
+                  ],
+                  "relationship_types": [
+                    {
+                      "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+                      "slug": "wrote",
+                      "label": "Wrote",
+                      "reverse_label": "Written by",
+                      "directional": true
+                    }
+                  ],
+                  "item_types": [
+                    {
+                      "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+                      "slug": "record",
+                      "label": "Record",
+                      "attributes_schema": {
+                        "type": "object",
+                        "properties": {
+                          "condition": {
+                            "type": "string",
+                            "title": "Condition",
+                            "x-menagerist": {
+                              "kind": "choice",
+                              "list": {
+                                "$preset": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a bundle file or its content is malformed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidBundleError",
+                  "status": 400,
+                  "detail": "presets[0] needs definition, kind",
+                  "instance": "https://menagerist.example/api/v1/bundles/export"
                 }
               }
             }
@@ -25631,6 +25729,22 @@
             "type": "array",
             "title": "Presets",
             "description": "The saved lists, fields and groups."
+          },
+          "relationship_types": {
+            "items": {
+              "$ref": "#/components/schemas/BundleRelationshipTypeEntry"
+            },
+            "type": "array",
+            "title": "Relationship Types",
+            "description": "The connection types; from version 2."
+          },
+          "item_types": {
+            "items": {
+              "$ref": "#/components/schemas/BundleItemTypeEntry"
+            },
+            "type": "array",
+            "title": "Item Types",
+            "description": "The item types, with their saved lists in `presets`; version 2."
           }
         },
         "additionalProperties": false,
@@ -25640,10 +25754,32 @@
           "version"
         ],
         "title": "BundleFile",
-        "description": "A bundle file to import. `format` says which reader takes it.\n\nA `menagerist-bundle` file has `version` 1 and the presets it holds.",
+        "description": "A bundle file to import. `format` says which reader takes it.\n\nA `menagerist-bundle` file has `version` 1 and the presets it holds, or\n`version` 2, which can also hold connection types and item types.",
         "examples": [
           {
             "format": "menagerist-bundle",
+            "item_types": [
+              {
+                "attributes_schema": {
+                  "properties": {
+                    "condition": {
+                      "title": "Condition",
+                      "type": "string",
+                      "x-menagerist": {
+                        "kind": "choice",
+                        "list": {
+                          "$preset": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+                        }
+                      }
+                    }
+                  },
+                  "type": "object"
+                },
+                "label": "Record",
+                "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+                "slug": "record"
+              }
+            ],
             "presets": [
               {
                 "definition": {
@@ -25658,7 +25794,16 @@
                 "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
               }
             ],
-            "version": 1
+            "relationship_types": [
+              {
+                "directional": true,
+                "label": "Wrote",
+                "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+                "reverse_label": "Written by",
+                "slug": "wrote"
+              }
+            ],
+            "version": 2
           }
         ]
       },
@@ -25681,19 +25826,59 @@
             "type": "array",
             "title": "Presets",
             "description": "The saved lists, fields and groups; each `ref` is its id."
+          },
+          "relationship_types": {
+            "items": {
+              "$ref": "#/components/schemas/BundleRelationshipTypeEntry"
+            },
+            "type": "array",
+            "title": "Relationship Types",
+            "description": "The connection types exported."
+          },
+          "item_types": {
+            "items": {
+              "$ref": "#/components/schemas/BundleItemTypeEntry"
+            },
+            "type": "array",
+            "title": "Item Types",
+            "description": "The item types exported."
           }
         },
         "type": "object",
         "required": [
           "format",
           "version",
-          "presets"
+          "presets",
+          "relationship_types",
+          "item_types"
         ],
         "title": "BundleFileResponse",
         "description": "A bundle file as exported, ready to save and import again.",
         "examples": [
           {
             "format": "menagerist-bundle",
+            "item_types": [
+              {
+                "attributes_schema": {
+                  "properties": {
+                    "condition": {
+                      "title": "Condition",
+                      "type": "string",
+                      "x-menagerist": {
+                        "kind": "choice",
+                        "list": {
+                          "$preset": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+                        }
+                      }
+                    }
+                  },
+                  "type": "object"
+                },
+                "label": "Record",
+                "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+                "slug": "record"
+              }
+            ],
             "presets": [
               {
                 "definition": {
@@ -25708,7 +25893,115 @@
                 "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
               }
             ],
-            "version": 1
+            "relationship_types": [
+              {
+                "directional": true,
+                "label": "Wrote",
+                "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+                "reverse_label": "Written by",
+                "slug": "wrote"
+              }
+            ],
+            "version": 2
+          }
+        ]
+      },
+      "BundleItemTypeEntry": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its id within the file; an export uses the id."
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Its short name, as used in URLs."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Its name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What it is for."
+          },
+          "attributes_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes Schema",
+            "description": "Its fields. A field that uses a saved list names it as `{\"$preset\": ref}`, where `ref` is a preset in the same file."
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "description": "Its icon name."
+          },
+          "colour": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colour",
+            "description": "Its colour name."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref",
+          "slug",
+          "label"
+        ],
+        "title": "BundleItemTypeEntry",
+        "description": "One item type in a `menagerist-bundle` file of version 2.",
+        "examples": [
+          {
+            "attributes_schema": {
+              "properties": {
+                "condition": {
+                  "title": "Condition",
+                  "type": "string",
+                  "x-menagerist": {
+                    "kind": "choice",
+                    "list": {
+                      "$preset": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+                    }
+                  }
+                }
+              },
+              "type": "object"
+            },
+            "label": "Record",
+            "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
+            "slug": "record"
           }
         ]
       },
@@ -25770,6 +26063,86 @@
             "kind": "choice_list",
             "label": "Condition grades",
             "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+          }
+        ]
+      },
+      "BundleRelationshipTypeEntry": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its id within the file; an export uses the id."
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Its short name, as used in URLs."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Its name."
+          },
+          "reverse_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverse Label",
+            "description": "Its name read from the other end."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What it is for."
+          },
+          "directional": {
+            "type": "boolean",
+            "title": "Directional",
+            "description": "Whether it reads one way, not both.",
+            "default": true
+          },
+          "attributes_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes Schema",
+            "description": "Its fields, as an item type's are."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref",
+          "slug",
+          "label"
+        ],
+        "title": "BundleRelationshipTypeEntry",
+        "description": "One connection type in a `menagerist-bundle` file of version 2.",
+        "examples": [
+          {
+            "directional": true,
+            "label": "Wrote",
+            "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+            "reverse_label": "Written by",
+            "slug": "wrote"
           }
         ]
       },

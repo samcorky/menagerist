@@ -10,9 +10,11 @@ from app.modules.transfer.domain.errors import InvalidBundleError
 PRESET_MARKER = "$preset"
 
 # The envelope of a bundle file a person exports and imports. Version 1 carries
-# presets only; types, items and collections join it in later versions.
+# presets only; version 2 adds relationship types and item types. Items and
+# collections join it in later versions.
 BUNDLE_FORMAT = "menagerist-bundle"
-BUNDLE_VERSION = 1
+BUNDLE_VERSION = 2
+PRESETS_ONLY_VERSION = 1
 
 
 COVER_STYLES = ("sleeve", "poster", "box", "card")

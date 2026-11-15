@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
-	import { Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { Download, Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -14,6 +14,7 @@
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import { downloadBundle, exportTypeBundle, presetFilename } from '$lib/preset-packs';
 	import { slugify } from '$lib/utils.js';
 	import { loadExampleIds } from '$lib/examples';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -54,6 +55,7 @@
 
 	let confirmTarget = $state<NodeTypeResponse | null>(null);
 	let deletingId = $state<string | null>(null);
+	let exportingId = $state<string | null>(null);
 
 	async function fetchPage(after?: string) {
 		loading = true;
@@ -72,6 +74,20 @@
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
 		}
 		loading = false;
+	}
+
+	/** Save the type, with the lists it uses, as a file someone else can import. */
+	async function handleExport(cat: NodeTypeResponse) {
+		if (exportingId) return;
+		exportingId = cat.id;
+		try {
+			downloadBundle(await exportTypeBundle(cat.id), presetFilename(cat.label));
+		} catch (error) {
+			const description = error instanceof Error ? error.message : errorMessage(error);
+			toast.error("Couldn't export", { description });
+		} finally {
+			exportingId = null;
+		}
 	}
 
 	function sentinel(node: HTMLElement) {
@@ -300,6 +316,14 @@
 						<span class="hidden shrink-0 text-xs text-muted-foreground sm:inline">
 							{fieldCount(cat) === 1 ? '1 field' : `${fieldCount(cat)} fields`}
 						</span>
+						<IconButton
+							labelOnTouch={false}
+							label="Export item type"
+							disabled={exportingId !== null}
+							onclick={() => handleExport(cat)}
+						>
+							<Download />
+						</IconButton>
 						<IconButton labelOnTouch={false} label="Edit item type" onclick={() => openEdit(cat)}>
 							<Pencil />
 						</IconButton>

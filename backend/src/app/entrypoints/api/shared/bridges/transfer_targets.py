@@ -57,6 +57,7 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
     create_graph_uow,
     create_in_memory_graph_uow,
 )
+from app.modules.graph.application.choice_lists import LIST_KEY, NAMESPACE
 from app.modules.graph.application.create_edge import CreateEdge, CreateEdgeCommand
 from app.modules.graph.application.create_edge_type import (
     CreateEdgeType,
@@ -75,6 +76,8 @@ from app.modules.graph.application.delete_unused_node_type import (
     DeleteUnusedNodeType,
     DeleteUnusedNodeTypeCommand,
 )
+from app.modules.graph.application.get_edge_type import GetEdgeType, GetEdgeTypeQuery
+from app.modules.graph.application.get_node_type import GetNodeType, GetNodeTypeQuery
 from app.modules.graph.application.purge_edge import PurgeEdge, PurgeEdgeCommand
 from app.modules.graph.application.purge_node import PurgeNode, PurgeNodeCommand
 from app.modules.graph.domain.edge import Edge  # noqa: TC001
@@ -119,6 +122,7 @@ from app.modules.presets.domain.preset import Preset  # noqa: TC001
 from app.modules.presets.ports.preset_usage import PresetUsage
 from app.modules.presets.ports.unit_of_work import PresetRepos, PresetUnitOfWork
 from app.modules.transfer.domain.bundle import (
+    PRESET_MARKER,
     BundleCollection,
     BundleConnection,
     BundleItem,
@@ -444,6 +448,18 @@ def _collection_content(
 # recovers name and style: the media module stores nothing else about it.
 
 
+def _marked(schema: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Return a copy of `schema` with each linked list named by a `$preset` marker."""
+    if schema is None:
+        return None
+    result = copy.deepcopy(schema)
+    for prop in result.get("properties", {}).values():
+        extension = prop.get(NAMESPACE) if isinstance(prop, dict) else None
+        if isinstance(extension, dict) and LIST_KEY in extension:
+            extension[LIST_KEY] = {PRESET_MARKER: str(extension[LIST_KEY])}
+    return result
+
+
 def _resolved(
     schema: dict[str, Any] | None, presets: Mapping[str, uuid.UUID]
 ) -> dict[str, Any] | None:
@@ -625,6 +641,52 @@ class GraphPackTarget:
                 self._stores.uow(), self._access, source
             ).handle(command, self._actor)
         return Created(entity_id=node_type.id, content=_node_type_content(node_type))
+
+    async def read_item_types(
+        self, type_ids: Sequence[uuid.UUID]
+    ) -> list[BundleItemType]:
+        """Return the person's item types with `type_ids`, each `ref` its id."""
+        found: list[BundleItemType] = []
+        async with self._stores.read() as repos:
+            for type_id in type_ids:
+                node_type = await GetNodeType(repos, self._access).handle(
+                    GetNodeTypeQuery(node_type_id=type_id), self._actor
+                )
+                found.append(
+                    BundleItemType(
+                        ref=str(node_type.id),
+                        slug=str(node_type.slug),
+                        label=node_type.label,
+                        description=node_type.description,
+                        attributes_schema=_marked(node_type.attributes_schema),
+                        icon=node_type.icon,
+                        colour=node_type.colour,
+                    )
+                )
+        return found
+
+    async def read_relationship_types(
+        self, type_ids: Sequence[uuid.UUID]
+    ) -> list[BundleRelationshipType]:
+        """Return the person's relationship types with `type_ids`, each `ref` its id."""
+        found: list[BundleRelationshipType] = []
+        async with self._stores.read() as repos:
+            for type_id in type_ids:
+                edge_type = await GetEdgeType(repos, self._access).handle(
+                    GetEdgeTypeQuery(edge_type_id=type_id), self._actor
+                )
+                found.append(
+                    BundleRelationshipType(
+                        ref=str(edge_type.id),
+                        slug=str(edge_type.slug),
+                        label=edge_type.label,
+                        reverse_label=edge_type.reverse_label,
+                        description=edge_type.description,
+                        directional=edge_type.directional,
+                        attributes_schema=_marked(edge_type.attributes_schema),
+                    )
+                )
+        return found
 
     async def create_item(self, spec: BundleItem, *, type_slug: str) -> Created:
         """Create the item under `type_slug`."""

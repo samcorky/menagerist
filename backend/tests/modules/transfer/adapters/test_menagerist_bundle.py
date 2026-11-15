@@ -22,6 +22,16 @@ def _preset(**change: object) -> dict[str, Any]:
     return {k: v for k, v in preset.items() if v is not ...}
 
 
+def _type(**change: object) -> dict[str, Any]:
+    entry: dict[str, Any] = {"ref": "record", "slug": "record", "label": "Record"}
+    entry.update(change)
+    return entry
+
+
+def _rel(**change: object) -> dict[str, Any]:
+    return _type(ref="wrote", slug="wrote", label="Wrote", **change)
+
+
 def _file(*presets: object, **change: object) -> dict[str, Any]:
     data: dict[str, Any] = {
         "format": "menagerist-bundle",
@@ -43,7 +53,12 @@ def test_a_file_decodes_and_encodes_back_the_same() -> None:
         ("grades", "Grades", "Mint to poor."),
         ("other", "Grades", None),
     ]
-    assert CODEC.encode(bundle) == data
+    assert CODEC.encode(bundle) == {
+        **data,
+        "version": 2,
+        "relationship_types": [],
+        "item_types": [],
+    }
 
 
 def test_a_preset_may_leave_out_its_description() -> None:
@@ -60,7 +75,27 @@ def test_a_file_without_presets_is_an_empty_bundle() -> None:
 @pytest.mark.parametrize(
     ("data", "message"),
     [
-        (_file(version=2), "unsupported menagerist-bundle version 2"),
+        (_file(version=3), "unsupported menagerist-bundle version 3"),
+        (_file(item_types=[]), "unknown keys"),
+        (_file(version=2, item_types={}), "item_types must be a list"),
+        (_file(version=2, item_types=["x"]), r"item_types\[0\] must be an object"),
+        (_file(version=2, item_types=[{"ref": "t"}]), "needs label, slug"),
+        (
+            _file(version=2, item_types=[_type(slug=5)]),
+            "item_types\\[0\\] slug must be text",
+        ),
+        (
+            _file(version=2, item_types=[_type(attributes_schema=[])]),
+            "attributes_schema must be an object",
+        ),
+        (
+            _file(version=2, relationship_types=[_rel(directional="yes")]),
+            "directional must be true or false",
+        ),
+        (
+            _file(version=2, relationship_types=[_rel(colour="red")]),
+            "unknown keys",
+        ),
         (_file(extra=1), "unknown keys"),
         (_file(presets={}), "presets must be a list"),
         (_file("text"), r"presets\[0\] must be an object"),
@@ -117,3 +152,53 @@ def test_a_bundle_preset_round_trips_through_encode() -> None:
             "definition": {"a": 1},
         }
     ]
+
+
+def test_a_version_two_file_carries_types() -> None:
+    """Types decode with their optional parts, and encode back as written."""
+    data = _file(
+        _preset(),
+        version=2,
+        relationship_types=[
+            {
+                "ref": "wrote",
+                "slug": "wrote",
+                "label": "Wrote",
+                "reverse_label": "Written by",
+                "description": None,
+                "directional": False,
+                "attributes_schema": None,
+            }
+        ],
+        item_types=[
+            {
+                "ref": "record",
+                "slug": "record",
+                "label": "Record",
+                "description": "A disc.",
+                "attributes_schema": {"type": "object"},
+                "icon": "disc",
+                "colour": "blue",
+            }
+        ],
+    )
+
+    bundle = CODEC.decode(data)
+
+    assert [(t.slug, t.icon, t.colour) for t in bundle.item_types] == [
+        ("record", "disc", "blue")
+    ]
+    assert [(r.reverse_label, r.directional) for r in bundle.relationship_types] == [
+        ("Written by", False)
+    ]
+    assert CODEC.encode(bundle) == data
+
+
+def test_a_type_may_leave_out_what_is_optional() -> None:
+    """Only `ref`, `slug` and `label` are needed; a connection type reads one way."""
+    bundle = CODEC.decode(
+        _file(version=2, item_types=[_type()], relationship_types=[_rel()])
+    )
+
+    assert bundle.item_types[0].icon is None
+    assert bundle.relationship_types[0].directional is True
