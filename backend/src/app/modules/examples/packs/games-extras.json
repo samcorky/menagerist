@@ -24,10 +24,6 @@
         "weight": "Medium",
         "rating": 4,
         "condition": "Good",
-        "price_paid": {
-          "value": 31.5,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -46,7 +42,19 @@
             "done": true
           }
         ],
-        "notes": "Takes two plays to click, then it never leaves the table."
+        "notes": "Takes two plays to click, then it never leaves the table.",
+        "acquisition": [
+          {
+            "date": "2022",
+            "price": {
+              "value": 31.5,
+              "currency": "GBP"
+            },
+            "source": "Online",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -65,10 +73,6 @@
         "weight": "Light",
         "rating": 4,
         "condition": "Worn",
-        "price_paid": {
-          "value": 22.0,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -87,7 +91,19 @@
             "done": true
           }
         ],
-        "notes": "The cardboard tankards have gone soft at the edges."
+        "notes": "The cardboard tankards have gone soft at the edges.",
+        "acquisition": [
+          {
+            "date": "2023-06-14",
+            "price": {
+              "value": 22.0,
+              "currency": "GBP"
+            },
+            "source": "Games caf\u00e9",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -106,10 +122,6 @@
         ],
         "weight": "Medium",
         "condition": "New",
-        "price_paid": {
-          "value": 36.0,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -128,7 +140,19 @@
             "done": true
           }
         ],
-        "notes": "Bought on a whim; not played yet."
+        "notes": "Bought on a whim; not played yet.",
+        "acquisition": [
+          {
+            "date": "2024-02",
+            "price": {
+              "value": 36.0,
+              "currency": "GBP"
+            },
+            "source": "The Dice Tower shop",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -147,10 +171,6 @@
         "weight": "Light",
         "rating": 3,
         "condition": "Good",
-        "price_paid": {
-          "value": 19.99,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -169,7 +189,19 @@
             "done": true
           }
         ],
-        "notes": "Good with younger players."
+        "notes": "Good with younger players.",
+        "acquisition": [
+          {
+            "date": "2021-03",
+            "price": {
+              "value": 19.99,
+              "currency": "GBP"
+            },
+            "source": "Car boot sale",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     },
     {
@@ -187,10 +219,6 @@
         ],
         "weight": "Medium",
         "condition": "New",
-        "price_paid": {
-          "value": 14.0,
-          "currency": "GBP"
-        },
         "complete": [
           {
             "text": "Box",
@@ -209,7 +237,19 @@
             "done": true
           }
         ],
-        "notes": "Plays best once the base game feels easy."
+        "notes": "Plays best once the base game feels easy.",
+        "acquisition": [
+          {
+            "date": "2022-11",
+            "price": {
+              "value": 14.0,
+              "currency": "GBP"
+            },
+            "source": "Online",
+            "how": "Bought"
+          }
+        ],
+        "status": "Owned"
       }
     }
   ],

@@ -1,0 +1,86 @@
+{
+  "id": "field-acquisition",
+  "title": "Acquisition",
+  "description": "When, where from, how and for how much you got it; a new row for each time.",
+  "section": "field",
+  "presets": [
+    {
+      "kind": "field",
+      "label": "Acquisition",
+      "description": null,
+      "definition": {
+        "property": {
+          "title": "Acquisition",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "title": "Date",
+                "type": "string",
+                "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+                "x-menagerist": {
+                  "kind": "partialdate"
+                }
+              },
+              "price": {
+                "title": "Price",
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "title": "Value",
+                    "type": "number"
+                  },
+                  "currency": {
+                    "title": "Currency",
+                    "type": "string"
+                  }
+                },
+                "x-menagerist": {
+                  "kind": "money"
+                }
+              },
+              "source": {
+                "title": "Source",
+                "type": "string",
+                "x-menagerist": {
+                  "kind": "text"
+                }
+              },
+              "how": {
+                "title": "How",
+                "type": "string",
+                "enum": [
+                  "Bought",
+                  "Gift",
+                  "Inherited",
+                  "Traded"
+                ],
+                "x-menagerist": {
+                  "kind": "choice"
+                }
+              },
+              "notes": {
+                "title": "Notes",
+                "type": "string",
+                "x-menagerist": {
+                  "kind": "longtext"
+                }
+              }
+            }
+          },
+          "x-menagerist": {
+            "kind": "group",
+            "columns": [
+              "date",
+              "price",
+              "source",
+              "how",
+              "notes"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
