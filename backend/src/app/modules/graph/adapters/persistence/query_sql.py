@@ -14,7 +14,7 @@ import json
 import operator
 import sys
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Final, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal, cast as type_cast
 
 from sqlalchemy import (
     Float,
@@ -44,6 +44,7 @@ from app.modules.graph.adapters.persistence.models import (
     NodeFavouriteModel,
     NodeModel,
 )
+from app.modules.graph.adapters.persistence.reach_sql import walk
 from app.modules.graph.adapters.persistence.search_sql import (
     like_pattern,
     search_clause,
@@ -82,9 +83,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from sqlalchemy import SQLColumnExpression
-    from sqlalchemy.sql.selectable import TableValuedAlias
+    from sqlalchemy.sql.selectable import FromClause, TableValuedAlias
 
     from app.modules.graph.adapters.persistence.query_env import QueryEnv
+    from app.modules.graph.domain.reach import ReachDirection
 
 type _Expr = ColumnElement[Any]
 type _Bool = ColumnElement[bool]
@@ -484,6 +486,43 @@ def _linked(
     )
 
 
+def _deep(condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv) -> _Bool:
+    """The item has (a matching) far item within `depth` hops of one relationship.
+
+    `to` is answered from the other end: the items that reach `item` by `out`
+    are the ones `item` reaches by `in`, so one uncorrelated walk from `item`
+    replaces a walk per row. A far-end filter needs the walk per row, written as
+    a nested recursive CTE correlated to the row.
+    """
+    relationship = type_cast("str", condition.relationship)
+    direction = type_cast("ReachDirection", condition.direction)
+    if condition.mode == "to":
+        steps = walk(
+            type_cast("uuid.UUID", condition.item),
+            relationship=relationship,
+            direction="in" if direction == "out" else "out",
+            max_depth=condition.depth,
+            scope=env.scope,
+        )
+        inside = select(steps.c.node_id).where(steps.c.node_id != condition.item)
+        return NodeModel.id.in_(inside)
+    steps = walk(
+        type_cast("ColumnElement[uuid.UUID]", NodeModel.id),
+        relationship=relationship,
+        direction=direction,
+        max_depth=condition.depth,
+        scope=env.scope,
+        nested=True,
+    )
+    tests: list[_Bool] = [steps.c.node_id != NodeModel.id]
+    source: FromClause = steps
+    if condition.where is not None:
+        far = NodeModel.__table__.alias()
+        source = steps.join(far, far.c.id == steps.c.node_id)
+        tests.append(ClauseAdapter(far).traverse(_group(condition.where, ctx, env)))
+    return exists(select(literal(1)).select_from(source).where(*tests))
+
+
 def _connection(
     condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv
 ) -> _Bool:
@@ -498,6 +537,9 @@ def _connection(
         return false()
     if condition.mode == "to" and condition.item not in ctx.visible_items:
         return false()
+    if condition.depth > 1:
+        found_deep = _deep(condition, ctx, env)
+        return not_(found_deep) if condition.mode == "none" else found_deep
     either = condition.direction == "any" or (info is not None and not info.directional)
     sides: tuple[Literal["out", "in"], ...] = ("out", "in")
     if not either:

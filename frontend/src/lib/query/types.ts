@@ -39,11 +39,18 @@ export type CollectionCondition = { kind: 'collection'; mode: 'any' | 'none'; in
  * `to` needs one and takes no `where`. `where` filters the linked item and cannot hold
  * another connection.
  */
+export const MAX_CONNECTION_DEPTH = 25;
+
+/**
+ * `depth` follows the relationship that many steps (1 to 25, default 1) and needs a named
+ * relationship with a direction of `out` or `in`.
+ */
 export type ConnectionCondition = {
 	kind: 'connection';
 	mode: 'exists' | 'none' | 'to';
 	relationship?: string;
 	direction?: 'out' | 'in' | 'any';
+	depth?: number;
 	item?: string;
 	where?: Group;
 };

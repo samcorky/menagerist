@@ -2153,6 +2153,95 @@
         },
         "sort": []
       }
+    },
+    {
+      "name": "connection depth 1",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "depth": 1,
+              "relationship": "contains",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection depth 25",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "depth": 25,
+              "relationship": "contains",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection to an item at depth",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "to",
+              "item": "018f5c2e-7b1a-7c3e-9d4f-1a2b3c4d5e6f",
+              "relationship": "contains",
+              "direction": "in",
+              "depth": 3
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection exists with far-end filter at depth",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "depth": 4,
+              "where": {
+                "op": "and",
+                "children": [
+                  {
+                    "kind": "tag",
+                    "mode": "any",
+                    "tags": [
+                      "fragile"
+                    ]
+                  }
+                ]
+              },
+              "relationship": "contains",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
     }
   ],
   "invalid": [
@@ -7062,6 +7151,125 @@
                   }
                 ]
               }
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection depth zero",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "depth": 0,
+              "relationship": "contains",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection depth above the cap",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "depth": 26,
+              "relationship": "contains",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection depth is a string",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "depth": "3",
+              "relationship": "contains",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection depth is a boolean",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "depth": true,
+              "relationship": "contains",
+              "direction": "out"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection depth with direction any",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "relationship": "contains",
+              "direction": "any",
+              "depth": 2
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "connection depth without a relationship",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "connection",
+              "mode": "exists",
+              "direction": "out",
+              "depth": 2
             }
           ]
         },

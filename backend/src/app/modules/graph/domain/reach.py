@@ -7,12 +7,22 @@ from typing import Final, Literal
 from app.shared_kernel.errors import ValidationError
 
 MAX_REACH_DEPTH: Final = 25
+MAX_REACHED: Final = 10_000
 
 type ReachDirection = Literal["out", "in"]
 
 
 class InvalidReachDepthError(ValidationError):
     """Raised when a depth is below one or above `MAX_REACH_DEPTH`."""
+
+
+class ReachTooLargeError(ValidationError):
+    """Raised when a walk finds more than `MAX_REACHED` items or runs too long."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This reaches too many items to follow. Try fewer steps or narrow it down."
+        )
 
 
 @dataclass(frozen=True, kw_only=True)

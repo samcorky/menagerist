@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
+    from app.modules.graph.domain.reach import ReachDirection
 
 
 class Links(Protocol):
@@ -21,6 +22,18 @@ class Links(Protocol):
 
         Only far items that are live and in `scope` are returned.
         """
+        ...
+
+    def reached(
+        self,
+        node_id: uuid.UUID,
+        *,
+        relationship: str,
+        direction: ReachDirection,
+        max_depth: int,
+        scope: ContentFilter,
+    ) -> list[Node]:
+        """The items `NodeRepository.reach` finds from the item, as items."""
         ...
 
 

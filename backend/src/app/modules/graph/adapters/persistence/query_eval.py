@@ -8,7 +8,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import UTC, date
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from app.modules.graph.adapters.persistence.text_match import (
     description_blank,
@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from app.modules.graph.adapters.persistence.query_env import QueryEnv
     from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
+    from app.modules.graph.domain.reach import ReachDirection
 
 _NUMERIC = frozenset({"number", "duration", "rating"})
 _TEXTUAL = frozenset({"text", "url", "email", "phone", "longtext"})
@@ -332,6 +333,29 @@ def _direction_ok(
     return near == node.id
 
 
+def _deep_matches(
+    node: Node, condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv
+) -> bool:
+    """A connection followed through several hops, to an item or one matching `where`.
+
+    Parsing guarantees a named relationship and a direction of `out` or `in`;
+    resolution has already dropped a relationship with no direction.
+    """
+    relationship = cast("str", condition.relationship)
+    found = env.links is not None and any(
+        (condition.mode != "to" or far.id == condition.item)
+        and (condition.where is None or matches(far, condition.where, ctx, env))
+        for far in env.links.reached(
+            node.id,
+            relationship=relationship,
+            direction=cast("ReachDirection", condition.direction),
+            max_depth=condition.depth,
+            scope=env.scope,
+        )
+    )
+    return found != (condition.mode == "none")
+
+
 def _connection_matches(
     node: Node, condition: ConnectionCondition, ctx: ResolvedQuery, env: QueryEnv
 ) -> bool:
@@ -346,6 +370,8 @@ def _connection_matches(
         return False
     if condition.mode == "to" and condition.item not in ctx.visible_items:
         return False
+    if condition.depth > 1:
+        return _deep_matches(node, condition, ctx, env)
     directional = info is None or info.directional
     found = env.links is not None and any(
         (slug is None or edge.type == slug)

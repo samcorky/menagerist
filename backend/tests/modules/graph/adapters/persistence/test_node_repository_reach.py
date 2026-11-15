@@ -18,6 +18,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
+from app.modules.graph.domain import reach as reach_rules
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.shared_kernel.content_filter import ContentFilter
@@ -238,3 +239,28 @@ async def test_a_long_chain_is_cut_at_the_depth_limit(store: Store) -> None:
 
     assert [r.depth for r in found] == list(range(1, 26))
     assert found[-1].node_id == chain[25].id
+
+
+async def test_reaching_more_than_the_cap_is_refused(
+    store: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A walk that finds more items than the cap fails rather than truncating."""
+    monkeypatch.setattr(reach_rules, "MAX_REACHED", 2)
+    box = await store.item("box")
+    for name in ("a", "b", "c"):
+        await store.link(box, await store.item(name))
+
+    with pytest.raises(reach_rules.ReachTooLargeError):
+        await store.reach(box)
+
+
+async def test_reaching_exactly_the_cap_is_allowed(
+    store: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cap is a ceiling, not an exclusive bound."""
+    monkeypatch.setattr(reach_rules, "MAX_REACHED", 2)
+    box = await store.item("box")
+    for name in ("a", "b"):
+        await store.link(box, await store.item(name))
+
+    assert len(await store.reach(box)) == 2

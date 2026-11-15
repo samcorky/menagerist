@@ -6,6 +6,7 @@ import {
 	MAX_SORT_KEYS,
 	MAX_TEXT_LENGTH,
 	type Condition,
+	MAX_CONNECTION_DEPTH,
 	type ConnectionCondition,
 	type Group,
 	type Node,
@@ -217,6 +218,14 @@ function connectionCondition(data: Rec, budget: Budget, farEnd: boolean): Condit
 		const relationship = str(data.relationship);
 		if (relationship === null) return null;
 		out.relationship = relationship;
+	}
+	if (data.depth !== undefined) {
+		const { depth } = data;
+		if (typeof depth !== 'number' || !Number.isInteger(depth)) return null;
+		if (depth < 1 || depth > MAX_CONNECTION_DEPTH) return null;
+		// Several steps only make sense along a named relationship with a direction.
+		if (depth > 1 && (!out.relationship || !out.direction || out.direction === 'any')) return null;
+		out.depth = depth;
 	}
 	const hasWhere = data.where !== undefined && data.where !== null;
 	if (mode === 'to') {

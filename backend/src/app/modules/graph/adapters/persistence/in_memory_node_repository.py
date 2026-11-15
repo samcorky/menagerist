@@ -12,6 +12,7 @@ from app.modules.graph.adapters.persistence.query_eval import (
 from app.modules.graph.adapters.persistence.text_match import fold, text_matches
 from app.modules.graph.application.field_kinds import KIND_OPERATORS
 from app.modules.graph.application.schema_meta import NAMESPACE
+from app.modules.graph.domain import reach as reach_rules
 from app.modules.graph.domain.query import ItemFieldUse, SearchHit, TypeCount
 from app.modules.graph.domain.reach import Reached
 
@@ -161,6 +162,8 @@ class InMemoryNodeRepository:
             frontier = reached
             if not frontier:
                 break
+        if len(found) > reach_rules.MAX_REACHED:
+            raise reach_rules.ReachTooLargeError
         return found
 
     def _visible(self, scope: ContentFilter) -> builtins.list[Node]:
