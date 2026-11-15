@@ -24,8 +24,14 @@ from app.modules.transfer.domain.errors import InvalidBundleError
 _ENVELOPE = {"format", "version", "presets"}
 _TYPE_SECTIONS = {"relationship_types", "item_types"}
 _CONTENT_SECTIONS = {"items", "connections", "collections"}
-_ITEM_REQUIRED = {"ref", "type_ref", "name"}
-_ITEM_KEYS = _ITEM_REQUIRED | {"description", "attributes", "tags", "extra_schema"}
+_ITEM_REQUIRED = {"ref", "name"}
+_ITEM_KEYS = _ITEM_REQUIRED | {
+    "type_ref",
+    "description",
+    "attributes",
+    "tags",
+    "extra_schema",
+}
 _CONNECTION_REQUIRED = {"source_ref", "target_ref", "type_ref"}
 _CONNECTION_KEYS = _CONNECTION_REQUIRED | {"attributes"}
 _COLLECTION_REQUIRED = {"ref", "name"}
@@ -150,7 +156,11 @@ def _item(raw: object, n: int) -> BundleItem:
         raise InvalidBundleError(f"{where} tags must be a list of text")
     return BundleItem(
         ref=entry["ref"],
-        type_ref=_ref_text(entry, "type_ref", where),
+        type_ref=(
+            None
+            if entry.get("type_ref") is None
+            else _ref_text(entry, "type_ref", where)
+        ),
         name=_text(entry["name"], f"{where} name"),
         description=_optional_text(entry, "description", where),
         attributes=_object(entry, "attributes", where),
@@ -213,7 +223,7 @@ def _check_links(bundle: Bundle) -> None:
     """Refuse a file whose items, connections or collections name what it lacks."""
     item_types = {t.ref for t in bundle.item_types}
     for item in bundle.items:
-        if item.type_ref not in item_types:
+        if item.type_ref is not None and item.type_ref not in item_types:
             raise InvalidBundleError(
                 f"item '{item.ref}' has type '{item.type_ref}', not in the file"
             )

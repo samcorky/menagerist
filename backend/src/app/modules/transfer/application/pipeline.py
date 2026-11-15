@@ -240,7 +240,7 @@ class _Planner:
         covers = self._extras.covers
         styles = self._extras.cover_styles
         for spec in self._bundle.items:
-            if covers is None or spec.type_ref not in styles:
+            if covers is None or spec.type_ref is None or spec.type_ref not in styles:
                 continue
             name = self._item_names[spec.ref]
             if (EntityKind.ITEM, spec.ref) in self._taken_back:
@@ -379,9 +379,9 @@ class _Applier:
                 self._item_names[spec.ref] = adoption.content["name"]
                 await self._took_back(adoption, spec.ref, spec.name)
                 continue
-            created = await self._graph.create_item(
-                spec, type_slug=self._type_slugs[spec.type_ref]
-            )
+            type_ref = spec.type_ref
+            type_slug = self._type_slugs[type_ref] if type_ref else None
+            created = await self._graph.create_item(spec, type_slug=type_slug)
             self._item_ids[spec.ref] = created.entity_id
             self._item_names[spec.ref] = spec.name
             await self._made(kind, spec.ref, spec.name, created)
@@ -439,7 +439,7 @@ class _Applier:
             if (adoption := self._adoption(EntityKind.COVER, spec.ref)) is not None:
                 await self._took_back(adoption, spec.ref, name)
                 continue
-            style = self._extras.cover_styles[spec.type_ref]
+            style = self._extras.cover_styles[spec.type_ref or ""]
             created = await covers.create(self._item_ids[spec.ref], name, style)
             await self._made(EntityKind.COVER, spec.ref, name, created)
 

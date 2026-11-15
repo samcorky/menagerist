@@ -310,7 +310,7 @@ def test_an_item_and_a_connection_may_leave_out_what_is_optional() -> None:
     ("data", "message"),
     [
         (_v3(items=["x"]), r"items\[0\] must be an object"),
-        (_v3(items=[{"ref": "blue"}]), "needs name, type_ref"),
+        (_v3(items=[{"ref": "blue"}]), "needs name"),
         (_v3(items=[_item(tags="jazz")]), "tags must be a list of text"),
         (_v3(items=[_item(tags=[5])]), "tags must be a list of text"),
         (_v3(items=[_item(attributes=[])]), "attributes must be an object"),
@@ -353,6 +353,19 @@ def test_a_malformed_version_three_file_is_refused(
     """Items, connections and collections are checked against each other."""
     with pytest.raises(InvalidBundleError, match=message):
         CODEC.decode(data)
+
+
+@pytest.mark.parametrize("type_ref", [None, ...])
+def test_an_item_may_have_no_type(type_ref: object) -> None:
+    """An item with no type is written with a null type and read back the same."""
+    item = {"ref": "loose", "name": "Loose end", "type_ref": type_ref}
+    item = {k: v for k, v in item.items() if v is not ...}
+    data = _v3(items=[item], connections=[], collections=[])
+
+    bundle = CODEC.decode(data)
+
+    assert bundle.items[0].type_ref is None
+    assert CODEC.encode(bundle)["items"][0]["type_ref"] is None
 
 
 def test_a_file_with_too_many_items_is_refused() -> None:

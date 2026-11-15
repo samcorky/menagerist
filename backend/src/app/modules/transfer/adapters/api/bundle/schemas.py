@@ -172,7 +172,10 @@ class BundleItemEntry(BaseModel):
     )
 
     ref: str = Field(description="Its id within the file; an export uses the id.")
-    type_ref: str = Field(description="The `ref` of its item type in the same file.")
+    type_ref: str | None = Field(
+        default=None,
+        description="The `ref` of its item type in the same file; none for no type.",
+    )
     name: str = Field(description="Its name.")
     description: str | None = Field(default=None, description="Its notes.")
     attributes: dict[str, Any] = Field(

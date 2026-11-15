@@ -26182,9 +26182,16 @@
             "description": "Its id within the file; an export uses the id."
           },
           "type_ref": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Type Ref",
-            "description": "The `ref` of its item type in the same file."
+            "description": "The `ref` of its item type in the same file; none for no type."
           },
           "name": {
             "type": "string",
@@ -26235,7 +26242,6 @@
         "type": "object",
         "required": [
           "ref",
-          "type_ref",
           "name"
         ],
         "title": "BundleItemEntry",

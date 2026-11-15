@@ -162,11 +162,11 @@ class BundleItemType:
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class BundleItem:
-    """An item (a node) the pack creates."""
+    """An item (a node) the pack creates; `type_ref` is `None` for an untyped item."""
 
     ref: str
-    type_ref: str
     name: str
+    type_ref: str | None = None
     description: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
     tags: tuple[str, ...] = ()

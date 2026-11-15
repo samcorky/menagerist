@@ -131,8 +131,8 @@ class ExamplePack(Bundle):
             if external is not None:
                 found.add((kind, *external))
 
-        for item in self.items:
-            add(EntityKind.ITEM_TYPE, item.type_ref)
+        for type_ref in (i.type_ref for i in self.items if i.type_ref is not None):
+            add(EntityKind.ITEM_TYPE, type_ref)
         for c in self.connections:
             add(EntityKind.ITEM, c.source_ref)
             add(EntityKind.ITEM, c.target_ref)
@@ -225,6 +225,8 @@ class ExamplePack(Bundle):
         item_refs = {i.ref for i in self.items}
         relationship_refs = {t.ref for t in self.relationship_types}
         for item in self.items:
+            if item.type_ref is None:
+                raise InvalidBundleError(f"item '{item.ref}' needs a type")
             if self._external(item.type_ref) is None and (
                 item.type_ref not in item_type_refs
             ):

@@ -274,7 +274,7 @@ async def test_pack_presets_are_used_and_names_are_unique(pack_id: str) -> None:
         assert preset.ref in used, f"{pack_id}: preset '{preset.ref}' is unused"
     seen: set[tuple[str, str]] = set()
     for item in pack.items:
-        key = (item.type_ref, item.name)
+        key = (item.type_ref or "", item.name)
         assert key not in seen, f"{pack_id}: duplicate name '{item.name}'"
         seen.add(key)
 
@@ -346,7 +346,7 @@ async def test_pack_attributes_match_their_type_schemas(pack_id: str) -> None:
 
     problems: list[str] = []
     for item in pack.items:
-        schema = item_schemas[item.type_ref]
+        schema = item_schemas[item.type_ref or ""]
         if item.extra_schema:
             properties = {
                 **((schema or {}).get("properties", {})),

@@ -650,3 +650,9 @@ def test_validate_catalogue_rejects_a_dangling_connection_source() -> None:
         InvalidBundleError, match=r"demo:zzz, which demo does not define"
     ):
         validate_catalogue({"demo": base, "extras": addon})
+
+
+def test_a_pack_item_needs_a_type() -> None:
+    """Unlike a file, a pack's items all have an item type."""
+    with pytest.raises(InvalidBundleError, match="item 'a' needs a type"):
+        _pack(items=(BundleItem(ref="a", name="A"),), connections=())
