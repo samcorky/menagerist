@@ -124,7 +124,8 @@ class _BigCollection:
     """A collection target whose one collection holds more items than a file can."""
 
     async def read_collections(
-        self, collection_ids: Any  # noqa: ANN401
+        self,
+        collection_ids: Any,  # noqa: ANN401
     ) -> list[BundleCollection]:
         return [
             BundleCollection(

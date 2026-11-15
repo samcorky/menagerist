@@ -1050,9 +1050,7 @@ class CollectionPackTarget:
                     ref=str(collection.id),
                     name=collection.name,
                     description=collection.description,
-                    item_refs=(
-                        () if is_smart else tuple(sorted(str(i) for i in live))
-                    ),
+                    item_refs=(() if is_smart else tuple(sorted(str(i) for i in live))),
                     definition=(
                         copy.deepcopy(dict(collection.definition))
                         if collection.definition is not None

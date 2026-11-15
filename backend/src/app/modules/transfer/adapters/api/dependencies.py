@@ -33,9 +33,7 @@ def get_plan_bundle_import_use_case(
     codecs: Annotated[CodecRegistry, Depends(get_codecs)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
-    collections: Annotated[
-        CollectionPackTarget, Depends(get_collection_pack_target)
-    ],
+    collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
 ) -> PlanBundleImport:
     return PlanBundleImport(guard, codecs, presets, graph, collections)
 
@@ -45,9 +43,7 @@ def get_import_bundle_use_case(
     codecs: Annotated[CodecRegistry, Depends(get_codecs)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
-    collections: Annotated[
-        CollectionPackTarget, Depends(get_collection_pack_target)
-    ],
+    collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
 ) -> ImportBundle:
     return ImportBundle(guard, codecs, presets, graph, collections)
 
@@ -57,8 +53,6 @@ def get_export_bundle_use_case(
     codecs: Annotated[CodecRegistry, Depends(get_codecs)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
-    collections: Annotated[
-        CollectionPackTarget, Depends(get_collection_pack_target)
-    ],
+    collections: Annotated[CollectionPackTarget, Depends(get_collection_pack_target)],
 ) -> ExportBundle:
     return ExportBundle(guard, codecs, presets, graph, collections)
