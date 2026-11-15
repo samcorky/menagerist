@@ -67,10 +67,11 @@ rules:
   ibm-no-operation-requestbody: error
   oas3-unused-component: error
 
-  # --- Documentation, added as routes are touched (#303) ------------------------------
-  ibm-property-description: warn
-  ibm-schema-description: warn
-  ibm-success-response-example: warn
+  # Every property and schema is described. Success examples are lifted from each
+  # response model's own example (entrypoints/api/openapi_examples.py).
+  ibm-property-description: error
+  ibm-schema-description: error
+  ibm-success-response-example: error
 
 # Exceptions for single schemas or paths, so each rule still guards everything else.
 overrides:

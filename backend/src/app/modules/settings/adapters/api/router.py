@@ -94,6 +94,11 @@ _SCHEMA_200: dict[int | str, dict[str, Any]] = {
         },
         "content": {
             "application/json": {
+                "schema": {
+                    "description": (
+                        "A JSON Schema 2020-12 document with one property per setting."
+                    )
+                },
                 "example": {
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "type": "object",
@@ -107,7 +112,7 @@ _SCHEMA_200: dict[int | str, dict[str, Any]] = {
                         }
                     },
                     "additionalProperties": False,
-                }
+                },
             }
         },
     }

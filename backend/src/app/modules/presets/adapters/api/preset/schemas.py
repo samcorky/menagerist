@@ -49,10 +49,15 @@ class CreatePresetRequest(RequestModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_CREATE_PRESET_EXAMPLE]})
 
-    kind: str
-    label: str
-    description: str | None = Field(default=None)
-    definition: dict[str, Any] = Field(default_factory=dict)
+    kind: str = Field(
+        description="What it saves: `field`, `field_set` or `choice_list`."
+    )
+    label: str = Field(description="Its name.")
+    description: str | None = Field(description="Free text about it.", default=None)
+    definition: dict[str, Any] = Field(
+        description="What is saved; for a `field`, its JSON Schema under `property`.",
+        default_factory=dict,
+    )
 
     def to_command(self) -> CreatePresetCommand:
         """Convert this request into a `CreatePresetCommand`."""
@@ -74,9 +79,11 @@ class UpdatePresetRequest(RequestModel):
         json_schema_extra={"examples": [{"label": "Condition (graded)"}]}
     )
 
-    label: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    definition: dict[str, Any] | None = Field(default=None)
+    label: str | None = Field(description="Its name.", default=None)
+    description: str | None = Field(description="Free text about it.", default=None)
+    definition: dict[str, Any] | None = Field(
+        description="What is saved; a change bumps `version`.", default=None
+    )
 
     def to_command(self, preset_id: uuid.UUID) -> UpdatePresetCommand:
         """Convert this request into an `UpdatePresetCommand` for `preset_id`."""
@@ -93,14 +100,18 @@ class PresetResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_PRESET_EXAMPLE]})
 
-    id: uuid.UUID
-    kind: str
-    label: str
-    description: str | None = Field(default=None)
-    definition: dict[str, Any]
-    version: int
-    created_at: datetime
-    updated_at: datetime
+    id: uuid.UUID = Field(description="The saved field's id.")
+    kind: str = Field(
+        description="What it saves: `field`, `field_set` or `choice_list`."
+    )
+    label: str = Field(description="Its name.")
+    description: str | None = Field(description="Free text about it.", default=None)
+    definition: dict[str, Any] = Field(
+        description="What is saved; for a `field`, its JSON Schema under `property`."
+    )
+    version: int = Field(description="Goes up by one each time the settings change.")
+    created_at: datetime = Field(description="When it was created.")
+    updated_at: datetime = Field(description="When it last changed.")
 
     @classmethod
     def from_domain(cls, preset: Preset) -> PresetResponse:

@@ -29,12 +29,21 @@ class CreateEdgeTypeRequest(RequestModel):
         }
     )
 
-    slug: str
-    label: str
-    reverse_label: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    directional: bool = Field(default=True)
-    attributes_schema: dict[str, Any] | None = Field(default=None)
+    slug: str = Field(
+        description="Its short name, unique among yours; connections refer to it."
+    )
+    label: str = Field(description="Its name, read from the source item.")
+    reverse_label: str | None = Field(
+        description="Its name read from the target item, such as `owned by`.",
+        default=None,
+    )
+    description: str | None = Field(description="Free text about it.", default=None)
+    directional: bool = Field(
+        description="Whether the connection has a direction.", default=True
+    )
+    attributes_schema: dict[str, Any] | None = Field(
+        description="Its fields, as a JSON Schema.", default=None
+    )
 
     def to_command(self) -> CreateEdgeTypeCommand:
         """Convert to the application-layer command."""
@@ -55,11 +64,19 @@ class UpdateEdgeTypeRequest(RequestModel):
         json_schema_extra={"examples": [{"label": "Directed by", "directional": False}]}
     )
 
-    label: str | None = Field(default=None)
-    reverse_label: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    directional: bool | None = Field(default=None)
-    attributes_schema: dict[str, Any] | None = Field(default=None)
+    label: str | None = Field(
+        description="Its name, read from the source item.", default=None
+    )
+    reverse_label: str | None = Field(
+        description="Its name read from the target item.", default=None
+    )
+    description: str | None = Field(description="Free text about it.", default=None)
+    directional: bool | None = Field(
+        description="Whether the connection has a direction.", default=None
+    )
+    attributes_schema: dict[str, Any] | None = Field(
+        description="Its fields, as a JSON Schema; replaces them all.", default=None
+    )
 
     def to_command(self, edge_type_id: uuid.UUID) -> UpdateEdgeTypeCommand:
         """Convert to the application-layer command."""
@@ -94,15 +111,19 @@ class EdgeTypeResponse(BaseModel):
         }
     )
 
-    id: uuid.UUID
-    slug: str
-    label: str
-    reverse_label: str | None
-    description: str | None
-    directional: bool
-    attributes_schema: dict[str, Any] | None
-    created_at: datetime
-    updated_at: datetime
+    id: uuid.UUID = Field(description="The connection type's id.")
+    slug: str = Field(description="Its short name; connections refer to it.")
+    label: str = Field(description="Its name, read from the source item.")
+    reverse_label: str | None = Field(
+        description="Its name read from the target item; null if the same."
+    )
+    description: str | None = Field(description="Free text about it.")
+    directional: bool = Field(description="Whether the connection has a direction.")
+    attributes_schema: dict[str, Any] | None = Field(
+        description="Its fields, as a JSON Schema."
+    )
+    created_at: datetime = Field(description="When it was created.")
+    updated_at: datetime = Field(description="When it last changed.")
 
     @classmethod
     def from_domain(cls, edge_type: EdgeType) -> EdgeTypeResponse:

@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 from starlette.responses import Response
@@ -130,7 +130,7 @@ async def _chunks(upload: UploadFile) -> AsyncGenerator[bytes]:
     },
 )
 async def stage_media(
-    file: UploadFile,
+    file: Annotated[UploadFile, File(description="The file to upload.")],
     use_case: Annotated[StageMedia, Depends(get_stage_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     settings: Annotated[MediaSettings, Depends(get_media_settings)],
@@ -177,13 +177,18 @@ async def stage_media(
     },
 )
 async def upload_and_attach_media(
-    file: UploadFile,
+    file: Annotated[UploadFile, File(description="The file to upload.")],
     use_case: Annotated[UploadAndAttachMedia, Depends(get_upload_and_attach_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     settings: Annotated[MediaSettings, Depends(get_media_settings)],
     target_type: Annotated[AttachmentTarget, Form()],
-    target_id: Annotated[uuid.UUID, Form()],
-    attribute_key: Annotated[AttachmentKey | None, Form()] = None,
+    target_id: Annotated[
+        uuid.UUID, Form(description="The id of what to attach it to.")
+    ],
+    attribute_key: Annotated[
+        AttachmentKey | None,
+        Form(description="The slot it fills, such as `cover`; none for a plain one."),
+    ] = None,
 ) -> MediaAttachmentResponse:
     """Stream a file to storage and attach it to a graph entity in one request."""
     sniffed_content_type, stream = await sniff_and_rechain(_chunks(file))
@@ -287,6 +292,7 @@ async def update_media(
 @router.get(
     "/{asset_id}/content",
     operation_id="stream_media_content",
+    response_class=Response,
     response_model=None,
     responses={
         200: {"content": {"application/octet-stream": {"schema": _BINARY}}},
@@ -331,6 +337,7 @@ async def stream_media_content(
 @router.get(
     "/{asset_id}/thumbnail",
     operation_id="stream_media_thumbnail",
+    response_class=Response,
     dependencies=[Depends(rate_limited(RateLimitBucket.THUMBNAILS))],
     response_model=None,
     responses={

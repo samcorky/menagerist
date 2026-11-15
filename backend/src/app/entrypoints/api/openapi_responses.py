@@ -14,7 +14,11 @@ from typing import Any
 
 from app.entrypoints.api.shared.http.problem_response import (
     INSTANCE_PLACEHOLDER,
+    PROBLEM_INSTANCE_DESCRIPTION,
     PROBLEM_JSON,
+    PROBLEM_STATUS_DESCRIPTION,
+    PROBLEM_TITLE_DESCRIPTION,
+    PROBLEM_TYPE_DESCRIPTION,
     ProblemDetail,
     problem_example,
 )
@@ -56,29 +60,44 @@ def _validation_problem_schema() -> dict[str, Any]:
     return {
         "type": "object",
         "title": "ValidationProblem",
+        "description": (
+            "An RFC 9457 problem for a request that could not be parsed, with one"
+            + " entry in `detail` per offending field."
+        ),
         "required": ["type", "title", "status", "detail", "instance"],
         "properties": {
-            "type": {"type": "string"},
-            "title": {"type": "string"},
-            "status": {"type": "integer"},
+            "type": {"type": "string", "description": PROBLEM_TYPE_DESCRIPTION},
+            "title": {"type": "string", "description": PROBLEM_TITLE_DESCRIPTION},
+            "status": {"type": "integer", "description": PROBLEM_STATUS_DESCRIPTION},
             "detail": {
                 "type": "array",
+                "description": "One entry per field that could not be accepted.",
                 "items": {
                     "type": "object",
                     "required": ["type", "loc", "msg"],
                     "properties": {
-                        "type": {"type": "string"},
+                        "type": {
+                            "type": "string",
+                            "description": "Machine-readable kind of failure.",
+                        },
                         "loc": {
                             "type": "array",
+                            "description": (
+                                "Where the value is: `body`, `query`, `path` or"
+                                + " `header`, then the field names and indexes."
+                            ),
                             "items": {
                                 "anyOf": [{"type": "string"}, {"type": "integer"}]
                             },
                         },
-                        "msg": {"type": "string"},
+                        "msg": {
+                            "type": "string",
+                            "description": "What is wrong, for a person to read.",
+                        },
                     },
                 },
             },
-            "instance": {"type": "string"},
+            "instance": {"type": "string", "description": PROBLEM_INSTANCE_DESCRIPTION},
         },
     }
 

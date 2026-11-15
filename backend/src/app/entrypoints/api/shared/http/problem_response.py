@@ -5,7 +5,7 @@ import structlog
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.platform.database import DATABASE_OUTAGE_ERRORS
@@ -44,6 +44,15 @@ _STATUS_BY_MENAGERIST_ERROR: dict[type[MenageristError], int] = {
 }
 
 
+# Shared with the 422 schema in `openapi_responses.py`.
+PROBLEM_TYPE_DESCRIPTION = (
+    "A URI naming the kind of problem; `about:blank` when the status says it all."
+)
+PROBLEM_TITLE_DESCRIPTION = "The kind of problem, the same for every occurrence."
+PROBLEM_STATUS_DESCRIPTION = "The HTTP status code."
+PROBLEM_INSTANCE_DESCRIPTION = "The URL of the request that failed."
+
+
 class ProblemDetail(BaseModel):
     """RFC 9457 `application/problem+json` body every `DomainError` maps to."""
 
@@ -63,12 +72,15 @@ class ProblemDetail(BaseModel):
         }
     )
 
-    type: str
-    title: str
-    status: int
-    detail: str
-    instance: str
-    errors: list[dict[str, str]] | None = None
+    type: str = Field(description=PROBLEM_TYPE_DESCRIPTION)
+    title: str = Field(description=PROBLEM_TITLE_DESCRIPTION)
+    status: int = Field(description=PROBLEM_STATUS_DESCRIPTION)
+    detail: str = Field(description="What went wrong, for a person to read.")
+    instance: str = Field(description=PROBLEM_INSTANCE_DESCRIPTION)
+    errors: list[dict[str, str]] | None = Field(
+        default=None,
+        description="For a validation error, the offending fields and what is wrong.",
+    )
 
 
 # Swapped for a URL that fits each route when the OpenAPI document is built.

@@ -70,9 +70,15 @@ class SetupRequest(RequestModel):
         }
     )
 
-    username: str = Field(max_length=MAX_USERNAME_LENGTH)
-    display_name: str = Field(max_length=MAX_DISPLAY_NAME_LENGTH)
-    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    username: str = Field(
+        description="The administrator's sign-in name.", max_length=MAX_USERNAME_LENGTH
+    )
+    display_name: str = Field(
+        description="The name shown to people.", max_length=MAX_DISPLAY_NAME_LENGTH
+    )
+    password: str = Field(
+        description="The administrator's passphrase.", max_length=_MAX_PASSWORD_INPUT
+    )
 
     def to_command(
         self,
@@ -98,8 +104,12 @@ class LoginRequest(RequestModel):
         }
     )
 
-    username: str = Field(max_length=MAX_USERNAME_LENGTH)
-    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    username: str = Field(
+        description="The account's sign-in name.", max_length=MAX_USERNAME_LENGTH
+    )
+    password: str = Field(
+        description="The account's passphrase.", max_length=_MAX_PASSWORD_INPUT
+    )
 
     def to_command(
         self,
@@ -131,8 +141,12 @@ class ChangePasswordRequest(RequestModel):
         }
     )
 
-    current_password: str = Field(max_length=_MAX_PASSWORD_INPUT)
-    new_password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    current_password: str = Field(
+        description="Your passphrase now.", max_length=_MAX_PASSWORD_INPUT
+    )
+    new_password: str = Field(
+        description="The passphrase to change to.", max_length=_MAX_PASSWORD_INPUT
+    )
 
     def to_command(
         self,
@@ -155,7 +169,9 @@ class UpdateMeRequest(RequestModel):
         json_schema_extra={"examples": [{"display_name": "Alice Example"}]}
     )
 
-    display_name: str = Field(max_length=MAX_DISPLAY_NAME_LENGTH)
+    display_name: str = Field(
+        description="The name shown to people.", max_length=MAX_DISPLAY_NAME_LENGTH
+    )
 
     def to_command(self) -> SetOwnDisplayNameCommand:
         """Convert this request into a `SetOwnDisplayNameCommand`."""
@@ -178,9 +194,16 @@ class CreateUserRequest(RequestModel):
         }
     )
 
-    username: str = Field(max_length=MAX_USERNAME_LENGTH)
-    display_name: str = Field(max_length=MAX_DISPLAY_NAME_LENGTH)
-    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    username: str = Field(
+        description="The sign-in name.", max_length=MAX_USERNAME_LENGTH
+    )
+    display_name: str = Field(
+        description="The name shown to people.", max_length=MAX_DISPLAY_NAME_LENGTH
+    )
+    password: str = Field(
+        description="An initial passphrase, to change at first sign-in.",
+        max_length=_MAX_PASSWORD_INPUT,
+    )
     role: Role = Role.MEMBER
 
     def to_command(self) -> CreateUserCommand:
@@ -204,9 +227,15 @@ class UpdateUserRequest(RequestModel):
         }
     )
 
-    display_name: str | None = Field(default=None, max_length=MAX_DISPLAY_NAME_LENGTH)
-    role: Role | None = None
-    disabled: bool | None = None
+    display_name: str | None = Field(
+        description="The name shown to people.",
+        default=None,
+        max_length=MAX_DISPLAY_NAME_LENGTH,
+    )
+    role: Role | None = Field(default=None, description="The account's role.")
+    disabled: bool | None = Field(
+        default=None, description="Whether the account is blocked from signing in."
+    )
 
     def to_command(self, user_id: uuid.UUID) -> UpdateUserCommand:
         """Convert this request into an `UpdateUserCommand`."""
@@ -225,7 +254,10 @@ class ResetPasswordRequest(RequestModel):
         json_schema_extra={"examples": [{"password": "a new initial passphrase"}]}
     )
 
-    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    password: str = Field(
+        description="A new initial passphrase, to change at next sign-in.",
+        max_length=_MAX_PASSWORD_INPUT,
+    )
 
     def to_command(self, user_id: uuid.UUID) -> ResetPasswordCommand:
         """Convert this request into a `ResetPasswordCommand`."""
@@ -239,7 +271,9 @@ class AuthStatusResponse(BaseModel):
         json_schema_extra={"examples": [{"setup_required": True}]}
     )
 
-    setup_required: bool
+    setup_required: bool = Field(
+        description="Whether the first administrator still has to be created."
+    )
 
 
 class UserResponse(BaseModel):
@@ -247,12 +281,16 @@ class UserResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_USER_EXAMPLE]})
 
-    id: uuid.UUID
-    username: str
-    display_name: str
+    id: uuid.UUID = Field(description="The account's id.")
+    username: str = Field(description="The sign-in name.")
+    display_name: str = Field(description="The name shown to people.")
     role: Role
-    password_expired: bool
-    disabled: bool
+    password_expired: bool = Field(
+        description="Whether the passphrase must be changed at the next sign-in."
+    )
+    disabled: bool = Field(
+        description="Whether the account is blocked from signing in."
+    )
     last_login_at: datetime | None = Field(
         default=None, description="When the account last signed in; null if never."
     )
@@ -263,8 +301,8 @@ class UserResponse(BaseModel):
             + " Only filled in by the administrator user list and update."
         ),
     )
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(description="When the account was created.")
+    updated_at: datetime = Field(description="When the account last changed.")
 
     @classmethod
     def from_listing(cls, listing: UserListing) -> UserResponse:
@@ -360,14 +398,22 @@ class SessionResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_SESSION_EXAMPLE]})
 
-    id: uuid.UUID
-    user_agent: str | None = None
-    client_platform: str | None = None
-    client_mobile: bool | None = None
-    client_ip: str | None = None
-    created_at: datetime
-    last_seen_at: datetime
-    expires_at: datetime
+    id: uuid.UUID = Field(description="The session's id.")
+    user_agent: str | None = Field(
+        default=None, description="The browser's user agent when it signed in."
+    )
+    client_platform: str | None = Field(
+        default=None, description="The platform the browser reported, if any."
+    )
+    client_mobile: bool | None = Field(
+        default=None, description="Whether the browser reported a mobile device."
+    )
+    client_ip: str | None = Field(
+        default=None, description="The address the session signed in from."
+    )
+    created_at: datetime = Field(description="When the session started.")
+    last_seen_at: datetime = Field(description="The session's latest request.")
+    expires_at: datetime = Field(description="When the session ends unless used.")
     device_id: uuid.UUID | None = Field(
         default=None,
         description="The remembered browser this session was started in, if any.",
@@ -379,7 +425,7 @@ class SessionResponse(BaseModel):
             + " as the app reported it; absent for older sessions."
         ),
     )
-    current: bool
+    current: bool = Field(description="Whether this is the session making the request.")
 
     @classmethod
     def from_own_session(cls, own: OwnSession) -> SessionResponse:
@@ -467,17 +513,27 @@ class AdminSessionResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_ADMIN_SESSION_EXAMPLE]})
 
-    id: uuid.UUID
-    user_id: uuid.UUID
-    username: str
-    display_name: str | None = None
-    user_agent: str | None = None
-    client_platform: str | None = None
-    client_mobile: bool | None = None
-    client_ip: str | None = None
-    created_at: datetime
-    last_seen_at: datetime
-    expires_at: datetime
+    id: uuid.UUID = Field(description="The session's id.")
+    user_id: uuid.UUID = Field(description="The id of the account it belongs to.")
+    username: str = Field(description="That account's sign-in name.")
+    display_name: str | None = Field(
+        default=None, description="That account's display name."
+    )
+    user_agent: str | None = Field(
+        default=None, description="The browser's user agent when it signed in."
+    )
+    client_platform: str | None = Field(
+        default=None, description="The platform the browser reported, if any."
+    )
+    client_mobile: bool | None = Field(
+        default=None, description="Whether the browser reported a mobile device."
+    )
+    client_ip: str | None = Field(
+        default=None, description="The address the session signed in from."
+    )
+    created_at: datetime = Field(description="When the session started.")
+    last_seen_at: datetime = Field(description="The session's latest request.")
+    expires_at: datetime = Field(description="When the session ends unless used.")
     device_id: uuid.UUID | None = Field(
         default=None,
         description="The remembered browser this session was started in, if any.",
@@ -516,7 +572,7 @@ class RevokedSessionsResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [{"ended": 2}]})
 
-    ended: int
+    ended: int = Field(description="How many other sessions were ended.")
 
 
 _TOKEN_EXAMPLE: dict[str, Any] = {
@@ -547,8 +603,14 @@ class CreateApiTokenRequest(RequestModel):
     )
 
     # Loose input guard only; the domain trims and applies the real name length.
-    name: str = Field(max_length=MAX_TOKEN_NAME_LENGTH * 4)
-    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    name: str = Field(
+        description="A label to recognise the token by.",
+        max_length=MAX_TOKEN_NAME_LENGTH * 4,
+    )
+    password: str = Field(
+        description="Your current passphrase, to confirm it is you.",
+        max_length=_MAX_PASSWORD_INPUT,
+    )
     grants: list[str] = Field(
         max_length=_MAX_TOKEN_GRANTS,
         description="Permissions the token holds; see the grants endpoint.",
@@ -578,7 +640,10 @@ class RotateApiTokenRequest(RequestModel):
         }
     )
 
-    password: str = Field(max_length=_MAX_PASSWORD_INPUT)
+    password: str = Field(
+        description="Your current passphrase, to confirm it is you.",
+        max_length=_MAX_PASSWORD_INPUT,
+    )
     expires_in_days: int | None = Field(
         default=None,
         description="Lifetime in days; the server default applies when omitted.",
@@ -601,11 +666,11 @@ class ApiTokenResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_TOKEN_EXAMPLE]})
 
-    id: uuid.UUID
-    name: str
-    grants: list[str]
-    created_at: datetime
-    expires_at: datetime
+    id: uuid.UUID = Field(description="The token's id.")
+    name: str = Field(description="Its label.")
+    grants: list[str] = Field(description="The permissions it holds.")
+    created_at: datetime = Field(description="When it was created.")
+    expires_at: datetime = Field(description="When it stops working.")
     last_used_at: datetime | None = Field(
         default=None, description="When the token was last used; null if never."
     )
@@ -648,4 +713,6 @@ class GrantablePermissionsResponse(BaseModel):
         json_schema_extra={"examples": [{"permissions": ["graph:item:read"]}]}
     )
 
-    permissions: list[Permission]
+    permissions: list[Permission] = Field(
+        description="Permissions a token of yours may hold."
+    )

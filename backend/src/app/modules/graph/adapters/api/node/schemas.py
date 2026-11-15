@@ -64,11 +64,19 @@ class DuplicateNodeRequest(RequestModel):
         }
     )
 
-    name: str
-    copy_relationships: bool = Field(default=False)
-    copy_media: bool = Field(default=False)
-    copy_cover: bool = Field(default=False)
-    copy_collections: bool = Field(default=True)
+    name: str = Field(description="The copy's name.")
+    copy_relationships: bool = Field(
+        description="Also copy the item's connections.", default=False
+    )
+    copy_media: bool = Field(
+        description="Also attach the item's media to the copy.", default=False
+    )
+    copy_cover: bool = Field(
+        description="Also give the copy the item's cover.", default=False
+    )
+    copy_collections: bool = Field(
+        description="Also add the copy to the item's collections.", default=True
+    )
 
     def to_command(self, node_id: uuid.UUID) -> DuplicateNodeCommand:
         """Convert this request into a `DuplicateNodeCommand` for `node_id`."""
@@ -102,13 +110,22 @@ class CreateNodeRequest(RequestModel):
         }
     )
 
-    name: str
-    type: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    attributes: dict[str, Any] = Field(default_factory=dict)
-    favourite: bool = Field(default=False)
-    tags: list[str] = Field(default_factory=list)
-    extra_schema: dict[str, Any] | None = Field(default=None)
+    name: str = Field(description="The item's name.")
+    type: str | None = Field(
+        description="The slug of its item type; none for an untyped item.", default=None
+    )
+    description: str | None = Field(
+        description="Free text about the item.", default=None
+    )
+    attributes: dict[str, Any] = Field(
+        description="Its field values, keyed by field key.", default_factory=dict
+    )
+    favourite: bool = Field(description="Whether it is a favourite.", default=False)
+    tags: list[str] = Field(description="Its tags.", default_factory=list)
+    extra_schema: dict[str, Any] | None = Field(
+        description="Fields of its own, beyond its type's, as a JSON Schema.",
+        default=None,
+    )
 
     @field_validator("type", mode="before")
     @classmethod
@@ -152,13 +169,27 @@ class UpdateNodeRequest(RequestModel):
         }
     )
 
-    name: str | None = Field(default=None)
-    type: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    attributes: dict[str, Any] | None = Field(default=None)
-    favourite: bool | None = Field(default=None)
-    tags: list[str] | None = Field(default=None)
-    extra_schema: dict[str, Any] | None = Field(default=None)
+    name: str | None = Field(description="The item's name.", default=None)
+    type: str | None = Field(
+        description="The slug of its item type; null makes it untyped.", default=None
+    )
+    description: str | None = Field(
+        description="Free text about the item.", default=None
+    )
+    attributes: dict[str, Any] | None = Field(
+        description="Its field values, keyed by field key; replaces them all.",
+        default=None,
+    )
+    favourite: bool | None = Field(
+        description="Whether it is a favourite.", default=None
+    )
+    tags: list[str] | None = Field(
+        description="Its tags; replaces them all.", default=None
+    )
+    extra_schema: dict[str, Any] | None = Field(
+        description="Fields of its own, beyond its type's, as a JSON Schema.",
+        default=None,
+    )
 
     def to_command(self, node_id: uuid.UUID) -> UpdateNodeCommand:
         """Convert this request into an `UpdateNodeCommand` for `node_id`."""
@@ -184,7 +215,7 @@ class PromoteExtraSchemaFieldRequest(RequestModel):
         }
     )
 
-    node_type_id: uuid.UUID
+    node_type_id: uuid.UUID = Field(description="The item type to move the field to.")
 
 
 class NodeResponse(BaseModel):
@@ -194,16 +225,23 @@ class NodeResponse(BaseModel):
         json_schema_extra={"examples": [_NODE_EXAMPLE, _NODE_MINIMAL_EXAMPLE]}
     )
 
-    id: uuid.UUID
-    name: str
-    type: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    attributes: dict[str, Any]
-    favourite: bool
-    tags: list[str]
-    extra_schema: dict[str, Any] | None = Field(default=None)
-    created_at: datetime
-    updated_at: datetime
+    id: uuid.UUID = Field(description="The item's id.")
+    name: str = Field(description="Its name.")
+    type: str | None = Field(
+        description="The slug of its item type; null if untyped.", default=None
+    )
+    description: str | None = Field(description="Free text about it.", default=None)
+    attributes: dict[str, Any] = Field(
+        description="Its field values, keyed by field key."
+    )
+    favourite: bool = Field(description="Whether it is a favourite.")
+    tags: list[str] = Field(description="Its tags.")
+    extra_schema: dict[str, Any] | None = Field(
+        description="Fields of its own, beyond its type's, as a JSON Schema.",
+        default=None,
+    )
+    created_at: datetime = Field(description="When it was created.")
+    updated_at: datetime = Field(description="When it last changed.")
 
     @classmethod
     def from_domain(cls, node: Node) -> NodeResponse:
@@ -258,10 +296,12 @@ class DeletedNodeResponse(BaseModel):
         }
     )
 
-    id: uuid.UUID
-    name: str
-    type: str | None = Field(default=None)
-    deleted_at: datetime
+    id: uuid.UUID = Field(description="The item's id.")
+    name: str = Field(description="Its name.")
+    type: str | None = Field(
+        description="The slug of its item type; null if untyped.", default=None
+    )
+    deleted_at: datetime = Field(description="When it was deleted.")
 
     @classmethod
     def from_domain(cls, node: Node) -> DeletedNodeResponse:
@@ -307,7 +347,13 @@ class NodeSearchRequest(RequestModel):
     query: dict[str, Any] = Field(
         description="The condition tree: `v`, an optional `where` group and `sort`."
     )
-    limit: int = Field(default=50, ge=1, le=200, strict=True)
+    limit: int = Field(
+        description="Most items to return on this page.",
+        default=50,
+        ge=1,
+        le=200,
+        strict=True,
+    )
     cursor: str | None = Field(
         default=None, description="The `next_cursor` of the previous page."
     )
@@ -327,8 +373,10 @@ class QueryWarningResponse(BaseModel):
         }
     )
 
-    path: str
-    message: str
+    path: str = Field(
+        description="Where it is in the query, such as `where.children[0]`."
+    )
+    message: str = Field(description="Why it no longer applies.")
 
 
 class NodeSearchResponse(BaseModel):
@@ -348,13 +396,18 @@ class NodeSearchResponse(BaseModel):
         }
     )
 
-    items: list[NodeResponse]
-    total: int
+    items: list[NodeResponse] = Field(description="This page of matching items.")
+    total: int = Field(description="How many items match.")
     total_capped: bool = Field(
         description="True when `total` is a lower bound, not the exact count."
     )
-    next_cursor: str | None = Field(default=None)
-    warnings: list[QueryWarningResponse]
+    next_cursor: str | None = Field(
+        description="Pass as `cursor` for the next page; null on the last.",
+        default=None,
+    )
+    warnings: list[QueryWarningResponse] = Field(
+        description="Parts of the query that no longer apply."
+    )
 
     @classmethod
     def from_result(cls, result: SearchNodesResult) -> NodeSearchResponse:
@@ -412,11 +465,13 @@ class NodeSearchCountResponse(BaseModel):
         }
     )
 
-    total: int
+    total: int = Field(description="How many items match.")
     total_capped: bool = Field(
         description="True when `total` is a lower bound, not the exact count."
     )
-    warnings: list[QueryWarningResponse]
+    warnings: list[QueryWarningResponse] = Field(
+        description="Parts of the query that no longer apply."
+    )
 
 
 class NodeSearchCountsResponse(BaseModel):
@@ -443,7 +498,9 @@ class NodeSearchCountsResponse(BaseModel):
         }
     )
 
-    counts: dict[str, NodeSearchCountResponse]
+    counts: dict[str, NodeSearchCountResponse] = Field(
+        description="Each query's count, under the name it was sent with."
+    )
 
     @classmethod
     def from_result(cls, result: dict[str, SearchCount]) -> NodeSearchCountsResponse:
@@ -500,7 +557,7 @@ class ItemFieldResponse(BaseModel):
         }
     )
 
-    key: str
+    key: str = Field(description="The field's key.")
     kind: str = Field(description="The field kind, such as `text` or `number`.")
     label: str = Field(description="The most common label, or the key if none.")
     count: int = Field(description="How many of your items declare the field.")
