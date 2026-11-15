@@ -127,7 +127,7 @@ async def export_bundle(
         Query(
             max_length=MAX_ITEMS,
             description="The items to export, with their types, the saved lists "
-            + "those use, and the connections that join two of the items."
+            + "those use, and the connections that join two of the items.",
         ),
     ] = None,
     file_format: Annotated[

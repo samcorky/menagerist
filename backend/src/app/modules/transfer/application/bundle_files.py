@@ -164,9 +164,7 @@ class ExportBundle(_FileUseCase, UseCase[ExportBundleQuery, dict[str, Any]]):
         )
 
 
-def _with_ids(
-    asked: list[uuid.UUID], refs: Iterable[str | None]
-) -> list[uuid.UUID]:
+def _with_ids(asked: list[uuid.UUID], refs: Iterable[str | None]) -> list[uuid.UUID]:
     """The ids asked for, then those of `refs` not already there; refs are ids."""
     ids = dict.fromkeys(asked)
     ids.update(dict.fromkeys(uuid.UUID(r) for r in refs if r is not None))
