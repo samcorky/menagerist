@@ -27,7 +27,17 @@ BUNDLE_EXAMPLE: dict[str, Any] = {
             "definition": {"options": ["Mint", "Near Mint", "Good"]},
         }
     ],
-    "relationship_types": [],
+    "relationship_types": [
+        {
+            "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+            "slug": "wrote",
+            "label": "Wrote",
+            "reverse_label": "Written by",
+            "description": None,
+            "directional": True,
+            "attributes_schema": None,
+        }
+    ],
     "item_types": [
         {
             "ref": "01978c3e-7d1f-7a4e-8b55-0c6f1d2e9a41",
@@ -77,7 +87,10 @@ _SCHEMA_DESCRIPTION = (
 class BundleItemTypeEntry(BaseModel):
     """One item type in a `menagerist-bundle` file of version 2."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [BUNDLE_EXAMPLE["item_types"][0]]},
+    )
 
     ref: str = Field(description="Its id within the file; an export uses the id.")
     slug: str = Field(description="Its short name, as used in URLs.")
@@ -94,7 +107,10 @@ class BundleItemTypeEntry(BaseModel):
 class BundleRelationshipTypeEntry(BaseModel):
     """One connection type in a `menagerist-bundle` file of version 2."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [BUNDLE_EXAMPLE["relationship_types"][0]]},
+    )
 
     ref: str = Field(description="Its id within the file; an export uses the id.")
     slug: str = Field(description="Its short name, as used in URLs.")
