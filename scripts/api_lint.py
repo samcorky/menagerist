@@ -144,7 +144,9 @@ def main() -> int:
     total = sum(warnings.values())
 
     if args.update:
-        BASELINE.write_text(json.dumps(dict(sorted(warnings.items())), indent=2) + "\n")
+        BASELINE.write_text(
+            json.dumps(dict(sorted(warnings.items())), indent=2) + "\n", newline="\n"
+        )
         print(f"Baseline written: {total} warnings across {len(warnings)} rules.")
         return 0
 
