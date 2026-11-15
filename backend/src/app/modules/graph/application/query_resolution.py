@@ -315,7 +315,14 @@ def resolve_connections(
             continue
         slug = condition.relationship
         if slug is not None:
-            if slug in directional:
+            if slug in directional and condition.depth > 1 and not directional[slug]:
+                warnings.append(
+                    QueryWarning(
+                        path,
+                        f"'{slug}' has no direction, so it only reaches one step.",
+                    )
+                )
+            elif slug in directional:
                 relationships[slug] = RelationshipInfo(
                     slug=slug, directional=directional[slug]
                 )

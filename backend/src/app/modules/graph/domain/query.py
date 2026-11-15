@@ -13,6 +13,7 @@ from datetime import date, timedelta
 from typing import Final, Literal, cast
 
 from app.modules.graph.domain.node import Node
+from app.modules.graph.domain.reach import InvalidReachDepthError, check_depth
 from app.shared_kernel.errors import ValidationError
 
 QUERY_VERSION: Final = 1
@@ -208,6 +209,10 @@ class ConnectionCondition:
     (`out`: this item is the source), and its far item is live, in the caller's
     scope and satisfies `where`. `to` additionally needs the far item to be
     `item`. For a non-directional relationship either end matches.
+
+    `depth` is how many hops of that relationship may lie between the two
+    items; more than one needs a named relationship and a direction of `out`
+    or `in`, and every item along the way must itself be live and in scope.
     """
 
     mode: Literal["exists", "none", "to"]
@@ -215,6 +220,7 @@ class ConnectionCondition:
     direction: Literal["out", "in", "any"]
     item: uuid.UUID | None
     where: Group | None
+    depth: int = 1
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -609,17 +615,41 @@ def _connection(
         raise InvalidQueryError(msg, path=path)
     else:
         item_id = None
+    named = (
+        None
+        if relationship is None
+        else _string(relationship, path, name="relationship")
+    )
     return ConnectionCondition(
         mode=cast("Literal['exists', 'none', 'to']", mode),
-        relationship=(
-            None
-            if relationship is None
-            else _string(relationship, path, name="relationship")
-        ),
+        relationship=named,
         direction=cast("Literal['out', 'in', 'any']", direction),
         item=item_id,
         where=where,
+        depth=_depth(data, path, relationship=named, direction=direction),
     )
+
+
+def _depth(
+    data: Mapping[str, object],
+    path: str,
+    *,
+    relationship: str | None,
+    direction: str,
+) -> int:
+    """Parse a connection's `depth`; several hops need a relationship and a side."""
+    raw = data.get("depth", 1)
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        msg = "'depth' must be a whole number."
+        raise InvalidQueryError(msg, path=path)
+    try:
+        depth = check_depth(raw)
+    except InvalidReachDepthError as error:
+        raise InvalidQueryError(str(error), path=path) from error
+    if depth > 1 and (relationship is None or direction == "any"):
+        msg = "More than one step needs a relationship and a direction of out or in."
+        raise InvalidQueryError(msg, path=path)
+    return depth
 
 
 def _item_id(raw: object, path: str) -> uuid.UUID:
@@ -700,7 +730,7 @@ _CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
     "media": frozenset({"kind", "mode", "type"}),
     "collection": frozenset({"kind", "mode", "in"}),
     "connection": frozenset(
-        {"kind", "mode", "relationship", "direction", "item", "where"}
+        {"kind", "mode", "relationship", "direction", "item", "where", "depth"}
     ),
     "date": frozenset({"kind", "on", "op", "value"}),
     "field": frozenset({"kind", "type", "field_kind", "key", "sub_key", "op", "value"}),
