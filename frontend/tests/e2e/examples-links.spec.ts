@@ -36,7 +36,9 @@ test('music and movies connect themselves and removal is never blocked', async (
 	await page.goto(`/items/${film.id}`);
 	await expect(page.getByText('Soundtrack', { exact: true }).first()).toBeVisible();
 	await page.getByRole('link', { name: 'Night Drive' }).first().click();
-	await expect(page.getByText('Soundtrack of', { exact: true }).first()).toBeVisible();
+	await expect(
+		page.getByText('Soundtrack of', { exact: true }).filter({ visible: true }).first()
+	).toBeVisible();
 
 	await page.goto('/library/examples');
 	await remove(page, MOVIES);
@@ -47,7 +49,9 @@ test('music and movies connect themselves and removal is never blocked', async (
 	await page.goto('/library/examples');
 	await install(page, MOVIES);
 	await page.goto(`/items/${record.id}`);
-	await expect(page.getByText('Soundtrack of', { exact: true }).first()).toBeVisible();
+	await expect(
+		page.getByText('Soundtrack of', { exact: true }).filter({ visible: true }).first()
+	).toBeVisible();
 });
 
 test('adding movies first gives the same connections', async ({ page, request }) => {
@@ -56,6 +60,8 @@ test('adding movies first gives the same connections', async ({ page, request })
 
 	const record = await nodeNamed(request, 'Thirteen Bells');
 	await page.goto(`/items/${record.id}`);
-	await expect(page.getByText('Soundtrack of', { exact: true }).first()).toBeVisible();
+	await expect(
+		page.getByText('Soundtrack of', { exact: true }).filter({ visible: true }).first()
+	).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Marmalade' }).first()).toBeVisible();
 });
