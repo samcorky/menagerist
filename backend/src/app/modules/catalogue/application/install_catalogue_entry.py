@@ -3,10 +3,12 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.catalogue.application.entry_plan import plan_entry
 from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.catalogue.domain.errors import CatalogueEntryNotFoundError
 from app.modules.catalogue.ports.entry_catalogue import EntryCatalogue  # noqa: TC001
 from app.modules.transfer.domain.entity_kind import EntityKind
+from app.modules.transfer.domain.plan import PlanAction
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
 
@@ -41,7 +43,8 @@ class InstallOutcome:
 class InstallCatalogueEntry(UseCase[InstallCatalogueEntryCommand, InstallOutcome]):
     """Install an entry as ordinary, owned presets or types.
 
-    Installing is idempotent: an identical preset or a taken slug is skipped. A
+    Installing is idempotent: it applies the entry's plan (`plan_entry`), which skips
+    an identical preset or a taken slug, so the dry run and the install agree. A
     failure part-way leaves what was made in place, and installing again finishes it.
     Nothing is recorded, so nothing it makes is labelled as an example.
 
@@ -67,32 +70,38 @@ class InstallCatalogueEntry(UseCase[InstallCatalogueEntryCommand, InstallOutcome
     async def _handle(
         self, request: InstallCatalogueEntryCommand, actor: Actor
     ) -> InstallOutcome:
-        """Create what the person does not already have."""
+        """Plan the entry, then create what the plan marks `create`."""
         entry = await self._catalogue.get(request.entry_id)
         if entry is None:
             raise CatalogueEntryNotFoundError(
                 f"Catalogue entry '{request.entry_id}' not found"
             )
-        outcomes = await self._presets.ensure(entry.presets)
+        plan = await plan_entry(entry, self._presets, self._graph)
+        creating = {(e.kind, e.ref) for e in plan.with_action(PlanAction.CREATE)}
+        outcomes = await self._presets.ensure(
+            [p for p in entry.presets if (EntityKind.PRESET, p.ref) in creating]
+        )
+        item_types = [
+            t for t in entry.item_types if (EntityKind.ITEM_TYPE, t.ref) in creating
+        ]
+        for spec in item_types:
+            await self._graph.create_item_type(spec, {})
+        rel_types = [
+            r
+            for r in entry.relationship_types
+            if (EntityKind.RELATIONSHIP_TYPE, r.ref) in creating
+        ]
+        for rel in rel_types:
+            await self._graph.create_relationship_type(rel, {})
         created = sum(1 for o in outcomes if o.created)
-        item_created = 0
-        for spec in entry.item_types:
-            if not await self._graph.slug_taken(EntityKind.ITEM_TYPE, spec.slug):
-                await self._graph.create_item_type(spec, {})
-                item_created += 1
-        rel_created = 0
-        for rel in entry.relationship_types:
-            if not await self._graph.slug_taken(EntityKind.RELATIONSHIP_TYPE, rel.slug):
-                await self._graph.create_relationship_type(rel, {})
-                rel_created += 1
         result = InstallOutcome(
             entry_id=entry.id,
             presets_created=created,
-            presets_skipped=len(outcomes) - created,
-            item_types_created=item_created,
-            item_types_skipped=len(entry.item_types) - item_created,
-            relationship_types_created=rel_created,
-            relationship_types_skipped=len(entry.relationship_types) - rel_created,
+            presets_skipped=len(entry.presets) - created,
+            item_types_created=len(item_types),
+            item_types_skipped=len(entry.item_types) - len(item_types),
+            relationship_types_created=len(rel_types),
+            relationship_types_skipped=len(entry.relationship_types) - len(rel_types),
         )
         logger.info("catalogue entry installed", entry=entry.id)
         return result

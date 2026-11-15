@@ -6,6 +6,12 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.examples.application.install_example_pack import installation_counts
+from app.modules.transfer.adapters.api.plan_schemas import (
+    PlanBlockerResponse,
+    PlannedEntityResponse,
+    blockers_from_domain,
+    entities_from_domain,
+)
 
 if TYPE_CHECKING:
     from app.modules.examples.application.install_example_pack import InstallResult
@@ -14,6 +20,7 @@ if TYPE_CHECKING:
     from app.modules.examples.application.uninstall_example_pack import UninstallResult
     from app.modules.examples.domain.pack import PackCounts, PackSummary
     from app.modules.transfer.application.removal import KeptEntity
+    from app.modules.transfer.domain.plan import Plan
 
 _COUNTS_EXAMPLE: dict[str, Any] = {
     "presets": 1,
@@ -213,6 +220,54 @@ class InstallResultResponse(BaseModel):
             created=PackCountsResponse.from_domain(result.created),
             adopted=PackCountsResponse.from_domain(result.adopted),
             linked=result.linked,
+        )
+
+
+PLAN_EXAMPLE: dict[str, Any] = {
+    "pack_id": "vinyl",
+    "ready": True,
+    "blockers": [],
+    "entities": [
+        {
+            "kind": "item_type",
+            "ref": "album",
+            "label": "Album",
+            "action": "create",
+            "reason": None,
+        },
+        {
+            "kind": "item",
+            "ref": "blue",
+            "label": "Blue",
+            "action": "unchanged",
+            "reason": "Kept from an earlier install, and taken back as it is.",
+        },
+    ],
+}
+
+
+class InstallPlanResponse(BaseModel):
+    """What adding an example set would do, worked out without changing anything."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [PLAN_EXAMPLE]})
+
+    pack_id: str = Field(description="The example set planned.")
+    ready: bool = Field(description="Whether adding the set would go ahead.")
+    blockers: list[PlanBlockerResponse] = Field(
+        description="Problems with the whole set that stop it being added."
+    )
+    entities: list[PlannedEntityResponse] = Field(
+        description="Every entity of the set, in the order adding makes them."
+    )
+
+    @classmethod
+    def from_domain(cls, plan: Plan) -> InstallPlanResponse:
+        """Build from the plan's report."""
+        return cls(
+            pack_id=plan.bundle_id,
+            ready=plan.ready,
+            blockers=blockers_from_domain(plan),
+            entities=entities_from_domain(plan),
         )
 
 

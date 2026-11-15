@@ -206,6 +206,64 @@ def test_slug_clash_is_a_409_naming_the_slug(make_world: MakeWorld) -> None:
     assert "demo-record" in response.json()["detail"]
 
 
+def test_plan_lists_what_adding_would_do_and_writes_nothing(
+    make_world: MakeWorld,
+) -> None:
+    """A dry run reports each entity; adding afterwards still creates everything."""
+    world = make_world()
+    client = _client(world)
+
+    response = client.get("/api/v1/examples/demo/installation/plan")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["pack_id"], body["ready"], body["blockers"]) == ("demo", True, [])
+    assert body["entities"][0] == {
+        "kind": "preset",
+        "ref": "grades",
+        "label": "demo grades",
+        "action": "create",
+        "reason": None,
+    }
+    assert {e["action"] for e in body["entities"]} == {"create"}
+    assert (
+        client.put("/api/v1/examples/demo/installation").json()["created"]["items"] == 2
+    )
+
+
+def test_plan_shows_a_clash_and_a_blocker(make_world: MakeWorld) -> None:
+    """A taken type name is a conflict; once added, the set is blocked."""
+    world = make_world()
+    asyncio.run(
+        world.graph_repos.node_types.add(
+            NodeType.create(owner_id=world.actor.id, slug="demo-person", label="Mine")
+        )
+    )
+    client = _client(world)
+
+    clash = client.get("/api/v1/examples/demo/installation/plan").json()
+
+    assert clash["ready"] is False
+    [conflict] = [e for e in clash["entities"] if e["action"] == "conflict"]
+    assert (conflict["kind"], conflict["ref"]) == ("item_type", "person")
+    assert "demo-person" in conflict["reason"]
+
+
+def test_plan_of_an_added_set_is_blocked_and_unknown_is_a_404(
+    make_world: MakeWorld,
+) -> None:
+    """The blocker's code is the problem title adding would return."""
+    client = _client(make_world())
+    client.put("/api/v1/examples/demo/installation")
+
+    body = client.get("/api/v1/examples/demo/installation/plan").json()
+    refused = client.put("/api/v1/examples/demo/installation").json()
+
+    assert (body["ready"], body["entities"]) == (False, [])
+    assert [b["code"] for b in body["blockers"]] == [refused["title"]]
+    assert client.get("/api/v1/examples/nope/installation/plan").status_code == 404
+
+
 def test_openapi_documents_the_installation_status_values(
     make_world: MakeWorld,
 ) -> None:

@@ -15924,6 +15924,13 @@
               }
             },
             "links": {
+              "PlanExamplePackInstall": {
+                "operationId": "plan_example_pack_install",
+                "parameters": {
+                  "pack_id": "$response.body#/0/id"
+                },
+                "description": "Plan example pack install with the id from this response."
+              },
               "InstallExamplePack": {
                 "operationId": "install_example_pack",
                 "parameters": {
@@ -16174,6 +16181,213 @@
           }
         ],
         "x-required-permission": "examples:pack:read"
+      }
+    },
+    "/api/v1/examples/{pack_id}/installation/plan": {
+      "get": {
+        "tags": [
+          "v1",
+          "Examples"
+        ],
+        "summary": "Plan Example Pack Install",
+        "description": "See what adding an example set would do, without changing anything.\n\nEach entity is listed with what adding would do with it: `create` it, or leave\nit `unchanged` (something an earlier removal kept, taken back as it is, or a\nsaved list you already have the same). A `conflict` entity, such as an item type\nwhose name you already use, stops the set being added; so does any `blockers`\nentry, such as the set already being added or a set it needs not being added\nyet. `ready` is true when neither is present, and adding then does what this\nlists. A set that is already added lists no entities.\n\n**Requires permission:** `examples:pack:install`",
+        "operationId": "plan_example_pack_install",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pack_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The example set's id.",
+              "examples": [
+                "vinyl"
+              ],
+              "title": "Pack Id"
+            },
+            "description": "The example set's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallPlanResponse"
+                },
+                "example": {
+                  "pack_id": "vinyl",
+                  "ready": true,
+                  "blockers": [],
+                  "entities": [
+                    {
+                      "kind": "item_type",
+                      "ref": "album",
+                      "label": "Album",
+                      "action": "create"
+                    },
+                    {
+                      "kind": "item",
+                      "ref": "blue",
+                      "label": "Blue",
+                      "action": "unchanged",
+                      "reason": "Kept from an earlier install, and taken back as it is."
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when an example pack id is not in the catalogue.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "PackNotFoundError",
+                  "status": 404,
+                  "detail": "Example pack 'vinyl' not found",
+                  "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/examples/pack_id/installation/plan"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "examples:pack:install"
       }
     },
     "/api/v1/examples/{pack_id}/installation": {
@@ -16636,6 +16850,13 @@
                   "entry_id": "$response.body#/0/id"
                 },
                 "description": "Install catalogue entry with the id from this response."
+              },
+              "PlanCatalogueEntryInstall": {
+                "operationId": "plan_catalogue_entry_install",
+                "parameters": {
+                  "entry_id": "$response.body#/0/id"
+                },
+                "description": "Plan catalogue entry install with the id from this response."
               }
             }
           },
@@ -16940,6 +17161,213 @@
                       "status": 500,
                       "detail": "An unexpected error occurred.",
                       "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "catalogue:entry:install"
+      }
+    },
+    "/api/v1/catalogue/{entry_id}/installation/plan": {
+      "get": {
+        "tags": [
+          "v1",
+          "Catalogue"
+        ],
+        "summary": "Plan Catalogue Entry Install",
+        "description": "See what adding an entry would do, without adding anything.\n\nEach thing the entry holds is `create`, or `unchanged` when you already have it\n(an identical saved list, field or field group, or a type whose name is taken),\nwith the reason. Adding the entry does exactly this.\n\n**Requires permission:** `catalogue:entry:install`",
+        "operationId": "plan_catalogue_entry_install",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the entry to plan.",
+              "examples": [
+                "starter-types"
+              ],
+              "title": "Entry Id"
+            },
+            "description": "The id of the entry to plan."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CataloguePlanResponse"
+                },
+                "example": {
+                  "entry_id": "starter-types",
+                  "ready": true,
+                  "blockers": [],
+                  "entities": [
+                    {
+                      "kind": "item_type",
+                      "ref": "person",
+                      "label": "Person",
+                      "action": "unchanged",
+                      "reason": "You already have one with this name."
+                    },
+                    {
+                      "kind": "item_type",
+                      "ref": "place",
+                      "label": "Place",
+                      "action": "create"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a catalogue entry id is not one the app ships.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "CatalogueEntryNotFoundError",
+                  "status": 404,
+                  "detail": "Catalogue entry 'condition-grades' not found",
+                  "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/catalogue/entry_id/installation/plan"
                     }
                   }
                 }
@@ -24461,6 +24889,67 @@
         "title": "CataloguePermission",
         "description": "Permissions for the catalogue of installable presets and starter types."
       },
+      "CataloguePlanResponse": {
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id",
+            "description": "The entry planned."
+          },
+          "ready": {
+            "type": "boolean",
+            "title": "Ready",
+            "description": "Whether installing would go ahead; always true for an entry."
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/PlanBlockerResponse"
+            },
+            "type": "array",
+            "title": "Blockers",
+            "description": "Problems that stop the install; an entry has none."
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedEntityResponse"
+            },
+            "type": "array",
+            "title": "Entities",
+            "description": "Everything the entry holds, in the order installing makes it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "ready",
+          "blockers",
+          "entities"
+        ],
+        "title": "CataloguePlanResponse",
+        "description": "What installing an entry would do, worked out without changing anything.",
+        "examples": [
+          {
+            "blockers": [],
+            "entities": [
+              {
+                "action": "unchanged",
+                "kind": "item_type",
+                "label": "Person",
+                "reason": "You already have one with this name.",
+                "ref": "person"
+              },
+              {
+                "action": "create",
+                "kind": "item_type",
+                "label": "Place",
+                "ref": "place"
+              }
+            ],
+            "entry_id": "starter-types",
+            "ready": true
+          }
+        ]
+      },
       "ChangePasswordRequest": {
         "properties": {
           "current_password": {
@@ -26312,6 +26801,67 @@
           }
         ]
       },
+      "InstallPlanResponse": {
+        "properties": {
+          "pack_id": {
+            "type": "string",
+            "title": "Pack Id",
+            "description": "The example set planned."
+          },
+          "ready": {
+            "type": "boolean",
+            "title": "Ready",
+            "description": "Whether adding the set would go ahead."
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/PlanBlockerResponse"
+            },
+            "type": "array",
+            "title": "Blockers",
+            "description": "Problems with the whole set that stop it being added."
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedEntityResponse"
+            },
+            "type": "array",
+            "title": "Entities",
+            "description": "Every entity of the set, in the order adding makes them."
+          }
+        },
+        "type": "object",
+        "required": [
+          "pack_id",
+          "ready",
+          "blockers",
+          "entities"
+        ],
+        "title": "InstallPlanResponse",
+        "description": "What adding an example set would do, worked out without changing anything.",
+        "examples": [
+          {
+            "blockers": [],
+            "entities": [
+              {
+                "action": "create",
+                "kind": "item_type",
+                "label": "Album",
+                "ref": "album"
+              },
+              {
+                "action": "unchanged",
+                "kind": "item",
+                "label": "Blue",
+                "reason": "Kept from an earlier install, and taken back as it is.",
+                "ref": "blue"
+              }
+            ],
+            "pack_id": "vinyl",
+            "ready": true
+          }
+        ]
+      },
       "InstallResultResponse": {
         "properties": {
           "pack_id": {
@@ -28093,6 +28643,95 @@
             "state": "running",
             "total": 2000,
             "unit": "count"
+          }
+        ]
+      },
+      "PlanAction": {
+        "type": "string",
+        "enum": [
+          "create",
+          "unchanged",
+          "conflict"
+        ],
+        "title": "PlanAction",
+        "description": "What installing would do with one entity."
+      },
+      "PlanBlockerResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "The problem `title` installing would return for it."
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "The problem `detail` installing would return."
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "reason"
+        ],
+        "title": "PlanBlockerResponse",
+        "description": "Something that stops the whole install.",
+        "examples": [
+          {
+            "code": "RequirementsNotMetError",
+            "reason": "Add Vinyl first."
+          }
+        ]
+      },
+      "PlannedEntityResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "What sort of thing it is, such as `item_type` or `item`."
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "The entity's id within what is installed."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Its name, as it would be shown."
+          },
+          "action": {
+            "$ref": "#/components/schemas/PlanAction"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it is unchanged or conflicts."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ref",
+          "label",
+          "action"
+        ],
+        "title": "PlannedEntityResponse",
+        "description": "One entity of what is being installed, and what installing would do with it.",
+        "examples": [
+          {
+            "action": "conflict",
+            "kind": "item_type",
+            "label": "Album",
+            "reason": "You already have an item type called 'album'. Rename or remove it, then try again.",
+            "ref": "album"
           }
         ]
       },
