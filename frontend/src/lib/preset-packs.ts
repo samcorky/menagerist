@@ -66,6 +66,13 @@ export async function exportTypeBundle(typeId: string): Promise<PresetBundle> {
 	return result.data;
 }
 
+/** Export one connection type, with the saved lists its fields use, as a bundle file. */
+export async function exportConnectionTypeBundle(typeId: string): Promise<PresetBundle> {
+	const result = await exportBundle({ query: { relationship_type_ids: [typeId] } });
+	if (result.error || !result.data) throw result.error ?? new Error('Could not export the type');
+	return result.data;
+}
+
 /** Parse a bundle file's text, checking only the envelope. The server validates the rest. */
 export function parseBundleText(text: string): PresetBundle {
 	let data: unknown;

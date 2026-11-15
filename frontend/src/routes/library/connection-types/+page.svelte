@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
-	import { ArrowLeftRight, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { ArrowLeftRight, Download, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -13,6 +13,7 @@
 		type EdgeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import { downloadBundle, exportConnectionTypeBundle, presetFilename } from '$lib/preset-packs';
 	import { slugify } from '$lib/utils.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { auth } from '$lib/auth.svelte.js';
@@ -44,6 +45,22 @@
 	let directional = $state(true);
 	let schema = $state<AttributesSchema | null>(null);
 	let saving = $state(false);
+
+	let exportingId = $state<string | null>(null);
+
+	/** Save the type, with the lists it uses, as a file someone else can import. */
+	async function handleExport(et: EdgeTypeResponse) {
+		if (exportingId) return;
+		exportingId = et.id;
+		try {
+			downloadBundle(await exportConnectionTypeBundle(et.id), presetFilename(et.label));
+		} catch (error) {
+			const description = error instanceof Error ? error.message : errorMessage(error);
+			toast.error("Couldn't export", { description });
+		} finally {
+			exportingId = null;
+		}
+	}
 
 	async function fetchPage(after?: string) {
 		loading = true;
@@ -248,6 +265,14 @@
 						<Badge variant="outline" class="hidden shrink-0 sm:inline-flex">
 							{et.directional ? 'Directional →' : 'Symmetric ↔'}
 						</Badge>
+						<IconButton
+							labelOnTouch={false}
+							label="Export relationship type"
+							disabled={exportingId !== null}
+							onclick={() => handleExport(et)}
+						>
+							<Download />
+						</IconButton>
 						<IconButton
 							labelOnTouch={false}
 							label="Edit relationship type"
