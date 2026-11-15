@@ -102,6 +102,8 @@ def test_conventional_links_are_named_after_the_target(schema: dict[str, Any]) -
         "UpdateNode",
         "DeleteNode",
         "DuplicateNode",
+        "ListNodeContents",
+        "ListNodePath",
         "ListNodeMedia",
     }
 

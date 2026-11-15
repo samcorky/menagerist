@@ -518,7 +518,7 @@ async def list_node_contents(
 @router.get(
     "/{node_id}/path",
     response_model=list[NodeResponse],
-    operation_id="get_node_path",
+    operation_id="list_node_path",
     responses={
         **error_response(
             NodeNotFoundError,
@@ -541,7 +541,7 @@ async def list_node_contents(
         ),
     },
 )
-async def get_node_path(
+async def list_node_path(
     node_id: uuid.UUID,
     use_case: Annotated[GetItemPath, Depends(get_get_item_path_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],

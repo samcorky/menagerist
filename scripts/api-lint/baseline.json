@@ -1,7 +1,7 @@
 {
   "ibm-accept-and-return-models": 1,
   "ibm-avoid-repeating-path-parameters": 27,
-  "ibm-collection-array-property": 26,
+  "ibm-collection-array-property": 27,
   "ibm-content-contains-schema": 4,
   "ibm-dont-require-merge-patch-properties": 3,
   "ibm-enum-casing-convention": 41,
