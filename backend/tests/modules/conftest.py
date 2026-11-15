@@ -9,8 +9,11 @@ from dataclasses import dataclass
 import pytest
 
 from app.entrypoints.api.shared.bridges.transfer_targets import (
+    CollectionPackTarget,
     GraphPackTarget,
     PresetPackTarget,
+    build_in_memory_collections_repos,
+    in_memory_collection_stores,
     in_memory_graph_stores,
     in_memory_preset_stores,
 )
@@ -40,10 +43,11 @@ BOB = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
 
 @dataclass
 class Targets:
-    """The two targets the catalogue installs through, for one person."""
+    """The targets the catalogue and bundle files go through, for one person."""
 
     presets: PresetPackTarget
     graph: GraphPackTarget
+    collections: CollectionPackTarget
 
 
 class Shared:
@@ -51,6 +55,7 @@ class Shared:
 
     def __init__(self) -> None:
         self.graph_repos = build_in_memory_graph_repos()
+        self.collection_repos = build_in_memory_collections_repos()
         self.preset_repos = PresetRepos(presets=InMemoryPresetRepository())
         assets = InMemoryMediaAssetRepository()
         self.media_repos = MediaRepos(
@@ -69,8 +74,16 @@ class Shared:
             ),
             graph=GraphPackTarget(
                 in_memory_graph_stores(
-                    self.graph_repos, self.media_repos, self.preset_repos
+                    self.graph_repos,
+                    self.media_repos,
+                    self.preset_repos,
+                    self.collection_repos,
                 ),
+                actor,
+                access=guard,
+            ),
+            collections=CollectionPackTarget(
+                in_memory_collection_stores(self.collection_repos, self.graph_repos),
                 actor,
                 access=guard,
             ),

@@ -32,7 +32,7 @@ from app.modules.transfer.application.bundle_files import (
     ImportBundle,
     PlanBundleImport,
 )
-from app.modules.transfer.domain.bundle import BUNDLE_FORMAT, MAX_ITEMS
+from app.modules.transfer.domain.bundle import BUNDLE_FORMAT, MAX_COLLECTIONS, MAX_ITEMS
 from app.modules.transfer.domain.errors import InvalidBundleError
 from app.shared_kernel.actor import Actor
 
@@ -130,6 +130,14 @@ async def export_bundle(
             + "those use, and the connections that join two of the items.",
         ),
     ] = None,
+    collection_ids: Annotated[
+        list[uuid.UUID] | None,
+        Query(
+            max_length=MAX_COLLECTIONS,
+            description="The collections to export. A manual collection brings its "
+            + "items; a smart one keeps its conditions.",
+        ),
+    ] = None,
     file_format: Annotated[
         str,
         Query(
@@ -139,13 +147,14 @@ async def export_bundle(
         ),
     ] = BUNDLE_FORMAT,
 ) -> dict[str, Any]:
-    """Export saved lists, fields, groups, types and items as a file to import again.
+    """Export saved lists, types, items and collections as a file to import again.
 
-    Choose at least one of the four kinds. In a `menagerist-bundle` file each
+    Choose at least one of the five kinds. In a `menagerist-bundle` file each
     `ref` is the id, so the same thing has the same ref in every file. A type
-    brings the saved lists its fields use, and an item brings its type and the
-    connections between the items chosen, so the file imports on its own; the file
-    is `version` 3. At most 500 items can be exported at once.
+    brings the saved lists its fields use, an item brings its type and the
+    connections between the items chosen, and a manual collection brings its items,
+    so the file imports on its own; the file is `version` 3. At most 500 items can
+    be exported at once.
     """
     return await use_case.handle(
         ExportBundleQuery(
@@ -153,6 +162,7 @@ async def export_bundle(
             item_type_ids=item_type_ids or [],
             relationship_type_ids=relationship_type_ids or [],
             item_ids=item_ids or [],
+            collection_ids=collection_ids or [],
             format=file_format,
         ),
         actor,
