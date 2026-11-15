@@ -83,6 +83,14 @@ export async function exportItemsBundle(itemIds: string[]): Promise<PresetBundle
 	return result.data;
 }
 
+/** Export a collection: a manual one brings its items, types and connections. */
+export async function exportCollectionBundle(collectionId: string): Promise<PresetBundle> {
+	const result = await exportBundle({ query: { collection_ids: [collectionId] } });
+	if (result.error || !result.data)
+		throw result.error ?? new Error('Could not export the collection');
+	return result.data;
+}
+
 /** Parse a bundle file's text, checking only the envelope. The server validates the rest. */
 export function parseBundleText(text: string): PresetBundle {
 	let data: unknown;
