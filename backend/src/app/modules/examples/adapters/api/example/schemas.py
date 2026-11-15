@@ -118,7 +118,9 @@ class PackRefResponse(BaseModel):
 class ExamplePackResponse(BaseModel):
     """A shipped example set and whether it is installed."""
 
+    # Every list is always sent, so the response schema marks it required.
     model_config = ConfigDict(
+        json_schema_serialization_defaults_required=True,
         json_schema_extra={
             "examples": [
                 {
@@ -136,7 +138,7 @@ class ExamplePackResponse(BaseModel):
                     },
                 }
             ]
-        }
+        },
     )
 
     id: str

@@ -62,6 +62,9 @@
             "description": "A required dependency is not ready.",
             "content": {
               "application/health+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                },
                 "example": {
                   "status": "fail"
                 }
@@ -12056,7 +12059,13 @@
               "application/json": {
                 "schema": {}
               },
-              "application/octet-stream": {}
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "The file's bytes."
+                }
+              }
             }
           },
           "401": {
@@ -12240,7 +12249,13 @@
               "application/json": {
                 "schema": {}
               },
-              "image/webp": {}
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "The file's bytes."
+                }
+              }
             }
           },
           "401": {
@@ -12677,18 +12692,48 @@
               "title": "Asset Id"
             },
             "description": "The media asset's id."
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AttachmentTarget",
+              "description": "What the asset is attached to."
+            },
+            "description": "What the asset is attached to."
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The id of what it is attached to.",
+              "title": "Target Id"
+            },
+            "description": "The id of what it is attached to."
+          },
+          {
+            "name": "attribute_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AttachmentKey"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The slot it fills, such as `cover`; none for a plain attachment.",
+              "title": "Attribute Key"
+            },
+            "description": "The slot it fills, such as `cover`; none for a plain attachment."
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DetachMediaRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -13095,18 +13140,30 @@
               "title": "Asset Id"
             },
             "description": "The media asset's id."
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AttachmentTarget",
+              "description": "What the asset is attached to."
+            },
+            "description": "What the asset is attached to."
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The id of what it is attached to.",
+              "title": "Target Id"
+            },
+            "description": "The id of what it is attached to."
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CoverRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -24899,6 +24956,9 @@
             "description": "One or more dependency checks failed.",
             "content": {
               "application/health+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyDetailResponse"
+                },
                 "example": {
                   "status": "fail",
                   "checks": {
@@ -27376,6 +27436,7 @@
           },
           "time": {
             "type": "string",
+            "format": "date-time",
             "title": "Time",
             "description": "ISO 8601 timestamp when this observation was taken.",
             "examples": [
@@ -27541,6 +27602,7 @@
           "kind",
           "visibility",
           "item_count",
+          "warnings",
           "created_at",
           "updated_at"
         ],
@@ -27565,12 +27627,14 @@
       "CoverRequest": {
         "properties": {
           "target_type": {
-            "$ref": "#/components/schemas/AttachmentTarget"
+            "$ref": "#/components/schemas/AttachmentTarget",
+            "description": "What the asset is attached to."
           },
           "target_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Target Id"
+            "title": "Target Id",
+            "description": "The id of what it is attached to."
           }
         },
         "additionalProperties": false,
@@ -27580,7 +27644,7 @@
           "target_id"
         ],
         "title": "CoverRequest",
-        "description": "Request body identifying the target whose cover to set or clear.",
+        "description": "The target whose cover to set (a body) or clear (query parameters).",
         "examples": [
           {
             "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
@@ -28390,43 +28454,6 @@
           }
         ]
       },
-      "DetachMediaRequest": {
-        "properties": {
-          "target_type": {
-            "$ref": "#/components/schemas/AttachmentTarget"
-          },
-          "target_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Target Id"
-          },
-          "attribute_key": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AttachmentKey"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "target_type",
-          "target_id"
-        ],
-        "title": "DetachMediaRequest",
-        "description": "Request body identifying the attachment to remove for a given asset.",
-        "examples": [
-          {
-            "attribute_key": "cover",
-            "target_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
-            "target_type": "node"
-          }
-        ]
-      },
       "DisplayMode": {
         "type": "string",
         "enum": [
@@ -28823,6 +28850,9 @@
           "name",
           "description",
           "counts",
+          "requires",
+          "required_by",
+          "links_with",
           "installation"
         ],
         "title": "ExamplePackResponse",
@@ -29011,19 +29041,6 @@
         ],
         "title": "GraphPermission",
         "description": "Permissions for graph operations.\n\nMembers hold every permission here: types belong to a person, so deleting one\nor purging an attribute reaches only the owner's content. `ITEM_PURGE`, the\ntype deletions and the attribute purges are never grantable to a token.\nValues read `<module>:<resource>:<action>`."
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
       },
       "HealthResponse": {
         "properties": {
@@ -33063,46 +33080,6 @@
             "username": "alice"
           }
         ]
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
       },
       "VerificationResponse": {
         "properties": {

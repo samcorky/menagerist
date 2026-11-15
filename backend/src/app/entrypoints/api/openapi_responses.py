@@ -8,6 +8,7 @@ examples cite its own URL as the `instance`, not one shared route.
 """
 
 import copy
+import json
 import re
 from typing import Any
 
@@ -283,3 +284,21 @@ def add_error_responses(openapi_schema: dict[str, Any]) -> None:
             if method not in _METHODS:
                 continue
             _document_operation(path, method, operation)
+    _drop_unused_validation_schemas(openapi_schema)
+
+
+# FastAPI's own 422 schemas, unused once every 422 is the problem+json body.
+_FASTAPI_VALIDATION_SCHEMAS = ("HTTPValidationError", "ValidationError")
+
+
+def _drop_unused_validation_schemas(openapi_schema: dict[str, Any]) -> None:
+    """Remove FastAPI's 422 schemas when nothing refers to them any more.
+
+    `HTTPValidationError` refers to `ValidationError`, so it is checked first.
+    """
+    schemas = openapi_schema["components"]["schemas"]
+    for name in _FASTAPI_VALIDATION_SCHEMAS:
+        others = {key: value for key, value in schemas.items() if key != name}
+        used = json.dumps([openapi_schema["paths"], others])
+        if name in schemas and f'"#/components/schemas/{name}"' not in used:
+            del schemas[name]

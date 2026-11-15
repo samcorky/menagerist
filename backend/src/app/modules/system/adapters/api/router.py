@@ -159,6 +159,7 @@ class CheckObservation(BaseModel):
         Field(
             description="ISO 8601 timestamp when this observation was taken.",
             examples=[_EXAMPLE_ISO],
+            json_schema_extra={"format": "date-time"},
         ),
     ]
     output: Annotated[
@@ -570,6 +571,7 @@ _DETAIL_200: dict[str, object] = {
 
 _DETAIL_503: dict[str, object] = {
     "description": "One or more dependency checks failed.",
+    "model": ReadyDetailResponse,
     "content": {
         "application/health+json": {
             "example": {
@@ -608,6 +610,7 @@ _PUBLIC_200: dict[str, object] = {
 
 _PUBLIC_503: dict[str, object] = {
     "description": "A required dependency is not ready.",
+    "model": ReadyResponse,
     "content": {"application/health+json": {"example": {"status": "fail"}}},
 }
 

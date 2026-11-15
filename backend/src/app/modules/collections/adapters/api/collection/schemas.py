@@ -207,7 +207,6 @@ class CollectionResponse(BaseModel):
         default=False, description="True when the real count is above `item_count`."
     )
     warnings: list[DefinitionWarningResponse] = Field(
-        default_factory=list,
         description=(
             "Conditions that no longer apply; filled for a single smart collection, "
             + "empty in lists."

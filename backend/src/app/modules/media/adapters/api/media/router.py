@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Depends, Form, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 from starlette.responses import Response
@@ -98,6 +98,9 @@ from app.shared_kernel.errors import ValidationError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+# A file body: OpenAPI 3.1 describes raw bytes as a binary string.
+_BINARY = {"type": "string", "format": "binary", "description": "The file's bytes."}
 
 router = APIRouter(prefix="/media", tags=["Media"], route_class=PermissionAwareRoute)
 # A node's media is addressed through the node.
@@ -286,7 +289,7 @@ async def update_media(
     operation_id="stream_media_content",
     response_model=None,
     responses={
-        200: {"content": {"application/octet-stream": {}}},
+        200: {"content": {"application/octet-stream": {"schema": _BINARY}}},
         **error_response(
             MediaAssetNotFoundError,
             detail="Media asset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
@@ -332,7 +335,7 @@ async def stream_media_content(
     response_model=None,
     responses={
         **RATE_LIMITED_RESPONSE,
-        200: {"content": {"image/webp": {}}},
+        200: {"content": {"image/webp": {"schema": _BINARY}}},
         **error_response(
             MediaAssetNotFoundError,
             detail="Media asset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
@@ -418,7 +421,7 @@ async def attach_media(
 )
 async def detach_media(
     asset_id: AssetId,
-    payload: DetachMediaRequest,
+    payload: Annotated[DetachMediaRequest, Query()],
     use_case: Annotated[DetachMedia, Depends(get_detach_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
@@ -469,7 +472,7 @@ async def set_media_cover(
 )
 async def clear_media_cover(
     asset_id: AssetId,
-    payload: CoverRequest,
+    payload: Annotated[CoverRequest, Query()],
     use_case: Annotated[ClearMediaCover, Depends(get_clear_media_cover_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
