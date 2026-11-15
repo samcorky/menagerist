@@ -1554,3 +1554,21 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 **Rationale:** the cursor is a position in the (depth, id) order, found by id in the reached list, because the order is not by id alone. A cursor whose item has since gone gives an empty page rather than restarting. The whole reach is computed on each page (at most `MAX_REACHED` items); pages are cheap slices, and a cached cursor would go stale as connections change.
 
 **Limits on multi-hop work:** a reach that finds more than 10,000 items, or any multi-hop statement that runs past five seconds (`WALK_TIMEOUT_MS`, set for that statement only), fails with a 400 asking the person to follow fewer steps. Searches only take the time limit when a connection condition has `depth` above 1.
+
+## Items and collections in a bundle file (2026-11-15)
+
+**Decision:** `menagerist-bundle` version 3 adds `items`, `connections` and `collections` to the sections version 2 has. Versions 1 and 2 still import; export writes version 3. The sections are the ones `Bundle` already holds and the pipeline already plans and applies (#456), so this adds a codec and a read side for export, not new import machinery.
+
+**Choices that are not obvious:**
+
+- An item's ref is its id, as for types. It names its type by `type_ref`. Exporting items always writes their item types and the saved lists those use, so the file imports on its own.
+- A connection is written only when both ends are in the file, and its connection type comes with it. Connections to items outside the file are left out, and the export says how many.
+- A manual collection lists `item_refs` and brings those items. A smart collection keeps its `definition`, which names types by slug and fields by key. Two conditions cannot travel: a condition on another collection, and a connection to one specific item. The export is refused, naming the collection and the condition, as example packs refuse them, rather than writing a collection that behaves differently.
+- Exporting the items a smart collection matches is a separate action. It writes today's items, their types and lists, and no collection, so it works for any smart collection.
+- Items have no unique name, so an import never skips an item: importing a file twice adds everything twice. The preview counts what will be added, which is the safeguard.
+- An item whose type was skipped because the slug is taken is added under the existing type only if its fields match the file's. If they differ, the plan reports a blocker rather than adding items under a shape they were not written for.
+- Limits start at the example-pack ones (500 items, 2,000 connections); a larger export is refused with a message.
+
+**Not in this version:** attachments and covers. A JSON file cannot hold them; a zip with the files beside the JSON is the likely shape, as its own change.
+
+**Rationale:** #471 asks for Export on item and collection screens. Types alone were the part that needed no format change; items and collections need the format settled first, and the open question was what an import does with things that have no unique name.
