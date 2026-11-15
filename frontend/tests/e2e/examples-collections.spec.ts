@@ -6,6 +6,7 @@ import {
 	GAME_COLLECTIONS,
 	MOVIES,
 	PARTS,
+	addFromPreview,
 	collectionCard,
 	exampleData,
 	install,
@@ -153,7 +154,7 @@ test('reinstalling after keeping items adopts them instead of duplicating', asyn
 	expect((await list()).filter((n) => n.name === 'Lantern Harbour')).toHaveLength(1);
 
 	await page.goto('/library/examples');
-	await page.getByRole('button', { name: /^Add Board games/ }).click();
+	await addFromPreview(page, /^Board games/);
 	await expect(page.getByText('Examples added')).toBeVisible();
 	await expect(page.getByText(/you'd kept (was|were) already here/)).toBeVisible();
 

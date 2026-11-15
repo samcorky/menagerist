@@ -22,6 +22,9 @@ test('adds a catalogue list to your saved lists and then shows it as added', asy
 
 	const dialog = page.getByRole('dialog', { name: 'Install from catalogue' });
 	await dialog.getByRole('button', { name: `Install ${TITLE}` }).click();
+	// The preview says what will be added; confirming adds it.
+	await expect(dialog.getByText('1 saved item')).toBeVisible();
+	await dialog.getByRole('button', { name: 'Add', exact: true }).click();
 
 	await expect(page.getByText(/Added 1 saved item/)).toBeVisible();
 	await expect(dialog.getByRole('button', { name: `Install ${TITLE}` })).toHaveCount(0);

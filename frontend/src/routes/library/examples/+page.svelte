@@ -8,6 +8,7 @@
 	import {
 		installExamplePack,
 		listExamplePacks,
+		planExamplePackInstall,
 		uninstallExamplePack,
 		type ExamplePackResponse
 	} from '$lib/api/client';
@@ -27,6 +28,8 @@
 	} from '$lib/examples';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import PlanPreviewDialog from '$lib/components/plan-preview-dialog.svelte';
+	import type { ImportPlan } from '$lib/import-plan';
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -38,6 +41,11 @@
 	let loadFailed = $state(false);
 	let busyId = $state<string | null>(null);
 	let confirmPack = $state<ExamplePackResponse | null>(null);
+	// The set being looked at before it is added, and what adding it would do.
+	let previewPack = $state<ExamplePackResponse | null>(null);
+	let plan = $state<ImportPlan | null>(null);
+	let planLoading = $state(false);
+	let planError = $state<string | null>(null);
 	let keptNotes = $state<Record<string, { reason: string; count: number }[]>>({});
 	let buttons: Record<string, HTMLElement | null> = {};
 
@@ -78,7 +86,33 @@
 		if (refreshed.data) packs = refreshed.data;
 	}
 
+	async function preview(pack: ExamplePackResponse) {
+		previewPack = pack;
+		plan = null;
+		planError = null;
+		planLoading = true;
+		const result = await planExamplePackInstall({ path: { pack_id: pack.id } });
+		// The preview may have been closed, or another set chosen, while this loaded.
+		if (previewPack?.id !== pack.id) return;
+		planLoading = false;
+		if (result.error || !result.data) {
+			planError = errorMessage(result.error);
+			return;
+		}
+		plan = result.data;
+		// A plan that cannot go ahead may mean this page is stale, so show the truth.
+		if (!result.data.ready) await refreshPacks();
+	}
+
+	function closePreview(open: boolean) {
+		if (open || busyId) return;
+		const id = previewPack?.id;
+		previewPack = null;
+		if (id) void tick().then(() => buttons[id]?.focus());
+	}
+
 	async function install(pack: ExamplePackResponse) {
+		previewPack = null;
 		busyId = pack.id;
 		keptNotes = {};
 		const result = await installExamplePack({ path: { pack_id: pack.id } });
@@ -221,7 +255,7 @@
 								aria-describedby={blocked ? `blocked-${pack.id}` : undefined}
 								aria-label="Add {pack.name}"
 								bind:ref={() => buttons[pack.id] ?? null, (el) => (buttons[pack.id] = el)}
-								onclick={() => void install(pack)}
+								onclick={() => void preview(pack)}
 							>
 								{#if busy}
 									<Spinner class="size-4" />
@@ -240,6 +274,16 @@
 		</div>
 	{/if}
 </Page>
+
+<PlanPreviewDialog
+	open={previewPack !== null}
+	title={previewPack ? `Add ${previewPack.name}` : 'Add examples'}
+	{plan}
+	loading={planLoading}
+	error={planError}
+	onOpenChange={closePreview}
+	onConfirm={() => previewPack && void install(previewPack)}
+/>
 
 <ConfirmDialog
 	open={confirmPack !== null}

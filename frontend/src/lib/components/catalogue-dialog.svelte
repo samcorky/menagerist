@@ -1,8 +1,15 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { listCatalogueEntries, installCatalogueEntry, type EntrySection } from '$lib/api/client';
+	import {
+		listCatalogueEntries,
+		installCatalogueEntry,
+		planCatalogueEntryInstall,
+		type EntrySection
+	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { describeInstall, entryNote, groupBySection, type CatalogueEntry } from '$lib/catalogue';
+	import type { ImportPlan } from '$lib/import-plan';
+	import PlanPreview from '$lib/components/plan-preview.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 
@@ -26,6 +33,11 @@
 	let loadError = $state<string | null>(null);
 	let installError = $state<string | null>(null);
 	let busyId = $state<string | null>(null);
+	// The entry being looked at before it is added, and what adding it would do.
+	let previewing = $state<CatalogueEntry | null>(null);
+	let plan = $state<ImportPlan | null>(null);
+	let planLoading = $state(false);
+	let planError = $state<string | null>(null);
 
 	const groups = $derived(
 		groupBySection(entries.filter((e) => !sections || sections.includes(e.section)))
@@ -46,15 +58,35 @@
 	$effect(() => {
 		if (open) {
 			installError = null;
+			previewing = null;
 			void load();
 		}
 	});
 
-	async function install(entry: CatalogueEntry) {
+	async function preview(entry: CatalogueEntry) {
+		previewing = entry;
+		plan = null;
+		planError = null;
+		planLoading = true;
+		const result = await planCatalogueEntryInstall({ path: { entry_id: entry.id } });
+		// Another entry may have been chosen, or the preview closed, while this loaded.
+		if (previewing?.id !== entry.id) return;
+		planLoading = false;
+		if (result.error || !result.data) {
+			planError = errorMessage(result.error);
+			return;
+		}
+		plan = result.data;
+	}
+
+	async function install() {
+		const entry = previewing;
+		if (!entry) return;
 		busyId = entry.id;
 		installError = null;
 		const result = await installCatalogueEntry({ path: { entry_id: entry.id } });
 		busyId = null;
+		previewing = null;
 		if (result.error || !result.data) {
 			installError = errorMessage(result.error);
 			return;
@@ -80,7 +112,17 @@
 			{#if installError}
 				<p class="text-sm text-destructive" role="alert">{installError}</p>
 			{/if}
-			{#if loading && entries.length === 0}
+			{#if previewing}
+				<h3 class="text-sm font-medium">Add {previewing.title}</h3>
+				<PlanPreview
+					{plan}
+					loading={planLoading}
+					error={planError}
+					busy={busyId !== null}
+					onCancel={() => (previewing = null)}
+					onConfirm={() => void install()}
+				/>
+			{:else if loading && entries.length === 0}
 				<p class="py-6 text-center text-sm text-muted-foreground">Loading…</p>
 			{:else if loadError}
 				<div class="flex flex-col items-center gap-2 py-6 text-center">
@@ -118,9 +160,9 @@
 												class="pointer-coarse:min-h-11"
 												disabled={busyId !== null}
 												aria-label="Install {entry.title}"
-												onclick={() => install(entry)}
+												onclick={() => void preview(entry)}
 											>
-												{busyId === entry.id ? 'Adding…' : 'Add'}
+												Add
 											</Button>
 										{/if}
 									</li>

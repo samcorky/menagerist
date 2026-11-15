@@ -104,9 +104,14 @@ test('a stale page shows the server message when a prerequisite is gone', async 
 	await removeViaApi(request, 'games');
 	await expect.poll(async () => (await nodesNamed(request, 'Lantern Harbour')).length).toBe(0);
 
+	// The preview asks the server, which says the prerequisite is gone and offers no Add.
 	await add.click();
-	await expect(page.getByText("Couldn't add these examples")).toBeVisible();
-	await expect(page.getByRole('region', { name: /Notifications/ })).toContainText(/board games/i);
+	const preview = page.getByRole('dialog', { name: /^Add Extra board games/ });
+	await expect(preview.getByText("This can't go ahead")).toBeVisible();
+	await expect(preview).toContainText(/board games/i);
+	await expect(preview.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0);
+	await preview.getByRole('button', { name: 'Cancel' }).click();
+	// The page now shows what the server said.
 	await expect(extras.getByText('Add Board games first.')).toBeVisible();
 	await expect(extras.getByRole('button', { name: /^Add Extra board games/ })).toBeDisabled();
 	expect(await nodesNamed(request, 'Quillfeather Quarry')).toHaveLength(0);

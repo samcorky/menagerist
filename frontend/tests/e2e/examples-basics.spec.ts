@@ -136,7 +136,7 @@ test('follows a connection between example items', async ({ page }) => {
 	await expect(page.getByRole('link', { name: 'Night Drive' }).first()).toBeVisible();
 });
 
-test('a clashing item type slug gives a friendly error and creates nothing', async ({
+test('a clashing item type slug is shown before adding and creates nothing', async ({
 	page,
 	request
 }) => {
@@ -144,7 +144,11 @@ test('a clashing item type slug gives a friendly error and creates nothing', asy
 
 	await page.goto('/library/examples');
 	await page.getByRole('button', { name: /^Add Music/ }).click();
-	await expect(page.getByText("Couldn't add these examples")).toBeVisible();
+	const preview = page.getByRole('dialog', { name: /^Add Music/ });
+	await expect(preview.getByText("This can't go ahead")).toBeVisible();
+	await expect(preview.getByText(/You already have an item type called/)).toBeVisible();
+	await expect(preview.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0);
+	await preview.getByRole('button', { name: 'Cancel' }).click();
 	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
 
 	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as { name: string }[];

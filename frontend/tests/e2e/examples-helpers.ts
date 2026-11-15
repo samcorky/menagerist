@@ -43,9 +43,18 @@ export function exampleData() {
 	return { ...owned, ownNames, ownTypeLabels, cleanUp };
 }
 
+/** Opens the preview of adding a pack and confirms it, leaving the result to the caller. */
+export async function addFromPreview(page: Page, pack: RegExp) {
+	await page.getByRole('button', { name: new RegExp(`^Add ${pack.source.slice(1)}`) }).click();
+	await page
+		.getByRole('dialog', { name: new RegExp(`^Add ${pack.source.slice(1)}`) })
+		.getByRole('button', { name: 'Add', exact: true })
+		.click();
+}
+
 export async function install(page: Page, pack: RegExp) {
 	await page.goto('/library/examples');
-	await page.getByRole('button', { name: new RegExp(`^Add ${pack.source.slice(1)}`) }).click();
+	await addFromPreview(page, pack);
 	await expect(page.getByText('Examples added')).toBeVisible();
 	await expect(
 		page.getByRole('button', { name: new RegExp(`^Remove ${pack.source.slice(1)}`) })
