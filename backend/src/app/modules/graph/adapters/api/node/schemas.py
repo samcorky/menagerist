@@ -222,6 +222,16 @@ class NodeResponse(BaseModel):
         )
 
 
+class NodeContentsEntryResponse(BaseModel):
+    """An item found inside another, and how many steps in it sits."""
+
+    item: NodeResponse
+    depth: int = Field(
+        description="1 for an item held directly, 2 for one held by that, and so on.",
+        examples=[1],
+    )
+
+
 class DeletedNodeResponse(BaseModel):
     """A deleted item as listed in Recently deleted."""
 

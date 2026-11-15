@@ -26,8 +26,10 @@ from app.modules.graph.adapters.api.dependencies import (
     get_create_node_use_case,
     get_delete_node_use_case,
     get_duplicate_node_use_case,
+    get_get_item_path_use_case,
     get_get_node_use_case,
     get_list_deleted_nodes_use_case,
+    get_list_item_contents_use_case,
     get_list_item_fields_use_case,
     get_list_nodes_use_case,
     get_promote_extra_schema_field_use_case,
@@ -43,6 +45,7 @@ from app.modules.graph.adapters.api.node.schemas import (
     DeletedNodeResponse,
     DuplicateNodeRequest,
     ItemFieldResponse,
+    NodeContentsEntryResponse,
     NodeCountResponse,
     NodeResponse,
     NodeSearchCountsRequest,
@@ -61,10 +64,15 @@ from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
 from app.modules.graph.application.duplicate_node import DuplicateNode
+from app.modules.graph.application.get_item_path import GetItemPath, GetItemPathQuery
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
 from app.modules.graph.application.list_deleted_nodes import (
     ListDeletedNodes,
     ListDeletedNodesQuery,
+)
+from app.modules.graph.application.list_item_contents import (
+    ListItemContents,
+    ListItemContentsQuery,
 )
 from app.modules.graph.application.list_item_fields import (
     ListItemFields,
@@ -89,12 +97,15 @@ from app.modules.graph.application.search_nodes import SearchNodes, SearchNodesQ
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.domain.errors import (
     CollectionNotFoundError,
+    EdgeTypeNotFoundError,
     InvalidSchemaError,
     NodeNotFoundError,
     NodeTypeDeletedError,
     NodeTypeNotFoundError,
+    RelationshipNotDirectionalError,
 )
 from app.modules.graph.domain.query import InvalidQueryError
+from app.modules.graph.domain.reach import InvalidReachDepthError, ReachTooLargeError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
 
@@ -423,6 +434,135 @@ async def get_node(
     ):
         return earlier
     return NodeResponse.from_domain(node)
+
+
+@router.get(
+    "/{node_id}/contents",
+    response_model=list[NodeContentsEntryResponse],
+    operation_id="list_node_contents",
+    responses={
+        "200": {
+            "headers": {
+                "Link": {
+                    "description": "RFC 8288 next-page cursor. Absent on last page.",
+                    "schema": {"type": "string"},
+                }
+            }
+        },
+        **error_response(
+            NodeNotFoundError,
+            detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+        ),
+        **error_response(
+            EdgeTypeNotFoundError,
+            detail="Relationship 'contains' not found",
+        ),
+        **error_response(
+            ReachTooLargeError,
+            detail="This reaches too many items to follow. Try fewer steps.",
+        ),
+        **error_response(
+            RelationshipNotDirectionalError,
+            detail="'sibling' has no direction, so it has no contents or path",
+        ),
+        **error_response(
+            InvalidReachDepthError, detail="Depth must be between 1 and 25"
+        ),
+    },
+)
+async def list_node_contents(
+    node_id: uuid.UUID,
+    use_case: Annotated[ListItemContents, Depends(get_list_item_contents_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    request: Request,
+    response: Response,
+    relationship: Annotated[
+        str,
+        Query(description="Slug of the relationship to follow, such as `contains`."),
+    ],
+    depth: Annotated[
+        int, Query(description="How many steps to follow, from 1 to 25.")
+    ] = 1,
+    after: uuid.UUID | None = None,
+    limit: int = 50,
+) -> list[NodeContentsEntryResponse]:
+    """List the items this item holds, nearest first.
+
+    Follows the relationship from the item to what it holds, then what those hold,
+    up to `depth` steps. Each item appears once, at its nearest depth, ordered by
+    depth and then id. Page with `after`, the id of the last item on the previous
+    page.
+    """
+    found = await use_case.handle(
+        ListItemContentsQuery(
+            item_id=node_id,
+            relationship=relationship,
+            depth=depth,
+            after=after,
+            limit=limit + 1,
+        ),
+        actor,
+    )
+    if len(found) > limit:
+        response.headers["Link"] = link_next_header(
+            request, str(found[limit - 1].node.id)
+        )
+    return [
+        NodeContentsEntryResponse(
+            item=NodeResponse.from_domain(entry.node), depth=entry.depth
+        )
+        for entry in found[:limit]
+    ]
+
+
+@router.get(
+    "/{node_id}/path",
+    response_model=list[NodeResponse],
+    operation_id="get_node_path",
+    responses={
+        **error_response(
+            NodeNotFoundError,
+            detail="Node 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+        ),
+        **error_response(
+            EdgeTypeNotFoundError,
+            detail="Relationship 'contains' not found",
+        ),
+        **error_response(
+            ReachTooLargeError,
+            detail="This reaches too many items to follow. Try fewer steps.",
+        ),
+        **error_response(
+            RelationshipNotDirectionalError,
+            detail="'sibling' has no direction, so it has no contents or path",
+        ),
+        **error_response(
+            InvalidReachDepthError, detail="Depth must be between 1 and 25"
+        ),
+    },
+)
+async def get_node_path(
+    node_id: uuid.UUID,
+    use_case: Annotated[GetItemPath, Depends(get_get_item_path_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    relationship: Annotated[
+        str,
+        Query(description="Slug of the relationship to follow, such as `contains`."),
+    ],
+    depth: Annotated[
+        int, Query(description="How many steps up to follow, from 1 to 25.")
+    ] = 25,
+) -> list[NodeResponse]:
+    """List the items that hold this item, outermost first.
+
+    The last entry is the item's direct holder. An item held in two places lists
+    both holders at that distance, in id order.
+    """
+    holders = await use_case.handle(
+        GetItemPathQuery(item_id=node_id, relationship=relationship, depth=depth),
+        actor,
+    )
+    return [NodeResponse.from_domain(node) for node in holders]
 
 
 @router.get(
