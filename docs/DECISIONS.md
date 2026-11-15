@@ -1562,7 +1562,7 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 **Choices that are not obvious:**
 
 - An item's ref is its id, as for types. It names its type by `type_ref`, which is `null` for an item with no type (the app allows those; example packs still require a type). Exporting items always writes their item types and the saved lists those use, so the file imports on its own.
-- A connection is written only when both ends are in the file, and its connection type comes with it. Connections to items outside the file are left out, and the export says how many.
+- A connection is written only when both ends are in the file, and its connection type comes with it. Connections to items outside the file are left out. A connection whose type no longer exists is left out too, and an item whose type no longer exists is written with no type.
 - A manual collection lists `item_refs` and brings those items. A smart collection keeps its `definition`, which names types by slug and fields by key. Two conditions cannot travel: a condition on another collection, and a connection to one specific item. The export is refused, naming the collection and the condition, as example packs refuse them, rather than writing a collection that behaves differently.
 - Exporting the items a smart collection matches is a separate action. It writes today's items, their types and lists, and no collection, so it works for any smart collection.
 - Items have no unique name, so an import never skips an item: importing a file twice adds everything twice. The preview counts what will be added, which is the safeguard.

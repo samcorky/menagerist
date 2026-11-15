@@ -144,6 +144,31 @@ class GraphTarget(Protocol):
         """
         ...
 
+    async def item_type_field_keys(self, slug: str) -> frozenset[str] | None:
+        """Return the field keys of the person's item type `slug`, or `None` if none."""
+        ...
+
+    async def read_items(self, item_ids: Sequence[uuid.UUID]) -> list[BundleItem]:
+        """Return the person's items with `item_ids`, in order; `ref` is the id.
+
+        `type_ref` is the id of the item's type, or `None` when it has no type or
+        its type no longer exists.
+
+        Raises:
+            NotFoundError: an id is not one of the person's live items.
+        """
+        ...
+
+    async def read_connections(
+        self, item_ids: Sequence[uuid.UUID]
+    ) -> list[BundleConnection]:
+        """Return the person's connections that join two of `item_ids`.
+
+        Ends are the item ids and `type_ref` is the connection type's id. A
+        connection whose type no longer exists is left out.
+        """
+        ...
+
     async def create_item(self, spec: BundleItem, *, type_slug: str | None) -> Created:
         """Create the item under the item type `type_slug`."""
         ...

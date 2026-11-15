@@ -122,6 +122,13 @@ async def export_bundle(
         list[uuid.UUID] | None,
         Query(description="The connection types to export."),
     ] = None,
+    item_ids: Annotated[
+        list[uuid.UUID] | None,
+        Query(
+            description="The items to export, with their types, the saved lists "
+            + "those use, and the connections that join two of the items."
+        ),
+    ] = None,
     file_format: Annotated[
         str,
         Query(
@@ -131,18 +138,20 @@ async def export_bundle(
         ),
     ] = BUNDLE_FORMAT,
 ) -> dict[str, Any]:
-    """Export saved lists, fields, groups and types as a file you can import again.
+    """Export saved lists, fields, groups, types and items as a file to import again.
 
-    Choose at least one of the three kinds. In a `menagerist-bundle` file each
-    `ref` is the id, so the same thing has the same ref in every file. An item
-    type brings the saved lists its fields use, so the file imports on its own;
-    the file is `version` 3.
+    Choose at least one of the four kinds. In a `menagerist-bundle` file each
+    `ref` is the id, so the same thing has the same ref in every file. A type
+    brings the saved lists its fields use, and an item brings its type and the
+    connections between the items chosen, so the file imports on its own; the file
+    is `version` 3. At most 500 items can be exported at once.
     """
     return await use_case.handle(
         ExportBundleQuery(
             preset_ids=preset_ids or [],
             item_type_ids=item_type_ids or [],
             relationship_type_ids=relationship_type_ids or [],
+            item_ids=item_ids or [],
             format=file_format,
         ),
         actor,

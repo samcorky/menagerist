@@ -3,7 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Copy, Pencil, Star, Trash2, X } from '@lucide/svelte';
+	import { Copy, Download, Pencil, Star, Trash2, X } from '@lucide/svelte';
+	import { downloadBundle, exportItemsBundle, presetFilename } from '$lib/preset-packs';
 	import { Shimmer } from '@shimmer-from-structure/svelte';
 	import {
 		createEdge,
@@ -153,6 +154,21 @@
 	let deletingNode = $state(false);
 	let confirmDeleteNode = $state(false);
 	let duplicateOpen = $state(false);
+	let exporting = $state(false);
+
+	/** Save this item, with its type and the lists the type uses, as a file to import again. */
+	async function handleExport() {
+		if (!node || exporting) return;
+		exporting = true;
+		try {
+			downloadBundle(await exportItemsBundle([node.id]), presetFilename(node.name));
+		} catch (error) {
+			const description = error instanceof Error ? error.message : errorMessage(error);
+			toast.error("Couldn't export", { description });
+		} finally {
+			exporting = false;
+		}
+	}
 
 	let editingEdge = $state<EdgeResponse | null>(null);
 	let editRows = $state<AttributeRow[]>([]);
@@ -785,6 +801,17 @@
 											variant="ghost"
 											size="icon"
 											class="max-md:hidden"
+											disabled={exporting}
+											onclick={handleExport}
+											aria-label="Export"
+										>
+											<Download class="size-4" />
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											class="max-md:hidden"
 											onclick={() => (mode = 'edit')}
 											aria-label="Edit"
 										>
@@ -1239,6 +1266,16 @@
 					>
 						<Copy class="size-4" />
 						Duplicate
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						class="flex-1 pointer-coarse:h-11"
+						disabled={exporting}
+						onclick={handleExport}
+					>
+						<Download class="size-4" />
+						Export
 					</Button>
 					<Button type="button" class="flex-1 pointer-coarse:h-11" onclick={() => (mode = 'edit')}>
 						<Pencil class="size-4" />

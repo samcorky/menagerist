@@ -77,7 +77,9 @@ from app.modules.graph.application.delete_unused_node_type import (
     DeleteUnusedNodeTypeCommand,
 )
 from app.modules.graph.application.get_edge_type import GetEdgeType, GetEdgeTypeQuery
+from app.modules.graph.application.get_node import GetNode, GetNodeQuery
 from app.modules.graph.application.get_node_type import GetNodeType, GetNodeTypeQuery
+from app.modules.graph.application.list_edges import ListEdges, ListEdgesQuery
 from app.modules.graph.application.purge_edge import PurgeEdge, PurgeEdgeCommand
 from app.modules.graph.application.purge_node import PurgeNode, PurgeNodeCommand
 from app.modules.graph.domain.edge import Edge  # noqa: TC001
@@ -687,6 +689,92 @@ class GraphPackTarget:
                     )
                 )
         return found
+
+    async def item_type_field_keys(self, slug: str) -> frozenset[str] | None:
+        """Return the field keys of the person's item type `slug`, or `None`."""
+        async with self._stores.read() as repos:
+            node_type = await repos.node_types.get_by_slug(slug, scope=self._scope)
+        if node_type is None:
+            return None
+        properties = (node_type.attributes_schema or {}).get("properties", {})
+        return frozenset(properties)
+
+    async def read_items(self, item_ids: Sequence[uuid.UUID]) -> list[BundleItem]:
+        """Return the person's items with `item_ids`, each `ref` its id."""
+        found: list[BundleItem] = []
+        async with self._stores.read() as repos:
+            type_ids: dict[str, str | None] = {}
+            for item_id in item_ids:
+                node = await GetNode(repos, self._access).handle(
+                    GetNodeQuery(node_id=item_id), self._actor
+                )
+                slug = node.type or ""
+                if slug not in type_ids:
+                    node_type = await repos.node_types.get_by_slug(
+                        slug, scope=self._scope
+                    )
+                    type_ids[slug] = None if node_type is None else str(node_type.id)
+                found.append(
+                    BundleItem(
+                        ref=str(node.id),
+                        type_ref=type_ids[slug],
+                        name=node.name,
+                        description=node.description,
+                        attributes=node.attributes,
+                        tags=tuple(node.tags),
+                        extra_schema=node.extra_schema,
+                    )
+                )
+        return found
+
+    async def read_connections(
+        self, item_ids: Sequence[uuid.UUID]
+    ) -> list[BundleConnection]:
+        """Return the connections that join two of `item_ids`."""
+        async with self._stores.read() as repos:
+            edges = await self._edges_between(repos, item_ids)
+            type_ids: dict[str, str | None] = {}
+            found: list[BundleConnection] = []
+            for edge in edges:
+                if edge.type not in type_ids:
+                    edge_type = await repos.edge_types.get_by_slug(
+                        edge.type, scope=self._scope
+                    )
+                    type_ids[edge.type] = (
+                        None if edge_type is None else str(edge_type.id)
+                    )
+                type_ref = type_ids[edge.type]
+                if type_ref is not None:
+                    found.append(
+                        BundleConnection(
+                            source_ref=str(edge.source_id),
+                            target_ref=str(edge.target_id),
+                            type_ref=type_ref,
+                            attributes=edge.attributes,
+                        )
+                    )
+        return found
+
+    async def _edges_between(
+        self, repos: GraphRepos, item_ids: Sequence[uuid.UUID]
+    ) -> list[Edge]:
+        """Each live connection with both ends among `item_ids`, once."""
+        wanted = set(item_ids)
+        edges: dict[uuid.UUID, Edge] = {}
+        for item_id in item_ids:
+            after: uuid.UUID | None = None
+            while True:
+                page = await ListEdges(repos, self._access).handle(
+                    ListEdgesQuery(node_id=item_id, after=after, limit=_EDGE_PAGE),
+                    self._actor,
+                )
+                for edge in page:
+                    if edge.source_id in wanted and edge.target_id in wanted:
+                        edges.setdefault(edge.id, edge)
+                if len(page) < _EDGE_PAGE:
+                    break
+                after = page[-1].id
+        return list(edges.values())
 
     async def create_item(self, spec: BundleItem, *, type_slug: str | None) -> Created:
         """Create the item under `type_slug`."""
