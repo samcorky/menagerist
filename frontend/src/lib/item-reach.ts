@@ -1,5 +1,5 @@
 import {
-	getNodePath,
+	listNodePath,
 	listNodeContents,
 	type EdgeResponse,
 	type EdgeTypeResponse,
@@ -47,7 +47,7 @@ export async function fetchPath(
 	nodeId: string,
 	relationship: string
 ): Promise<NodeResponse[] | null> {
-	const { data, error } = await getNodePath({
+	const { data, error } = await listNodePath({
 		path: { node_id: nodeId },
 		query: { relationship }
 	});
