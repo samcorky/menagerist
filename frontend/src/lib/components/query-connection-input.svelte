@@ -6,8 +6,11 @@
 	import QueryItemPicker from '$lib/components/query-item-picker.svelte';
 	import {
 		ANY_RELATIONSHIP_LABEL,
+		canChooseDepth,
+		DEPTH_CHOICES,
 		directionChoices,
 		relationshipOptionLabel,
+		withConnectionDepth,
 		withConnectionDirection,
 		withConnectionFilter,
 		withConnectionItem,
@@ -42,6 +45,9 @@
 	const unlisted = $derived(condition.relationship !== undefined && relationship === null);
 	// No relationship, or one the list does not know, leaves the direction open.
 	const directions = $derived(directionChoices(relationship));
+
+	// "How far" only means something one way along a relationship that has a direction.
+	const showDepth = $derived(canChooseDepth(condition, relationship));
 
 	function onRelationship(slug: string) {
 		const chosen = view.relationships?.find((r) => r.slug === slug) ?? null;
@@ -80,6 +86,18 @@
 					)}
 			>
 				{#each directions as d (d.value)}
+					<NativeSelect.Option value={d.value}>{d.label}</NativeSelect.Option>
+				{/each}
+			</NativeSelect.Root>
+		{/if}
+		{#if showDepth}
+			<NativeSelect.Root
+				class="min-w-0 flex-1 basis-36 sm:max-w-48 [&_select]:h-9"
+				aria-label="{name}, how far"
+				value={condition.depth ?? 1}
+				onchange={(e) => onchange(withConnectionDepth(condition, Number(e.currentTarget.value)))}
+			>
+				{#each DEPTH_CHOICES as d (d.value)}
 					<NativeSelect.Option value={d.value}>{d.label}</NativeSelect.Option>
 				{/each}
 			</NativeSelect.Root>

@@ -1,5 +1,12 @@
 import { OPERATOR_LABELS, operatorTakesValue } from './operators';
-import { isGroup, type Condition, type Group, type Operand, type Value } from './types';
+import {
+	isGroup,
+	MAX_CONNECTION_DEPTH,
+	type Condition,
+	type Group,
+	type Operand,
+	type Value
+} from './types';
 
 export type RelationshipInfo = {
 	label: string;
@@ -245,6 +252,12 @@ function relationshipText(
 	return { via: ` via ${info.label}`, directionNote: note };
 }
 
+/** ", at any depth" for the longest reach, ", up to 3 steps" for the others. */
+function depthText(depth: number | undefined): string {
+	if (depth === undefined || depth <= 1) return '';
+	return depth >= MAX_CONNECTION_DEPTH ? ', at any depth' : `, up to ${depth} steps`;
+}
+
 function describeConnection(
 	c: Extract<Condition, { kind: 'connection' }>,
 	lookup: SummaryLookup
@@ -253,9 +266,9 @@ function describeConnection(
 	if (c.mode === 'to') {
 		const name = safe(() => lookup.itemName?.(c.item ?? ''));
 		const who = name === undefined ? 'an item' : (name ?? 'an item that no longer exists');
-		return `Connected to ${who}${via}${directionNote}`;
+		return `Connected to ${who}${via}${directionNote}${depthText(c.depth)}`;
 	}
-	const head = `${c.mode === 'none' ? 'Has no' : 'Has a'} linked item${via}${directionNote}`;
+	const head = `${c.mode === 'none' ? 'Has no' : 'Has a'} linked item${via}${directionNote}${depthText(c.depth)}`;
 	return c.where ? `${head} where ${describeGroup(c.where, lookup)}` : head;
 }
 
