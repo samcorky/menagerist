@@ -14,7 +14,8 @@
 		Ellipsis,
 		Library
 	} from '@lucide/svelte';
-	import { Shimmer } from '@shimmer-from-structure/svelte';
+	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
+	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
@@ -53,7 +54,6 @@
 	} from '$lib/preset-packs';
 
 	const PAGE_SIZE = 50;
-	const loadingSkeletons = [1, 2, 3];
 	const sectionFilenames: Record<PackSectionKind, string> = {
 		field: 'menagerist-fields.json',
 		choice_list: 'menagerist-lists.json',
@@ -649,18 +649,7 @@
 		{/snippet}
 
 		{#if fieldsLoading && fields.length === 0}
-			<Shimmer loading={true}>
-				<div class="grid gap-3">
-					{#each loadingSkeletons as s (s)}
-						<div class="rounded-lg border p-4">
-							<div class="space-y-1">
-								<div class="h-5 w-48 rounded bg-muted"></div>
-								<div class="h-4 w-32 rounded-full bg-muted"></div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</Shimmer>
+			<ListRowSkeleton count={3} />
 		{:else if fieldsLoadFailed}
 			<LoadFailed what="your saved fields" onretry={() => void fetchFields()} />
 		{:else}
@@ -680,11 +669,7 @@
 
 		{#if fieldsHasMore}
 			<div use:fieldsSentinel class="flex justify-center py-2" aria-hidden="true">
-				{#if fieldsLoading}
-					<div
-						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-					></div>
-				{/if}
+				<LoadMoreSpinner loading={fieldsLoading} hasRows={fields.length > 0} />
 			</div>
 		{/if}
 	</CollapsibleSection>
@@ -695,18 +680,7 @@
 		{/snippet}
 
 		{#if listsLoading && lists.length === 0}
-			<Shimmer loading={true}>
-				<div class="grid gap-3">
-					{#each loadingSkeletons as s (s)}
-						<div class="rounded-lg border p-4">
-							<div class="space-y-1">
-								<div class="h-5 w-48 rounded bg-muted"></div>
-								<div class="h-4 w-32 rounded-full bg-muted"></div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</Shimmer>
+			<ListRowSkeleton count={3} />
 		{:else if listsLoadFailed}
 			<LoadFailed what="your saved lists" onretry={() => void fetchLists()} />
 		{:else}
@@ -736,11 +710,7 @@
 
 		{#if listsHasMore}
 			<div use:listsSentinel class="flex justify-center py-2" aria-hidden="true">
-				{#if listsLoading}
-					<div
-						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-					></div>
-				{/if}
+				<LoadMoreSpinner loading={listsLoading} hasRows={lists.length > 0} />
 			</div>
 		{/if}
 	</CollapsibleSection>
@@ -756,18 +726,7 @@
 		{/snippet}
 
 		{#if fieldSetsLoading && fieldSets.length === 0}
-			<Shimmer loading={true}>
-				<div class="grid gap-3">
-					{#each loadingSkeletons as s (s)}
-						<div class="rounded-lg border p-4">
-							<div class="space-y-1">
-								<div class="h-5 w-48 rounded bg-muted"></div>
-								<div class="h-4 w-32 rounded-full bg-muted"></div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</Shimmer>
+			<ListRowSkeleton count={3} />
 		{:else if fieldSetsLoadFailed}
 			<LoadFailed what="your saved field groups" onretry={() => void fetchFieldSets()} />
 		{:else}
@@ -797,11 +756,7 @@
 
 		{#if fieldSetsHasMore}
 			<div use:fieldSetsSentinel class="flex justify-center py-2" aria-hidden="true">
-				{#if fieldSetsLoading}
-					<div
-						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-					></div>
-				{/if}
+				<LoadMoreSpinner loading={fieldSetsLoading} hasRows={fieldSets.length > 0} />
 			</div>
 		{/if}
 	</CollapsibleSection>
