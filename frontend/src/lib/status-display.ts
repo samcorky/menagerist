@@ -10,12 +10,14 @@ import {
 	HeartPulse,
 	Hourglass,
 	ListOrdered,
+	Lock,
 	Network,
 	PackageCheck,
 	Pencil,
 	Server,
 	ShieldCheck,
 	TriangleAlert,
+	UserSearch,
 	Wrench
 } from '@lucide/svelte';
 
@@ -31,6 +33,8 @@ export type StatusIconName =
 	| 'queue'
 	| 'stuck'
 	| 'failing'
+	| 'locked'
+	| 'guessed'
 	| 'network'
 	| 'package'
 	| 'pencil'
@@ -50,6 +54,8 @@ const ICONS: Record<StatusIconName, Component> = {
 	queue: ListOrdered,
 	stuck: Hourglass,
 	failing: TriangleAlert,
+	locked: Lock,
+	guessed: UserSearch,
 	network: Network,
 	package: PackageCheck,
 	pencil: Pencil,
@@ -84,6 +90,7 @@ export function groupIconName(key: string): StatusIconName {
 	if (key === 'configuration' || key === 'proxy') return 'network';
 	if (key === 'storage') return 'disk';
 	if (key === 'scheduler') return 'calendar';
+	if (key === 'identity') return 'shield';
 	return FALLBACK_GROUP_ICON;
 }
 
@@ -102,6 +109,9 @@ export function metricIconName(label: string): StatusIconName {
 	if (lower.includes('queue')) return 'queue';
 	if (lower.includes('stuck')) return 'stuck';
 	if (lower.includes('failing')) return 'failing';
+	if (lower.includes('guessed')) return 'guessed';
+	if (lower.includes('address')) return 'network';
+	if (lower.includes('locked')) return 'locked';
 	if (lower.includes('response')) return 'activity';
 	return FALLBACK_METRIC_ICON;
 }

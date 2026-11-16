@@ -18,6 +18,14 @@ from app.entrypoints.api.shared.bridges.scheduler_jobs_check import (
     ALL_KEYS,
     SchedulerJobsCheck,
 )
+from app.entrypoints.api.shared.bridges.sign_in_protection_check import (
+    ALL_KEYS as SIGN_IN_KEYS,
+    SignInProtectionCheck,
+)
+from app.modules.identity.application.assess_sign_in_protection import (
+    AssessSignInProtection,
+    SignInProtection,
+)
 from app.modules.scheduling.application.assess_job_health import (
     AssessJobHealth,
     JobHealth,
@@ -189,5 +197,20 @@ async def test_live_scheduler_jobs_check_reports_listed_keys_and_units() -> None
         result = await check.run()
 
     assert tuple(result) == ALL_KEYS
+    for key, observed in result.items():
+        assert listed.get(key) == observed.observed_unit, key
+
+
+async def test_live_sign_in_protection_check_reports_listed_keys_and_units() -> None:
+    """The sign-in protection keys are module constants, so run the check for real."""
+    listed = {c["key"]: c["unit"] for c in _contract()["checks"]}
+    check = SignInProtectionCheck(MagicMock())
+
+    with patch.object(
+        AssessSignInProtection, "handle", AsyncMock(return_value=SignInProtection())
+    ):
+        result = await check.run()
+
+    assert tuple(result) == SIGN_IN_KEYS
     for key, observed in result.items():
         assert listed.get(key) == observed.observed_unit, key

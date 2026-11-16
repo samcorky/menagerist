@@ -16,6 +16,10 @@ class SignInAttemptRepository(Protocol):
         """Return, for each of `keys` that is locked at `now`, when its lock ends."""
         ...
 
+    async def all_locked(self, *, now: datetime) -> dict[ThrottleKey, datetime]:
+        """Return every key locked at `now`, with when its lock ends."""
+        ...
+
     async def record_failure(
         self, key: ThrottleKey, *, limit: int, window: timedelta, now: datetime
     ) -> AttemptWindow:

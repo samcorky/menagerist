@@ -46,9 +46,11 @@ async def _script(repo: SignInAttemptRepository) -> list[dict[ThrottleKey, datet
         KEY, limit=5, window=WINDOW, now=NOW + timedelta(minutes=4)
     )
     seen.append(await repo.locked_keys([KEY, OTHER], now=NOW + timedelta(minutes=5)))
+    seen.append(await repo.all_locked(now=NOW + timedelta(minutes=5)))
     # Still locked until the window (started at NOW) ends; free just after.
     seen.append(await repo.locked_keys([KEY], now=NOW + WINDOW - timedelta(seconds=1)))
     seen.append(await repo.locked_keys([KEY], now=NOW + WINDOW))
+    seen.append(await repo.all_locked(now=NOW + WINDOW))
     # A failure after the window starts a fresh count.
     await repo.record_failure(KEY, limit=5, window=WINDOW, now=NOW + WINDOW)
     seen.append(await repo.locked_keys([KEY], now=NOW + WINDOW))

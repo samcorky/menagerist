@@ -55,6 +55,7 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "graph.PurgeExpiredTypes",
         "graph.PurgeNode",
         "identity.PurgeExpiredCredentials",
+        "identity.AssessSignInProtection",
         "media.ClaimOrphanedMedia",
         "media.CleanupExpiredMedia",
         "media.PurgeAttachment",
