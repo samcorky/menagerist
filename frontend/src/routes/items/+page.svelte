@@ -53,6 +53,7 @@
 	import { createCountTracker } from '$lib/query/search-count';
 	import { combineWithSaved, narrowFilterCount, saveBlockReason } from '$lib/query/narrow';
 	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
+	import { pickEmptyLine } from '$lib/empty-lines';
 	import {
 		mapWarnings,
 		pathKey,
@@ -81,6 +82,16 @@
 	import { matchContext } from '$lib/search-context';
 	import { normaliseQuery } from '$lib/search-palette';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
+
+	const EMPTY_LINES = [
+		'Your menagerie is quiet... too quiet.',
+		'Nothing here yet. Even the Tribbles are elsewhere.',
+		'An empty shelf is just a collection waiting to happen.',
+		'Space: the final frontier. Shelves: the first one.',
+		'No items detected. Scanning for signs of life...'
+	];
+	// Stable for this page within a session (hashed from the path, not the filters).
+	const emptyLine = $derived(pickEmptyLine(EMPTY_LINES, page.url.pathname));
 
 	const loadingSkeletons = [1, 2, 3, 4, 5];
 
@@ -749,7 +760,7 @@
 			{:else}
 				<LayoutGrid class="size-10 text-muted-foreground/50" />
 				<div>
-					<p class="font-medium">Nothing here yet</p>
+					<p class="font-medium" data-testid="empty-line">{emptyLine}</p>
 					<p class="text-sm text-muted-foreground">Add your first item to get started</p>
 				</div>
 				<Button onclick={() => goto(resolve('/items/new'))}>

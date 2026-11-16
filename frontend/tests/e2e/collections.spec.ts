@@ -178,7 +178,7 @@ test('filters a collection by item type', async ({ page, request }) => {
 	await page.reload();
 	await page.getByLabel('Item type').selectOption({ label: other.label });
 	await expect(page.getByText('Nothing matched this type')).toBeVisible();
-	await expect(page.getByText('Nothing in this collection yet.')).toHaveCount(0);
+	await expect(page.getByTestId('empty-line')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Show all types' }).click();
 	await expect(page.getByRole('link', { name: film.name }).first()).toBeVisible();
 	await expectNoShelfCopy(page);
@@ -196,7 +196,7 @@ test('removes an item from a collection, keeps the item, and undo puts it back',
 	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
 	await page.getByRole('button', { name: `Remove ${item.name} from this collection` }).click();
 	await expect(page.getByText(`Removed from ${collection.name}`)).toBeVisible();
-	await expect(page.getByText('Nothing in this collection yet.')).toBeVisible();
+	await expect(page.getByTestId('empty-line')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Add items' }).first()).toBeVisible();
 
 	await page.getByRole('button', { name: 'Undo' }).click();
@@ -204,7 +204,7 @@ test('removes an item from a collection, keeps the item, and undo puts it back',
 	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
 
 	await page.getByRole('button', { name: `Remove ${item.name} from this collection` }).click();
-	await expect(page.getByText('Nothing in this collection yet.')).toBeVisible();
+	await expect(page.getByTestId('empty-line')).toBeVisible();
 	await page.goto(`/items/${item.id}`);
 	await expect(page.getByText(item.name, { exact: true }).first()).toBeVisible();
 });
@@ -339,7 +339,7 @@ test('removing a middle item keeps the others, moves focus to the next remove bu
 
 	// Removing the only one falls back to the header Add items button.
 	await removeButton(page, nameOf(first)).click();
-	await expect(page.getByText('Nothing in this collection yet.')).toBeVisible();
+	await expect(page.getByTestId('empty-line')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Add items' }).first()).toBeFocused();
 });
 
@@ -362,7 +362,7 @@ test('double-clicking Remove sends one request and Undo restores the item', asyn
 	await page.goto(`/collections/${collection.id}`);
 	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
 	await removeButton(page, item.name).dblclick({ force: true });
-	await expect(page.getByText('Nothing in this collection yet.')).toBeVisible();
+	await expect(page.getByTestId('empty-line')).toBeVisible();
 	await expect(page.getByText('No items', { exact: true })).toBeVisible();
 	expect(deletes).toBe(1);
 
@@ -417,7 +417,7 @@ test('an empty collection shows the empty state with an Add items button', async
 }) => {
 	const collection = await makeCollection(request, uniqueName('Empty'));
 	await page.goto(`/collections/${collection.id}`);
-	await expect(page.getByText('Nothing in this collection yet.')).toBeVisible();
+	await expect(page.getByTestId('empty-line')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Add items' })).toHaveCount(2);
 	await page.getByRole('button', { name: 'Add items' }).last().click();
 	await expect(page.getByRole('dialog', { name: 'Add items' })).toBeVisible();
@@ -448,7 +448,7 @@ test.describe('collections page search', () => {
 
 		await box(page).fill('zzz-no-match-zzz');
 		await expect(page.getByText('Nothing matched "zzz-no-match-zzz"')).toBeVisible();
-		await expect(page.getByText('No collections yet')).toBeHidden();
+		await expect(page.getByTestId('empty-line')).toBeHidden();
 
 		await page.getByRole('button', { name: 'Clear search' }).click();
 		await expect(box(page)).toHaveValue('');

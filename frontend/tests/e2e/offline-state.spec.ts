@@ -10,13 +10,12 @@ async function restoreApi(page: Page) {
 	await page.unroute('**/api/**');
 }
 
-for (const { path, link, what, emptyText } of [
-	{ path: '/items', link: 'Items', what: 'your items', emptyText: 'Nothing here yet' },
+for (const { path, link, what } of [
+	{ path: '/items', link: 'Items', what: 'your items' },
 	{
 		path: '/collections',
 		link: 'Collections',
-		what: 'your collections',
-		emptyText: 'No collections yet'
+		what: 'your collections'
 	}
 ]) {
 	test(`${path} says it cannot load when offline, never that there is nothing`, async ({
@@ -32,7 +31,7 @@ for (const { path, link, what, emptyText } of [
 		const failed = page.getByTestId('load-failed');
 		await expect(failed).toContainText(`You're offline, so ${what} can't load.`);
 		await expect(page.getByTestId('offline-banner')).toBeVisible();
-		await expect(page.getByText(emptyText)).toHaveCount(0);
+		await expect(page.getByTestId('empty-line')).toHaveCount(0);
 
 		await restoreApi(page);
 		await failed.getByRole('button', { name: 'Try again' }).click();
