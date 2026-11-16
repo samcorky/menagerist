@@ -13,8 +13,11 @@ Logs (agent and verbose modes only) live in
 """
 
 import codecs
+import ctypes
 import hashlib
+import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -590,18 +593,23 @@ def execute(
     workers: str = "",
     root: Path = ROOT,
     cmd: list[str] | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> int:
-    """Run ``tool`` in ``mode`` and return the tool's own exit code."""
+    """Run ``tool`` in ``mode`` and return the tool's own exit code.
+
+    ``env`` replaces the inherited environment (the frontend tasks pass
+    :func:`frontend_env`).
+    """
     argv = cmd or tool.build(mode, workers)
     cwd = root / tool.cwd
     if mode == "human":
         try:
-            return subprocess.call(argv, cwd=cwd)
+            return subprocess.call(argv, cwd=cwd, env=env)
         except OSError as exc:
             return _start_failure(tool, argv, exc)
     run_dir = make_run_dir(root / LOG_DIR_NAME, task)
     log_path = run_dir / f"{tool.name}.log"
-    env = dict(os.environ)
+    env = dict(os.environ if env is None else env)
     if mode == "agent":
         env["NO_COLOR"] = "1"
         env.pop("FORCE_COLOR", None)
@@ -640,7 +648,7 @@ FRONTEND_TASKS = frozenset(
 CLIENT_STAMP = "schema.sha256"
 
 
-def ensure_api_client(root: Path = ROOT) -> bool:
+def ensure_api_client(root: Path = ROOT, env: Mapping[str, str] | None = None) -> bool:
     """Regenerate the frontend API client when ``openapi.json`` has changed.
 
     The client is gitignored, so after pulling a schema change it silently predates the
@@ -663,7 +671,7 @@ def ensure_api_client(root: Path = ROOT) -> bool:
         flush=True,
     )
     npm = shutil.which("npm") or "npm"
-    code = subprocess.call([npm, "run", "generate"], cwd=root / "frontend")
+    code = subprocess.call([npm, "run", "generate"], cwd=root / "frontend", env=env)
     if code != 0:
         sys.exit(code)
     out.mkdir(parents=True, exist_ok=True)
@@ -671,13 +679,141 @@ def ensure_api_client(root: Path = ROOT) -> bool:
     return True
 
 
+# --- CPUs without AVX2 -------------------------------------------------------
+# Rolldown's prebuilt native binding dies with "Illegal instruction" on such CPUs, so
+# the frontend tools there run napi's WebAssembly build instead (see CONTRIBUTING.md).
+
+FORCE_WASI = "NAPI_RS_FORCE_WASI"
+WASI_BINDING = "@rolldown/binding-wasm32-wasi"
+_PF_AVX2_INSTRUCTIONS_AVAILABLE = 40  # winnt.h
+
+
+def has_avx2(system: str | None = None, cpuinfo: Path = Path("/proc/cpuinfo")) -> bool:
+    """Whether the CPU has AVX2; assumed true where it cannot be checked."""
+    system = system or platform.system()
+    if system == "Linux":
+        try:
+            with cpuinfo.open(encoding="utf-8") as lines:
+                return any(
+                    "avx2" in line.split() for line in lines if line.startswith("flags")
+                )
+        except OSError:
+            return True
+    if system == "Windows":
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined,unused-ignore]
+        return bool(kernel32.IsProcessorFeaturePresent(_PF_AVX2_INSTRUCTIONS_AVAILABLE))
+    return True
+
+
+def rolldown_version(frontend: Path) -> str | None:
+    """The Rolldown version in ``package-lock.json``; the binding must match it."""
+    try:
+        lock = json.loads((frontend / "package-lock.json").read_text(encoding="utf-8"))
+        return str(lock["packages"]["node_modules/rolldown"]["version"])
+    except OSError, ValueError, KeyError, TypeError:
+        return None
+
+
+def wasi_cache_dir(environ: Mapping[str, str], system: str | None = None) -> Path:
+    """Per-user cache for WebAssembly bindings, outside the repository."""
+    if (system or platform.system()) == "Windows":
+        base = environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+    else:
+        base = environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    return Path(base) / "menagerist" / "napi-wasi"
+
+
+def ensure_wasi_binding(version: str, cache: Path) -> Path | None:
+    """Install Rolldown's WebAssembly binding into ``cache`` once per version.
+
+    It lives outside ``frontend/`` so ``npm ci`` cannot remove it, and a Rolldown bump
+    gets its own directory. ``--force`` overrides the package's ``cpu: wasm32`` field,
+    which npm otherwise refuses on x64. Returns the ``node_modules`` to put on
+    ``NODE_PATH``, or ``None`` when the install failed.
+    """
+    prefix = cache / f"rolldown-{version}"
+    modules = prefix / "node_modules"
+    if (modules / WASI_BINDING / "package.json").is_file():
+        return modules
+    print(
+        f"Using napi's WebAssembly build; installing {WASI_BINDING}@{version} "
+        + f"into {prefix}...",
+        file=sys.stderr,
+        flush=True,
+    )
+    prefix.mkdir(parents=True, exist_ok=True)
+    npm = shutil.which("npm") or "npm"
+    code = subprocess.call(
+        [
+            npm,
+            "install",
+            "--no-save",
+            "--no-package-lock",
+            "--no-audit",
+            "--no-fund",
+            "--force",
+            f"{WASI_BINDING}@{version}",
+        ],
+        cwd=prefix,
+    )
+    if code != 0:
+        print(
+            f"Could not install {WASI_BINDING}@{version}; the frontend tools may "
+            + "fail with 'Illegal instruction'.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
+    return modules
+
+
+def frontend_env(
+    environ: Mapping[str, str] | None = None,
+    avx2: bool | None = None,
+    frontend: Path = ROOT / "frontend",
+    cache: Path | None = None,
+) -> dict[str, str]:
+    """The environment for frontend tools, forcing WebAssembly bindings without AVX2.
+
+    An explicit ``NAPI_RS_FORCE_WASI`` wins: ``true`` or ``error`` forces the fallback
+    (handy for trying it on any machine) and any other value turns it off. napi only
+    honours those two values; ``1`` does nothing.
+    """
+    env = dict(os.environ if environ is None else environ)
+    explicit = env.get(FORCE_WASI)
+    if explicit is None:
+        if avx2 if avx2 is not None else has_avx2():
+            return env
+        env[FORCE_WASI] = "true"
+    elif explicit not in ("true", "error"):
+        return env
+    version = rolldown_version(frontend)
+    if version is None:
+        return env
+    modules = ensure_wasi_binding(version, cache or wasi_cache_dir(env))
+    if modules is not None:
+        paths = [str(modules), *filter(None, [env.get("NODE_PATH")])]
+        env["NODE_PATH"] = os.pathsep.join(paths)
+    return env
+
+
+def npm(*args: str) -> None:
+    """Poe entry point: run ``npm`` in ``frontend/`` with :func:`frontend_env`."""
+    executable = shutil.which("npm") or "npm"
+    sys.exit(
+        subprocess.call([executable, *args], cwd=ROOT / "frontend", env=frontend_env())
+    )
+
+
 def main(
     task: str, mode: str = "", workers: str = "", files: list[str] | None = None
 ) -> None:
     """Poe entry point: resolve the mode, run the task's tool, exit with its code."""
     tool = TOOLS[task]
+    env: dict[str, str] | None = None
     if task in FRONTEND_TASKS:
-        ensure_api_client()
+        env = frontend_env()
+        ensure_api_client(env=env)
     if files and task in PYTEST_SELECTORS:
         selector, append = PYTEST_SELECTORS[task]
         tool = Tool(
@@ -691,4 +827,4 @@ def main(
             ),
             tool.parser,
         )
-    sys.exit(execute(task, tool, resolve_mode(mode), workers))
+    sys.exit(execute(task, tool, resolve_mode(mode), workers, env=env))

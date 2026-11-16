@@ -77,6 +77,12 @@ The `media-data` named volume is initialised with the application's uid `1000`
 from the image. If you replace it with a bind mount, set ownership on the host
 with `chown 1000:1000 <host directory>` so uploads can be written.
 
+### CPUs without AVX2
+
+On an older CPU without AVX2 (an Intel Celeron N2820, for example), the frontend tools die with `Illegal instruction`: Rolldown's prebuilt native binding uses instructions that CPU lacks. Docker does not help, because containers run on the host CPU. `poe` handles this for you: every frontend task (the lint, typecheck and test tasks, client generation, `format-frontend`, `lint-frontend-fix`, the builds and `serve-frontend`, and so the pre-commit hooks, which call them) checks the CPU, and without AVX2 it sets `NAPI_RS_FORCE_WASI=true` to use napi's slower WebAssembly build. The matching `@rolldown/binding-wasm32-wasi` is installed once per Rolldown version into a per-user cache (`%LOCALAPPDATA%\menagerist\napi-wasi` on Windows, `${XDG_CACHE_HOME:-~/.cache}/menagerist/napi-wasi` elsewhere) and found through `NODE_PATH`, so `npm ci` cannot remove it and a Rolldown update fetches the new version by itself. Machines with AVX2 are untouched. Both pieces live in `frontend_env()` in `scripts/poe_run.py`.
+
+Setting `NAPI_RS_FORCE_WASI` yourself overrides the check: `true` (or `error`, which fails instead of falling back to the native binding) forces the WebAssembly build on any machine, and any other value turns it off. napi accepts only those two values, so `1` does nothing. The fallback is known to work on Linux. On Windows, Rolldown's WebAssembly build cannot resolve drive-letter paths, so Vite and Vitest fail there even with it. To run `npm` or `npx` directly without `poe`, set both variables yourself, for example `NAPI_RS_FORCE_WASI=true NODE_PATH=~/.cache/menagerist/napi-wasi/rolldown-<version>/node_modules npx vitest run`.
+
 ### Manually, without `poe`
 
 ```sh
