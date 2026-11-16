@@ -338,7 +338,7 @@ Swagger UI is at `/api/docs` on the backend (`http://localhost:8000/api/docs` in
 ## Pull requests
 
 - Target the `feature/initial-implementation` branch (pre-`main` merge) or `main` once it's open.
-- `poe check` must pass, and `poe coverage` for backend changes.
+- The pre-commit hooks (`poe check`) must pass. prek runs them on every commit, so run `poe check` yourself only if you skipped them. `poe coverage` must also pass for backend changes; the hooks do not run it.
 - Coverage floors must not drop.
 - One focused change per PR.
 - The `Build` workflow builds the image and runs the smoke test; `CI` calls it, so it runs on every pull request.
