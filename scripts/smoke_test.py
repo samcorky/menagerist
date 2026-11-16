@@ -190,7 +190,9 @@ def check_hardening(client: docker.DockerClient) -> None:
         raise SmokeTestError(f"expected no capabilities added back, got {cap_add!r}")
 
     security_opt = host_config.get("SecurityOpt") or []
-    if "no-new-privileges:true" not in security_opt:
+    # The engine reports the option as written: `=` is the supported separator, and
+    # older engines may still report the deprecated `:` form.
+    if not {"no-new-privileges=true", "no-new-privileges:true"} & set(security_opt):
         raise SmokeTestError(f"expected no-new-privileges, got {security_opt!r}")
 
     # container.top() reads the process table from the host side, so this

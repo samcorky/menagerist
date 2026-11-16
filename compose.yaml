@@ -4,7 +4,7 @@ x-app: &app
   restart: unless-stopped
   read_only: true
   security_opt:
-    - no-new-privileges:true
+    - no-new-privileges=true
   cap_drop:
     - ALL
   tmpfs:
@@ -48,7 +48,7 @@ services:
       - -c
       - max_connections=${POSTGRES_MAX_CONNECTIONS:-100}
     security_opt:
-      - no-new-privileges:true
+      - no-new-privileges=true
     cap_drop:
       - ALL
     cap_add:
