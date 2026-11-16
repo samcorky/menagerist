@@ -314,4 +314,11 @@ describe('nameDevice', () => {
 		});
 		expect(nameDevice('   ', 'Chrome on Android').title).toBe('Chrome on Android');
 	});
+
+	it('does not repeat the label when the name is the label', () => {
+		expect(nameDevice('Chrome on Android', 'Chrome on Android')).toEqual({
+			title: 'Chrome on Android',
+			subtitle: null
+		});
+	});
 });

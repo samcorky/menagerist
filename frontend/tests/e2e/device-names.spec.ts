@@ -38,6 +38,9 @@ test('signing in on an unnamed browser offers to name it', async ({
 	await signInThroughForm(page, user);
 
 	await expect(prompt(page)).toBeVisible();
+	// The field is empty, with the generated label as its placeholder.
+	await expect(prompt(page).getByLabel('Device name')).toHaveValue('');
+	await expect(prompt(page).getByLabel('Device name')).toHaveAttribute('placeholder', /.+/);
 	await prompt(page).getByLabel('Device name').fill(name);
 	await prompt(page).getByRole('button', { name: 'Save name' }).click();
 	await expect(page.getByText('Device named')).toBeVisible();

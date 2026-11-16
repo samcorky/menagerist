@@ -108,7 +108,7 @@
 </script>
 
 <ResponsiveDialog.Root {open} onOpenChange={(v) => (v ? (open = true) : dismiss())}>
-	<ResponsiveDialog.Content title="Name this device" size="sm">
+	<ResponsiveDialog.Content title="Name this device" size="md">
 		<ResponsiveDialog.Description>
 			A name makes it easier to tell your devices apart when you sign one out.
 		</ResponsiveDialog.Description>
