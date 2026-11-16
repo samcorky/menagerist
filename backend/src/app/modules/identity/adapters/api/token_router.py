@@ -1,8 +1,8 @@
-import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
+from app.entrypoints.api.shared.http.parameters import TokenId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.dependencies import (
@@ -161,7 +161,7 @@ async def create_api_token(
     },
 )
 async def rotate_api_token(
-    token_id: uuid.UUID,
+    token_id: TokenId,
     payload: RotateApiTokenRequest,
     response: Response,
     use_case: Annotated[RotateApiToken, Depends(get_rotate_api_token_use_case)],
@@ -186,7 +186,7 @@ async def rotate_api_token(
     responses={**_UNAUTHENTICATED, **_NOT_FOUND},
 )
 async def revoke_api_token(
-    token_id: uuid.UUID,
+    token_id: TokenId,
     use_case: Annotated[RevokeOwnApiToken, Depends(get_revoke_own_api_token_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
 ) -> None:

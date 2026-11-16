@@ -8,15 +8,20 @@ examples cite its own URL as the `instance`, not one shared route.
 """
 
 import copy
+import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.entrypoints.api.shared.http.problem_response import (
     INSTANCE_PLACEHOLDER,
     PROBLEM_JSON,
     ProblemDetail,
+    ValidationProblem,
     problem_example,
 )
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 _API_PREFIX = "/api/v1"
 _UNSAFE_METHODS = frozenset({"post", "put", "patch", "delete"})
@@ -50,36 +55,11 @@ _UNPROCESSABLE = {
 }
 
 
-def _validation_problem_schema() -> dict[str, Any]:
-    """Schema of the 422 body: `detail` lists the offending fields, not text."""
-    return {
-        "type": "object",
-        "title": "ValidationProblem",
-        "required": ["type", "title", "status", "detail", "instance"],
-        "properties": {
-            "type": {"type": "string"},
-            "title": {"type": "string"},
-            "status": {"type": "integer"},
-            "detail": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["type", "loc", "msg"],
-                    "properties": {
-                        "type": {"type": "string"},
-                        "loc": {
-                            "type": "array",
-                            "items": {
-                                "anyOf": [{"type": "string"}, {"type": "integer"}]
-                            },
-                        },
-                        "msg": {"type": "string"},
-                    },
-                },
-            },
-            "instance": {"type": "string"},
-        },
-    }
+def _add_model_schema(schemas: dict[str, Any], model: type[BaseModel]) -> None:
+    """Register `model` and the models it nests as component schemas."""
+    schema = model.model_json_schema(ref_template="#/components/schemas/{model}")
+    schemas.update(schema.pop("$defs", {}))
+    schemas[model.__name__] = schema
 
 
 def _problem(
@@ -274,8 +254,9 @@ def add_error_responses(openapi_schema: dict[str, Any]) -> None:
     """
     components = openapi_schema.setdefault("components", {})
     schemas = components.setdefault("schemas", {})
-    schemas.setdefault("ProblemDetail", ProblemDetail.model_json_schema())
-    schemas["ValidationProblem"] = _validation_problem_schema()
+    if "ProblemDetail" not in schemas:
+        _add_model_schema(schemas, ProblemDetail)
+    _add_model_schema(schemas, ValidationProblem)
     for path, item in openapi_schema.get("paths", {}).items():
         if not path.startswith(_API_PREFIX):
             continue
@@ -283,3 +264,21 @@ def add_error_responses(openapi_schema: dict[str, Any]) -> None:
             if method not in _METHODS:
                 continue
             _document_operation(path, method, operation)
+    _drop_unused_validation_schemas(openapi_schema)
+
+
+# FastAPI's own 422 schemas, unused once every 422 is the problem+json body.
+_FASTAPI_VALIDATION_SCHEMAS = ("HTTPValidationError", "ValidationError")
+
+
+def _drop_unused_validation_schemas(openapi_schema: dict[str, Any]) -> None:
+    """Remove FastAPI's 422 schemas when nothing refers to them any more.
+
+    `HTTPValidationError` refers to `ValidationError`, so it is checked first.
+    """
+    schemas = openapi_schema["components"]["schemas"]
+    for name in _FASTAPI_VALIDATION_SCHEMAS:
+        others = {key: value for key, value in schemas.items() if key != name}
+        used = json.dumps([openapi_schema["paths"], others])
+        if name in schemas and f'"#/components/schemas/{name}"' not in used:
+            del schemas[name]

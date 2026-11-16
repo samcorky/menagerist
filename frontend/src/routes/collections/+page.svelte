@@ -34,9 +34,9 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { loadExampleIds } from '$lib/examples';
-	import { fetchItemFields, type ItemField } from '$lib/item-fields';
+	import { fetchItemFields, fetchSavedFields, type ItemField } from '$lib/item-fields';
 	import { fetchAllNodeTypes } from '$lib/node-types';
-	import { buildCatalogue } from '$lib/query/fields';
+	import { buildCatalogue, type SavedField } from '$lib/query/fields';
 	import { emptyQuery } from '$lib/query/tree';
 	import { pickEmptyLine } from '$lib/empty-lines';
 	import type { Query } from '$lib/query/types';
@@ -95,9 +95,10 @@
 	let categories = $state<NodeTypeResponse[]>([]);
 	let categoriesLoaded = $state(false);
 	let itemFields = $state<ItemField[] | null>(null);
+	let savedFields = $state<SavedField[] | null>(null);
 	let pickerCollections = $state<{ id: string; name: string }[] | null>(null);
 	let collectionsFailed = $state(false);
-	const catalogue = $derived(buildCatalogue(categories, categoriesLoaded, itemFields));
+	const catalogue = $derived(buildCatalogue(categories, categoriesLoaded, itemFields, savedFields));
 	const kindId = $props.id();
 
 	// §13a: don't flash a skeleton for loads under 300ms
@@ -236,6 +237,7 @@
 			categoriesLoaded = true;
 		});
 		void fetchItemFields().then((fields) => (itemFields = fields));
+		void fetchSavedFields().then((fields) => (savedFields = fields));
 		void loadCollectionChoices();
 	}
 

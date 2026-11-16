@@ -1,18 +1,22 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
     link_next_header,
 )
+from app.entrypoints.api.shared.http.parameters import EdgeId, PageAfter, PageLimit
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.graph.adapters.api.dependencies import (
@@ -105,10 +109,10 @@ async def create_edges(
     },
 )
 async def get_edge(
-    edge_id: uuid.UUID,
+    edge_id: EdgeId,
     use_case: Annotated[GetEdge, Depends(get_get_edge_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> EdgeResponse | Response:
     """Fetch a single edge by id."""
     edge = await use_case.handle(GetEdgeQuery(edge_id=edge_id), actor)
@@ -128,9 +132,12 @@ async def list_edges(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: uuid.UUID | None = None,
-    limit: int = 50,
-    node_id: uuid.UUID | None = None,
+    after: PageAfter = None,
+    limit: PageLimit = 50,
+    node_id: Annotated[
+        uuid.UUID | None,
+        Query(description="Keep connections to or from the item with this id."),
+    ] = None,
 ) -> list[EdgeResponse]:
     """List edge, paginated by id and optionally filtered to one node."""
     edges = await use_case.handle(
@@ -154,12 +161,12 @@ async def list_edges(
     },
 )
 async def update_edge(
-    edge_id: uuid.UUID,
+    edge_id: EdgeId,
     payload: UpdateEdgeRequest,
     update_use_case: Annotated[UpdateEdge, Depends(get_update_edge_use_case)],
     get_use_case: Annotated[GetEdge, Depends(get_get_edge_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
 ) -> EdgeResponse | Response:
     """Update an edge's editable fields."""
     current = await get_use_case.handle(GetEdgeQuery(edge_id=edge_id), actor)
@@ -180,7 +187,7 @@ async def update_edge(
     ),
 )
 async def delete_edge(
-    edge_id: uuid.UUID,
+    edge_id: EdgeId,
     use_case: Annotated[DeleteEdge, Depends(get_delete_edge_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:

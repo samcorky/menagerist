@@ -20,6 +20,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import BackButton from '$lib/components/back-button.svelte';
 	import IconButton from '$lib/components/icon-button.svelte';
 	import LoadFailed from '$lib/components/load-failed.svelte';
@@ -43,6 +44,7 @@
 	let reverseLabel = $state('');
 	let description = $state('');
 	let directional = $state(true);
+	let holder = $state<EdgeTypeResponse['holder']>('none');
 	let schema = $state<AttributesSchema | null>(null);
 	let saving = $state(false);
 
@@ -102,6 +104,7 @@
 		reverseLabel = '';
 		description = '';
 		directional = true;
+		holder = 'none';
 		schema = null;
 		editorOpen = true;
 	}
@@ -112,6 +115,7 @@
 		reverseLabel = et.reverse_label ?? '';
 		description = et.description ?? '';
 		directional = et.directional;
+		holder = et.holder;
 		schema = (et.attributes_schema as AttributesSchema | null) ?? null;
 		editorOpen = true;
 	}
@@ -128,6 +132,7 @@
 					reverse_label: reverseLabel || null,
 					description: description || null,
 					directional,
+					holder: directional ? holder : 'none',
 					attributes_schema: schema
 				}
 			});
@@ -146,6 +151,7 @@
 					reverse_label: reverseLabel || undefined,
 					description: description || undefined,
 					directional,
+					holder: directional ? holder : 'none',
 					attributes_schema: schema
 				}
 			});
@@ -324,7 +330,7 @@
 	submitLabel={editingId ? 'Save' : 'Add relationship type'}
 	busyLabel={editingId ? 'Saving…' : 'Adding…'}
 	busy={saving}
-	value={{ label, reverseLabel, description, directional, schema }}
+	value={{ label, reverseLabel, description, directional, holder, schema }}
 	onSubmit={handleSubmit}
 	onClose={() => (editorOpen = false)}
 >
@@ -363,6 +369,23 @@
 			<p class="text-xs text-muted-foreground">Uncheck for symmetric (A ↔ B)</p>
 		</div>
 	</div>
+	{#if directional}
+		<div class="space-y-1.5">
+			<Label for="rel-holder">Holds</Label>
+			<NativeSelect.Root id="rel-holder" bind:value={holder} class="w-full">
+				<NativeSelect.Option value="none">Neither holds the other</NativeSelect.Option>
+				<NativeSelect.Option value="source">
+					The item it starts from holds the other (as Contains)
+				</NativeSelect.Option>
+				<NativeSelect.Option value="target">
+					The item it points to holds the other (as Located in)
+				</NativeSelect.Option>
+			</NativeSelect.Root>
+			<p class="text-xs text-muted-foreground">
+				Shows what is inside an item, and where it is, on its page.
+			</p>
+		</div>
+	{/if}
 	<SchemaEditor
 		bind:schema
 		typeId={editingId ?? undefined}

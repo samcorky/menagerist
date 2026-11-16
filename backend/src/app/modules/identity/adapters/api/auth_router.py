@@ -10,6 +10,7 @@ from app.entrypoints.api.shared.http.cross_site import (
     CrossSiteRequestError,
     refuse_cross_site,
 )
+from app.entrypoints.api.shared.http.parameters import SessionId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.cookies import (
@@ -454,7 +455,7 @@ async def list_own_sessions(
     },
 )
 async def revoke_own_session(
-    session_id: uuid.UUID,
+    session_id: SessionId,
     use_case: Annotated[RevokeOwnSession, Depends(get_revoke_own_session_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
     current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],

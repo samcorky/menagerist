@@ -69,8 +69,8 @@ class CreateCollectionRequest(RequestModel):
         }
     )
 
-    name: str = Field(max_length=MAX_NAME_LENGTH)
-    description: str | None = Field(default=None)
+    name: str = Field(description="The collection's name.", max_length=MAX_NAME_LENGTH)
+    description: str | None = Field(description="Free text about it.", default=None)
     slug: str | None = Field(
         default=None,
         max_length=MAX_SLUG_LENGTH,
@@ -107,8 +107,10 @@ class UpdateCollectionRequest(RequestModel):
         }
     )
 
-    name: str | None = Field(default=None, max_length=MAX_NAME_LENGTH)
-    description: str | None = Field(default=None)
+    name: str | None = Field(
+        description="The collection's name.", default=None, max_length=MAX_NAME_LENGTH
+    )
+    description: str | None = Field(description="Free text about it.", default=None)
     definition: dict[str, Any] | None = Field(
         default=None, description="Replaces a smart collection's search query."
     )
@@ -149,7 +151,10 @@ class AddItemsRequest(RequestModel):
         }
     )
 
-    item_ids: list[uuid.UUID] = Field(max_length=MAX_ITEMS_PER_REQUEST)
+    item_ids: list[uuid.UUID] = Field(
+        description="The items to put on the collection.",
+        max_length=MAX_ITEMS_PER_REQUEST,
+    )
 
 
 class AddItemsResponse(BaseModel):
@@ -183,7 +188,7 @@ class DefinitionWarningResponse(BaseModel):
     )
 
     path: str = Field(description="JSON path of the condition in the definition.")
-    message: str
+    message: str = Field(description="Why it no longer applies.")
 
 
 class CollectionResponse(BaseModel):
@@ -191,12 +196,12 @@ class CollectionResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_COLLECTION_EXAMPLE]})
 
-    id: uuid.UUID
-    name: str
-    slug: str
-    description: str | None = Field(default=None)
+    id: uuid.UUID = Field(description="The collection's id.")
+    name: str = Field(description="Its name.")
+    slug: str = Field(description="Its short name for links, unique among yours.")
+    description: str | None = Field(description="Free text about it.", default=None)
     kind: CollectionKind
-    visibility: str
+    visibility: str = Field(description="Who can see it; only `private` for now.")
     definition: dict[str, Any] | None = Field(
         default=None, description="A smart collection's search query; null if manual."
     )
@@ -207,14 +212,13 @@ class CollectionResponse(BaseModel):
         default=False, description="True when the real count is above `item_count`."
     )
     warnings: list[DefinitionWarningResponse] = Field(
-        default_factory=list,
         description=(
             "Conditions that no longer apply; filled for a single smart collection, "
             + "empty in lists."
         ),
     )
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(description="When it was created.")
+    updated_at: datetime = Field(description="When it last changed.")
 
     @classmethod
     def from_domain(cls, summary: CollectionSummary) -> CollectionResponse:
@@ -274,10 +278,10 @@ class DeletedCollectionResponse(BaseModel):
         }
     )
 
-    id: uuid.UUID
-    name: str
+    id: uuid.UUID = Field(description="The collection's id.")
+    name: str = Field(description="Its name.")
     kind: CollectionKind
-    deleted_at: datetime
+    deleted_at: datetime = Field(description="When it was deleted.")
 
     @classmethod
     def from_domain(cls, collection: Collection) -> DeletedCollectionResponse:

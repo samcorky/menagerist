@@ -623,7 +623,7 @@ So a plain private array is the source of truth, `active` is a write-only `$stat
 
 **Decision (2026-10-09):** a pack format 4 pack may list `requires` (a list, so a bridge add-on can need several packs) and refer to a required pack's types and items as `pack:ref`. An add-on only adds: it never changes a required pack's types or items, and everything it creates is recorded in its own installation. Removal is blocked, not cascaded: a pack cannot be removed while an add-on that requires it is installed (or half installed), and the message names every dependant. An edited add-on connection is kept when the add-on is removed, and then counts as the person's data on the base item, so a later removal of the base pack keeps that item.
 
-An add-on item of a base item type inherits that type's cover style, read through the catalogue, so it gets a generated cover and is removed with the add-on. One add-on ships: `games-extras` (Extra board games, needs Board games). The Film soundtracks add-on was converted to links declared by Music (2026-10-14, see "Optional links between example packs").
+An add-on item of a base item type inherits that type's cover style, read through the catalogue, so it gets a generated cover and is removed with the add-on. Add-ons that ship: `games-extras` (Extra board games, needs Board games) and, from 2026-11-15, `storage` (Board game storage, needs Board games; see the catalogue entry's #347 update). The Film soundtracks add-on was converted to links declared by Music (2026-10-14, see "Optional links between example packs").
 
 **Note:** the blocking is derived from the current catalogue's `requires`, not recorded at install time. A later pack update that drops a `requires` would lift the block. Nothing the person made is lost by that, because touched base items are kept as user data.
 
@@ -895,6 +895,8 @@ Further known limits, left as they are for now:
 **Listing:** `GET /node/item-fields` returns the per-item fields in use as `{key, kind, label, count}`, one row per key and kind (the same key with two kinds gives two rows), for the actor's own items, archived fields excluded. It returns at most 200 rows, most used first and then by key. The label is the most common non-empty JSON Schema `title` in the group (ties by title), falling back to the key.
 
 **Not chosen:** resolving per-item keys through the type (no type is involved) and a server-side stale-field warning (it would need a scan of every overlay on each search).
+
+**Update (2026-11-15):** `field_kind` without `type` now means that key and kind on *any* item: a type field or the item's own field. It may name a table column (`sub_key`), which reaches type fields only. The rule that a type field never matches a per-item condition is reversed on purpose. See "Field conditions across item types".
 
 ## Smart collections: a stored search, resolved through bridges (2026-10-17)
 
@@ -1524,6 +1526,8 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 
 **Rationale:** per-user presets (previous entry) left no way for a person to get the old built-ins back. The catalogue is that way, kept apart from example packs because starter types are meant to be kept and example content is meant to be removed. It must ship in the same release as per-user presets.
 
+**Update (2026-11-15, #347):** a catalogue item type may carry `attributesSchema`, `icon` and `colour`, as an example pack's types can. They're optional and are checked by the same type creation an install already goes through. _Storage locations_ uses them: a Location type (Kind: Room, Shelf, Box, Drawer, Cabinet; Notes) with the same _Located in_ / _Contains_ relationship as the starter types. Whichever entry is installed second skips it, so both share one relationship. Nesting, the path ("room › shelf › box"), the contents view and searches "anywhere inside" come from relationships with a direction in general, with nothing location-specific.
+
 ## Remembered browsers and the device cookie (2026-11-14)
 
 **Decision:** a successful sign-in, first-run setup or password change sets a second HttpOnly cookie (`MENAGERIST_IDENTITY_DEVICE_COOKIE_NAME`, default `menagerist-device`, with the same `__Host-Http-` prefix and attributes as the session cookie) that remembers the browser for the account. A `devices` row holds only the hash of its secret, the account and the browser's user agent and platform. Each session links to the device it was started in, and the account page lists devices rather than sessions. It stops targeted lockout: anyone who knew a username could lock that account by failing on purpose, and the real user could not tell why.
@@ -1553,6 +1557,8 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 
 **Rationale:** the cursor is a position in the (depth, id) order, found by id in the reached list, because the order is not by id alone. A cursor whose item has since gone gives an empty page rather than restarting. The whole reach is computed on each page (at most `MAX_REACHED` items); pages are cheap slices, and a cached cursor would go stale as connections change.
 
+**Update (2026-11-15, #347): which end holds.** A relationship type has a `holder` of `source` (the source holds the target, as _Contains_), `target` (the target holds the source, as _Located in_) or `none` (the default; neither holds the other, as _Published by_). Contents and path follow the relationship in the direction `holder` gives, and refuse one that holds nothing with a 400 (`RelationshipHoldsNothingError`, which replaces the no-direction error, since a relationship with no direction can't hold). Before this, both reads assumed the source held the target, so "Game _Located in_ Box" showed the box inside the game, and every directional relationship was offered on the item page. The item page now offers only relationships that hold, each worded from that item's end: a box reads _Contains_ and the game _Located in_. Only a relationship with a direction may hold. The domain checks this before changing anything, and `ck_edge_types_holder` backs it up. The migration sets `target` on existing _Located in_ and _Part of_ types, which come from the starter types, and the starter types now ship with it. Bundles, example packs and catalogue entries carry `holder`; a file without it reads as `none`. The examples' content hash includes `holder` only when it isn't `none`, so types installed before the change don't read as edited.
+
 **Limits on multi-hop work:** a reach that finds more than 10,000 items, or any multi-hop statement that runs past five seconds (`WALK_TIMEOUT_MS`, set for that statement only), fails with a 400 asking the person to follow fewer steps. Searches only take the time limit when a connection condition has `depth` above 1.
 
 ## Items and collections in a bundle file (2026-11-15)
@@ -1573,3 +1579,20 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 **Not in this version:** attachments and covers. A JSON file cannot hold them; a zip with the files beside the JSON is the likely shape, as its own change.
 
 **Rationale:** #471 asks for Export on item and collection screens. Types alone were the part that needed no format change; items and collections need the format settled first, and the open question was what an import does with things that have no unique name.
+
+## Field conditions across item types (2026-11-15)
+
+**Decision:** a field condition names exactly one of `type` (a field of one item type), `field_kind` (key K of that kind on any item) or `origin` (every type field copied from that saved field, with no `key`). Either cross-type form may name a table column with `sub_key`. Only `type` may compare with another field. Before resolution, `expand_field_scopes` (`graph/application/field_scope_expansion.py`) rewrites each cross-type condition into an `or` of one-type leaves taken from the current schemas: every live property with key K and kind T, or with `x-menagerist.origin.preset` equal to the id. A `field_kind` condition without a column also keeps itself as a leaf for the item's own overlay. The pass runs in `prepare_query` and on each inlined smart collection, so a type added after a smart collection was saved is matched without re-saving it.
+
+**Rationale:** wishlist status (#241), acquisitions (#349) and set completion (#346) all need "the same field on every type". Saved fields are copied into each type with that type's own key, so a one-type condition can't say it once. Rewriting into conditions the adapters already run keeps SQL, the in-memory evaluator and the scoped `!=` / `not_in` semantics unchanged. Keys are slugged from the title, so copies of one saved field normally share a key, and `field_kind` covers them along with fields made by hand. `origin` is the exact form for when keys differ (`status_2`).
+
+**Rulings:**
+
+- A cross-type condition that reaches no field stays as written and resolves as stale **without** a warning, as for R15: a later type may match it.
+- The operator and value are checked once against the named kind (`field_kind`). For `origin`, only copies whose kind accepts them are kept. When none do, the query is refused at the condition's path.
+- `origin` reaches type fields only. A copy in an item's own overlay has a key that varies per item, so it can't be one SQL test. Such copies are still found by `field_kind`.
+- No sorting by a cross-type field, and no field references from one.
+
+**Not chosen:** matching on the visible name (a rename would silently drop a type from stored searches; names aren't unique), a stored status column (status is a field like any other), and a pack-shipped search that lists one condition per type (it misses types added later).
+
+**Content (#241, #349):** the catalogue ships two saved fields: _Status_ (choice: Owned, Wanted; no default, so unset reads as owned and nothing needs backfilling) and _Acquisition_ (a table of Date as a partial date, Price, Source, How (Bought, Gift, Inherited, Traded) and Notes; one row per time it was got). _Acquisition_ replaces the single-row _Purchase details_ field group. In the Board games packs, the game type's _Price paid_ becomes an _Acquisition_ row and gains _Status_. _Wishlist_ becomes a smart collection, `{"kind": "field", "field_kind": "choice", "key": "status", "op": "=", "value": "Wanted"}`, so it also lists the person's own types with a Status field. It uses the key and kind form, not `origin`, so it doesn't depend on which saved field a type's Status came from. A table field still can't be a card highlight, so the latest acquisition isn't shown on cards yet (follow-up).

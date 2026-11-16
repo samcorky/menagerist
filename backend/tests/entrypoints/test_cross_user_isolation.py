@@ -401,6 +401,10 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
     "limit": lambda _: "50",
     "value": lambda _: "R",
     "sub_key": lambda _: "x",
+    # The media DELETE routes name their attachment in the query.
+    "target_type": lambda _: "node",
+    "target_id": lambda s: s.item,
+    "attribute_key": lambda _: "cover",
 }
 # Request-body recipes by OpenAPI schema name: kwargs for `client.request`.
 BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
@@ -453,13 +457,6 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
     "UpdateMediaRequest": lambda s: {"json": {"filename": "mine.jpg"}},
     "AttachMediaRequest": lambda s: {
         "json": {"target_type": "node", "target_id": s.item2}
-    },
-    "DetachMediaRequest": lambda s: {
-        "json": {
-            "target_type": "node",
-            "target_id": s.item,
-            "attribute_key": "cover",
-        }
     },
     "CoverRequest": lambda s: {"json": {"target_type": "node", "target_id": s.item}},
     "UploadAndAttachMediaBody": lambda s: {
@@ -832,6 +829,16 @@ class World:
                 },
             )
         )
+        # "owns" holds what it points at, so contents and path have an answer.
+        owns = next(
+            t for t in a.get("/api/v1/edge-types").json() if t["slug"] == "owns"
+        )
+        assert (
+            a.patch(
+                f"/api/v1/edge-types/{owns['id']}", json={"holder": "source"}
+            ).status_code
+            == 200
+        )
         # Unused, so the admin-only delete has something it may remove.
         edge_type = _created(
             a.post("/api/v1/edge-types", json={"slug": "spare", "label": "Spare"})
@@ -1127,6 +1134,10 @@ def _fill(
 
 
 # Where the generic value would match nothing of A's even for A.
+# Optional parameters a route needs to reach A's seeded row: A's attachment is a cover.
+QUERY_ALWAYS: dict[str, tuple[str, ...]] = {
+    "/api/v1/media/{asset_id}/attachments": ("attribute_key",),
+}
 QUERY_OVERRIDES: dict[tuple[str, str], str] = {
     ("/api/v1/collections", "q"): "alpha",  # collections match on their name
     ("/api/v1/node-types/{node_type_id}/attributes/{key}/values", "q"): "R",
@@ -1164,7 +1175,7 @@ def build_request(
         p["name"]
         for p in op.get("parameters", [])
         if p["in"] == "query" and p.get("required")
-    ]
+    ] + list(QUERY_ALWAYS.get(case.template, ()))
     if required and not case.variant.startswith("query:"):
         kwargs["params"] = _fill(case, QUERY_PARAMS, required, seed, "query")
     if case.variant.startswith("query:"):

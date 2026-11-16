@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi.openapi.utils import get_openapi
 
+from app.entrypoints.api.openapi_examples import add_success_examples
 from app.entrypoints.api.openapi_links import add_conventional_links
 from app.entrypoints.api.openapi_responses import add_error_responses
 from app.platform.config import get_identity_settings
@@ -147,6 +148,8 @@ def _normalise_openapi_schemas(openapi_schema: dict[str, Any]) -> None:
     for old_name, new_name in renames.items():
         schema = components.pop(old_name)
         schema["title"] = new_name
+        operation_id = old_name.removeprefix("Body_")
+        schema.setdefault("description", f"The multipart form for `{operation_id}`.")
         components[new_name] = schema
     renamed_refs = {
         f"#/components/schemas/{old_name}": f"#/components/schemas/{new_name}"
@@ -198,6 +201,7 @@ def configure_openapi(app: FastAPI) -> None:
         _declare_merge_patch(openapi_schema)
         add_conventional_links(openapi_schema)
         add_error_responses(openapi_schema)
+        add_success_examples(openapi_schema)
         app.openapi_schema = openapi_schema
         return openapi_schema
 

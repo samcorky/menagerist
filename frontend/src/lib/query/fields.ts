@@ -40,7 +40,14 @@ export type FieldInfo = {
 	kind: string;
 	prop: JsonSchemaProperty;
 	archived: boolean;
+	/** The saved field a "Saved fields" entry stands for. */
+	origin?: string;
+	/** A choice with no option list to offer, so its values are typed (R17). */
+	typedChoice?: boolean;
 };
+
+/** A saved single field the builder can search by, from the presets listing. */
+export type SavedField = { id: string; label: string; property: JsonSchemaProperty };
 
 export type ItemTypeLike = {
 	slug: string;
@@ -55,16 +62,21 @@ export type Catalogue = {
 	loaded: boolean;
 	/** The per-item fields in use; null until read, or when the read failed. */
 	itemFields: readonly ItemField[] | null;
+	/** The person's saved single fields; null until read, or when the read failed. */
+	savedFields: readonly SavedField[] | null;
 };
 
 /** The most rows the server returns; a listing this long may be missing fields. */
 export const ITEM_FIELDS_CAP = 200;
 
-/** The field picker's heading for fields an individual item carries. */
-export const ITEM_FIELDS_LABEL = 'Per-item fields';
+/** The most saved fields read for the picker; a listing this long may be missing some. */
+export const SAVED_FIELDS_CAP = 100;
 
-/** What a chip calls one per-item field (the group is plural, a single field is not). */
-export const ITEM_FIELD_CHIP_LABEL = 'Per-item field';
+/** The field picker's heading for a field by key and kind on any item, of any type. */
+export const ITEM_FIELDS_LABEL = 'Any item type';
+
+/** The field picker's heading for fields copied from a saved field. */
+export const SAVED_FIELDS_LABEL = 'Saved fields';
 
 function isRec(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -92,7 +104,8 @@ function title(prop: JsonSchemaProperty, key: string): string {
 export function buildCatalogue(
 	itemTypes: readonly ItemTypeLike[],
 	loaded = true,
-	itemFields: readonly ItemField[] | null = null
+	itemFields: readonly ItemField[] | null = null,
+	savedFields: readonly SavedField[] | null = null
 ): Catalogue {
 	const fields: FieldInfo[] = [];
 	for (const t of itemTypes) {
@@ -122,7 +135,8 @@ export function buildCatalogue(
 		types: itemTypes.map((t) => ({ slug: t.slug, label: t.label })),
 		fields,
 		loaded,
-		itemFields
+		itemFields,
+		savedFields
 	};
 }
 
@@ -142,27 +156,135 @@ export function fieldReferenceLabel(
 	return `${type === undefined ? ITEM_FIELDS_LABEL : typeLabel(catalogue, type)} › ${name}`;
 }
 
-/** The listing's row for a per-item field, matched on both kind and key. */
+type AnyField = ItemField & { prop?: JsonSchemaProperty };
+
+const anyFieldCache = new WeakMap<Catalogue, AnyField[]>();
+
+/**
+ * Fields worth searching by key and kind on any item: a top-level field on two or more item
+ * types, or one individual items carry. One row per key and kind, labelled by the most
+ * common title and sorted by it. A field on one type only is left to that type's group.
+ * `prop` is the first type field's property, so its option list can be offered.
+ */
+export function anyTypeFields(catalogue: Catalogue): AnyField[] {
+	const cached = anyFieldCache.get(catalogue);
+	if (cached) return cached;
+	const rows = new Map<
+		string,
+		{ row: AnyField; titles: Map<string, number>; types: Set<string>; own: boolean }
+	>();
+	const add = (
+		key: string,
+		kind: string,
+		label: string,
+		count: number,
+		type?: string,
+		prop?: JsonSchemaProperty
+	) => {
+		const id = `${kind}:${key}`;
+		const entry = rows.get(id) ?? {
+			row: { key, kind, label, count: 0, prop },
+			titles: new Map<string, number>(),
+			types: new Set<string>(),
+			own: false
+		};
+		if (type === undefined) entry.own = true;
+		else entry.types.add(type);
+		entry.row.count += count;
+		entry.row.prop ??= prop;
+		entry.titles.set(label, (entry.titles.get(label) ?? 0) + Math.max(count, 1));
+		rows.set(id, entry);
+	};
+	for (const f of catalogue.fields) {
+		if (f.subKey || f.archived || operatorsForKind(f.kind).length === 0) continue;
+		add(f.key, f.kind, f.label, 0, f.type, f.prop);
+	}
+	for (const f of catalogue.itemFields ?? []) add(f.key, f.kind, f.label, f.count);
+	const reachable = [...rows.values()].filter((e) => e.own || e.types.size > 1);
+	const out = reachable.map(({ row, titles }) => {
+		const [label] = [...titles].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+		return { ...row, label };
+	});
+	out.sort((a, b) => a.label.localeCompare(b.label) || a.kind.localeCompare(b.kind));
+	anyFieldCache.set(catalogue, out);
+	return out;
+}
+
+/** The row for a field on any item, matched on both kind and key. */
 export function findItemField(
 	catalogue: Catalogue,
 	kind: string,
 	key: string
-): ItemField | undefined {
-	return catalogue.itemFields?.find((f) => f.kind === kind && f.key === key);
+): AnyField | undefined {
+	return anyTypeFields(catalogue).find((f) => f.kind === kind && f.key === key);
 }
 
-/** Convert a per-item field to a `FieldInfo`. */
+/** Convert a field on any item to a `FieldInfo`, with a type field's options when one has it. */
 export function itemFieldInfo(catalogue: Catalogue, kind: string, key: string): FieldInfo {
-	const label = findItemField(catalogue, kind, key)?.label ?? key;
+	const found = findItemField(catalogue, kind, key);
+	const label = found?.label ?? key;
+	const prop = found?.prop;
 	return {
 		type: '',
 		typeLabel: ITEM_FIELDS_LABEL,
 		key,
 		label,
 		kind,
-		prop: itemFieldProp(kind, key, label),
-		archived: false
+		prop: prop ?? itemFieldProp(kind, key, label),
+		archived: false,
+		typedChoice: prop === undefined && TYPED_TEXT_KINDS.has(kind)
 	};
+}
+
+/** The saved fields, and their table columns, a condition may be about. */
+export function savedFieldInfos(catalogue: Catalogue): FieldInfo[] {
+	const out: FieldInfo[] = [];
+	for (const saved of catalogue.savedFields ?? []) {
+		const kind = kindOf(saved.property);
+		if (!kind) continue;
+		const base = {
+			type: '',
+			typeLabel: SAVED_FIELDS_LABEL,
+			key: '',
+			archived: false,
+			origin: saved.id
+		};
+		if (operatorsForKind(kind).length > 0)
+			out.push({ ...base, label: saved.label, kind, prop: saved.property });
+		const prop = saved.property;
+		if (kind !== 'group' || prop.type !== 'array' || !isRec(prop.items)) continue;
+		for (const [subKey, sub] of propertiesOf(prop.items)) {
+			const subKind = kindOf(sub);
+			if (!subKind || operatorsForKind(subKind).length === 0) continue;
+			const label = `${saved.label} › ${title(sub, subKey)}`;
+			out.push({ ...base, subKey, label, kind: subKind, prop: sub });
+		}
+	}
+	return out;
+}
+
+export function findSavedField(
+	catalogue: Catalogue,
+	origin: string,
+	subKey?: string
+): FieldInfo | undefined {
+	return savedFieldInfos(catalogue).find(
+		(f) => f.origin === origin && (f.subKey ?? undefined) === (subKey ?? undefined)
+	);
+}
+
+/** The picker value for a saved field or one of its columns: `saved:<id>[:<column>]`. */
+export function savedFieldSubject(origin: string, subKey?: string): string {
+	return subKey === undefined ? `saved:${origin}` : `saved:${origin}:${subKey}`;
+}
+
+/** Inverse of `savedFieldSubject`; ids have no colons, columns may. */
+export function parseSavedFieldSubject(
+	subject: string
+): { origin: string; subKey?: string } | null {
+	const match = /^saved:([^:]+)(?::(.+))?$/s.exec(subject);
+	if (!match) return null;
+	return match[2] === undefined ? { origin: match[1] } : { origin: match[1], subKey: match[2] };
 }
 
 /** Kinds whose per-item value is typed text, because the listing carries no option list (R17). */
@@ -184,11 +306,11 @@ function itemFieldProp(kind: string, key: string, label: string): JsonSchemaProp
 
 export type ItemFieldOption = { value: string; label: string; kind: string; count: number };
 
-/** The "Per-item fields" group for the field picker; null when there is nothing to offer. */
+/** The "Any item type" group for the field picker; null when there is nothing to offer. */
 export function itemFieldGroup(
 	catalogue: Catalogue
 ): { label: string; options: ItemFieldOption[] } | null {
-	const options = (catalogue.itemFields ?? [])
+	const options = anyTypeFields(catalogue)
 		.filter((f) => operatorsForKind(f.kind).length > 0)
 		.map((f) => ({
 			value: itemFieldSubject(f.kind, f.key),
@@ -279,6 +401,12 @@ export function summaryLookup(
 		typeLabel: (slug) => typeLabel(catalogue, slug),
 		fieldLabel: (type, key) => findField(catalogue, type, key)?.label ?? key,
 		itemFieldLabel: (kind, key) => findItemField(catalogue, kind, key)?.label ?? key,
+		savedFieldLabel: (origin, subKey) => findSavedField(catalogue, origin, subKey)?.label ?? null,
+		savedFieldKind: (origin, subKey) => findSavedField(catalogue, origin, subKey)?.kind ?? null,
+		formatSavedValue: (origin, subKey, value) => {
+			const field = findSavedField(catalogue, origin, subKey);
+			return field ? formatFieldValue(field, value) : null;
+		},
 		subFieldLabel: (type, key, subKey) => findField(catalogue, type, key, subKey)?.label ?? null,
 		fieldKind: (type, key, subKey) => findField(catalogue, type, key, subKey)?.kind ?? null,
 		formatValue: (type, key, subKey, value) => {

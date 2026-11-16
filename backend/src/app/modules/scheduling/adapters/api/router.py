@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -120,7 +120,7 @@ async def list_jobs(
     responses={**_FORBIDDEN, **_UNKNOWN_JOB},
 )
 async def list_job_runs(
-    job_key: str,
+    job_key: Annotated[str, Path(description="The job's key, such as `backup`.")],
     response: Response,
     use_case: Annotated[GetJobHistory, Depends(get_job_history_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -144,7 +144,7 @@ async def list_job_runs(
     responses={**_FORBIDDEN, **_UNKNOWN_JOB, **_NOT_RUNNABLE},
 )
 async def run_job_now(
-    job_key: str,
+    job_key: Annotated[str, Path(description="The job's key, such as `backup`.")],
     use_case: Annotated[RunJobNow, Depends(get_run_job_now_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> JobRunResponse:

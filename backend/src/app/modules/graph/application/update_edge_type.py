@@ -8,7 +8,7 @@ import structlog
 from app.modules.graph.application.choice_lists import check_list_refs, strip_list_enums
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import check_meta_shape
-from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.edge_type import EdgeType, Holder
 from app.modules.graph.domain.errors import EdgeTypeNotFoundError, InvalidSchemaError
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
@@ -33,6 +33,7 @@ class UpdateEdgeTypeCommand:
     reverse_label: str | None = field(default=None)
     description: str | None = field(default=None)
     directional: bool | None = field(default=None)
+    holder: Holder | None = field(default=None)
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
@@ -77,6 +78,7 @@ class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, Edge
                 reverse_label=command.reverse_label,
                 description=command.description,
                 directional=command.directional,
+                holder=command.holder,
                 attributes_schema=attributes_schema,
             )
             await repos.edge_types.save(edge_type)

@@ -57,14 +57,16 @@ export type ConnectionCondition = {
 export type MediaType = 'image' | 'document';
 
 /**
- * Names an item type (`type`) or, for a field an individual item carries, its kind
- * (`field_kind`): exactly one of the two. A per-item condition has no `sub_key` or `ref`.
+ * Names exactly one of an item type (`type`), a field kind on any item (`field_kind`) or a
+ * saved field (`origin`, every type field copied from it, with no `key`). Only a `type`
+ * condition may compare with another field (`ref`).
  */
 export type FieldCondition = {
 	kind: 'field';
 	type?: string;
 	field_kind?: string;
-	key: string;
+	origin?: string;
+	key?: string;
 	sub_key?: string;
 	op: string;
 	value?: Value;

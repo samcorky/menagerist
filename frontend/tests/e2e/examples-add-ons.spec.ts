@@ -116,3 +116,22 @@ test('a stale page shows the server message when a prerequisite is gone', async 
 	await expect(extras.getByRole('button', { name: /^Add Extra board games/ })).toBeDisabled();
 	expect(await nodesNamed(request, 'Quillfeather Quarry')).toHaveLength(0);
 });
+
+test('storage locations nest: an item shows where it is, and a location what it holds', async ({
+	page,
+	request
+}) => {
+	await installViaApiMany(request, ['games', 'storage']);
+	const orchard = await nodeNamed(request, 'Pocket Orchard');
+
+	await page.goto(`/items/${orchard.id}`);
+	const path = page.getByRole('navigation', { name: 'Where this item is' });
+	await expect(path).toBeVisible();
+	for (const holder of ['Living room', 'Tall bookcase', 'Top shelf', 'Tin box'])
+		await expect(path.getByRole('link', { name: holder })).toBeVisible();
+
+	await path.getByRole('link', { name: 'Top shelf' }).click();
+	const inside = page.getByRole('list', { name: 'Inside this item' });
+	for (const held of ['Lantern Harbour', 'Tea Clipper Race', 'Tin box'])
+		await expect(inside.getByRole('link', { name: held })).toBeVisible();
+});

@@ -177,7 +177,13 @@ def _parse_relationship_type(t: Mapping[str, Any]) -> BundleRelationshipType:
     _check_keys(
         t,
         required={"ref", "slug", "label"},
-        optional={"reverse_label", "description", "directional", "attributes_schema"},
+        optional={
+            "reverse_label",
+            "description",
+            "directional",
+            "attributes_schema",
+            "holder",
+        },
         where="a relationship type",
     )
     return BundleRelationshipType(
@@ -188,6 +194,7 @@ def _parse_relationship_type(t: Mapping[str, Any]) -> BundleRelationshipType:
         description=_opt_str(t.get("description"), "description"),
         directional=_bool(t.get("directional", True), "directional"),
         attributes_schema=_opt_object(t.get("attributes_schema"), "attributes_schema"),
+        holder=_opt_str(t.get("holder"), "holder") or "none",
     )
 
 

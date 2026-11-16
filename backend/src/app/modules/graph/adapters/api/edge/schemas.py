@@ -39,10 +39,12 @@ class CreateEdgeRequest(RequestModel):
         }
     )
 
-    source_id: uuid.UUID
-    target_id: uuid.UUID
-    type: str
-    attributes: dict[str, Any] = Field(default_factory=dict)
+    source_id: uuid.UUID = Field(description="The item the connection starts from.")
+    target_id: uuid.UUID = Field(description="The item it goes to.")
+    type: str = Field(description="The slug of its connection type.")
+    attributes: dict[str, Any] = Field(
+        description="Its field values, keyed by field key.", default_factory=dict
+    )
 
     def to_command(self) -> CreateEdgeCommand:
         """Convert this request into a `CreateEdgeCommand`."""
@@ -77,10 +79,12 @@ class CreateEdgesRequest(RequestModel):
         }
     )
 
-    source_id: uuid.UUID
-    target_ids: list[uuid.UUID]
-    type: str
-    attributes: dict[str, Any] = Field(default_factory=dict)
+    source_id: uuid.UUID = Field(description="The item the connections start from.")
+    target_ids: list[uuid.UUID] = Field(description="The items they go to.")
+    type: str = Field(description="The slug of their connection type.")
+    attributes: dict[str, Any] = Field(
+        description="Field values given to every new connection.", default_factory=dict
+    )
 
     def to_command(self) -> CreateEdgesCommand:
         """Convert this request into a `CreateEdgesCommand`."""
@@ -99,7 +103,10 @@ class UpdateEdgeRequest(RequestModel):
         json_schema_extra={"examples": [{"attributes": {"since": "1979"}}]}
     )
 
-    attributes: dict[str, Any] | None = Field(default=None)
+    attributes: dict[str, Any] | None = Field(
+        description="Its field values, keyed by field key; replaces them all.",
+        default=None,
+    )
 
     def to_command(self, edge_id: uuid.UUID) -> UpdateEdgeCommand:
         """Convert this request into an `UpdateEdgeCommand` for `edge_id`."""
@@ -111,13 +118,15 @@ class EdgeResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_EDGE_EXAMPLE]})
 
-    id: uuid.UUID
-    source_id: uuid.UUID
-    target_id: uuid.UUID
-    type: str
-    attributes: dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
+    id: uuid.UUID = Field(description="The connection's id.")
+    source_id: uuid.UUID = Field(description="The item it starts from.")
+    target_id: uuid.UUID = Field(description="The item it goes to.")
+    type: str = Field(description="The slug of its connection type.")
+    attributes: dict[str, Any] = Field(
+        description="Its field values, keyed by field key."
+    )
+    created_at: datetime = Field(description="When it was created.")
+    updated_at: datetime = Field(description="When it last changed.")
 
     @classmethod
     def from_domain(cls, edge: Edge) -> EdgeResponse:
@@ -147,5 +156,7 @@ class CreateEdgesResponse(BaseModel):
         }
     )
 
-    created: list[EdgeResponse]
-    skipped: list[uuid.UUID]
+    created: list[EdgeResponse] = Field(description="The connections made.")
+    skipped: list[uuid.UUID] = Field(
+        description="Targets left alone because they were already connected."
+    )

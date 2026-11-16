@@ -903,3 +903,51 @@ def test_another_persons_collection_named_in_a_definition_is_stale(env: Env) -> 
     assert [w["message"] for w in mine["warnings"]] == [
         "That collection no longer exists."
     ]
+
+
+_STATUS: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "status": {
+            "type": "string",
+            "enum": ["Owned", "Wanted"],
+            "x-menagerist": {"kind": "choice"},
+        }
+    },
+}
+_WANTED: dict[str, Any] = {
+    "kind": "field",
+    "field_kind": "choice",
+    "key": "status",
+    "op": "=",
+    "value": "Wanted",
+}
+
+
+def _typed(env: Env, slug: str) -> None:
+    response = env.client.post(
+        "/api/v1/node-types",
+        json={"slug": slug, "label": slug.title(), "attributes_schema": _STATUS},
+    )
+    assert response.status_code == 201, response.text
+
+
+def test_any_type_condition_picks_up_a_type_added_after_saving(env: Env) -> None:
+    """The stored search is expanded each time, also when nested in another."""
+    _typed(env, "film")
+    env.item("Alien", type="film", attributes={"status": "Wanted"})
+    env.item("Heat", type="film", attributes={"status": "Owned"})
+    smart = env.smart(_where(_WANTED), name="Wanted")
+    outer = env.smart(
+        _where({"kind": "collection", "mode": "any", "in": [smart["id"]]}),
+        name="Outer",
+    )
+    _typed(env, "game")
+    env.item("Chess", type="game", attributes={"status": "Wanted"})
+    env.as_(BOB)
+    _typed(env, "game")
+    env.item("Bob's Chess", type="game", attributes={"status": "Wanted"})
+    a = env.as_(ALICE)
+
+    assert _names(a.get(f"{NODES}?collection={smart['id']}")) == {"Alien", "Chess"}
+    assert _names(a.get(f"{NODES}?collection={outer['id']}")) == {"Alien", "Chess"}

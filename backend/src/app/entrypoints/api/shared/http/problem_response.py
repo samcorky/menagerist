@@ -5,7 +5,7 @@ import structlog
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.platform.database import DATABASE_OUTAGE_ERRORS
@@ -44,7 +44,36 @@ _STATUS_BY_MENAGERIST_ERROR: dict[type[MenageristError], int] = {
 }
 
 
-class ProblemDetail(BaseModel):
+class _Problem(BaseModel):
+    """The RFC 9457 fields every problem body carries."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "type": "about:blank",
+                    "title": "NotFoundError",
+                    "status": 404,
+                    "instance": "https://menagerist.example/api/v1/nodes",
+                }
+            ]
+        }
+    )
+
+    type: str = Field(
+        description=(
+            "A URI naming the kind of problem; `about:blank` when the status"
+            + " says it all."
+        )
+    )
+    title: str = Field(
+        description="The kind of problem, the same for every occurrence."
+    )
+    status: int = Field(description="The HTTP status code.")
+    instance: str = Field(description="The URL of the request that failed.")
+
+
+class ProblemDetail(_Problem):
     """RFC 9457 `application/problem+json` body every `DomainError` maps to."""
 
     # Every response carries its own example, so this one only shows in the
@@ -63,12 +92,64 @@ class ProblemDetail(BaseModel):
         }
     )
 
-    type: str
-    title: str
-    status: int
-    detail: str
-    instance: str
-    errors: list[dict[str, str]] | None = None
+    detail: str = Field(description="What went wrong, for a person to read.")
+    errors: list[dict[str, str]] | None = Field(
+        default=None,
+        description="For a validation error, the offending fields and what is wrong.",
+    )
+
+
+class FieldIssue(BaseModel):
+    """One field of a request that could not be accepted."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"type": "missing", "loc": ["body", "name"], "msg": "Field required"}
+            ]
+        }
+    )
+
+    type: str = Field(description="Machine-readable kind of failure.")
+    loc: list[str | int] = Field(
+        description=(
+            "Where the value is: `body`, `query`, `path` or `header`, then the"
+            + " field names and indexes."
+        )
+    )
+    msg: str = Field(description="What is wrong, for a person to read.")
+
+
+class ValidationProblem(_Problem):
+    """An RFC 9457 problem for a request that could not be parsed.
+
+    `detail` has one entry per offending field, in FastAPI's shape, which the
+    web client reads.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "type": "about:blank",
+                    "title": "Unprocessable Content",
+                    "status": 422,
+                    "detail": [
+                        {
+                            "type": "missing",
+                            "loc": ["body", "name"],
+                            "msg": "Field required",
+                        }
+                    ],
+                    "instance": "https://menagerist.example/api/v1/nodes",
+                }
+            ]
+        }
+    )
+
+    detail: list[FieldIssue] = Field(
+        description="One entry per field that could not be accepted."
+    )
 
 
 # Swapped for a URL that fits each route when the OpenAPI document is built.
@@ -110,6 +191,28 @@ def problem_response(
             },
         }
     }
+
+
+PRECONDITION_FAILED_TITLE = "PreconditionFailedError"
+PRECONDITION_FAILED_DETAIL = (
+    "The resource has changed since you read it. Fetch it again for its current ETag."
+)
+
+
+def precondition_failed_response(instance: str, etag: str) -> JSONResponse:
+    """Answer a failed `If-Match` or `If-Unmodified-Since` with 412 and the ETag."""
+    return JSONResponse(
+        status_code=412,
+        media_type=PROBLEM_JSON,
+        content={
+            "type": "about:blank",
+            "title": PRECONDITION_FAILED_TITLE,
+            "status": 412,
+            "detail": PRECONDITION_FAILED_DETAIL,
+            "instance": instance,
+        },
+        headers={"ETag": etag},
+    )
 
 
 def _status_for(error_type: type[DomainError]) -> int:

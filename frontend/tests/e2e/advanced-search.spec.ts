@@ -375,7 +375,7 @@ test('the count line stays while more items load', async ({ page, request }) => 
 	await expect(countLine).toBeVisible();
 });
 
-test('filter items by a per-item field, and never match a type field with the same key', async ({
+test('filter items by a field on any item type: own fields and type fields with that key', async ({
 	page,
 	request
 }) => {
@@ -415,24 +415,24 @@ test('filter items by a per-item field, and never match a type field with the sa
 	const dialog = await openFilters(page);
 
 	await dialog.getByRole('combobox', { name: 'Condition 1, field' }).click();
-	await page.getByPlaceholder('Search fields…').fill(`Per-item fields ${label}`);
+	await page.getByPlaceholder('Search fields…').fill(`Any item type ${label}`);
 	await page.getByRole('option', { name: label, exact: true }).click();
 	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'is' });
 	await dialog.getByLabel('Condition 1, value').fill('oak');
 	await dialog.getByRole('button', { name: 'Done' }).click();
 	await expect(dialog).toHaveCount(0);
 
-	// Only the item whose own field matches is listed: not B (pine), not C (type field, same value).
+	// A (its own field) and C (its type's field, same key and kind) match; B (pine) does not.
 	await expect(itemLink(page, names.a)).toBeVisible();
+	await expect(itemLink(page, names.c)).toBeVisible();
 	await expect(itemLink(page, names.b)).toHaveCount(0);
-	await expect(itemLink(page, names.c)).toHaveCount(0);
-	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
+	await expect(page.getByText('2 items', { exact: true })).toBeVisible();
 	await expect(page).toHaveURL(/[?&]f=/);
 
 	await page.reload();
 	await expect(itemLink(page, names.a)).toBeVisible();
+	await expect(itemLink(page, names.c)).toBeVisible();
 	await expect(itemLink(page, names.b)).toHaveCount(0);
-	await expect(itemLink(page, names.c)).toHaveCount(0);
 	await expect(page.getByRole('list', { name: 'Active filters' })).toContainText(label);
 });
 
@@ -460,7 +460,7 @@ test('filter items by a per-item number field with at least', async ({ page, req
 	await expect(page.getByRole('heading', { name: 'My items' })).toBeVisible();
 	const dialog = await openFilters(page);
 	await dialog.getByRole('combobox', { name: 'Condition 1, field' }).click();
-	await page.getByPlaceholder('Search fields…').fill(`Per-item fields ${label}`);
+	await page.getByPlaceholder('Search fields…').fill(`Any item type ${label}`);
 	await page.getByRole('option', { name: label, exact: true }).click();
 	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'is at least' });
 	await dialog.getByLabel('Condition 1, value').fill('10');
@@ -470,7 +470,7 @@ test('filter items by a per-item number field with at least', async ({ page, req
 	await expect(itemLink(page, names.big)).toBeVisible();
 	await expect(itemLink(page, names.small)).toHaveCount(0);
 	await expect(page.getByRole('list', { name: 'Active filters' })).toContainText(
-		`Per-item field › ${label}`
+		`Any item type › ${label}`
 	);
 });
 

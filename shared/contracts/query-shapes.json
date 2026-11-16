@@ -2242,6 +2242,63 @@
         },
         "sort": []
       }
+    },
+    {
+      "name": "any-type field with a sub_key",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "key": "signed",
+              "field_kind": "boolean",
+              "op": "=",
+              "value": true,
+              "sub_key": "role"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "saved-field condition",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "origin": "0193e3a1-7c2a-7000-8000-000000000001",
+              "op": "=",
+              "value": "Wanted"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "saved-field condition on a column",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "origin": "0193e3a1-7c2a-7000-8000-000000000001",
+              "sub_key": "date",
+              "op": ">=",
+              "value": "2022-01-01"
+            }
+          ]
+        },
+        "sort": []
+      }
     }
   ],
   "invalid": [
@@ -6181,27 +6238,6 @@
       }
     },
     {
-      "name": "per-item field with a sub_key",
-      "path": "where.children[0]",
-      "query": {
-        "v": 1,
-        "where": {
-          "op": "and",
-          "children": [
-            {
-              "kind": "field",
-              "key": "signed",
-              "field_kind": "boolean",
-              "op": "=",
-              "value": true,
-              "sub_key": "role"
-            }
-          ]
-        },
-        "sort": []
-      }
-    },
-    {
       "name": "per-item field with a reference",
       "path": "where.children[0]",
       "query": {
@@ -7270,6 +7306,106 @@
               "mode": "exists",
               "direction": "out",
               "depth": 2
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "saved-field condition with a type",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "origin": "0193e3a1-7c2a-7000-8000-000000000001",
+              "op": "=",
+              "value": "Wanted",
+              "type": "film"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "saved-field condition with a field kind",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "origin": "0193e3a1-7c2a-7000-8000-000000000001",
+              "op": "=",
+              "value": "Wanted",
+              "field_kind": "choice"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "saved-field condition with a key",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "origin": "0193e3a1-7c2a-7000-8000-000000000001",
+              "op": "=",
+              "value": "Wanted",
+              "key": "status"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "saved-field condition with an empty origin",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "origin": "",
+              "op": "=",
+              "value": "Wanted"
+            }
+          ]
+        },
+        "sort": []
+      }
+    },
+    {
+      "name": "saved-field condition with a reference",
+      "path": "where.children[0]",
+      "query": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "origin": "0193e3a1-7c2a-7000-8000-000000000001",
+              "op": "=",
+              "value": {
+                "ref": "other"
+              }
             }
           ]
         },

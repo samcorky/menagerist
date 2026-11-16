@@ -51,10 +51,14 @@ class CreateNodeTypeRequest(RequestModel):
         }
     )
 
-    slug: str
-    label: str
-    description: str | None = Field(default=None)
-    attributes_schema: dict[str, Any] | None = Field(default=None)
+    slug: str = Field(
+        description="Its short name, unique among yours; items refer to it."
+    )
+    label: str = Field(description="Its name, for people.")
+    description: str | None = Field(description="Free text about it.", default=None)
+    attributes_schema: dict[str, Any] | None = Field(
+        description="Its fields, as a JSON Schema.", default=None
+    )
     icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
     colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
 
@@ -88,9 +92,11 @@ class UpdateNodeTypeRequest(RequestModel):
         }
     )
 
-    label: str | None = Field(default=None)
-    description: str | None = Field(default=None)
-    attributes_schema: dict[str, Any] | None = Field(default=None)
+    label: str | None = Field(description="Its name, for people.", default=None)
+    description: str | None = Field(description="Free text about it.", default=None)
+    attributes_schema: dict[str, Any] | None = Field(
+        description="Its fields, as a JSON Schema; replaces them all.", default=None
+    )
     icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
     colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
 
@@ -113,15 +119,17 @@ class NodeTypeResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [_NODE_TYPE_EXAMPLE]})
 
-    id: uuid.UUID
-    slug: str
-    label: str
-    description: str | None = Field(default=None)
-    attributes_schema: dict[str, Any] | None = Field(default=None)
+    id: uuid.UUID = Field(description="The item type's id.")
+    slug: str = Field(description="Its short name; items refer to it.")
+    label: str = Field(description="Its name, for people.")
+    description: str | None = Field(description="Free text about it.", default=None)
+    attributes_schema: dict[str, Any] | None = Field(
+        description="Its fields, as a JSON Schema.", default=None
+    )
     icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
     colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(description="When it was created.")
+    updated_at: datetime = Field(description="When it last changed.")
 
     @classmethod
     def from_domain(cls, node_type: NodeType) -> NodeTypeResponse:
@@ -146,5 +154,5 @@ class AttributeValueCountResponse(BaseModel):
         json_schema_extra={"examples": [{"value": "Draft", "count": 12}]}
     )
 
-    value: str
-    count: int
+    value: str = Field(description="A value the field has held.")
+    count: int = Field(description="How many items hold it.")

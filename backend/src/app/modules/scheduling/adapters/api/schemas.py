@@ -71,15 +71,19 @@ class JobRunResponse(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"examples": [RUN_EXAMPLE]})
 
-    id: UUID
-    job_key: str
+    id: UUID = Field(description="The run's id.")
+    job_key: str = Field(description="The key of the job it ran.")
     status: RunStatus
     scheduled_for: datetime = Field(
         description="The occurrence this run was created for, or when it was requested."
     )
-    created_at: datetime
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
+    created_at: datetime = Field(description="When the run was queued.")
+    started_at: datetime | None = Field(
+        default=None, description="When it started; null while it waits."
+    )
+    finished_at: datetime | None = Field(
+        default=None, description="When it finished; null until then."
+    )
     error: str | None = Field(
         default=None, description="Why the run failed, when it did."
     )
@@ -144,13 +148,15 @@ class JobResponse(BaseModel):
         }
     )
 
-    job_key: str
+    job_key: str = Field(description="The job's key, such as `backup`.")
     title: str = Field(description="What the task is called, in plain language.")
     description: str = Field(description="What the task does, in a sentence.")
     lane: Lane
     overlap: Overlap
     missed_run: MissedRun
-    run_now_allowed: bool
+    run_now_allowed: bool = Field(
+        description="Whether it may be run by hand now, outside its schedule."
+    )
     confirm_required: bool = Field(
         description="Whether the interface should ask before running it by hand."
     )

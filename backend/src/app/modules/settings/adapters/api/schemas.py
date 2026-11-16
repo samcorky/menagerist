@@ -1,6 +1,6 @@
 """Request and response bodies for the settings API."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,7 +8,10 @@ from app.modules.settings.application.update_settings import UpdateSettingsComma
 from app.modules.settings.domain.setting import ResolvedSetting  # noqa: TC001
 from app.platform.request_model import RequestModel
 
-type SettingJson = bool | int | float | str | list[str]
+type SettingJson = Annotated[
+    bool | int | float | str | list[str],
+    Field(description="A setting's value: a flag, number, text or list of text."),
+]
 
 
 class SettingResponse(BaseModel):
@@ -35,8 +38,10 @@ class SettingResponse(BaseModel):
 
     key: str = Field(description="Stable name of the setting, `group.field`.")
     group: str = Field(description="The part of the app the setting belongs to.")
-    title: str
-    description: str | None
+    title: str = Field(description="The setting's name, for people.")
+    description: str | None = Field(
+        description="What it does; null if the title says enough."
+    )
     value: SettingJson = Field(description="The effective value.")
     source: Literal["default", "instance", "user", "env"] = Field(
         description="Which layer supplied the value."

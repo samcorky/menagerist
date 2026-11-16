@@ -1,17 +1,26 @@
-import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
     link_next_header,
+)
+from app.entrypoints.api.shared.http.parameters import (
+    EdgeTypeId,
+    FieldKey,
+    PageAfter,
+    PageLimit,
+    SubFieldKey,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
@@ -95,10 +104,10 @@ async def create_edge_type(
     },
 )
 async def get_edge_type(
-    edge_type_id: uuid.UUID,
+    edge_type_id: EdgeTypeId,
     use_case: Annotated[GetEdgeType, Depends(get_get_edge_type_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> EdgeTypeResponse | Response:
     """Fetch a single edge type by id."""
     edge_type = await use_case.handle(
@@ -120,8 +129,8 @@ async def list_edge_types(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: uuid.UUID | None = None,
-    limit: int = 50,
+    after: PageAfter = None,
+    limit: PageLimit = 50,
 ) -> list[EdgeTypeResponse]:
     """List edge types, paginated by id."""
     edge_types = await use_case.handle(
@@ -148,11 +157,11 @@ async def list_edge_types(
     },
 )
 async def update_edge_type(
-    edge_type_id: uuid.UUID,
+    edge_type_id: EdgeTypeId,
     payload: UpdateEdgeTypeRequest,
     get_usecase: Annotated[GetEdgeType, Depends(get_get_edge_type_use_case)],
     update_usecase: Annotated[UpdateEdgeType, Depends(get_update_edge_type_use_case)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> EdgeTypeResponse | Response:
     """Update an edge type's editable fields. `slug` is immutable."""
@@ -185,7 +194,7 @@ async def update_edge_type(
     },
 )
 async def delete_edge_type(
-    edge_type_id: uuid.UUID,
+    edge_type_id: EdgeTypeId,
     use_case: Annotated[DeleteEdgeType, Depends(get_delete_edge_type_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
@@ -203,15 +212,18 @@ async def delete_edge_type(
     ),
 )
 async def count_edge_type_attribute_usage(
-    edge_type_id: uuid.UUID,
-    key: str,
+    edge_type_id: EdgeTypeId,
+    key: FieldKey,
     use_case: Annotated[
         CountEdgeTypeAttributeUsage,
         Depends(get_count_edge_type_attribute_usage_use_case),
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    value: str | None = None,
-    sub_key: str | None = None,
+    value: Annotated[
+        str | None,
+        Query(description="Count only connections where the field holds this value."),
+    ] = None,
+    sub_key: SubFieldKey = None,
 ) -> AttributeUsageResponse:
     """Count edges of this type holding `key`, optionally where it equals `value`.
 
@@ -242,13 +254,13 @@ async def count_edge_type_attribute_usage(
     },
 )
 async def purge_edge_type_attribute(
-    edge_type_id: uuid.UUID,
-    key: str,
+    edge_type_id: EdgeTypeId,
+    key: FieldKey,
     use_case: Annotated[
         PurgeEdgeTypeAttribute, Depends(get_purge_edge_type_attribute_use_case)
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    sub_key: str | None = None,
+    sub_key: SubFieldKey = None,
 ) -> None:
     """Permanently remove `key` from every edge of this type (cannot be undone).
 

@@ -136,6 +136,18 @@ def _operands(value: Operand | None) -> tuple[Operand, ...]:
 type _Schemas = Mapping[str, Mapping[str, Any]]
 
 
+def accepts(kind: str, op: str, value: Operand | None) -> bool:
+    """Whether a `kind` field takes `op` with these operands (references aside)."""
+    if op not in KIND_OPERATORS.get(kind, frozenset()):
+        return False
+    if op in NO_VALUE_OPERATORS:
+        return True
+    return all(
+        isinstance(operand, FieldReference) or _fits(kind, operand)
+        for operand in _operands(value)
+    )
+
+
 def _check_reference(
     schemas: _Schemas,
     warnings: list[QueryWarning],
@@ -182,6 +194,36 @@ def _check_value(
     return stale
 
 
+def _unexpanded(condition: FieldCondition) -> bool:
+    """A cross-type condition `expand_field_scopes` left because it reached no field.
+
+    An overlay has no columns, so a `field_kind` condition with a column that is
+    still here reached nothing either.
+    """
+    return condition.origin is not None or (
+        condition.field_kind is not None and condition.sub_key is not None
+    )
+
+
+def _type_field_kind(
+    schemas: _Schemas,
+    warnings: list[QueryWarning],
+    condition: FieldCondition,
+    path: str,
+) -> str | None:
+    """The kind of a type field, or None (with a warning) when it is gone."""
+    prop, gone = _find(schemas, condition.type or "", condition.key, condition.sub_key)
+    if prop is None:
+        warnings.append(QueryWarning(path, gone or ""))
+        return None
+    found = kind_of(prop)
+    if found is None:
+        raise InvalidQueryError(
+            f"The field '{condition.key}' cannot be filtered.", path=path
+        )
+    return found
+
+
 def _resolve_field(
     schemas: _Schemas,
     kinds: dict[FieldKey, str],
@@ -190,22 +232,17 @@ def _resolve_field(
     path: str,
 ) -> bool:
     """Record the field's kind; return True when the condition is stale."""
+    if _unexpanded(condition):
+        return True
     if condition.type is None:
         # Per-item: the condition names its kind, so no schema is consulted.
-        kind = condition.field_kind or ""
+        kind: str | None = condition.field_kind or ""
         if kind not in KIND_OPERATORS:
             raise InvalidQueryError("Unknown field kind.", path=path)
     else:
-        prop, gone = _find(schemas, condition.type, condition.key, condition.sub_key)
-        if prop is None:
-            warnings.append(QueryWarning(path, gone or ""))
-            return True
-        found = kind_of(prop)
-        if found is None:
-            raise InvalidQueryError(
-                f"The field '{condition.key}' cannot be filtered.", path=path
-            )
-        kind = found
+        kind = _type_field_kind(schemas, warnings, condition, path)
+    if kind is None:
+        return True
     if condition.op not in KIND_OPERATORS[kind]:
         raise InvalidQueryError(
             f"'{condition.op}' is not available for {kind} fields.", path=path

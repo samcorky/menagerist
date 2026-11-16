@@ -1,18 +1,21 @@
-import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
     link_next_header,
 )
+from app.entrypoints.api.shared.http.parameters import PageAfter, PageLimit, PresetId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.presets.adapters.api.dependencies import (
@@ -78,10 +81,10 @@ async def create_preset(
     responses={**conditional_get_responses(), **_NOT_FOUND},
 )
 async def get_preset(
-    preset_id: uuid.UUID,
+    preset_id: PresetId,
     use_case: Annotated[GetPreset, Depends(get_get_preset_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> PresetResponse | Response:
     """Fetch a single preset by id."""
     preset = await use_case.handle(GetPresetQuery(preset_id=preset_id), actor)
@@ -101,10 +104,15 @@ async def list_presets(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: uuid.UUID | None = None,
-    limit: int = 50,
-    kind: str | None = None,
-    q: str | None = None,
+    after: PageAfter = None,
+    limit: PageLimit = 50,
+    kind: Annotated[
+        str | None, Query(description="Keep saved fields of this field type.")
+    ] = None,
+    q: Annotated[
+        str | None,
+        Query(description="Keep saved fields whose label contains this text."),
+    ] = None,
 ) -> list[PresetResponse]:
     """List presets, paginated by id, optionally filtered by kind or a label search."""
     presets = await use_case.handle(
@@ -127,11 +135,11 @@ async def list_presets(
     },
 )
 async def update_preset(
-    preset_id: uuid.UUID,
+    preset_id: PresetId,
     payload: UpdatePresetRequest,
     get_usecase: Annotated[GetPreset, Depends(get_get_preset_use_case)],
     update_usecase: Annotated[UpdatePreset, Depends(get_update_preset_use_case)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> PresetResponse | Response:
     """Update a preset's editable fields. Setting `definition` bumps `version`."""
@@ -156,7 +164,7 @@ async def update_preset(
     },
 )
 async def delete_preset(
-    preset_id: uuid.UUID,
+    preset_id: PresetId,
     use_case: Annotated[DeletePreset, Depends(get_delete_preset_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:

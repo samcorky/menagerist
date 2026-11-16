@@ -2,9 +2,10 @@ import hashlib
 import json
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.parameters import IfNoneMatch
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.settings.adapters.api.dependencies import (
@@ -85,8 +86,19 @@ _UPDATE_BODY = {
 }
 _SCHEMA_200: dict[int | str, dict[str, Any]] = {
     200: {
+        "headers": {
+            "ETag": {
+                "description": "Version of the schema, for `If-None-Match`.",
+                "schema": {"type": "string"},
+            }
+        },
         "content": {
             "application/json": {
+                "schema": {
+                    "description": (
+                        "A JSON Schema 2020-12 document with one property per setting."
+                    )
+                },
                 "example": {
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "type": "object",
@@ -100,9 +112,9 @@ _SCHEMA_200: dict[int | str, dict[str, Any]] = {
                         }
                     },
                     "additionalProperties": False,
-                }
+                },
             }
-        }
+        },
     }
 }
 
@@ -134,6 +146,7 @@ async def get_settings_schema(
     response: Response,
     use_case: Annotated[GetSettingsSchema, Depends(get_get_settings_schema_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    if_none_match: IfNoneMatch = None,
 ) -> dict[str, object] | Response:
     """Describe the instance settings as a JSON Schema document.
 
@@ -143,7 +156,7 @@ async def get_settings_schema(
     schema = await use_case.handle(GetSettingsSchemaQuery(), actor)
     etag = _etag(schema)
     headers = {"ETag": etag, "Cache-Control": _REVALIDATE}
-    if _not_modified(request.headers.get("If-None-Match"), etag):
+    if _not_modified(if_none_match, etag):
         return Response(status_code=304, headers=headers)
     response.headers.update(headers)
     return schema
@@ -196,7 +209,7 @@ async def update_instance_settings(
     responses={**_FORBIDDEN, **_UNKNOWN, **_LOCKED},
 )
 async def reset_instance_setting(
-    key: str,
+    key: Annotated[str, Path(description="The setting's key.")],
     response: Response,
     use_case: Annotated[ResetSetting, Depends(get_reset_setting_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],

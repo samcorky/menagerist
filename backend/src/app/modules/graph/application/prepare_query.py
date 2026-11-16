@@ -1,9 +1,11 @@
 """Parse a stored query and resolve it against the current item types."""
 
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.modules.graph.application.collection_expansion import expand_collections
+from app.modules.graph.application.field_scope_expansion import expand_field_scopes
 from app.modules.graph.application.query_resolution import (
     ConnectionResolution,
     connection_references,
@@ -79,9 +81,10 @@ async def prepare_query(
             not fit a field that still exists, or a collection that refers to
             itself.
     """
-    parsed = parse_query(raw)
     node_types = await load_node_types(repos, scope)
     schemas = {str(t.slug): t.attributes_schema or {} for t in node_types}
+    parsed = parse_query(raw)
+    parsed = replace(parsed, where=expand_field_scopes(parsed.where, schemas))
     resolution = resolve_fields(parsed, schemas)
     expansion = await expand_collections(
         parsed.where,

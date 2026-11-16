@@ -69,15 +69,28 @@ def _item_types(value: object, where: str) -> tuple[BundleItemType, ...]:
     for raw in value:
         item = _object(raw, where)
         slug = _text(item, "slug", where)
+        schema = item.get("attributesSchema")
         result.append(
             BundleItemType(
                 ref=slug,
                 slug=slug,
                 label=_text(item, "label", where),
                 description=item.get("description"),
+                attributes_schema=(
+                    None
+                    if schema is None
+                    else _object(schema, f"{where} attributesSchema")
+                ),
+                icon=_optional_text(item, "icon", where),
+                colour=_optional_text(item, "colour", where),
             )
         )
     return tuple(result)
+
+
+def _optional_text(data: dict[str, Any], key: str, where: str) -> str | None:
+    """A key that may be left out, but is non-blank text when given."""
+    return None if data.get(key) is None else _text(data, key, where)
 
 
 def _relationship_types(
@@ -97,6 +110,7 @@ def _relationship_types(
                 reverse_label=item.get("reverseLabel"),
                 description=item.get("description"),
                 directional=bool(item.get("directional", True)),
+                holder=str(item.get("holder") or "none"),
             )
         )
     return tuple(result)

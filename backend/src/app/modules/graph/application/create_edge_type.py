@@ -7,7 +7,7 @@ import structlog
 from app.modules.graph.application.choice_lists import check_list_refs, strip_list_enums
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import check_meta_shape
-from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.edge_type import EdgeType, Holder
 from app.modules.graph.domain.errors import (
     EdgeTypeSlugConflictError,
     InvalidSchemaError,
@@ -36,6 +36,7 @@ class CreateEdgeTypeCommand:
     reverse_label: str | None = field(default=None)
     description: str | None = field(default=None)
     directional: bool = field(default=True)
+    holder: Holder = field(default="none")
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
@@ -83,6 +84,7 @@ class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, Edge
                 reverse_label=command.reverse_label,
                 description=command.description,
                 directional=command.directional,
+                holder=command.holder,
                 attributes_schema=attributes_schema,
             )
             await repos.edge_types.add(edge_type)

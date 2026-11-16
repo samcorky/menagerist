@@ -17,7 +17,7 @@ test('shows where an item sits and what it holds', async ({ page, request }) => 
 	const label = `Contains ${suffix}`;
 	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 	const res = await request.post('/api/v1/edge-types', {
-		data: { slug, label, reverse_label: `Inside ${suffix}`, directional: true }
+		data: { slug, label, reverse_label: `Inside ${suffix}`, directional: true, holder: 'source' }
 	});
 	expect(res.status(), await res.text()).toBe(201);
 	edgeTypeIds.push(((await res.json()) as { id: string }).id);

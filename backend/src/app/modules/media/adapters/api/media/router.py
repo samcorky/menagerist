@@ -1,18 +1,22 @@
 import uuid
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, Depends, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.conditional_request import ConditionalRequestDep
+from app.entrypoints.api.shared.http.conditional_request import (
+    ConditionalGetDep,
+    ConditionalPatchDep,
+)
 from app.entrypoints.api.shared.http.content_sniffing import sniff_and_rechain
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
 )
+from app.entrypoints.api.shared.http.parameters import AssetId, NodeId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -95,6 +99,9 @@ from app.shared_kernel.errors import ValidationError
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+# A file body: OpenAPI 3.1 describes raw bytes as a binary string.
+_BINARY = {"type": "string", "format": "binary", "description": "The file's bytes."}
+
 router = APIRouter(prefix="/media", tags=["Media"], route_class=PermissionAwareRoute)
 # A node's media is addressed through the node.
 node_media_router = APIRouter(
@@ -123,7 +130,7 @@ async def _chunks(upload: UploadFile) -> AsyncGenerator[bytes]:
     },
 )
 async def stage_media(
-    file: UploadFile,
+    file: Annotated[UploadFile, File(description="The file to upload.")],
     use_case: Annotated[StageMedia, Depends(get_stage_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     settings: Annotated[MediaSettings, Depends(get_media_settings)],
@@ -170,13 +177,18 @@ async def stage_media(
     },
 )
 async def upload_and_attach_media(
-    file: UploadFile,
+    file: Annotated[UploadFile, File(description="The file to upload.")],
     use_case: Annotated[UploadAndAttachMedia, Depends(get_upload_and_attach_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     settings: Annotated[MediaSettings, Depends(get_media_settings)],
     target_type: Annotated[AttachmentTarget, Form()],
-    target_id: Annotated[uuid.UUID, Form()],
-    attribute_key: Annotated[AttachmentKey | None, Form()] = None,
+    target_id: Annotated[
+        uuid.UUID, Form(description="The id of what to attach it to.")
+    ],
+    attribute_key: Annotated[
+        AttachmentKey | None,
+        Form(description="The slot it fills, such as `cover`; none for a plain one."),
+    ] = None,
 ) -> MediaAttachmentResponse:
     """Stream a file to storage and attach it to a graph entity in one request."""
     sniffed_content_type, stream = await sniff_and_rechain(_chunks(file))
@@ -205,7 +217,7 @@ async def upload_and_attach_media(
     operation_id="list_node_media",
 )
 async def list_node_media(
-    node_id: uuid.UUID,
+    node_id: NodeId,
     use_case: Annotated[ListNodeMedia, Depends(get_list_node_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> list[NodeMediaItemResponse]:
@@ -233,10 +245,10 @@ async def list_node_media(
     },
 )
 async def get_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalGetDep,
 ) -> MediaAssetResponse | Response:
     """Fetch a media asset's metadata by id."""
     asset = await use_case.handle(GetMediaQuery(asset_id=asset_id), actor)
@@ -261,11 +273,11 @@ async def get_media(
     },
 )
 async def update_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: UpdateMediaRequest,
     get_use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     update_use_case: Annotated[UpdateMedia, Depends(get_update_media_use_case)],
-    cond: ConditionalRequestDep,
+    cond: ConditionalPatchDep,
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> MediaAssetResponse | Response:
     """Update the media asset's editable filename."""
@@ -280,9 +292,10 @@ async def update_media(
 @router.get(
     "/{asset_id}/content",
     operation_id="stream_media_content",
+    response_class=Response,
     response_model=None,
     responses={
-        200: {"content": {"application/octet-stream": {}}},
+        200: {"content": {"application/octet-stream": {"schema": _BINARY}}},
         **error_response(
             MediaAssetNotFoundError,
             detail="Media asset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
@@ -290,7 +303,7 @@ async def update_media(
     },
 )
 async def stream_media_content(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     request: Request,
     get_use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
@@ -324,11 +337,12 @@ async def stream_media_content(
 @router.get(
     "/{asset_id}/thumbnail",
     operation_id="stream_media_thumbnail",
+    response_class=Response,
     dependencies=[Depends(rate_limited(RateLimitBucket.THUMBNAILS))],
     response_model=None,
     responses={
         **RATE_LIMITED_RESPONSE,
-        200: {"content": {"image/webp": {}}},
+        200: {"content": {"image/webp": {"schema": _BINARY}}},
         **error_response(
             MediaAssetNotFoundError,
             detail="Media asset 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
@@ -340,7 +354,7 @@ async def stream_media_content(
     },
 )
 async def stream_media_thumbnail(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     request: Request,
     get_use_case: Annotated[GetMedia, Depends(get_get_media_use_case)],
     storage: Annotated[MediaStoragePort, Depends(get_media_storage)],
@@ -391,7 +405,7 @@ async def stream_media_thumbnail(
     },
 )
 async def attach_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: AttachMediaRequest,
     use_case: Annotated[AttachMedia, Depends(get_attach_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -413,8 +427,8 @@ async def attach_media(
     },
 )
 async def detach_media(
-    asset_id: uuid.UUID,
-    payload: DetachMediaRequest,
+    asset_id: AssetId,
+    payload: Annotated[DetachMediaRequest, Query()],
     use_case: Annotated[DetachMedia, Depends(get_detach_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
@@ -442,7 +456,7 @@ async def detach_media(
     },
 )
 async def set_media_cover(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     payload: CoverRequest,
     use_case: Annotated[SetMediaCover, Depends(get_set_media_cover_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
@@ -464,8 +478,8 @@ async def set_media_cover(
     },
 )
 async def clear_media_cover(
-    asset_id: uuid.UUID,
-    payload: CoverRequest,
+    asset_id: AssetId,
+    payload: Annotated[CoverRequest, Query()],
     use_case: Annotated[ClearMediaCover, Depends(get_clear_media_cover_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:
@@ -489,7 +503,7 @@ async def clear_media_cover(
     },
 )
 async def promote_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[PromoteMedia, Depends(get_promote_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> MediaAssetResponse:
@@ -511,7 +525,7 @@ async def promote_media(
     },
 )
 async def orphan_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[OrphanMedia, Depends(get_orphan_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> MediaAssetResponse:
@@ -530,7 +544,7 @@ async def orphan_media(
     ),
 )
 async def delete_media(
-    asset_id: uuid.UUID,
+    asset_id: AssetId,
     use_case: Annotated[DeleteMedia, Depends(get_delete_media_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> None:

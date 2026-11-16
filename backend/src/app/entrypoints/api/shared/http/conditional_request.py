@@ -8,6 +8,8 @@ from starlette.responses import Response
 from app.shared_kernel.etag import ETaggable, etag_from_entity
 
 from .http_headers import http_date, parse_http_date
+from .parameters import IfMatch, IfNoneMatch  # noqa: TC001 - FastAPI resolves these at runtime
+from .problem_response import precondition_failed_response
 
 
 def _unweak(value: str) -> str:
@@ -75,7 +77,7 @@ class ConditionalRequest:
         etag = etag_from_entity(current, extra)
 
         if if_match and if_match != "*" and _unweak(if_match) != _unweak(etag):
-            return Response(status_code=412, headers={"ETag": etag})
+            return precondition_failed_response(str(self._req.url), etag)
 
         # RFC 9110 13.1.4: If-Unmodified-Since is ignored when If-Match is sent.
         if if_unmodified_since and not if_match:
@@ -83,7 +85,7 @@ class ConditionalRequest:
             utc_updated = current.updated_at.astimezone(UTC)
             # Compare at second resolution. RFC 1123 omits sub-second precision.
             if since and utc_updated.replace(microsecond=0) > since.astimezone(UTC):
-                return Response(status_code=412, headers={"ETag": etag})
+                return precondition_failed_response(str(self._req.url), etag)
 
         return None
 
@@ -93,10 +95,27 @@ class ConditionalRequest:
         self._res.headers["Last-Modified"] = http_date(entity.updated_at)
 
 
-def get_conditional_request(request: Request, response: Response) -> ConditionalRequest:
-    """FastAPI dependency that provides a ConditionalRequest for the current request."""
+# The header parameters only declare the headers in OpenAPI, so clients see them;
+# `ConditionalRequest` reads the values from the request itself.
+
+
+def get_conditional_get(
+    request: Request,
+    response: Response,
+    if_none_match: IfNoneMatch = None,
+) -> ConditionalRequest:
+    """Provide a ConditionalRequest for a GET that can answer 304."""
     return ConditionalRequest(request, response)
 
 
-# Convenience alias for Annotated injection
-ConditionalRequestDep = Annotated[ConditionalRequest, Depends(get_conditional_request)]
+def get_conditional_patch(
+    request: Request,
+    response: Response,
+    if_match: IfMatch = None,
+) -> ConditionalRequest:
+    """Provide a ConditionalRequest for a PATCH that can answer 412."""
+    return ConditionalRequest(request, response)
+
+
+ConditionalGetDep = Annotated[ConditionalRequest, Depends(get_conditional_get)]
+ConditionalPatchDep = Annotated[ConditionalRequest, Depends(get_conditional_patch)]

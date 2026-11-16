@@ -86,6 +86,10 @@ class Rig:
         """Names of the items the smart collection `name` matches, sorted."""
         kind, definition = (await self.collections())[name]
         assert kind is CollectionKind.DYNAMIC
+        return await self.search(definition)
+
+    async def search(self, definition: dict[str, object]) -> list[str]:
+        """Names of the items a query matches, sorted."""
         resolved, warnings = await prepare_query(
             self.world.graph_repos,
             definition,
@@ -198,18 +202,79 @@ async def test_a_pack_smart_collection_goes_with_the_pack_and_comes_back(
     assert before != []
 
 
+async def test_the_wishlist_is_everything_marked_wanted(
+    make_world: MakeWorld,
+) -> None:
+    """The former hand-built list, now Status is Wanted on any item type."""
+    rig = await _rig(make_world, "games")
+    await rig.install("games")
+
+    assert await rig.matches("Wishlist") == ["Gilded Moth", "Saltmarsh Express"]
+
+
 async def test_the_other_games_collections_stay_manual(
     make_world: MakeWorld,
 ) -> None:
-    """Only the collection with an honest rule in the pack's data converted."""
+    """Only collections with an honest rule in the pack's data converted."""
     rig = await _rig(make_world, "games")
     await rig.install("games")
 
     kinds = {name: kind for name, (kind, _) in (await rig.collections()).items()}
 
     assert kinds == {
-        "Wishlist": CollectionKind.MANUAL,
+        "Wishlist": CollectionKind.DYNAMIC,
         "Games for two": CollectionKind.MANUAL,
         "Family game night": CollectionKind.MANUAL,
         "Still to try": CollectionKind.DYNAMIC,
     }
+
+
+async def _storage(make_world: MakeWorld) -> Rig:
+    rig = await _rig(make_world, "games", "storage")
+    await rig.install("games")
+    await rig.install("storage")
+    return rig
+
+
+async def test_not_put_away_is_owned_games_with_no_place(
+    make_world: MakeWorld,
+) -> None:
+    """Owned games that no room, shelf or box contains; wanted games are left out."""
+    rig = await _storage(make_world)
+
+    assert await rig.matches("Not put away yet") == [
+        "Cobbled Streets: The Canal Expansion",
+        "Ministry of Mild Mischief",
+        "Slow Parcel Panic",
+    ]
+
+
+async def test_everything_anywhere_in_the_living_room(make_world: MakeWorld) -> None:
+    """Locations nest, so one condition with a depth finds all that is inside."""
+    rig = await _storage(make_world)
+    items = {
+        n.name: n.id
+        for n in await rig.world.graph_repos.nodes.list(
+            scope=_EVERYONE, after=None, limit=100
+        )
+    }
+    inside = {
+        "kind": "connection",
+        "mode": "to",
+        "relationship": "storage-located-in",
+        "direction": "out",
+        "item": str(items["Living room"]),
+    }
+
+    def where(**extra: object) -> dict[str, object]:
+        return {"v": 1, "where": {"op": "and", "children": [inside | extra]}}
+
+    assert await rig.search(where()) == ["Tall bookcase"]
+    assert await rig.search(where(depth=4)) == [
+        "Lantern Harbour",
+        "Pocket Orchard",
+        "Tall bookcase",
+        "Tea Clipper Race",
+        "Tin box",
+        "Top shelf",
+    ]

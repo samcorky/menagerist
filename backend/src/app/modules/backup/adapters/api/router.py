@@ -1,6 +1,5 @@
 from datetime import UTC
 from typing import Annotated, Any
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
@@ -8,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from app.entrypoints.api.shared.bridges.backup_setup_gate import first_run_restore_slot
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.cross_site import refuse_cross_site
+from app.entrypoints.api.shared.http.parameters import BackupId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -78,12 +78,15 @@ public_router = APIRouter(
     prefix="/backups", tags=["Backups"], route_class=PermissionAwareRoute
 )
 
+ARCHIVE_SCHEMA = {
+    "type": "string",
+    "format": "binary",
+    "description": "A Menagerist archive: a gzipped tar file.",
+}
 ARCHIVE_BODY = {
     "requestBody": {
         "required": True,
-        "content": {
-            "application/gzip": {"schema": {"type": "string", "format": "binary"}}
-        },
+        "content": {"application/gzip": {"schema": ARCHIVE_SCHEMA}},
     }
 }
 ADMIN_RESPONSES: dict[int | str, dict[str, Any]] = error_response(
@@ -233,7 +236,7 @@ async def get_restore_progress_snapshot(
     responses={**ADMIN_RESPONSES, **_BACKUP_NOT_FOUND},
 )
 async def verify_backup(
-    backup_id: UUID,
+    backup_id: BackupId,
     use_case: Annotated[VerifyBackup, Depends(get_verify_backup)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> VerificationResponse:
@@ -246,19 +249,18 @@ async def verify_backup(
 @router.get(
     "/{backup_id}/download",
     operation_id="download_backup",
+    response_class=Response,
     responses={
         **ADMIN_RESPONSES,
         **_BACKUP_NOT_FOUND,
         200: {
             "description": "The compressed backup archive.",
-            "content": {
-                "application/gzip": {"schema": {"type": "string", "format": "binary"}}
-            },
+            "content": {"application/gzip": {"schema": ARCHIVE_SCHEMA}},
         },
     },
 )
 async def download_backup(
-    backup_id: UUID,
+    backup_id: BackupId,
     use_case: Annotated[OpenBackup, Depends(get_open_backup)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> StreamingResponse:
@@ -284,7 +286,7 @@ async def download_backup(
     responses={**ADMIN_RESPONSES, **_BACKUP_NOT_FOUND},
 )
 async def delete_backup(
-    backup_id: UUID,
+    backup_id: BackupId,
     use_case: Annotated[DeleteBackup, Depends(get_delete_backup)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> Response:

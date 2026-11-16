@@ -89,7 +89,7 @@ test('your own cover on an example game survives removal and reinstall', async (
 
 	// Take the pack's cover off first, so the game's only cover is the person's own.
 	const detach = await request.delete(`/api/v1/media/${packCover!.id}/attachments`, {
-		data: { target_type: 'node', target_id: game.id, attribute_key: 'cover' }
+		params: { target_type: 'node', target_id: game.id, attribute_key: 'cover' }
 	});
 	expect(detach.ok(), await detach.text()).toBeTruthy();
 	expect(await coverOf(request, game.id)).toBeUndefined();

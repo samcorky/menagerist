@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Final
 
+from app.modules.graph.application.field_scope_expansion import expand_field_scopes
 from app.modules.graph.application.query_resolution import resolve_fields
 from app.modules.graph.domain.query import (
     CollectionCondition,
@@ -125,6 +126,9 @@ class _Expander:
     ) -> CollectionTarget:
         try:
             parsed = parse_query(definition)
+            parsed = replace(
+                parsed, where=expand_field_scopes(parsed.where, self.schemas)
+            )
             resolution = resolve_fields(Query(where=parsed.where), self.schemas)
         except InvalidQueryError:
             return self.stale(

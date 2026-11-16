@@ -8,6 +8,10 @@ import {
 	type Value
 } from './types';
 
+/** What a chip calls a field by key and kind on any item, and one copied from a saved field. */
+export const ANY_TYPE_CHIP_LABEL = 'Any item type';
+export const SAVED_FIELD_CHIP_LABEL = 'Saved field';
+
 export type RelationshipInfo = {
 	label: string;
 	reverse_label: string | null;
@@ -17,10 +21,16 @@ export type RelationshipInfo = {
 export type SummaryLookup = {
 	typeLabel(slug: string): string;
 	fieldLabel(type: string, key: string): string;
-	/** A per-item field's label; when absent the key is used. */
+	/** The label of a field on any item type; when absent the key is used. */
 	itemFieldLabel?(kind: string, key: string): string | null;
-	/** Formats a plain value of a per-item field; null leaves the default text. */
+	/** Formats a plain value of a field on any item type; null leaves the default text. */
 	formatItemValue?(kind: string, key: string, value: unknown): string | null;
+	/** A saved field's label ("Acquisition › Date" for a column); null when it is gone. */
+	savedFieldLabel?(origin: string, subKey: string | undefined): string | null;
+	/** A saved field's kind, so its date conditions read like the others. */
+	savedFieldKind?(origin: string, subKey: string | undefined): string | null;
+	/** Formats a plain value of a saved field; null leaves the default text. */
+	formatSavedValue?(origin: string, subKey: string | undefined, value: unknown): string | null;
 	/** A table column's label ("Cast › Role"); when absent the raw column key is used. */
 	subFieldLabel?(type: string, key: string, subKey: string): string | null;
 	/**
@@ -116,9 +126,11 @@ function fieldFormat(c: Extract<Condition, { kind: 'field' }>, lookup: SummaryLo
 		if (plain) {
 			try {
 				const text =
-					c.field_kind !== undefined
-						? lookup.formatItemValue?.(c.field_kind, c.key, operand)
-						: lookup.formatValue?.(c.type ?? '', c.key, c.sub_key, operand);
+					c.origin !== undefined
+						? lookup.formatSavedValue?.(c.origin, c.sub_key, operand)
+						: c.field_kind !== undefined
+							? lookup.formatItemValue?.(c.field_kind, c.key ?? '', operand)
+							: lookup.formatValue?.(c.type ?? '', c.key ?? '', c.sub_key, operand);
 				if (typeof text === 'string') return text;
 			} catch {
 				// fall back to the default text
@@ -138,24 +150,32 @@ function safe<T>(read: () => T): T | null {
 
 const DATE_KINDS = new Set(['date', 'partialdate']);
 
-function describeField(c: Extract<Condition, { kind: 'field' }>, lookup: SummaryLookup): string {
-	const itemKind = c.field_kind;
+/** "Film: Rating", "Any item type › Status:" or "Saved field › Acquisition › Date:". */
+function fieldHead(
+	c: Extract<Condition, { kind: 'field' }>,
+	lookup: SummaryLookup
+): { head: string; kind: string | null | undefined } {
 	const subKey = c.sub_key;
-	let field: string;
-	let kind: string | null | undefined;
-	if (itemKind !== undefined) {
-		field = safe(() => lookup.itemFieldLabel?.(itemKind, c.key)) || c.key;
-		kind = itemKind;
-	} else {
-		const label = lookup.fieldLabel(c.type ?? '', c.key);
-		const sub = subKey ? safe(() => lookup.subFieldLabel?.(c.type ?? '', c.key, subKey)) : null;
-		field = subKey ? (sub ?? `${label} › ${subKey}`) : label;
-		kind = safe(() => lookup.fieldKind?.(c.type ?? '', c.key, c.sub_key));
+	const origin = c.origin;
+	if (origin !== undefined) {
+		const field = safe(() => lookup.savedFieldLabel?.(origin, subKey)) || SAVED_FIELD_CHIP_LABEL;
+		const kind = safe(() => lookup.savedFieldKind?.(origin, subKey));
+		return { head: `${SAVED_FIELD_CHIP_LABEL} › ${field}:`, kind };
 	}
-	const head =
-		itemKind === undefined
-			? `${lookup.typeLabel(c.type ?? '')}: ${field}`
-			: `Per-item field › ${field}:`;
+	const itemKind = c.field_kind;
+	if (itemKind !== undefined) {
+		const field = safe(() => lookup.itemFieldLabel?.(itemKind, c.key ?? '')) || (c.key ?? '');
+		return { head: `${ANY_TYPE_CHIP_LABEL} › ${field}:`, kind: itemKind };
+	}
+	const label = lookup.fieldLabel(c.type ?? '', c.key ?? '');
+	const sub = subKey ? safe(() => lookup.subFieldLabel?.(c.type ?? '', c.key ?? '', subKey)) : null;
+	const field = subKey ? (sub ?? `${label} › ${subKey}`) : label;
+	const kind = safe(() => lookup.fieldKind?.(c.type ?? '', c.key ?? '', c.sub_key));
+	return { head: `${lookup.typeLabel(c.type ?? '')}: ${field}`, kind };
+}
+
+function describeField(c: Extract<Condition, { kind: 'field' }>, lookup: SummaryLookup): string {
+	const { head, kind } = fieldHead(c, lookup);
 	if (kind && DATE_KINDS.has(kind) && operatorTakesValue(c.op) && c.value !== undefined)
 		return `${head} ${datePhrase(c.op, c.value, fieldFormat(c, lookup))}`;
 	const op = OPERATOR_LABELS[c.op] ?? c.op;

@@ -37,7 +37,7 @@ def test_list_returns_every_entry_not_yet_installed(shared: Shared) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 14
+    assert len(body) == 16
     grades = next(e for e in body if e["id"] == "condition-grades")
     assert grades["installed"] is False
     assert (grades["present"], grades["total"]) == (0, 1)

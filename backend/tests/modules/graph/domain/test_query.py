@@ -477,7 +477,6 @@ def test_per_item_condition_parses() -> None:
         (_per_item(field_kind=3), "where.children[0]"),
         (_per_item(field_kind=""), "where.children[0]"),
         (_per_item(field_kind="x" * 201), "where.children[0]"),
-        (_per_item(sub_key="role"), "where.children[0]"),
         (_per_item(value={"ref": "other"}), "where.children[0]"),
         (_per_item(op="in", value=[1, {"ref": "other"}]), "where.children[0]"),
     ],
@@ -489,6 +488,48 @@ def test_per_item_condition_rejections_carry_a_path(
     with pytest.raises(InvalidQueryError) as caught:
         parse_query(_query(_and(condition)))
     assert caught.value.path == path
+
+
+def test_any_type_condition_may_name_a_column() -> None:
+    """Across types a table column is addressable; overlays simply have none."""
+    query = parse_query(_query(_and(_per_item(sub_key="role"))))
+    ((_, condition),) = list(walk_conditions(query.where))
+    assert condition == FieldCondition(
+        key="signed", field_kind="boolean", sub_key="role", op="=", value=True
+    )
+
+
+def _by_origin(**kwargs: Any) -> dict[str, Any]:  # noqa: ANN401
+    base = {"kind": "field", "origin": "p-1", "op": "=", "value": "Wanted"}
+    return base | kwargs
+
+
+def test_origin_condition_parses_without_a_key() -> None:
+    """A saved field is addressed by its id alone, optionally with a column."""
+    query = parse_query(_query(_and(_by_origin(), _by_origin(sub_key="date"))))
+    conditions = [c for _, c in walk_conditions(query.where)]
+    assert conditions == [
+        FieldCondition(key="", origin="p-1", op="=", value="Wanted"),
+        FieldCondition(key="", origin="p-1", sub_key="date", op="=", value="Wanted"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        _by_origin(type="film"),
+        _by_origin(field_kind="choice"),
+        _by_origin(key="status"),
+        _by_origin(origin=""),
+        _by_origin(origin=7),
+        _by_origin(value={"ref": "other"}),
+    ],
+)
+def test_origin_condition_rejections(condition: dict[str, Any]) -> None:
+    """One scope only, no key, and no comparison with another field."""
+    with pytest.raises(InvalidQueryError) as caught:
+        parse_query(_query(_and(condition)))
+    assert caught.value.path == "where.children[0]"
 
 
 def test_a_field_condition_naming_neither_says_so() -> None:

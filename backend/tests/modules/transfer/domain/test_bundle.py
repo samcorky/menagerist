@@ -9,6 +9,7 @@ from app.modules.transfer.domain.bundle import (
     BundleCollection,
     BundleConnection,
     BundleItem,
+    BundleRelationshipType,
     unportable_condition,
 )
 from app.modules.transfer.domain.errors import InvalidBundleError
@@ -125,3 +126,10 @@ def test_a_connection_to_one_item_cannot_travel() -> None:
         "where",
         "a connection to one item cannot be in a bundle",
     )
+
+
+def test_a_relationship_holder_is_one_of_three() -> None:
+    """`source`, `target` or `none`; the default holds nothing."""
+    assert BundleRelationshipType(ref="r", slug="r", label="R").holder == "none"
+    with pytest.raises(InvalidBundleError, match="unknown holder"):
+        BundleRelationshipType(ref="r", slug="r", label="R", holder="middle")

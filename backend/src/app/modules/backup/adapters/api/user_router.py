@@ -1,10 +1,10 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.parameters import ExportId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -15,7 +15,7 @@ from app.entrypoints.api.shared.http.upload_limit_middleware import (
     PAYLOAD_TOO_LARGE_RESPONSE,
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
-from app.modules.backup.adapters.api.router import ARCHIVE_BODY
+from app.modules.backup.adapters.api.router import ARCHIVE_BODY, ARCHIVE_SCHEMA
 from app.modules.backup.adapters.api.schemas import BackupResponse, UserExportResponse
 from app.modules.backup.adapters.api.user_dependencies import (
     get_delete_user_export,
@@ -122,6 +122,7 @@ async def list_user_exports(
 @router.get(
     "/exports/{export_id}/download",
     operation_id="download_user_export",
+    response_class=Response,
     responses={
         **error_response(
             BackupNotFoundError,
@@ -129,14 +130,12 @@ async def list_user_exports(
         ),
         200: {
             "description": "The caller's personal archive.",
-            "content": {
-                "application/gzip": {"schema": {"type": "string", "format": "binary"}}
-            },
+            "content": {"application/gzip": {"schema": ARCHIVE_SCHEMA}},
         },
     },
 )
 async def download_user_export(
-    export_id: UUID,
+    export_id: ExportId,
     use_case: Annotated[OpenUserExport, Depends(get_open_user_export)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> StreamingResponse:
@@ -164,7 +163,7 @@ async def download_user_export(
     ),
 )
 async def delete_user_export(
-    export_id: UUID,
+    export_id: ExportId,
     use_case: Annotated[DeleteUserExport, Depends(get_delete_user_export)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> Response:

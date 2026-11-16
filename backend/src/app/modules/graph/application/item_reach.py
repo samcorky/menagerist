@@ -1,11 +1,11 @@
 """What both item-reach reads share: checking the request, then following it."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from app.modules.graph.domain.errors import (
     EdgeTypeNotFoundError,
     NodeNotFoundError,
-    RelationshipNotDirectionalError,
+    RelationshipHoldsNothingError,
 )
 from app.modules.graph.domain.reach import check_depth
 
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     import uuid
 
     from app.modules.graph.domain.node import Node
-    from app.modules.graph.domain.reach import ReachDirection, Reached
+    from app.modules.graph.domain.reach import Reached
     from app.modules.graph.ports.unit_of_work import GraphRepos
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
@@ -28,10 +28,13 @@ async def reach_from_item(
     scope: ContentFilter,
     item_id: uuid.UUID,
     relationship: str,
-    direction: ReachDirection,
+    toward: Literal["held", "holders"],
     depth: int,
 ) -> list[Reached]:
-    """Follow `relationship` from a visible item, after checking the request."""
+    """Follow `relationship` from a visible item to what it holds or what holds it.
+
+    The relationship's `holder` says which way that is.
+    """
     check_depth(depth)
     start = await repos.nodes.get(item_id, scope=scope)
     if start is None:
@@ -40,14 +43,15 @@ async def reach_from_item(
     edge_type = await repos.edge_types.get_by_slug(relationship, scope=scope)
     if edge_type is None:
         raise EdgeTypeNotFoundError(f"Relationship '{relationship}' not found")
-    if not edge_type.directional:
-        raise RelationshipNotDirectionalError(
-            f"'{relationship}' has no direction, so it has no contents or path"
+    if edge_type.holder == "none":
+        raise RelationshipHoldsNothingError(
+            f"'{relationship}' does not hold items, so it has no contents or path"
         )
+    outward = (edge_type.holder == "source") == (toward == "held")
     return await repos.nodes.reach(
         item_id,
         relationship=relationship,
-        direction=direction,
+        direction="out" if outward else "in",
         max_depth=depth,
         scope=scope,
     )

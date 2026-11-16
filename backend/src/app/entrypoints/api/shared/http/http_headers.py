@@ -1,6 +1,12 @@
 from email.utils import formatdate, parsedate_to_datetime
 from typing import TYPE_CHECKING, Any
 
+from .problem_response import (
+    PRECONDITION_FAILED_DETAIL,
+    PRECONDITION_FAILED_TITLE,
+    problem_response,
+)
+
 if TYPE_CHECKING:
     from datetime import datetime
 
@@ -53,12 +59,15 @@ def conditional_get_responses() -> dict[int | str, dict[str, Any]]:
 
 def conditional_patch_responses() -> dict[int | str, dict[str, Any]]:
     """OpenAPI docs for 412 Precondition Failed on conditional PATCH endpoints."""
+    responses = problem_response(
+        412,
+        "Precondition failed: `If-Match` or `If-Unmodified-Since` no longer matches.",
+        PRECONDITION_FAILED_TITLE,
+        PRECONDITION_FAILED_DETAIL,
+    )
     return {
         412: {
-            "description": (
-                "Precondition failed: `If-Match` or `If-Unmodified-Since`"
-                + " no longer matches."
-            ),
+            **responses[412],
             "headers": {
                 "ETag": {
                     "description": "Current ETag of the resource.",

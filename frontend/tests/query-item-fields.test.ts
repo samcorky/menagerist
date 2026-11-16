@@ -65,7 +65,6 @@ describe('decoder', () => {
 		['an empty field_kind', { ...signed, field_kind: '' }],
 		['an unknown field_kind', { ...signed, field_kind: 'hologram' }],
 		['an inherited field_kind name', { ...signed, field_kind: 'toString' }],
-		['a sub_key', { ...signed, sub_key: 'role' }],
 		['a reference operand', { ...signed, key: 'a', op: '=', value: { ref: 'b' } }],
 		['a reference in a list', { ...signed, op: 'in', value: ['x', { ref: 'b' }] }]
 	])('rejects %s', (_name, condition) => {
@@ -75,6 +74,11 @@ describe('decoder', () => {
 	it('rejects neither type nor field_kind', () => {
 		const { field_kind: _kind, ...rest } = signed;
 		expect(roundTrip(rest as Condition)).toBeNull();
+	});
+
+	it('accepts a sub_key, which reaches table columns on any type', () => {
+		const column = { ...signed, sub_key: 'role' };
+		expect(roundTrip(column as Condition)).toEqual(wrap(column));
 	});
 
 	it('accepts a null sub_key', () => {
@@ -104,9 +108,9 @@ describe('subjects', () => {
 });
 
 describe('itemFieldGroup', () => {
-	it('offers a Per-item fields group with one option per key and kind', () => {
+	it('offers an Any item type group with one option per key and kind', () => {
 		const group = itemFieldGroup(catalogue);
-		expect(group?.label).toBe('Per-item fields');
+		expect(group?.label).toBe('Any item type');
 		expect(group?.options.map((o) => o.value)).toEqual([
 			'item:boolean:signed',
 			'item:number:size',
@@ -220,8 +224,8 @@ describe('problems and status', () => {
 describe('wording', () => {
 	const lookup = summaryLookup(catalogue);
 
-	it('describes a per-item condition as Per-item field › label: operator value', () => {
-		expect(describeCondition(signed, lookup)).toBe('Per-item field › Signed: is yes');
+	it('describes a per-item condition as Any item type › label: operator value', () => {
+		expect(describeCondition(signed, lookup)).toBe('Any item type › Signed: is yes');
 		const size: Condition = {
 			kind: 'field',
 			field_kind: 'number',
@@ -229,9 +233,9 @@ describe('wording', () => {
 			op: '>=',
 			value: 3
 		};
-		expect(describeCondition(size, lookup)).toBe('Per-item field › Size: is at least 3');
+		expect(describeCondition(size, lookup)).toBe('Any item type › Size: is at least 3');
 		const none: Condition = { kind: 'field', field_kind: 'number', key: 'size', op: 'empty' };
-		expect(describeCondition(none, lookup)).toBe('Per-item field › Size: is empty');
+		expect(describeCondition(none, lookup)).toBe('Any item type › Size: is empty');
 	});
 
 	it('formats a rating like the type fields do', () => {
@@ -242,7 +246,7 @@ describe('wording', () => {
 			op: '>=',
 			value: 4
 		};
-		expect(describeCondition(stars, lookup)).toBe('Per-item field › Stars: is at least 4 stars');
+		expect(describeCondition(stars, lookup)).toBe('Any item type › Stars: is at least 4 stars');
 	});
 
 	it('words dates as the date conditions do', () => {
@@ -253,20 +257,20 @@ describe('wording', () => {
 			op: '>=',
 			value: { rel: '-30d' }
 		};
-		expect(describeCondition(when, lookup)).toBe('Per-item field › bought: in the last 30 days');
+		expect(describeCondition(when, lookup)).toBe('Any item type › bought: in the last 30 days');
 	});
 
 	it('falls back to the key when the label is unknown', () => {
 		expect(describeCondition({ ...signed, key: 'gone' }, lookup)).toBe(
-			'Per-item field › gone: is yes'
+			'Any item type › gone: is yes'
 		);
 		const bare = { fieldLabel: (_t: string, k: string) => k, typeLabel: (s: string) => s };
-		expect(describeCondition(signed, bare)).toBe('Per-item field › signed: is yes');
+		expect(describeCondition(signed, bare)).toBe('Any item type › signed: is yes');
 	});
 
 	it('shows in chips', () => {
 		const { chips } = chipModels(wrap(signed), lookup);
-		expect(chips[0].text).toBe('Per-item field › Signed: is yes');
+		expect(chips[0].text).toBe('Any item type › Signed: is yes');
 	});
 });
 
