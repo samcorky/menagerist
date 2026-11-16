@@ -1526,6 +1526,8 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 
 **Rationale:** per-user presets (previous entry) left no way for a person to get the old built-ins back. The catalogue is that way, kept apart from example packs because starter types are meant to be kept and example content is meant to be removed. It must ship in the same release as per-user presets.
 
+**Update (2026-11-15, #347):** a catalogue item type may carry `attributesSchema`, `icon` and `colour`, as an example pack's types can. They're optional and are checked by the same type creation an install already goes through. _Storage locations_ uses them: a Location type (Kind: Room, Shelf, Box, Drawer, Cabinet; Notes) with the same _Located in_ / _Contains_ relationship as the starter types. Whichever entry is installed second skips it, so both share one relationship. Nesting, the path ("room › shelf › box"), the contents view and searches "anywhere inside" come from relationships with a direction in general, with nothing location-specific.
+
 ## Remembered browsers and the device cookie (2026-11-14)
 
 **Decision:** a successful sign-in, first-run setup or password change sets a second HttpOnly cookie (`MENAGERIST_IDENTITY_DEVICE_COOKIE_NAME`, default `menagerist-device`, with the same `__Host-Http-` prefix and attributes as the session cookie) that remembers the browser for the account. A `devices` row holds only the hash of its secret, the account and the browser's user agent and platform. Each session links to the device it was started in, and the account page lists devices rather than sessions. It stops targeted lockout: anyone who knew a username could lock that account by failing on purpose, and the real user could not tell why.

@@ -194,3 +194,37 @@ async def test_starter_located_in_and_part_of_hold_from_the_target(
         "part-of": "target",
         "related-to": "none",
     }
+
+
+async def test_storage_locations_share_located_in_with_starter_types(
+    shared: Shared,
+) -> None:
+    """Its Location type keeps its fields, icon and colour; Located in is reused."""
+    await _install(shared, ALICE).handle(
+        InstallCatalogueEntryCommand(entry_id="starter-types"), ALICE
+    )
+    result = await _install(shared, ALICE).handle(
+        InstallCatalogueEntryCommand(entry_id="storage-locations"), ALICE
+    )
+
+    assert (result.item_types_created, result.relationship_types_skipped) == (1, 1)
+    location = await shared.graph_repos.node_types.get_by_slug(
+        "location", scope=ContentFilter.of(ALICE.id)
+    )
+    assert location is not None
+    assert (location.icon, location.colour) == ("archive", "amber")
+    schema = location.attributes_schema or {}
+    assert schema["properties"]["kind"]["enum"] == [
+        "Room",
+        "Shelf",
+        "Box",
+        "Drawer",
+        "Cabinet",
+    ]
+    located_in = await shared.graph_repos.edge_types.get_by_slug(
+        "located-in", scope=ContentFilter.of(ALICE.id)
+    )
+    assert located_in is not None
+    assert located_in.holder == "target"
+    status = await _status(shared, ALICE, "storage-locations")
+    assert status.installed is True

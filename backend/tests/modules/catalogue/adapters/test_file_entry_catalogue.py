@@ -19,7 +19,7 @@ async def test_the_shipped_entries_load_and_can_be_found() -> None:
     """The shipped entries load and can be found."""
     catalogue = FileEntryCatalogue()
     entries = await catalogue.list_entries()
-    assert len(entries) == 15
+    assert len(entries) == 16
     assert (await catalogue.get("countries")) is not None
     assert await catalogue.get("missing") is None
     assert await catalogue.get("../etc") is None
