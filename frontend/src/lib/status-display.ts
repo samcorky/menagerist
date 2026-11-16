@@ -1,17 +1,21 @@
 import type { Component } from 'svelte';
 import {
 	Activity,
+	AlarmClock,
 	CalendarClock,
 	Database,
 	Gauge,
 	GitBranch,
 	HardDrive,
 	HeartPulse,
+	Hourglass,
+	ListOrdered,
 	Network,
 	PackageCheck,
 	Pencil,
 	Server,
 	ShieldCheck,
+	TriangleAlert,
 	Wrench
 } from '@lucide/svelte';
 
@@ -23,6 +27,10 @@ export type StatusIconName =
 	| 'branch'
 	| 'disk'
 	| 'heartbeat'
+	| 'overdue'
+	| 'queue'
+	| 'stuck'
+	| 'failing'
 	| 'network'
 	| 'package'
 	| 'pencil'
@@ -38,6 +46,10 @@ const ICONS: Record<StatusIconName, Component> = {
 	branch: GitBranch,
 	disk: HardDrive,
 	heartbeat: HeartPulse,
+	overdue: AlarmClock,
+	queue: ListOrdered,
+	stuck: Hourglass,
+	failing: TriangleAlert,
 	network: Network,
 	package: PackageCheck,
 	pencil: Pencil,
@@ -86,6 +98,10 @@ export function metricIconName(label: string): StatusIconName {
 	if (lower.includes('version') || lower.includes('build')) return 'package';
 	if (lower.includes('health') || lower.includes('status')) return 'shield';
 	if (lower.includes('heartbeat')) return 'heartbeat';
+	if (lower.includes('overdue')) return 'overdue';
+	if (lower.includes('queue')) return 'queue';
+	if (lower.includes('stuck')) return 'stuck';
+	if (lower.includes('failing')) return 'failing';
 	if (lower.includes('response')) return 'activity';
 	return FALLBACK_METRIC_ICON;
 }

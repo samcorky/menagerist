@@ -125,6 +125,20 @@ def test_invalid_job_definitions(key: str, lateness: timedelta) -> None:
         JobDefinition(job_key=key, max_lateness=lateness)
 
 
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"overdue_grace": timedelta(seconds=-1)},
+        {"stuck_after": timedelta()},
+        {"failure_streak": 0},
+    ],
+)
+def test_invalid_health_thresholds(override: dict[str, object]) -> None:
+    """Health thresholds must be usable: no negative grace, no zero window or streak."""
+    with pytest.raises(ValidationError):
+        JobDefinition(job_key="x", **override)  # type: ignore[arg-type]
+
+
 def test_job_definition_defaults_and_policy_override() -> None:
     """Definitions carry portable metadata without handler or engine references."""
     job = JobDefinition(

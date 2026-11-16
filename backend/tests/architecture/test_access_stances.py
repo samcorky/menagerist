@@ -71,6 +71,7 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "scheduling.PruneJobRuns",
         "scheduling.GetWorkerStatus",
         "scheduling.GetJobNextRun",
+        "scheduling.AssessJobHealth",
     }
 )
 EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(

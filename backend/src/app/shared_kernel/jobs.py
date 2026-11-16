@@ -41,6 +41,13 @@ class JobDefinition:
     overlap: Overlap = Overlap.COALESCE
     missed_run: MissedRun = MissedRun.SKIP
     max_lateness: timedelta = timedelta(minutes=10)
+    # Health thresholds for the status page; none of them change how a job runs.
+    # An occurrence still unstarted this long after max_lateness counts as overdue.
+    overdue_grace: timedelta = timedelta(minutes=5)
+    # A run in progress for longer than this is reported as stuck.
+    stuck_after: timedelta = timedelta(hours=1)
+    # This many consecutive failed runs are reported as failing.
+    failure_streak: int = 3
     schedule_key: str | None = None
     run_now_allowed: bool = True
     needs_setup_complete: bool = True
@@ -57,6 +64,12 @@ class JobDefinition:
             raise ValidationError("A job key is required")
         if self.max_lateness < timedelta():
             raise ValidationError("Maximum lateness cannot be negative")
+        if self.overdue_grace < timedelta():
+            raise ValidationError("Overdue grace cannot be negative")
+        if self.stuck_after <= timedelta():
+            raise ValidationError("Stuck threshold must be positive")
+        if self.failure_streak < 1:
+            raise ValidationError("Failure streak must be at least one")
 
 
 type JobHandler = Callable[[Actor, ProgressReporter], Awaitable[None]]

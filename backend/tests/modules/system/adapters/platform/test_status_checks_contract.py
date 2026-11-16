@@ -10,9 +10,18 @@ import json
 import re
 from pathlib import Path
 from typing import Any, get_args
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from pydantic import SecretStr
 
+from app.entrypoints.api.shared.bridges.scheduler_jobs_check import (
+    ALL_KEYS,
+    SchedulerJobsCheck,
+)
+from app.modules.scheduling.application.assess_job_health import (
+    AssessJobHealth,
+    JobHealth,
+)
 from app.modules.system.adapters.platform.checks.cors_configuration_check import (
     CorsConfigurationCheck,
 )
@@ -165,5 +174,20 @@ async def test_live_outbound_proxy_check_reports_listed_keys_and_units() -> None
     ).run()
 
     assert len(result) == 3
+    for key, observed in result.items():
+        assert listed.get(key) == observed.observed_unit, key
+
+
+async def test_live_scheduler_jobs_check_reports_listed_keys_and_units() -> None:
+    """The job-health keys are module constants, so run the check for real."""
+    listed = {c["key"]: c["unit"] for c in _contract()["checks"]}
+    check = SchedulerJobsCheck(
+        MagicMock(), registry=MagicMock(), schedules=MagicMock(), evaluator=MagicMock()
+    )
+
+    with patch.object(AssessJobHealth, "handle", AsyncMock(return_value=JobHealth())):
+        result = await check.run()
+
+    assert tuple(result) == ALL_KEYS
     for key, observed in result.items():
         assert listed.get(key) == observed.observed_unit, key

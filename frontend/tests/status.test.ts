@@ -208,6 +208,12 @@ describe('formatObservedValue for the outbound proxy', () => {
 		expect(formatObservedValue(1, 'exempt hosts')).toBe('1 entry skips the proxy');
 		expect(formatObservedValue(3, 'exempt hosts')).toBe('3 entries skip the proxy');
 	});
+
+	it('counts jobs needing attention, singular for one', () => {
+		expect(formatObservedValue(0, 'jobs')).toBe('None');
+		expect(formatObservedValue(1, 'jobs')).toBe('1 job');
+		expect(formatObservedValue(3, 'jobs')).toBe('3 jobs');
+	});
 });
 
 describe('releaseViewOf', () => {

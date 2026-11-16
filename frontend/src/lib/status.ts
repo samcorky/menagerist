@@ -80,6 +80,10 @@ export function formatObservedValue(value: unknown, unit: string | null | undefi
 	// The API leaves out a null, so an unset proxy arrives as no value at all.
 	if (unit === 'proxy')
 		return value === null || value === undefined ? 'Not used' : `Through ${value}`;
+	if (unit === 'jobs') {
+		if (value === 0) return 'None';
+		return `${value} ${value === 1 ? 'job' : 'jobs'}`;
+	}
 	if (unit === 'exempt hosts') {
 		if (value === 0) return 'No exemptions';
 		return `${value} ${value === 1 ? 'entry skips' : 'entries skip'} the proxy`;
