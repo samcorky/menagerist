@@ -27926,7 +27926,7 @@
           },
           "relationship_types": {
             "items": {
-              "$ref": "#/components/schemas/BundleRelationshipTypeEntry"
+              "$ref": "#/components/schemas/BundleRelationshipTypeExport"
             },
             "type": "array",
             "title": "Relationship Types",
@@ -28395,6 +28395,98 @@
         ],
         "title": "BundleRelationshipTypeEntry",
         "description": "One connection type in a `menagerist-bundle` file of version 2.",
+        "examples": [
+          {
+            "directional": true,
+            "holder": "none",
+            "label": "Wrote",
+            "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
+            "reverse_label": "Written by",
+            "slug": "wrote"
+          }
+        ]
+      },
+      "BundleRelationshipTypeExport": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Its id within the file; an export uses the id."
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Its short name, as used in URLs."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Its name."
+          },
+          "reverse_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverse Label",
+            "description": "Its name read from the other end."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What it is for."
+          },
+          "directional": {
+            "type": "boolean",
+            "title": "Directional",
+            "description": "Whether it reads one way, not both.",
+            "default": true
+          },
+          "holder": {
+            "type": "string",
+            "enum": [
+              "source",
+              "target",
+              "none"
+            ],
+            "title": "Holder",
+            "description": "Which end holds the other: `source`, `target` or `none`."
+          },
+          "attributes_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes Schema",
+            "description": "Its fields, as an item type's are."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref",
+          "slug",
+          "label",
+          "holder"
+        ],
+        "title": "BundleRelationshipTypeExport",
+        "description": "A connection type as exported: every field is written, `holder` included.",
         "examples": [
           {
             "directional": true,

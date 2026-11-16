@@ -169,6 +169,14 @@ class BundleRelationshipTypeEntry(BaseModel):
     )
 
 
+class BundleRelationshipTypeExport(BundleRelationshipTypeEntry):
+    """A connection type as exported: every field is written, `holder` included."""
+
+    holder: Literal["source", "target", "none"] = Field(
+        description="Which end holds the other: `source`, `target` or `none`."
+    )
+
+
 class BundleItemEntry(BaseModel):
     """One item in a `menagerist-bundle` file of version 3."""
 
@@ -281,7 +289,7 @@ class BundleFileResponse(BaseModel):
     presets: list[BundlePresetEntry] = Field(
         description="The saved lists, fields and groups; each `ref` is its id."
     )
-    relationship_types: list[BundleRelationshipTypeEntry] = Field(
+    relationship_types: list[BundleRelationshipTypeExport] = Field(
         description="The connection types exported."
     )
     item_types: list[BundleItemTypeEntry] = Field(
