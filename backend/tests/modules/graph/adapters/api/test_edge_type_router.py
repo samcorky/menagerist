@@ -309,3 +309,33 @@ def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
     assert client.get(f"{base}/usage", params={"sub_key": "duration"}).json() == {
         "count": 0
     }
+
+
+def test_holder_is_set_changed_and_refused_without_a_direction() -> None:
+    """`holder` round-trips, PATCH changes it, and a direction is required."""
+    client = TestClient(_app_with_in_memory_graph())
+    created = client.post(
+        "/api/v1/edge-types",
+        json={"slug": "located-in", "label": "Located in", "holder": "target"},
+    )
+    assert created.status_code == 201
+    et = created.json()
+    assert et["holder"] == "target"
+
+    plain = client.post("/api/v1/edge-types", json={"slug": "near", "label": "Near"})
+    assert plain.json()["holder"] == "none"
+
+    patched = client.patch(f"/api/v1/edge-types/{et['id']}", json={"holder": "source"})
+    assert patched.status_code == 200
+    assert patched.json()["holder"] == "source"
+
+    refused = client.patch(
+        f"/api/v1/edge-types/{et['id']}", json={"directional": False}
+    )
+    assert refused.status_code == 400
+    assert client.get(f"/api/v1/edge-types/{et['id']}").json()["directional"] is True
+    unknown = client.post(
+        "/api/v1/edge-types",
+        json={"slug": "odd", "label": "Odd", "holder": "middle"},
+    )
+    assert unknown.status_code == 422

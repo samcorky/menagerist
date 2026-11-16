@@ -22,11 +22,11 @@ from app.modules.graph.application.list_item_contents import (
     ListItemContentsQuery,
 )
 from app.modules.graph.domain.edge import Edge
-from app.modules.graph.domain.edge_type import EdgeType
+from app.modules.graph.domain.edge_type import EdgeType, Holder
 from app.modules.graph.domain.errors import (
     EdgeTypeNotFoundError,
     NodeNotFoundError,
-    RelationshipNotDirectionalError,
+    RelationshipHoldsNothingError,
 )
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.reach import InvalidReachDepthError
@@ -55,12 +55,20 @@ class World:
         self.path = GetItemPath(self.repos, InMemoryAccessGuard())
 
     async def relationship(
-        self, slug: str = "contains", *, directional: bool = True
+        self,
+        slug: str = "contains",
+        *,
+        directional: bool = True,
+        holder: Holder = "source",
     ) -> None:
-        """Add a relationship type."""
+        """Add a relationship type; by default its source holds its target."""
         await self.types.add(
             EdgeType.create(
-                owner_id=OWNER, slug=slug, label=slug, directional=directional
+                owner_id=OWNER,
+                slug=slug,
+                label=slug,
+                directional=directional,
+                holder=holder if directional else "none",
             )
         )
 
@@ -191,16 +199,37 @@ async def test_an_unknown_relationship_is_not_found() -> None:
         )
 
 
-async def test_a_relationship_without_direction_is_refused() -> None:
+@pytest.mark.parametrize("directional", [False, True])
+async def test_a_relationship_that_holds_nothing_is_refused(directional: bool) -> None:
     """Contents and path mean nothing without an inside and an outside."""
     world = World()
-    await world.relationship("sibling", directional=False)
+    await world.relationship("sibling", directional=directional, holder="none")
     item = await world.item("box")
 
-    with pytest.raises(RelationshipNotDirectionalError):
+    with pytest.raises(RelationshipHoldsNothingError):
         await world.path.handle(
             GetItemPathQuery(item_id=item.id, relationship="sibling"), SYSTEM_ACTOR
         )
+
+
+async def test_a_target_holder_is_followed_the_other_way() -> None:
+    """With "Located in" the box is the target, so contents follow incoming links."""
+    world = World()
+    await world.relationship("located-in", holder="target")
+    shed, box, bag = [await world.item(n) for n in ("shed", "box", "bag")]
+    await world.hold(box, shed, "located-in")
+    await world.hold(bag, box, "located-in")
+
+    inside = await world.contents.handle(
+        ListItemContentsQuery(item_id=shed.id, relationship="located-in", depth=3),
+        SYSTEM_ACTOR,
+    )
+    holders = await world.path.handle(
+        GetItemPathQuery(item_id=bag.id, relationship="located-in"), SYSTEM_ACTOR
+    )
+
+    assert [(e.node.id, e.depth) for e in inside] == [(box.id, 1), (bag.id, 2)]
+    assert [n.id for n in holders] == [shed.id, box.id]
 
 
 @pytest.mark.parametrize("depth", [0, 26])

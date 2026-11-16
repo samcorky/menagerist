@@ -55,7 +55,7 @@ class ListItemContents(
             scope=scope,
             item_id=query.item_id,
             relationship=query.relationship,
-            direction="out",
+            toward="held",
             depth=query.depth,
         )
         ids = [r.node_id for r in reached]

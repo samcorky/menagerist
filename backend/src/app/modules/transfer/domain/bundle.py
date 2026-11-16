@@ -3,7 +3,7 @@
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final
 
 from app.modules.transfer.domain.errors import InvalidBundleError
 
@@ -32,6 +32,8 @@ REF_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*\Z")
 
 
 REF_RULE = "must be lowercase letters, digits and hyphens"
+# Which end of a relationship holds the other; mirrors the graph's `HOLDERS`.
+RELATIONSHIP_HOLDERS: Final = ("source", "target", "none")
 
 
 def split_ref(ref: str) -> tuple[str | None, str]:
@@ -120,7 +122,11 @@ class BundlePreset:
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class BundleRelationshipType:
-    """A relationship type (an edge type) the pack creates."""
+    """A relationship type (an edge type) the pack creates.
+
+    `holder` is which end holds the other (`source`, `target` or `none`), as on
+    the graph's relationship types; the graph checks it again on creation.
+    """
 
     ref: str
     slug: str
@@ -129,6 +135,15 @@ class BundleRelationshipType:
     description: str | None = None
     directional: bool = True
     attributes_schema: dict[str, Any] | None = None
+    holder: str = "none"
+
+    def __post_init__(self) -> None:
+        """Reject a holder outside the closed set."""
+        if self.holder not in RELATIONSHIP_HOLDERS:
+            raise InvalidBundleError(
+                f"relationship type '{self.ref}' has unknown holder "
+                + f"'{self.holder}'; use one of {', '.join(RELATIONSHIP_HOLDERS)}"
+            )
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)

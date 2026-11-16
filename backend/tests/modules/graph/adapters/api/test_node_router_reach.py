@@ -87,9 +87,15 @@ def _hold(client: TestClient, outer: str, inner: str, slug: str = "contains") ->
 
 
 def _relationship(client: TestClient, slug: str, *, directional: bool = True) -> None:
+    """A relationship whose source holds its target, or one with no direction."""
     response = client.post(
         "/api/v1/edge-types",
-        json={"slug": slug, "label": slug, "directional": directional},
+        json={
+            "slug": slug,
+            "label": slug,
+            "directional": directional,
+            "holder": "source" if directional else "none",
+        },
     )
     assert response.status_code == 201
 

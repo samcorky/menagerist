@@ -9556,6 +9556,7 @@
                   "created_at": "2026-08-23T10:14:44.465954Z",
                   "description": "Links a film to its director.",
                   "directional": true,
+                  "holder": "none",
                   "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
                   "label": "Directed by",
                   "reverse_label": "Directed",
@@ -9810,6 +9811,7 @@
                     "created_at": "2026-08-23T10:14:44.465954Z",
                     "description": "Links a film to its director.",
                     "directional": true,
+                    "holder": "none",
                     "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
                     "label": "Directed by",
                     "reverse_label": "Directed",
@@ -10041,6 +10043,7 @@
                   "created_at": "2026-08-23T10:14:44.465954Z",
                   "description": "Links a film to its director.",
                   "directional": true,
+                  "holder": "none",
                   "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
                   "label": "Directed by",
                   "reverse_label": "Directed",
@@ -10303,6 +10306,7 @@
                   "created_at": "2026-08-23T10:14:44.465954Z",
                   "description": "Links a film to its director.",
                   "directional": true,
+                  "holder": "none",
                   "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
                   "label": "Directed by",
                   "reverse_label": "Directed",
@@ -19566,7 +19570,8 @@
                       "slug": "wrote",
                       "label": "Wrote",
                       "reverse_label": "Written by",
-                      "directional": true
+                      "directional": true,
+                      "holder": "none"
                     }
                   ],
                   "item_types": [
@@ -27888,6 +27893,7 @@
             "relationship_types": [
               {
                 "directional": true,
+                "holder": "none",
                 "label": "Wrote",
                 "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
                 "reverse_label": "Written by",
@@ -28051,6 +28057,7 @@
             "relationship_types": [
               {
                 "directional": true,
+                "holder": "none",
                 "label": "Wrote",
                 "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
                 "reverse_label": "Written by",
@@ -28354,6 +28361,17 @@
             "description": "Whether it reads one way, not both.",
             "default": true
           },
+          "holder": {
+            "type": "string",
+            "enum": [
+              "source",
+              "target",
+              "none"
+            ],
+            "title": "Holder",
+            "description": "Which end holds the other: `source`, `target` or `none`.",
+            "default": "none"
+          },
           "attributes_schema": {
             "anyOf": [
               {
@@ -28380,6 +28398,7 @@
         "examples": [
           {
             "directional": true,
+            "holder": "none",
             "label": "Wrote",
             "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
             "reverse_label": "Written by",
@@ -29089,6 +29108,17 @@
             "description": "Whether the connection has a direction.",
             "default": true
           },
+          "holder": {
+            "type": "string",
+            "enum": [
+              "source",
+              "target",
+              "none"
+            ],
+            "title": "Holder",
+            "description": "Which end holds the other, for an item's contents and path: `source` (the source contains the target, as Contains), `target` (the target contains the source, as Located in) or `none`. Needs a direction.",
+            "default": "none"
+          },
           "attributes_schema": {
             "anyOf": [
               {
@@ -29115,6 +29145,7 @@
           {
             "description": "Links a film to its director.",
             "directional": true,
+            "holder": "none",
             "label": "Directed by",
             "reverse_label": "Directed",
             "slug": "directed-by"
@@ -29930,6 +29961,16 @@
             "title": "Directional",
             "description": "Whether the connection has a direction."
           },
+          "holder": {
+            "type": "string",
+            "enum": [
+              "source",
+              "target",
+              "none"
+            ],
+            "title": "Holder",
+            "description": "Which end holds the other, for an item's contents and path: `source` (the source contains the target, as Contains), `target` (the target contains the source, as Located in) or `none`. Needs a direction."
+          },
           "attributes_schema": {
             "anyOf": [
               {
@@ -29964,6 +30005,7 @@
           "reverse_label",
           "description",
           "directional",
+          "holder",
           "attributes_schema",
           "created_at",
           "updated_at"
@@ -29978,6 +30020,7 @@
             "created_at": "2026-08-23T10:14:44.465954Z",
             "description": "Links a film to its director.",
             "directional": true,
+            "holder": "none",
             "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
             "label": "Directed by",
             "reverse_label": "Directed",
@@ -33950,6 +33993,23 @@
             ],
             "title": "Directional",
             "description": "Whether the connection has a direction."
+          },
+          "holder": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "source",
+                  "target",
+                  "none"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holder",
+            "description": "Which end holds the other, for an item's contents and path: `source` (the source contains the target, as Contains), `target` (the target contains the source, as Located in) or `none`. Needs a direction."
           },
           "attributes_schema": {
             "anyOf": [

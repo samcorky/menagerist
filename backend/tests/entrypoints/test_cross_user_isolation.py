@@ -829,6 +829,16 @@ class World:
                 },
             )
         )
+        # "owns" holds what it points at, so contents and path have an answer.
+        owns = next(
+            t for t in a.get("/api/v1/edge-types").json() if t["slug"] == "owns"
+        )
+        assert (
+            a.patch(
+                f"/api/v1/edge-types/{owns['id']}", json={"holder": "source"}
+            ).status_code
+            == 200
+        )
         # Unused, so the admin-only delete has something it may remove.
         edge_type = _created(
             a.post("/api/v1/edge-types", json={"slug": "spare", "label": "Spare"})

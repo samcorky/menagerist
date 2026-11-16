@@ -12,19 +12,36 @@ const contains = {
 	slug: 'contains',
 	label: 'Contains',
 	reverse_label: 'Inside',
-	directional: true
+	directional: true,
+	holder: 'source'
 } as EdgeTypeResponse;
-const sibling = {
-	slug: 'sibling',
-	label: 'Sibling of',
-	reverse_label: null,
-	directional: false
+const locatedIn = {
+	slug: 'located-in',
+	label: 'Located in',
+	reverse_label: 'Contains',
+	directional: true,
+	holder: 'target'
+} as EdgeTypeResponse;
+const publishedBy = {
+	slug: 'published-by',
+	label: 'Published by',
+	reverse_label: 'Published',
+	directional: true,
+	holder: 'none'
 } as EdgeTypeResponse;
 const shelf = {
 	slug: 'shelved-on',
 	label: 'Shelved on',
 	reverse_label: null,
-	directional: true
+	directional: true,
+	holder: 'target'
+} as EdgeTypeResponse;
+const kit = {
+	slug: 'kit-has',
+	label: 'Has',
+	reverse_label: null,
+	directional: true,
+	holder: 'source'
 } as EdgeTypeResponse;
 
 const edge = (source: string, target: string, type: string) =>
@@ -36,7 +53,7 @@ const edge = (source: string, target: string, type: string) =>
 	}) as EdgeResponse;
 
 describe('reachChoices', () => {
-	it('reads a holder as Contains and a held item as Inside', () => {
+	it('with the source holding: a holder reads Contains and a held item Inside', () => {
 		const edges = [edge('shed', 'box', 'contains'), edge('box', 'bag', 'contains')];
 
 		expect(reachChoices('box', edges, [contains])).toEqual({
@@ -50,26 +67,39 @@ describe('reachChoices', () => {
 		expect(reachChoices('bag', edges, [contains]).contents).toEqual([]);
 	});
 
+	it('with the target holding: the box holds the game that is Located in it', () => {
+		const edges = [edge('game', 'box', 'located-in'), edge('box', 'room', 'located-in')];
+
+		expect(reachChoices('box', edges, [locatedIn])).toEqual({
+			contents: [{ slug: 'located-in', label: 'Contains' }],
+			inside: [{ slug: 'located-in', label: 'Located in' }]
+		});
+		expect(reachChoices('game', edges, [locatedIn])).toEqual({
+			contents: [],
+			inside: [{ slug: 'located-in', label: 'Located in' }]
+		});
+	});
+
 	it('falls back to the label when there is no reverse label', () => {
-		const edges = [edge('a', 'me', 'shelved-on')];
-		expect(reachChoices('me', edges, [shelf]).inside).toEqual([
+		const edges = [edge('book', 'me', 'shelved-on')];
+		expect(reachChoices('me', edges, [shelf]).contents).toEqual([
 			{ slug: 'shelved-on', label: 'Shelved on' }
 		]);
 	});
 
-	it('ignores relationships with no direction and ones it does not know', () => {
-		const edges = [edge('me', 'x', 'sibling'), edge('me', 'y', 'mystery')];
-		expect(reachChoices('me', edges, [sibling])).toEqual({ contents: [], inside: [] });
+	it('ignores relationships that hold nothing and ones it does not know', () => {
+		const edges = [edge('me', 'x', 'published-by'), edge('me', 'y', 'mystery')];
+		expect(reachChoices('me', edges, [publishedBy])).toEqual({ contents: [], inside: [] });
 	});
 
 	it('lists each relationship once, in the order first seen', () => {
 		const edges = [
-			edge('me', 'a', 'shelved-on'),
+			edge('me', 'a', 'kit-has'),
 			edge('me', 'b', 'contains'),
-			edge('me', 'c', 'shelved-on')
+			edge('me', 'c', 'kit-has')
 		];
-		expect(reachChoices('me', edges, [contains, shelf]).contents.map((c) => c.slug)).toEqual([
-			'shelved-on',
+		expect(reachChoices('me', edges, [contains, kit]).contents.map((c) => c.slug)).toEqual([
+			'kit-has',
 			'contains'
 		]);
 	});

@@ -14,9 +14,10 @@ export type ReachChoice = { slug: string; label: string };
 export const CONTENTS_PAGE_SIZE = 50;
 
 /**
- * The directional relationships this item takes part in: `contents` where it holds other
- * items (read as the relationship's label, "Contains") and `inside` where other items hold
- * it (read as the reverse label, "Inside"). A relationship with no direction has neither.
+ * The holding relationships this item takes part in: `contents` where it holds other items
+ * and `inside` where other items hold it. The relationship's `holder` says which end holds;
+ * each is worded from this item's end, so "Contains" on a box and "Located in" on what is in
+ * it. A relationship that holds nothing (`holder: 'none'`) has neither.
  */
 export function reachChoices(
 	nodeId: string,
@@ -28,11 +29,14 @@ export function reachChoices(
 	const inside = new Map<string, ReachChoice>();
 	for (const edge of edges) {
 		const type = bySlug.get(edge.type);
-		if (!type?.directional) continue;
-		if (edge.source_id === nodeId && !contents.has(type.slug))
-			contents.set(type.slug, { slug: type.slug, label: type.label });
-		if (edge.target_id === nodeId && !inside.has(type.slug))
-			inside.set(type.slug, { slug: type.slug, label: type.reverse_label ?? type.label });
+		if (!type || type.holder === 'none') continue;
+		// Read from this item's end: its own label when it starts the link, else the reverse.
+		const own = edge.source_id === nodeId;
+		if (!own && edge.target_id !== nodeId) continue;
+		const label = own ? type.label : (type.reverse_label ?? type.label);
+		const holds = (type.holder === 'source') === own;
+		const into = holds ? contents : inside;
+		if (!into.has(type.slug)) into.set(type.slug, { slug: type.slug, label });
 	}
 	return { contents: [...contents.values()], inside: [...inside.values()] };
 }

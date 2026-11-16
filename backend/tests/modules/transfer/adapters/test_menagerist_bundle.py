@@ -195,9 +195,13 @@ def test_a_version_two_file_carries_types() -> None:
     assert [(r.reverse_label, r.directional) for r in bundle.relationship_types] == [
         ("Written by", False)
     ]
+    # A file from before `holder` reads as holding nothing, and says so when written.
     assert CODEC.encode(bundle) == {
         **data,
         "version": 3,
+        "relationship_types": [
+            r | {"holder": "none"} for r in data["relationship_types"]
+        ],
         "items": [],
         "connections": [],
         "collections": [],

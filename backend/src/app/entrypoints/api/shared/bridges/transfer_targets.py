@@ -4,7 +4,7 @@ import copy
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from fastapi import Depends
 
@@ -155,6 +155,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from app.modules.graph.domain.edge_type import Holder
     from app.shared_kernel.access_guard import AccessGuard
 
 _PAGE = 1
@@ -404,7 +405,7 @@ def _node_type_content(t: NodeType) -> dict[str, Any]:
 
 
 def _edge_type_content(t: EdgeType) -> dict[str, Any]:
-    return {
+    content: dict[str, Any] = {
         "slug": str(t.slug),
         "label": t.label,
         "reverse_label": t.reverse_label,
@@ -412,6 +413,10 @@ def _edge_type_content(t: EdgeType) -> dict[str, Any]:
         "directional": t.directional,
         "attributes_schema": copy.deepcopy(t.attributes_schema),
     }
+    # Only when set, so types installed before `holder` existed hash as they did.
+    if t.holder != "none":
+        content["holder"] = t.holder
+    return content
 
 
 def _node_content(n: Node) -> dict[str, Any]:
@@ -624,6 +629,7 @@ class GraphPackTarget:
             description=spec.description,
             directional=spec.directional,
             attributes_schema=_resolved(spec.attributes_schema, presets),
+            holder=cast("Holder", spec.holder),
         )
         async with self._stores.choice_lists(self._scope) as source:
             edge_type = await CreateEdgeType(
@@ -691,6 +697,7 @@ class GraphPackTarget:
                         description=edge_type.description,
                         directional=edge_type.directional,
                         attributes_schema=_marked(edge_type.attributes_schema),
+                        holder=edge_type.holder,
                     )
                 )
         return found

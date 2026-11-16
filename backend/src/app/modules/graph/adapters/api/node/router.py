@@ -112,7 +112,7 @@ from app.modules.graph.domain.errors import (
     NodeNotFoundError,
     NodeTypeDeletedError,
     NodeTypeNotFoundError,
-    RelationshipNotDirectionalError,
+    RelationshipHoldsNothingError,
 )
 from app.modules.graph.domain.query import InvalidQueryError
 from app.modules.graph.domain.reach import InvalidReachDepthError, ReachTooLargeError
@@ -476,8 +476,8 @@ async def get_node(
             detail="This reaches too many items to follow. Try fewer steps.",
         ),
         **error_response(
-            RelationshipNotDirectionalError,
-            detail="'sibling' has no direction, so it has no contents or path",
+            RelationshipHoldsNothingError,
+            detail="'sibling' does not hold items, so it has no contents or path",
         ),
         **error_response(
             InvalidReachDepthError, detail="Depth must be between 1 and 25"
@@ -547,8 +547,8 @@ async def list_node_contents(
             detail="This reaches too many items to follow. Try fewer steps.",
         ),
         **error_response(
-            RelationshipNotDirectionalError,
-            detail="'sibling' has no direction, so it has no contents or path",
+            RelationshipHoldsNothingError,
+            detail="'sibling' does not hold items, so it has no contents or path",
         ),
         **error_response(
             InvalidReachDepthError, detail="Depth must be between 1 and 25"

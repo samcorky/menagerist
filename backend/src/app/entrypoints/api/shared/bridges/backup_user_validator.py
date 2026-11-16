@@ -1,9 +1,11 @@
 """Validate portable rows with the modules that own their domain rules."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from app.modules.graph.domain.edge_type import Holder
 
 import jsonschema
 
@@ -74,6 +76,8 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
             attributes_schema=schema,
             directional=directional,
             reverse_label=_optional_text(row, "reverse_label"),
+            # A backup from before `holder` existed has no such column.
+            holder=cast("Holder", row.get("holder", "none")),
         )
     if str(entity.slug) != slug:
         raise ValueError("slug must be normalised")

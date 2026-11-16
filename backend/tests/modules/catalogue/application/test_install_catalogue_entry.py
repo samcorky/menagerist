@@ -21,6 +21,7 @@ from app.modules.presets.application.list_presets import ListPresets, ListPreset
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ForbiddenError
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
@@ -173,3 +174,23 @@ async def test_a_taken_relationship_slug_is_skipped(shared: Shared) -> None:
         3,
         1,
     )
+
+
+async def test_starter_located_in_and_part_of_hold_from_the_target(
+    shared: Shared,
+) -> None:
+    """So a box's page lists what is Located in it, and a series its parts."""
+    await _install(shared, ALICE).handle(
+        InstallCatalogueEntryCommand(entry_id="starter-types"), ALICE
+    )
+    scope = ContentFilter.of(ALICE.id)
+    holders = {
+        slug: found.holder
+        for slug in ("located-in", "part-of", "related-to")
+        if (found := await shared.graph_repos.edge_types.get_by_slug(slug, scope=scope))
+    }
+    assert holders == {
+        "located-in": "target",
+        "part-of": "target",
+        "related-to": "none",
+    }

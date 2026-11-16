@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,6 +35,7 @@ BUNDLE_EXAMPLE: dict[str, Any] = {
             "reverse_label": "Written by",
             "description": None,
             "directional": True,
+            "holder": "none",
             "attributes_schema": None,
         }
     ],
@@ -158,6 +159,10 @@ class BundleRelationshipTypeEntry(BaseModel):
     description: str | None = Field(default=None, description="What it is for.")
     directional: bool = Field(
         default=True, description="Whether it reads one way, not both."
+    )
+    holder: Literal["source", "target", "none"] = Field(
+        default="none",
+        description="Which end holds the other: `source`, `target` or `none`.",
     )
     attributes_schema: dict[str, Any] | None = Field(
         default=None, description="Its fields, as an item type's are."
