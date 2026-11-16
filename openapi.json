@@ -34297,6 +34297,9 @@
           "item",
           "collection",
           "item_type",
+          "saved_field",
+          "example_pack",
+          "user",
           "setting",
           "scheduled_task"
         ],

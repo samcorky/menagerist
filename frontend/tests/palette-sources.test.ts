@@ -50,6 +50,9 @@ describe('searchEverything', () => {
 					...Array.from({ length: 7 }, (_, n) => hit('item', `Film ${n}`)),
 					hit('collection', 'Films'),
 					hit('item_type', 'Film'),
+					hit('saved_field', 'Film grades'),
+					hit('example_pack', 'Film collection'),
+					hit('user', 'Film Fan'),
 					hit('setting', 'Backups to keep'),
 					hit('scheduled_task', 'Nightly backup')
 				],
@@ -65,8 +68,31 @@ describe('searchEverything', () => {
 		expect((all.items as { rows: unknown[] }).rows).toHaveLength(5);
 		expect(all.collections).toEqual({ status: 'ok', rows: [hit('collection', 'Films')] });
 		expect(all.itemTypes).toEqual({ status: 'ok', rows: [hit('item_type', 'Film')] });
+		expect(all.savedFields).toEqual({ status: 'ok', rows: [hit('saved_field', 'Film grades')] });
+		expect(all.packs).toEqual({ status: 'ok', rows: [hit('example_pack', 'Film collection')] });
+		expect(all.users).toEqual({ status: 'ok', rows: [hit('user', 'Film Fan')] });
 		expect(all.settings).toEqual({ status: 'ok', rows: [hit('setting', 'Backups to keep')] });
 		expect(all.tasks).toEqual({ status: 'ok', rows: [hit('scheduled_task', 'Nightly backup')] });
+	});
+
+	it('shows no group for a kind the server left out, so nobody learns it exists', async () => {
+		// A member's results hold no user rows and the server does not list users as failed.
+		searchApi.mockResolvedValue({ data: { results: [hit('item', 'Film')], failed: [] } });
+		const { updates, done } = run('film');
+		await done;
+		expect(merged(updates).users).toEqual({ status: 'ok', rows: [] });
+	});
+
+	it('marks only the kind that failed, whichever of the new kinds it is', async () => {
+		searchApi.mockResolvedValue({
+			data: { results: [hit('saved_field', 'Film grades')], failed: ['example_pack'] }
+		});
+		const { updates, done } = run('film');
+		await done;
+		const all = merged(updates);
+		expect(all.packs).toEqual({ status: 'error' });
+		expect(all.savedFields).toEqual({ status: 'ok', rows: [hit('saved_field', 'Film grades')] });
+		expect(all.users).toEqual({ status: 'ok', rows: [] });
 	});
 
 	it('reports pages straight away, before the server has answered', async () => {
@@ -93,7 +119,16 @@ describe('searchEverything', () => {
 		const { updates, done } = run('film');
 		await done;
 		const all = merged(updates);
-		for (const key of ['items', 'collections', 'itemTypes', 'settings', 'tasks'] as const) {
+		for (const key of [
+			'items',
+			'collections',
+			'itemTypes',
+			'savedFields',
+			'packs',
+			'users',
+			'settings',
+			'tasks'
+		] as const) {
 			expect(all[key]).toEqual({ status: 'error' });
 		}
 		searchApi.mockRejectedValue(new Error('offline'));

@@ -1,6 +1,8 @@
 import { test, expect, type APIRequestContext, type Page } from './fixtures';
 import { GROUP_CAPS } from '../../src/lib/palette-search';
 import {
+	asUser,
+	createUserViaApi,
 	failCollectionSearch,
 	openSearch,
 	ownedData,
@@ -19,6 +21,7 @@ test.afterEach(async ({ request }) => {
 });
 
 const popup = searchPopup;
+const HINT = /Type to search items, collections, item types, saved fields, example packs/;
 const input = (page: Page) => popup(page).getByPlaceholder('Search everything…');
 
 /** The collection page shows its slug in the address. */
@@ -38,9 +41,7 @@ async function openWithSlash(page: Page, path = '/') {
 test('/ opens the popup with the input focused and a hint', async ({ page }) => {
 	await openWithSlash(page);
 	await expect(input(page)).toBeFocused();
-	await expect(
-		popup(page).getByText('Type to search items, collections, item types and pages')
-	).toBeVisible();
+	await expect(popup(page).getByText(HINT)).toBeVisible();
 });
 
 test('typing finds an item with its type, and Enter opens it', async ({ page, request }) => {
@@ -134,9 +135,7 @@ test('the top-bar search field opens the hint when clicked', async ({ page }) =>
 	await searchField(page).click();
 	await expect(popup(page)).toBeVisible();
 	await expect(input(page)).toBeFocused();
-	await expect(
-		popup(page).getByText('Type to search items, collections, item types and pages')
-	).toBeVisible();
+	await expect(popup(page).getByText(HINT)).toBeVisible();
 	await page.keyboard.press('Escape');
 	await expect(popup(page)).toBeHidden();
 });
@@ -520,4 +519,105 @@ test('on a collection page its items lead, ahead of the same match elsewhere', a
 	await expect(options.first()).toContainText(inside.name);
 	await expect(popup(page).getByText(outside.name)).toBeVisible();
 	await expect(popup(page).getByText('In this collection', { exact: true })).toBeVisible();
+});
+
+/** A saved field made through the API; the caller removes it. */
+async function makePreset(
+	request: APIRequestContext,
+	data: { kind: string; label: string; description?: string; definition: object }
+) {
+	const res = await request.post('/api/v1/presets', { data });
+	expect(res.ok(), await res.text()).toBe(true);
+	return (await res.json()) as { id: string };
+}
+
+test('a saved field is found by name or description, shows what it is, and opens its page', async ({
+	page,
+	request
+}) => {
+	const label = uniqueName('Grading scale');
+	const word = uniqueName('Zzmint').toLowerCase();
+	const list = await makePreset(request, {
+		kind: 'choice_list',
+		label,
+		description: `Condition grades such as ${word}`,
+		definition: { options: ['Mint', 'Good'] }
+	});
+	try {
+		await openWithSlash(page);
+		await input(page).fill(label);
+		const group = popup(page).getByRole('group', { name: 'Saved fields' });
+		await expect(group).toBeVisible();
+		const row = group.locator(`[role="option"][data-value="saved-field:${list.id}"]`);
+		await expect(row).toContainText(label);
+		// A choice list is a "List" on the Saved fields page.
+		await expect(row).toContainText('List');
+
+		// A word only in the description finds it too, and says where it matched.
+		await input(page).fill(word);
+		await expect(row).toBeVisible();
+		await expect(row).toContainText(word);
+
+		await row.click();
+		await expect(page).toHaveURL(/\/library\/saved-fields$/);
+		await expect(popup(page)).toBeHidden();
+	} finally {
+		await request.delete(`/api/v1/presets/${list.id}`);
+	}
+});
+
+test('an example pack is found by name and opens the Examples page', async ({ page, request }) => {
+	const res = await request.get('/api/v1/examples');
+	expect(res.ok()).toBe(true);
+	const [pack] = (await res.json()) as { id: string; name: string }[];
+
+	await openWithSlash(page);
+	await input(page).fill(pack.name);
+	const group = popup(page).getByRole('group', { name: 'Example packs' });
+	await expect(group).toBeVisible();
+	const row = group.locator(`[role="option"][data-value="pack:${pack.id}"]`);
+	await expect(row).toContainText(pack.name);
+	await row.click();
+	await expect(page).toHaveURL(/\/library\/examples$/);
+});
+
+test('an administrator finds a person by name and opens the Users page', async ({
+	page,
+	request,
+	workerBaseURL
+}) => {
+	const person = await createUserViaApi(request, workerBaseURL, { prefix: 'findable' });
+
+	await openWithSlash(page);
+	await input(page).fill(person.username);
+	const group = popup(page).getByRole('group', { name: 'Users' });
+	await expect(group).toBeVisible();
+	const row = group.getByRole('option').filter({ hasText: `@${person.username}` });
+	await expect(row).toContainText(person.displayName);
+	await expect(row).toContainText('Member');
+	await row.click();
+	await expect(page).toHaveURL(/\/admin\/users$/);
+});
+
+test('a member is never shown people, nor a hint that they can be searched', async ({
+	browser,
+	request,
+	workerBaseURL
+}) => {
+	const person = await createUserViaApi(request, workerBaseURL, { prefix: 'hidden' });
+	const member = await createUserViaApi(request, workerBaseURL, { prefix: 'looker' });
+	const { page, context } = await asUser(browser, member);
+
+	await openWithSlash(page);
+	await expect(popup(page).getByText(HINT)).toBeVisible();
+	await expect(popup(page)).not.toContainText('users');
+	await input(page).fill(person.username);
+	// The message is also in a visually hidden live region, so look at the one on screen.
+	await expect(
+		popup(page).locator('p:not(.sr-only)', {
+			hasText: `Nothing found for "${person.username}"`
+		})
+	).toBeVisible();
+	await expect(popup(page).getByRole('group', { name: 'Users' })).toHaveCount(0);
+	await context.close();
 });

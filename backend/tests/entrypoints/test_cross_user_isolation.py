@@ -1546,6 +1546,34 @@ def test_searching_with_a_foreign_collection_reads_like_an_unknown_one(
     ]
 
 
+def _found(client: TestClient, text: str) -> set[tuple[str, str]]:
+    """The (kind, ref) of everything the search returns for `text`."""
+    response = client.get("/api/v1/search", params={"q": text})
+    assert response.status_code == 200, response.text
+    return {(h["kind"], h["ref"]) for h in response.json()["results"]}
+
+
+def test_search_finds_saved_fields_packs_and_people_only_for_whom_they_belong(
+    world: World,
+) -> None:
+    """B never finds A's saved fields, and only an administrator finds people."""
+    seed = world.seed()
+
+    # A's saved field is A's alone.
+    assert ("saved_field", seed.preset) in _found(world.act_as(ALICE), "genres")
+    assert not {k for k, _ in _found(world.act_as(BOB), "genres")} & {"saved_field"}
+
+    # Example packs are listed for everyone who may read them, and nothing else leaks.
+    assert ("example_pack", PACK_ID) in _found(world.act_as(BOB), PACK_ID)
+
+    # People are for administrators: others get no user hit and no sign the kind exists.
+    member_hits = world.act_as(BOB).get("/api/v1/search", params={"q": "alice"})
+    assert member_hits.status_code == 200
+    assert "user" not in {h["kind"] for h in member_hits.json()["results"]}
+    assert member_hits.json()["failed"] == []
+    assert ("user", seed.user) in _found(world.act_as(ADMIN, "admin"), "alice")
+
+
 def _linking_schema(list_id: str) -> dict[str, Any]:
     return {
         "type": "object",

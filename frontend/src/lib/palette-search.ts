@@ -7,6 +7,9 @@ export const GROUP_CAPS = {
 	items: 5,
 	collections: 3,
 	itemTypes: 3,
+	savedFields: 3,
+	packs: 3,
+	users: 3,
 	pages: 4,
 	settings: 4,
 	tasks: 3,
@@ -65,6 +68,23 @@ export function matchPages(query: string): PalettePage[] {
 		.map(({ label, path }) => ({ label, path }));
 }
 
+/** Where saved fields, example packs and people live; none of the pages takes a row deep link. */
+export const SAVED_FIELDS_PAGE: StaticRoute = '/library/saved-fields';
+export const EXAMPLE_PACKS_PAGE: StaticRoute = '/library/examples';
+export const USERS_PAGE: StaticRoute = '/admin/users';
+
+/** What a saved field is, in the words the Saved fields page uses for its sections. */
+export function savedFieldKind(kind: string | null | undefined): string {
+	if (kind === 'field_set') return 'Field group';
+	if (kind === 'choice_list') return 'List';
+	return 'Field';
+}
+
+/** A person's role as the Users page words it. */
+export function roleLabel(role: string | null | undefined): string {
+	return role === 'admin' ? 'Administrator' : 'Member';
+}
+
 export type PaletteSetting = { key: string; group: string };
 export type PaletteTask = { job_key: string };
 
@@ -94,9 +114,12 @@ const DEFAULT_ORDER: PaletteGroup[] = [
 	'items',
 	'collections',
 	'itemTypes',
+	'savedFields',
+	'packs',
 	'pages',
 	'settings',
-	'tasks'
+	'tasks',
+	'users'
 ];
 const LEAD_BONUS = 3;
 
@@ -118,6 +141,9 @@ export function paletteLayout(pathname: string): PaletteLayout {
 		lead = ['collectionItems'];
 	} else if (path === '/collections') lead = ['collections'];
 	else if (path === '/library/item-types') lead = ['itemTypes'];
+	else if (path === '/library/saved-fields') lead = ['savedFields'];
+	else if (path === '/library/examples') lead = ['packs'];
+	else if (path === '/admin/users') lead = ['users'];
 	else if (path === '/admin/scheduled-tasks') lead = ['tasks', 'settings'];
 	else if (path === '/admin' || path === '/settings/server' || path.startsWith('/admin/'))
 		lead = ['settings', 'tasks'];
