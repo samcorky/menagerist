@@ -1,3 +1,4 @@
+import { pickEmptyLine } from '$lib/empty-lines';
 import { withFilter } from '$lib/query/items-page';
 import type { Condition, Group, Node, Query } from '$lib/query/types';
 
@@ -74,10 +75,19 @@ export function itemsHref(query: Query): string {
 	return search ? `/items?${search}` : '/items';
 }
 
-export function greeting(hour: number): string {
+const SMALL_HOURS_GREETINGS = [
+	'Burning the midnight oil',
+	'Up with the owls',
+	'Collecting at this hour',
+	'The night shift begins'
+];
+
+/** The small hours get a session-stable quip; the rest of the day keeps a plain greeting. */
+export function greeting(hour: number, seed?: string): string {
 	if (hour >= 5 && hour < 12) return 'Good morning';
 	if (hour >= 12 && hour < 18) return 'Good afternoon';
-	return 'Good evening';
+	if (hour >= 18) return 'Good evening';
+	return pickEmptyLine(SMALL_HOURS_GREETINGS, 'greeting', seed);
 }
 
 /** A whole-number share, 0 with nothing to divide by and never above 100. */

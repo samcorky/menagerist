@@ -38,6 +38,7 @@
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { buildCatalogue } from '$lib/query/fields';
 	import { emptyQuery } from '$lib/query/tree';
+	import { pickEmptyLine } from '$lib/empty-lines';
 	import type { Query } from '$lib/query/types';
 	import { normaliseQuery } from '$lib/search-palette';
 	import {
@@ -48,6 +49,16 @@
 		isSmart,
 		saveSmartCollection
 	} from '$lib/smart-collections';
+
+	const EMPTY_LINES = [
+		'No collections yet. The cabinet is wide open.',
+		'A blank shelf, full of potential.',
+		'These are the voyages of your first collection.',
+		'Nothing catalogued so far. Engage when ready.',
+		'Every great collection began with an empty drawer.'
+	];
+	// Stable for this page within a session.
+	const emptyLine = $derived(pickEmptyLine(EMPTY_LINES, page.url.pathname));
 
 	const PAGE_SIZE = 50;
 
@@ -367,7 +378,7 @@
 			class="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-12 text-center"
 		>
 			<Library class="size-10 text-muted-foreground" aria-hidden="true" />
-			<h2 class="text-lg font-medium">No collections yet</h2>
+			<h2 class="text-lg font-medium" data-testid="empty-line">{emptyLine}</h2>
 			<p class="max-w-sm text-sm text-muted-foreground">
 				A collection groups items together. Make one for your vinyl, your Funkos, or films to watch.
 			</p>

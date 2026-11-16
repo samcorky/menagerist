@@ -403,7 +403,7 @@ for (const size of SIZES) {
 			expect(Math.max(b.height, reach)).toBeGreaterThanOrEqual(GUIDELINE_TARGET);
 
 			await remove.tap();
-			await expect(page.getByText('Nothing in this collection yet.')).toBeVisible();
+			await expect(page.getByTestId('empty-line')).toBeVisible();
 		});
 
 		test('item page remove-from-collection is a 44px touch target', async ({ page, request }) => {

@@ -128,11 +128,20 @@ describe('greeting', () => {
 		[12, 'Good afternoon'],
 		[17, 'Good afternoon'],
 		[18, 'Good evening'],
-		[23, 'Good evening'],
-		[0, 'Good evening'],
-		[4, 'Good evening']
+		[23, 'Good evening']
 	])("at %i o'clock says %s", (hour, text) => {
-		expect(greeting(hour)).toBe(text);
+		expect(greeting(hour, 's1')).toBe(text);
+	});
+
+	it.each([0, 1, 4])("at %i o'clock uses a small-hours line, steady for a session", (hour) => {
+		const line = greeting(hour, 's1');
+		expect(line).not.toMatch(/^Good /);
+		expect(greeting(hour, 's1')).toBe(line);
+	});
+
+	it('varies the small-hours line between sessions', () => {
+		const seen = new Set(Array.from({ length: 50 }, (_, i) => greeting(2, `seed-${i}`)));
+		expect(seen.size).toBeGreaterThan(1);
 	});
 });
 

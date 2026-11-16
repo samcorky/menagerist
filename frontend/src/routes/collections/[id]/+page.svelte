@@ -71,6 +71,7 @@
 	} from '$lib/query/narrow';
 	import { SearchError, type SearchWarning } from '$lib/query/search';
 	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
+	import { pickEmptyLine } from '$lib/empty-lines';
 	import type { Path, Query } from '$lib/query/types';
 	import { mapWarnings, pathKey, splitDetail } from '$lib/query/warnings';
 	import {
@@ -123,6 +124,16 @@
 	} from '$lib/examples';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { matchContext } from '$lib/search-context';
+
+	const EMPTY_LINES = [
+		'This collection is quiet... too quiet.',
+		'Empty for now. Plenty of room to boldly collect.',
+		'A tidy shelf, ready for its first arrival.',
+		'Nothing on display. Make it so.',
+		'Space reserved for something rather special.'
+	];
+	// Hashed from the path, so each collection keeps its own line for the session.
+	const emptyLine = $derived(pickEmptyLine(EMPTY_LINES, page.url.pathname));
 
 	const PAGE_SIZE = 50;
 	const SMART_EXPLANATION = 'Items are added automatically by the conditions.';
@@ -1349,7 +1360,7 @@
 				{:else}
 					<Library class="size-10 text-muted-foreground/50" />
 					<div>
-						<p class="font-medium">Nothing in this collection yet.</p>
+						<p class="font-medium" data-testid="empty-line">{emptyLine}</p>
 						<p class="text-sm text-muted-foreground">Add items here, or from any item's page.</p>
 					</div>
 					<Button onclick={openAdd}>
