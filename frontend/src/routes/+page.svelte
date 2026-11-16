@@ -21,6 +21,7 @@
 	import { captureController } from '$lib/capture.svelte.js';
 	import { collectionRouteParams } from '$lib/collections';
 	import { greeting, itemsHref, noPhotoQuery, percent, tidyRows } from '$lib/dashboard';
+	import { pickEmptyLine } from '$lib/empty-lines';
 	import { formatRelativeTime } from '$lib/format-date';
 	import {
 		loadCollections,
@@ -45,6 +46,16 @@
 	import { formatCount } from '$lib/query/items-page';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { Button } from '$lib/components/ui/button/index.js';
+
+	const EMPTY_LINES = [
+		'Welcome aboard. Your collection starts here.',
+		'All quiet on the home front.',
+		'Every great collection began with item number one.',
+		'A clean slate and endless possibilities.',
+		'Ready when you are. Engage.'
+	];
+	// Home is always the root path, so its line is stable for the tab's session.
+	const emptyLine = pickEmptyLine(EMPTY_LINES, '/');
 
 	// Each block holds its own result: null while loading, then ok or error.
 	let stats = $state<Block<Stats> | null>(null);
@@ -207,6 +218,9 @@
 				<Package class="size-8 text-muted-foreground" />
 			</div>
 			<div class="space-y-1.5">
+				<p class="text-sm font-medium text-muted-foreground" data-testid="empty-line">
+					{emptyLine}
+				</p>
 				<h1 class="font-heading text-2xl font-semibold tracking-tight">
 					You don't have any items yet
 				</h1>
