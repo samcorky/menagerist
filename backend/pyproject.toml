@@ -1,7 +1,7 @@
 [project]
 name = "menagerist"
 dynamic = ["version"]
-description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
+description = "A self-hostable platform for organising the things you care about."
 requires-python = ">=3.14"
 license = "Apache-2.0"
 

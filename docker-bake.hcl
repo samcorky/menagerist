@@ -16,6 +16,10 @@ variable "VERSION" {
   default = ""
 }
 
+variable "DESCRIPTION" {
+  default = ""
+}
+
 variable "COMMIT_SHA" {
   default = ""
 }
@@ -59,6 +63,7 @@ target "menagerist" {
 
   args = {
     VERSION                         = "${VERSION}"
+    DESCRIPTION                     = "${DESCRIPTION}"
     MENAGERIST_BUILD_COMMIT_SHA     = "${COMMIT_SHA}"
     MENAGERIST_BUILD_BRANCH         = "${BRANCH}"
     MENAGERIST_BUILD_REPOSITORY_URL = "${REPOSITORY_URL}"

@@ -6,7 +6,7 @@
 
 *(meh-NAH-juh-rist)*
 
-A lightweight, self-hostable platform for organising the things you care about.
+A self-hostable platform for organising the things you care about.
 
 <div align="center">
 

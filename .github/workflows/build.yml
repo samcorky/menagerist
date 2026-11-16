@@ -45,9 +45,11 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           version="$(cd backend && uv run --locked --only-group release calver-scm --format plain version)"
+          description="$(python3 scripts/project_description.py)"
           timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           {
             echo "version=${version}"
+            echo "description=${description}"
             echo "commit=${COMMIT_SHA}"
             echo "branch=${BRANCH}"
             echo "timestamp=${timestamp}"
@@ -58,6 +60,7 @@ jobs:
         uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         env:
           VERSION: ${{ steps.args.outputs.version }}
+          DESCRIPTION: ${{ steps.args.outputs.description }}
           COMMIT_SHA: ${{ steps.args.outputs.commit }}
           BRANCH: ${{ steps.args.outputs.branch }}
           REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}

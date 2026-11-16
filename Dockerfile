@@ -220,6 +220,7 @@ RUN --mount=type=cache,target=/app/node_modules/.vite \
 FROM gcr.io/distroless/base-debian13:nonroot@sha256:a08d9054afbaf1af9b90fd02cdc7b32236319b5376d374505a41548d42b0c5db AS runtime
 
 ARG VERSION=""
+ARG DESCRIPTION=""
 ARG MENAGERIST_BUILD_COMMIT_SHA=""
 ARG MENAGERIST_BUILD_BRANCH=""
 ARG MENAGERIST_BUILD_REPOSITORY_URL=""
@@ -227,7 +228,7 @@ ARG MENAGERIST_BUILD_TIMESTAMP=""
 ARG MENAGERIST_BUILD_DIRTY=""
 
 LABEL org.opencontainers.image.title="Menagerist" \
-      org.opencontainers.image.description="A lightweight, self-hostable and flexible platform for organising the things you care about." \
+      org.opencontainers.image.description="${DESCRIPTION}" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/samcorky/menagerist" \
       org.opencontainers.image.url="https://github.com/samcorky/menagerist" \
