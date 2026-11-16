@@ -13,6 +13,17 @@ import {
 
 /** Shared end-to-end helpers drive the real UI. */
 
+/**
+ * Dismiss the "Name this device" dialog whenever it opens. Signing in through the form offers
+ * to name the browser, and the dialog would otherwise cover whatever the test does next. Call
+ * it before the sign-in click in any test that is not about naming devices.
+ */
+export async function skipDeviceNamePrompt(page: Page): Promise<void> {
+	await page.addLocatorHandler(page.getByRole('dialog', { name: 'Name this device' }), (dialog) =>
+		dialog.getByRole('button', { name: 'Not now' }).click()
+	);
+}
+
 /** A name that's unique per call, so tests never collide with earlier runs against the same db. */
 export function uniqueName(prefix: string): string {
 	return `${prefix} ${Date.now()}-${randomInt(100_000)}`;

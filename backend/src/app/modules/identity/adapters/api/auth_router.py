@@ -20,6 +20,7 @@ from app.modules.identity.adapters.api.cookies import (
 )
 from app.modules.identity.adapters.api.dependencies import (
     get_active_identity_actor,
+    get_adopt_device_name_use_case,
     get_change_password_use_case,
     get_client_device,
     get_client_ip,
@@ -28,8 +29,10 @@ from app.modules.identity.adapters.api.dependencies import (
     get_get_setup_status_use_case,
     get_identity_actor,
     get_identity_settings_dep,
+    get_list_device_name_suggestions_use_case,
     get_list_own_devices_use_case,
     get_list_own_sessions_use_case,
+    get_rename_own_device_use_case,
     get_revoke_other_sessions_use_case,
     get_revoke_own_device_use_case,
     get_revoke_own_session_use_case,
@@ -43,10 +46,15 @@ from app.modules.identity.adapters.api.dependencies import (
 from app.modules.identity.adapters.api.device_header_fields import device_header_fields
 from app.modules.identity.adapters.api.schemas import (
     DEVICE_EXAMPLE,
+    DEVICE_NAME_EXAMPLE,
+    DEVICE_NAME_SUGGESTION_EXAMPLE,
     AuthStatusResponse,
     ChangePasswordRequest,
+    DeviceNameResponse,
+    DeviceNameSuggestionResponse,
     LoginRequest,
     OwnDeviceResponse,
+    RenameDeviceRequest,
     RevokedSessionsResponse,
     SessionResponse,
     SetupRequest,
@@ -54,11 +62,19 @@ from app.modules.identity.adapters.api.schemas import (
     UpdateMeRequest,
     UserResponse,
 )
+from app.modules.identity.application.adopt_device_name import (
+    AdoptDeviceName,
+    AdoptDeviceNameCommand,
+)
 from app.modules.identity.application.change_password import ChangePassword
 from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
     GetSetupStatusQuery,
+)
+from app.modules.identity.application.list_device_name_suggestions import (
+    ListDeviceNameSuggestions,
+    ListDeviceNameSuggestionsQuery,
 )
 from app.modules.identity.application.list_own_devices import (
     ListOwnDevices,
@@ -67,6 +83,10 @@ from app.modules.identity.application.list_own_devices import (
 from app.modules.identity.application.list_own_sessions import (
     ListOwnSessions,
     ListOwnSessionsQuery,
+)
+from app.modules.identity.application.rename_own_device import (
+    RenameOwnDevice,
+    RenameOwnDeviceCommand,
 )
 from app.modules.identity.application.revoke_other_sessions import (
     RevokeOtherSessions,
@@ -90,6 +110,7 @@ from app.modules.identity.domain.errors import (
     CurrentSessionError,
     DeviceNotFoundError,
     InvalidCredentialsError,
+    InvalidDeviceNameError,
     InvalidPasswordError,
     InvalidUserError,
     PasswordUnchangedError,
@@ -419,6 +440,100 @@ async def revoke_own_device(
         actor,
     )
     return RevokedSessionsResponse(ended=ended)
+
+
+@me_router.patch(
+    "/devices/{device_id}",
+    response_model=DeviceNameResponse,
+    operation_id="rename_own_device",
+    tags=["Sessions"],
+    responses={
+        200: {"content": {"application/json": {"example": DEVICE_NAME_EXAMPLE}}},
+        **_UNAUTHENTICATED,
+        **error_response(DeviceNotFoundError, detail="That device was not found."),
+        **error_response(
+            InvalidDeviceNameError, detail="A device name can be at most 60 characters."
+        ),
+    },
+)
+async def rename_own_device(
+    device_id: Annotated[uuid.UUID, Path(description="The device to name.")],
+    payload: RenameDeviceRequest,
+    use_case: Annotated[RenameOwnDevice, Depends(get_rename_own_device_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+) -> DeviceNameResponse:
+    """Name one of your devices, or clear its name with a blank one."""
+    device = await use_case.handle(
+        RenameOwnDeviceCommand(device_id=device_id, name=payload.name), actor
+    )
+    return DeviceNameResponse.from_domain(device)
+
+
+@me_router.get(
+    "/devices/suggestions",
+    response_model=list[DeviceNameSuggestionResponse],
+    operation_id="list_device_name_suggestions",
+    tags=["Sessions"],
+    responses={
+        200: {
+            "content": {
+                "application/json": {"example": [DEVICE_NAME_SUGGESTION_EXAMPLE]}
+            }
+        },
+        **_UNAUTHENTICATED,
+    },
+)
+async def list_device_name_suggestions(
+    use_case: Annotated[
+        ListDeviceNameSuggestions, Depends(get_list_device_name_suggestions_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+) -> list[DeviceNameSuggestionResponse]:
+    """List older devices of yours whose name this browser could take.
+
+    Only unused devices of the same browser, platform and mobile flag are
+    listed, and only while this browser has no name of its own.
+    """
+    devices = await use_case.handle(
+        ListDeviceNameSuggestionsQuery(current_session_id=current_session_id), actor
+    )
+    return [DeviceNameSuggestionResponse.from_domain(d) for d in devices]
+
+
+@me_router.post(
+    "/devices/{device_id}/adopt",
+    response_model=DeviceNameResponse,
+    operation_id="adopt_device_name",
+    tags=["Sessions"],
+    responses={
+        200: {"content": {"application/json": {"example": DEVICE_NAME_EXAMPLE}}},
+        **_UNAUTHENTICATED,
+        **error_response(
+            DeviceNotFoundError, detail="That device's name cannot be reused."
+        ),
+    },
+)
+async def adopt_device_name(
+    device_id: Annotated[
+        uuid.UUID, Path(description="The older device whose name to take.")
+    ],
+    use_case: Annotated[AdoptDeviceName, Depends(get_adopt_device_name_use_case)],
+    actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+) -> DeviceNameResponse:
+    """Take an older device's name for this browser and forget that device.
+
+    The older device is signed out. Only a device listed by
+    `GET /me/devices/suggestions` can be taken.
+    """
+    device = await use_case.handle(
+        AdoptDeviceNameCommand(
+            current_session_id=current_session_id, from_device_id=device_id
+        ),
+        actor,
+    )
+    return DeviceNameResponse.from_domain(device)
 
 
 @me_router.get(

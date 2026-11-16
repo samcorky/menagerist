@@ -58,6 +58,7 @@ class DeviceModel(IdentifiableMixin, Base):
     user_agent: Mapped[str | None]
     platform: Mapped[str | None]
     mobile: Mapped[bool | None]
+    name: Mapped[str | None]
 
 
 class ApiTokenModel(IdentifiableMixin, Base):

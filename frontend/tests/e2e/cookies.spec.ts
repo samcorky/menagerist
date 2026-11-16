@@ -8,7 +8,7 @@ import {
 	COOKIES_TLS_PORT,
 	ensureAdminSession
 } from './fixtures';
-import { createUserViaApi, type E2EUser } from './helpers';
+import { createUserViaApi, type E2EUser, skipDeviceNamePrompt } from './helpers';
 
 /**
  * The session cookie in a real browser engine. The app is reached over HTTPS through a TLS proxy
@@ -51,6 +51,7 @@ async function signIn(page: Page, origin: string, who: E2EUser = user) {
 	await page.goto(`${origin}/login`, READY);
 	await page.getByLabel('Username').fill(who.username);
 	await page.getByLabel('Password', { exact: true }).fill(who.password);
+	await skipDeviceNamePrompt(page);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(accountMenu(page)).toBeVisible();
 }

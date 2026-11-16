@@ -6,16 +6,24 @@
 	import { toast } from 'svelte-sonner';
 	import { auth } from '$lib/auth.svelte.js';
 	import { DISPLAY_NAME_MAX_LENGTH, displayNameProblem, PASSWORD_MIN_LENGTH } from '$lib/auth';
-	import { deviceRow, formatRelativeTime, type DeviceRevoke, type DeviceRow } from '$lib/devices';
+	import {
+		deviceRow,
+		formatRelativeTime,
+		nameDevice,
+		type DeviceRevoke,
+		type DeviceRow
+	} from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
 	import { wide } from '$lib/viewport.svelte';
 	import {
 		listOwnDevices,
+		renameOwnDevice,
 		revokeOwnDevice,
 		revokeOwnSession,
 		revokeOtherSessions
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import DeviceTitle from '$lib/components/device-title.svelte';
 	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
@@ -123,6 +131,28 @@
 	});
 
 	const hasOtherDevices = $derived(devices.some((d) => !d.current));
+
+	function applyName(deviceId: string, name: string | null) {
+		devices = devices.map((d) =>
+			d.deviceId === deviceId ? { ...d, name, ...nameDevice(name, d.label) } : d
+		);
+	}
+
+	async function saveName(deviceId: string, name: string | null): Promise<boolean> {
+		try {
+			const result = await renameOwnDevice({ path: { device_id: deviceId }, body: { name } });
+			if (result.error || !result.data) {
+				toast.error(errorMessage(result.error));
+				return false;
+			}
+			applyName(deviceId, result.data.name ?? null);
+			toast.success(result.data.name ? 'Device named' : 'Device name cleared');
+			return true;
+		} catch {
+			toast.error('Could not save the name.');
+			return false;
+		}
+	}
 
 	async function handleRevoke(key: string, revoke: DeviceRevoke) {
 		if (sessionBusy !== null) return;
@@ -368,9 +398,16 @@
 								<Table.Cell>
 									<div class="flex items-center gap-2">
 										<DeviceIcon kind={device.kind} class="size-4 shrink-0 text-muted-foreground" />
-										<span class="font-medium" title={device.userAgent ?? undefined}
-											>{device.label}</span
-										>
+										<DeviceTitle
+											title={device.title}
+											subtitle={device.subtitle}
+											name={device.name}
+											label={device.label}
+											userAgent={device.userAgent}
+											onsave={device.deviceId
+												? (name) => saveName(device.deviceId!, name)
+												: undefined}
+										/>
 										{#if device.current}
 											<Badge variant="secondary">This device</Badge>
 										{/if}
@@ -418,9 +455,16 @@
 											</div>
 											<div class="space-y-1">
 												<div class="flex flex-wrap items-center gap-2">
-													<p class="font-medium" title={device.userAgent ?? undefined}>
-														{device.label}
-													</p>
+													<DeviceTitle
+														title={device.title}
+														subtitle={device.subtitle}
+														name={device.name}
+														label={device.label}
+														userAgent={device.userAgent}
+														onsave={device.deviceId
+															? (name) => saveName(device.deviceId!, name)
+															: undefined}
+													/>
 													{#if device.current}
 														<Badge variant="secondary">This device</Badge>
 													{/if}

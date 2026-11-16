@@ -1,6 +1,6 @@
 import { expect, request, test, type Page } from '@playwright/test';
 import { apiSessionOptions, signInViaApi } from './fixtures';
-import { createUserViaApi, type E2EUser } from './helpers';
+import { createUserViaApi, type E2EUser, skipDeviceNamePrompt } from './helpers';
 
 /**
  * Runs in the `auth` project against its own backend and an empty database (menagerist_auth),
@@ -23,6 +23,7 @@ const accountMenu = (page: Page, name: string) =>
 async function signInThroughForm(page: Page, username: string, password: string) {
 	await page.getByLabel('Username').fill(username);
 	await page.getByLabel('Password', { exact: true }).fill(password);
+	await skipDeviceNamePrompt(page);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 

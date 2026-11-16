@@ -10,3 +10,4 @@ class SessionListing:
     session: Session
     username: str
     display_name: str | None = None
+    device_name: str | None = None

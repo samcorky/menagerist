@@ -1,5 +1,5 @@
 import { test, expect, E2E_ADMIN, type BrowserContext, type Page } from './fixtures';
-import { uniqueName } from './helpers';
+import { skipDeviceNamePrompt, uniqueName } from './helpers';
 
 /** Make the server end this page's session: the next request answers 401. */
 async function endSession(context: BrowserContext) {
@@ -13,6 +13,7 @@ async function signInAgain(page: Page) {
 	await expect(page.getByTestId('session-expired')).toBeVisible();
 	await page.getByLabel('Username').fill(E2E_ADMIN.username);
 	await page.getByLabel('Password', { exact: true }).fill(E2E_ADMIN.password);
+	await skipDeviceNamePrompt(page);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
