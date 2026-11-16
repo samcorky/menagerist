@@ -14,11 +14,11 @@
 	class="grid w-full max-w-[96rem] items-start gap-4 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] 2xl:grid-cols-[18rem_minmax(0,1fr)_minmax(18rem,22rem)]"
 	aria-hidden="true"
 >
-	<div class="lg:col-start-1 lg:row-span-2 lg:row-start-1">
+	<div data-testid="item-cover" class="lg:col-start-1 lg:row-span-2 lg:row-start-1">
 		<Skeleton class="aspect-[4/3] w-full rounded-xl lg:aspect-[3/4]" />
 	</div>
 
-	<div class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
+	<div data-testid="item-main" class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
 		<Card.Root class="overflow-hidden">
 			<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
 				<div class="min-w-0 flex-1">

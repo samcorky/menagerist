@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 // Design §13a: known layouts use matching skeletons and never show a spinner beside them.
 // Page-level loaders must not be hand-rolled spinners; load-more indicators use the shared
 // LoadMoreSpinner, and in-place actions use ui/spinner or an animated icon.
-const sources = import.meta.glob<string>('/src/routes/**/*.svelte', {
+const sources = import.meta.glob<string>('../src/routes/**/*.svelte', {
 	query: '?raw',
 	import: 'default',
 	eager: true
