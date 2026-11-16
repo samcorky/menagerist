@@ -342,6 +342,26 @@ async def test_a_device_with_recent_session_activity_is_not_stale(
 
 
 @time_machine.travel(NOW, tick=False)
+async def test_a_session_from_before_devices_does_not_affect_suggestions(
+    world: World, make_user: MakeUser
+) -> None:
+    """A session with no device is ignored when working out which devices are idle."""
+    alice = make_user("alice")
+    await world.users.add(alice)
+    stale = await _device(world, alice.id, agent=OLD_FIREFOX, name="Desk laptop")
+    legacy = Session.create(
+        user_id=alice.id, token_hash="legacy", now=NOW, ttl=SESSION_TTL
+    )
+    await world.sessions.add(legacy)
+    current = await _device(world, alice.id, seen=timedelta())
+    current_session = await _session(world, current, active=timedelta())
+
+    assert [d.id for d in await _suggest(world, alice.id, current_session)] == [
+        stale.id
+    ]
+
+
+@time_machine.travel(NOW, tick=False)
 async def test_offers_nothing_when_the_current_device_is_already_named(
     world: World, make_user: MakeUser
 ) -> None:
