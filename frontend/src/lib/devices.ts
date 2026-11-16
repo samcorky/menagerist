@@ -105,7 +105,10 @@ export function nameDevice(
 	label: string
 ): { title: string; subtitle: string | null } {
 	const trimmed = name?.trim();
-	return trimmed ? { title: trimmed, subtitle: label } : { title: label, subtitle: null };
+	// A name that is just the label would repeat itself underneath.
+	return trimmed && trimmed !== label
+		? { title: trimmed, subtitle: label }
+		: { title: label, subtitle: null };
 }
 
 export interface DeviceRow extends DescribedDevice {
