@@ -226,6 +226,10 @@ pretty = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# Async fixtures run in the loop of their own scope, as before pytest-asyncio made the
+# default explicit. A future release will default to "function", which could split the
+# session-scoped database fixtures from the tests' loop; change it only with the integration tests.
+asyncio_default_fixture_loop_scope = "fixture-scope"
 # No --cov here: only the poe test tasks pass it, so an ad-hoc pytest run never
 # overwrites the combined .coverage data the coverage gate reads.
 markers = [
