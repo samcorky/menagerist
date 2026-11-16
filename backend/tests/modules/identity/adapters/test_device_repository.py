@@ -64,6 +64,7 @@ async def test_device_round_trips_and_is_found_by_hash(
     device = _device(user, "hash-1")
     await devices.add(device)
     device.seen(NOW + timedelta(days=1), ttl=TTL, user_agent="Firefox 2")
+    device.rename("Sam's laptop")
     await devices.save(device)
     db_session.expire_all()
 
@@ -72,6 +73,7 @@ async def test_device_round_trips_and_is_found_by_hash(
     assert stored.id == device.id
     assert stored.user_agent == "Firefox 2"
     assert stored.platform is None
+    assert stored.name == "Sam's laptop"
     assert stored.last_seen_at == NOW + timedelta(days=1)
     assert (await devices.get(device.id)) is not None
     assert await devices.get(uuid.uuid7()) is None

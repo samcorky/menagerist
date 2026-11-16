@@ -64,11 +64,18 @@ class ListSessions(
                 if user is not None:
                     users_by_id[s.user_id] = user
 
+        device_names: dict[uuid.UUID, str | None] = {}
+        for s in active_sessions:
+            if s.device_id is not None and s.device_id not in device_names:
+                device = await self._repos.devices.get(s.device_id)
+                device_names[s.device_id] = None if device is None else device.name
+
         return [
             SessionListing(
                 session=s,
                 username=users_by_id[s.user_id].username,
                 display_name=users_by_id[s.user_id].display_name,
+                device_name=None if s.device_id is None else device_names[s.device_id],
             )
             for s in active_sessions
             if s.user_id in users_by_id

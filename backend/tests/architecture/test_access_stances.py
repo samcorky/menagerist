@@ -77,12 +77,15 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
 )
 EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
     {
+        "identity.AdoptDeviceName",
         "identity.ChangePassword",
         "identity.CreateApiToken",
+        "identity.ListDeviceNameSuggestions",
         "identity.ListGrantablePermissions",
         "identity.ListOwnApiTokens",
         "identity.ListOwnDevices",
         "identity.ListOwnSessions",
+        "identity.RenameOwnDevice",
         "identity.RevokeOtherSessions",
         "identity.RevokeOwnApiToken",
         "identity.RevokeOwnDevice",

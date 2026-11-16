@@ -1,13 +1,43 @@
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app.modules.identity.domain.errors import InvalidDeviceNameError
 from app.modules.identity.domain.session import (
     MAX_CLIENT_PLATFORM_LENGTH,
     MAX_USER_AGENT_LENGTH,
     clean_text,
 )
 from app.shared_kernel.mixins import Identifiable
+
+MAX_DEVICE_NAME_LENGTH = 60
+
+# Checked in order: browsers built on another browser's engine also name that
+# engine (Edge says "Chrome", Chrome on iOS says "Safari"), so the specific
+# markers come first. Versions are deliberately not captured.
+_BROWSER_MARKERS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("Edge", re.compile(r"\b(?:Edg|EdgA|EdgiOS|Edge)/")),
+    ("Opera", re.compile(r"\b(?:OPR|OPT|OPiOS)/|\bOpera\b")),
+    ("Samsung Internet", re.compile(r"\bSamsungBrowser/")),
+    ("Firefox", re.compile(r"\b(?:Firefox|FxiOS)/")),
+    ("Chrome", re.compile(r"\b(?:Chrome|CriOS|Chromium)/")),
+    ("Safari", re.compile(r"\bSafari/")),
+)
+
+
+def browser_family(user_agent: str | None) -> str | None:
+    """Name the browser behind `user_agent` without its version, or `None`.
+
+    Versions change with every update, so only the family is used to decide
+    whether two devices are the same kind of browser.
+    """
+    if not user_agent:
+        return None
+    return next(
+        (name for name, marker in _BROWSER_MARKERS if marker.search(user_agent)),
+        None,
+    )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -27,6 +57,7 @@ class Device(Identifiable):
     user_agent: str | None = None
     platform: str | None = None
     mobile: bool | None = None
+    name: str | None = None
 
     @classmethod
     def create(
@@ -69,6 +100,35 @@ class Device(Identifiable):
         self.user_agent = clean_text(user_agent, MAX_USER_AGENT_LENGTH)
         self.platform = clean_text(platform, MAX_CLIENT_PLATFORM_LENGTH)
         self.mobile = mobile
+
+    def rename(self, name: str | None) -> None:
+        """Give the device a name, or clear it with a blank one.
+
+        Raises:
+            InvalidDeviceNameError: If the trimmed name is too long.
+        """
+        trimmed = (name or "").strip()
+        if len(trimmed) > MAX_DEVICE_NAME_LENGTH:
+            raise InvalidDeviceNameError(
+                f"A device name can be at most {MAX_DEVICE_NAME_LENGTH} characters."
+            )
+        self.name = trimmed or None
+
+    def is_same_kind_of_browser(self, other: Device) -> bool:
+        """Whether `other` has the same browser family, platform and mobile flag.
+
+        A suggestion aid only: nothing reliably identifies a browser once its
+        cookie is gone. A missing family, platform or mobile flag never matches.
+        """
+        family = browser_family(self.user_agent)
+        return (
+            family is not None
+            and self.platform is not None
+            and self.mobile is not None
+            and family == browser_family(other.user_agent)
+            and self.platform == other.platform
+            and self.mobile == other.mobile
+        )
 
     def is_expired(self, now: datetime) -> bool:
         """Whether `now` is at or past the expiry instant."""

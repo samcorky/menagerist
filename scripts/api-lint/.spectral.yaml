@@ -104,6 +104,7 @@ overrides:
       ibm-required-array-properties-in-response: "off"
   # Each of these PATCH bodies has one field, and that field is the change.
   - files:
+      - "**#/components/schemas/RenameDeviceRequest"
       - "**#/components/schemas/UpdateMeRequest"
       - "**#/components/schemas/UpdateMediaRequest"
       - "**#/components/schemas/UpdateSettingsRequest"

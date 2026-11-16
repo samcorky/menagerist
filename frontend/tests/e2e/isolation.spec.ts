@@ -2,11 +2,12 @@ import { expect, request, apiSessionOptions, test, type APIRequestContext } from
 import {
 	asUser,
 	createUserViaApi,
+	type E2EUser,
 	openSearch,
 	removeExamplePacks,
 	searchPopup,
-	uniqueName,
-	type E2EUser
+	skipDeviceNamePrompt,
+	uniqueName
 } from './helpers';
 import { OWN_COVER } from './examples-helpers';
 
@@ -177,6 +178,7 @@ test('an administrator can add a member who then has to choose a password at fir
 	await memberPage.goto('/login');
 	await memberPage.getByLabel('Username').fill(username);
 	await memberPage.getByLabel('Password', { exact: true }).fill(startingPassword);
+	await skipDeviceNamePrompt(memberPage);
 	await memberPage.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(memberPage).toHaveURL(/\/settings\/account$/);
 	await member.close();
