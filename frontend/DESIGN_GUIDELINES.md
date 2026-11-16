@@ -168,6 +168,7 @@ Give meaningful actions lightweight feedback. Use inline feedback for visible re
 - Known layouts/initial content use matching skeletons; unknown layouts or in-place actions use spinners. Never show both together.
 - Inline actions show progress on their trigger. Full-page loaders are only for hard navigation with no partial content available.
 - Reduce or remove skeleton shimmer for reduced motion; keep the placeholder shape.
+- A skeleton mirrors the content it stands in for (same grid, card or row shape and heights) and lives beside it (`node-skeleton`, `list-row-skeleton`), so the content replaces it without shifting. A list's end-of-page "load more" indicator is `load-more-spinner`, shown only once rows exist. Page loaders are never hand-rolled spinners; a test enforces this.
 
 ## 14. Confirmation vs. Undo
 
@@ -294,7 +295,7 @@ Prefer bottom sheets, full-screen dialogs/search where appropriate, sticky actio
 - **Detail pages put their main actions under the thumb.** On a phone, a sticky bar carries the page's actions (Duplicate and Edit; Cancel and Save while editing) instead of leaving them in a header that scrolls away.
 - **Pressed and dragged states.** Controls dim while pressed on touch screens, double-tap zoom is off on them, and pulling down at the top of the page does not reload the app mid-edit.
 - **Failed loads offer a retry**, which also runs when the connection returns. A session that the server ended says so on the sign-in page, and signing in returns to the page being used.
-- **Motion** eases only where it helps, and `prefers-reduced-motion` turns it off everywhere except spinners and skeletons.
+- **Motion** eases only where it helps, and `prefers-reduced-motion` turns it off everywhere except spinners; skeletons keep their shape but stop pulsing.
 
 ## 24. Terminology Reference
 

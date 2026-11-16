@@ -14,9 +14,6 @@ importers:
       '@fontsource-variable/manrope':
         specifier: ^5.3.0
         version: 5.3.0
-      '@shimmer-from-structure/svelte':
-        specifier: ^2.4.6
-        version: 2.4.6(svelte@5.57.3(@typescript-eslint/types@8.72.2))
       bowser:
         specifier: ^2.14.1
         version: 2.15.0
@@ -434,14 +431,6 @@ packages:
 
   '@rolldown/pluginutils@1.1.1':
     resolution: {integrity: sha512-glFIJDvLNDtJhT9qrMFWLPbvS+skxgt4L0K8Ei2YtnhPysAJnsI7nyxSJxKj4ADeKX0OLjC4ntRkwpLOoS3rwA==}
-
-  '@shimmer-from-structure/core@2.4.6':
-    resolution: {integrity: sha512-g0pC2rNtSCUdOwgfTS02x47TR8J07Rl2l1Fn4wL07LjBpg6lMvZf/NlkFdSwYxl/cvmpOL3KdpFacNLi9nocuQ==}
-
-  '@shimmer-from-structure/svelte@2.4.6':
-    resolution: {integrity: sha512-ULNt9b2i1iPGEf7hyREY/m3jFG7yl3WxXkFSMXVateWWMoQPW06Lj64qWmCRIZG+yjcXd7IKBrR6uGOpE3RDxg==}
-    peerDependencies:
-      svelte: ^5.53.5
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -1995,13 +1984,6 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.1.1': {}
-
-  '@shimmer-from-structure/core@2.4.6': {}
-
-  '@shimmer-from-structure/svelte@2.4.6(svelte@5.57.3(@typescript-eslint/types@8.72.2))':
-    dependencies:
-      '@shimmer-from-structure/core': 2.4.6
-      svelte: 5.57.3(@typescript-eslint/types@8.72.2)
 
   '@standard-schema/spec@1.1.0': {}
 

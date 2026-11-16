@@ -24,7 +24,8 @@
 	} from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
-	import { Shimmer } from '@shimmer-from-structure/svelte';
+	import NodeSkeleton from '$lib/components/node-skeleton.svelte';
+	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
 	import { toast } from 'svelte-sonner';
 	import type { CollectionResponse, NodeResponse, NodeTypeResponse } from '$lib/api/client';
 	import { fetchAllNodeTypes } from '$lib/node-types';
@@ -92,8 +93,6 @@
 	];
 	// Stable for this page within a session (hashed from the path, not the filters).
 	const emptyLine = $derived(pickEmptyLine(EMPTY_LINES, page.url.pathname));
-
-	const loadingSkeletons = [1, 2, 3, 4, 5];
 
 	// Persisted outside component so scroll position survives navigation
 	let savedScrollTop = 0;
@@ -653,29 +652,7 @@
 	<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
 	{#if loadingDisplay.show && shownItems.length === 0}
-		<Shimmer loading={true}>
-			{#if viewMode === 'grid'}
-				<div class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
-					{#each loadingSkeletons as skeleton (skeleton)}
-						<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
-					{/each}
-				</div>
-			{:else}
-				<div class="grid gap-3">
-					{#each loadingSkeletons as skeleton (skeleton)}
-						<div class="rounded-lg border p-4">
-							<div class="flex items-center justify-between gap-4">
-								<div class="space-y-1">
-									<div class="h-5 w-48 rounded bg-muted"></div>
-									<div class="h-4 w-72 rounded bg-muted"></div>
-								</div>
-								<div class="h-6 w-16 rounded-full bg-muted"></div>
-							</div>
-						</div>
-					{/each}
-				</div>
-			{/if}
-		</Shimmer>
+		<NodeSkeleton view={viewMode} count={8} />
 	{:else if viewMode === 'grid'}
 		<div data-slot="node-grid" class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
 			{#each shownItems as item (item.id)}
@@ -773,11 +750,7 @@
 
 	{#if hasMore}
 		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-			{#if loading}
-				<div
-					class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-				></div>
-			{/if}
+			<LoadMoreSpinner {loading} hasRows={shownItems.length > 0} />
 		</div>
 	{/if}
 </Page>

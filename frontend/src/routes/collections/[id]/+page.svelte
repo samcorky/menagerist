@@ -6,7 +6,8 @@
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Shimmer } from '@shimmer-from-structure/svelte';
+	import NodeSkeleton from '$lib/components/node-skeleton.svelte';
+	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
 	import {
 		Download,
 		EyeOff,
@@ -139,7 +140,6 @@
 	const SMART_EXPLANATION = 'Items are added automatically by the conditions.';
 	const EDIT_CONDITIONS_DESCRIPTION =
 		'Change the saved conditions, then choose Save. Cancel discards your changes.';
-	const loadingSkeletons = [1, 2, 3, 4, 5];
 
 	// The address segment: an id or a slug. Item queries need the canonical id.
 	const collectionId = $derived(page.params.id ?? '');
@@ -1222,26 +1222,7 @@
 		<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
 		{#if loadingDisplay.show && shownItems.length === 0}
-			<Shimmer loading={true}>
-				{#if viewMode === 'grid'}
-					<div class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
-						{#each loadingSkeletons as skeleton (skeleton)}
-							<div class="aspect-[3/4] animate-pulse rounded-xl bg-muted"></div>
-						{/each}
-					</div>
-				{:else}
-					<div class="grid gap-3">
-						{#each loadingSkeletons as skeleton (skeleton)}
-							<div class="rounded-lg border p-4">
-								<div class="space-y-1">
-									<div class="h-5 w-48 rounded bg-muted"></div>
-									<div class="h-4 w-72 rounded bg-muted"></div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</Shimmer>
+			<NodeSkeleton view={viewMode} count={8} />
 		{:else if viewMode === 'grid'}
 			<div data-slot="node-grid" class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
 				{#each shownItems as item (item.id)}
@@ -1377,11 +1358,7 @@
 
 		{#if hasMore}
 			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-				{#if loading}
-					<div
-						class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-					></div>
-				{/if}
+				<LoadMoreSpinner {loading} hasRows={shownItems.length > 0} />
 			</div>
 		{/if}
 	{/if}

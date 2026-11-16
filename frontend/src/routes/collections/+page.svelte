@@ -25,6 +25,8 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import LoadFailed from '$lib/components/load-failed.svelte';
+	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -324,7 +326,13 @@
 	{#if loadingDisplay.show && collections.length === 0}
 		<div class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]" aria-hidden="true">
 			{#each [1, 2, 3, 4] as s (s)}
-				<div class="h-28 animate-pulse rounded-xl bg-muted"></div>
+				<div class="flex h-28 flex-col justify-between rounded-xl border bg-card p-4">
+					<div class="space-y-2">
+						<Skeleton class="h-5 w-40 max-w-full rounded" />
+						<Skeleton class="h-4 w-56 max-w-full rounded" />
+					</div>
+					<Skeleton class="h-4 w-20 rounded" />
+				</div>
 			{/each}
 		</div>
 	{:else if loadFailed}
@@ -393,11 +401,7 @@
 
 	{#if hasMore}
 		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-			{#if loading}
-				<div
-					class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-				></div>
-			{/if}
+			<LoadMoreSpinner {loading} hasRows={collections.length > 0} />
 		</div>
 	{/if}
 </Page>

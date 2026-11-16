@@ -2,7 +2,8 @@
 	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
 	import { ArrowLeftRight, Download, Pencil, Plus, Trash2 } from '@lucide/svelte';
-	import { Shimmer } from '@shimmer-from-structure/svelte';
+	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
+	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -30,7 +31,6 @@
 	import type { AttributesSchema } from '$lib/schema-types';
 
 	const PAGE_SIZE = 50;
-	const loadingSkeletons = [1, 2, 3];
 
 	let relTypes = $state<EdgeTypeResponse[]>([]);
 	let loading = $state(false);
@@ -235,20 +235,7 @@
 	</div>
 
 	{#if loading && relTypes.length === 0}
-		<Shimmer loading={true}>
-			<div class="grid gap-3">
-				{#each loadingSkeletons as s (s)}
-					<div class="rounded-lg border p-4">
-						<div class="flex items-center justify-between gap-4">
-							<div class="space-y-1">
-								<div class="h-5 w-48 rounded bg-muted"></div>
-								<div class="h-4 w-32 rounded-full bg-muted"></div>
-							</div>
-						</div>
-					</div>
-				{/each}
-			</div>
-		</Shimmer>
+		<ListRowSkeleton count={3} />
 	{:else if loadFailed}
 		<LoadFailed what="your connection types" onretry={() => void fetchPage()} />
 	{:else}
@@ -315,11 +302,7 @@
 
 	{#if hasMore}
 		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-			{#if loading}
-				<div
-					class="size-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground"
-				></div>
-			{/if}
+			<LoadMoreSpinner {loading} hasRows={relTypes.length > 0} />
 		</div>
 	{/if}
 </Page>
