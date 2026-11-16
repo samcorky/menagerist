@@ -24,7 +24,7 @@ services:
     mem_limit: 256m
     read_only: true
     security_opt:
-      - no-new-privileges:true
+      - no-new-privileges=true
     cap_drop:
       - ALL
     user: "1000:1000"
