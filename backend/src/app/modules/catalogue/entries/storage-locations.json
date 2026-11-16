@@ -63,7 +63,8 @@
       "label": "Located in",
       "reverseLabel": "Contains",
       "description": null,
-      "directional": true
+      "directional": true,
+      "holder": "target"
     }
   ]
 }

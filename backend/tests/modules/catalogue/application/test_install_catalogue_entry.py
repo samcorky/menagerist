@@ -221,5 +221,10 @@ async def test_storage_locations_share_located_in_with_starter_types(
         "Drawer",
         "Cabinet",
     ]
+    located_in = await shared.graph_repos.edge_types.get_by_slug(
+        "located-in", scope=ContentFilter.of(ALICE.id)
+    )
+    assert located_in is not None
+    assert located_in.holder == "target"
     status = await _status(shared, ALICE, "storage-locations")
     assert status.installed is True
