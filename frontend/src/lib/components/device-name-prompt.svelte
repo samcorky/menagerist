@@ -23,18 +23,15 @@
 		ondismiss: () => void;
 	} = $props();
 
+	// The field starts empty with the generated label as its placeholder, and saving it blank
+	// takes that label as the name, so a one-tap save is possible.
 	let draft = $state('');
 	let busy = $state<string | null>(null);
 
-	// Start from the generated label, so a one-tap save is possible.
-	$effect.pre(() => {
-		if (draft === '') draft = label;
-	});
-
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		const name = draft.trim();
-		if (!name || busy) return;
+		const name = draft.trim() || label;
+		if (busy) return;
 		busy = 'new';
 		await onname(name);
 		busy = null;
@@ -74,26 +71,32 @@
 		</div>
 	{/if}
 
-	<form class="flex flex-col gap-2 sm:flex-row sm:items-end" onsubmit={save}>
-		<div class="flex-1 space-y-1.5">
+	<form class="flex flex-col gap-4" onsubmit={save}>
+		<div class="space-y-1.5">
 			<Label for="new-device-name">
 				{suggestions.length > 0 ? 'Or choose a new name' : 'Device name'}
 			</Label>
-			<Input id="new-device-name" bind:value={draft} maxlength={60} />
+			<Input
+				id="new-device-name"
+				bind:value={draft}
+				placeholder={label}
+				maxlength={60}
+				autocomplete="off"
+			/>
 		</div>
-		<div class="flex gap-2">
-			<Button type="submit" class="pointer-coarse:h-11" disabled={busy !== null || !draft.trim()}>
-				{#if busy === 'new'}<Spinner class="size-4" />{/if}
-				Save name
-			</Button>
+		<div class="flex justify-end gap-2">
 			<Button
 				type="button"
-				variant="ghost"
+				variant="outline"
 				class="pointer-coarse:h-11"
 				disabled={busy !== null}
 				onclick={ondismiss}
 			>
 				Not now
+			</Button>
+			<Button type="submit" class="pointer-coarse:h-11" disabled={busy !== null}>
+				{#if busy === 'new'}<Spinner class="size-4" />{/if}
+				Save name
 			</Button>
 		</div>
 	</form>
