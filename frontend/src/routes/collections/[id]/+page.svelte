@@ -129,7 +129,7 @@
 	const EMPTY_LINES = [
 		'This collection is quiet... too quiet.',
 		'Empty for now. Plenty of room to boldly collect.',
-		'A tidy shelf, ready for its first arrival.',
+		'Room for a first arrival.',
 		'Nothing on display. Make it so.',
 		'Space reserved for something rather special.'
 	];

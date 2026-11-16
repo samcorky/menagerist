@@ -54,7 +54,7 @@
 
 	const EMPTY_LINES = [
 		'No collections yet. The cabinet is wide open.',
-		'A blank shelf, full of potential.',
+		'A blank canvas, full of potential.',
 		'These are the voyages of your first collection.',
 		'Nothing catalogued so far. Engage when ready.',
 		'Every great collection began with an empty drawer.'
