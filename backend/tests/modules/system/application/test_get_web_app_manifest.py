@@ -10,7 +10,9 @@ from app.shared_kernel.actor import SYSTEM_ACTOR
 async def test_manifest_carries_the_configured_public_origin() -> None:
     """The origin comes from configuration, never from the request."""
     use_case = GetWebAppManifest(
-        InMemoryAccessGuard(), public_origin="https://menagerist.example.com"
+        InMemoryAccessGuard(),
+        description="An app.",
+        public_origin="https://menagerist.example.com",
     )
 
     manifest = await use_case.handle(GetWebAppManifestQuery(), SYSTEM_ACTOR)
@@ -20,11 +22,24 @@ async def test_manifest_carries_the_configured_public_origin() -> None:
 
 async def test_manifest_without_a_public_origin_has_none() -> None:
     """With no origin configured the manifest's URLs stay relative."""
-    use_case = GetWebAppManifest(InMemoryAccessGuard(), public_origin=None)
+    use_case = GetWebAppManifest(
+        InMemoryAccessGuard(), description="An app.", public_origin=None
+    )
 
     manifest = await use_case.handle(GetWebAppManifestQuery(), SYSTEM_ACTOR)
 
     assert manifest.origin is None
+
+
+async def test_manifest_carries_the_description_it_is_given() -> None:
+    """The manifest holds no fixed description: the use case's builder supplies it."""
+    use_case = GetWebAppManifest(
+        InMemoryAccessGuard(), description="Something else.", public_origin=None
+    )
+
+    manifest = await use_case.handle(GetWebAppManifestQuery(), SYSTEM_ACTOR)
+
+    assert manifest.description == "Something else."
 
 
 def test_manifest_is_public() -> None:

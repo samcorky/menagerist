@@ -51,6 +51,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
+      description: ${{ steps.version.outputs.description }}
       timestamp: ${{ steps.version.outputs.timestamp }}
     steps:
       - name: Checkout code
@@ -77,9 +78,11 @@ jobs:
         id: version
         run: |
           version="$(cd backend && uv run --locked --only-group release calver-scm --format plain version)"
+          description="$(python3 scripts/project_description.py)"
           timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           {
             echo "version=${version}"
+            echo "description=${description}"
             echo "timestamp=${timestamp}"
           } | tee -a "$GITHUB_OUTPUT"
 
@@ -262,6 +265,7 @@ jobs:
       - name: Show the build arguments
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          DESCRIPTION: ${{ needs.version.outputs.description }}
           BUILD_TIMESTAMP: ${{ needs.version.outputs.timestamp }}
           PLATFORM: ${{ matrix.platform }}
           COMMIT_SHA: ${{ github.sha }}
@@ -273,6 +277,7 @@ jobs:
             "image=${REGISTRY_IMAGE}" \
             "pushing=${PUSH}" \
             "VERSION=${VERSION}" \
+            "DESCRIPTION=${DESCRIPTION}" \
             "COMMIT_SHA=${COMMIT_SHA}" \
             "BRANCH=${BRANCH}" \
             "REPOSITORY_URL=${REPOSITORY_URL}" \
@@ -294,6 +299,7 @@ jobs:
         uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          DESCRIPTION: ${{ needs.version.outputs.description }}
           COMMIT_SHA: ${{ github.sha }}
           BRANCH: ${{ github.ref_name }}
           REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}

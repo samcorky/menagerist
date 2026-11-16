@@ -54,6 +54,7 @@ from app.modules.system.application.get_web_app_manifest import GetWebAppManifes
 from app.modules.system.application.run_browser_check import RunBrowserCheck
 from app.modules.system.application.setting_keys import RELEASE_CHANNEL
 from app.modules.system.domain.release import ReleaseChannel
+from app.platform.app_info import load_app_info
 from app.platform.config.api import get_api_settings
 from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
@@ -133,7 +134,12 @@ def get_get_version_use_case(
 def get_get_web_app_manifest_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> GetWebAppManifest:
-    return GetWebAppManifest(guard, public_origin=get_api_settings().public_origin)
+    # The same package description the API's OpenAPI summary shows.
+    return GetWebAppManifest(
+        guard,
+        description=load_app_info().project.description or "",
+        public_origin=get_api_settings().public_origin,
+    )
 
 
 async def get_version_detail_sources(

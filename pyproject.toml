@@ -1,7 +1,7 @@
 [project]
 name = "menagerist-workspace"
 version = "0.0.0"
-description = "A lightweight, self-hostable and flexible platform for organising the things you care about."
+description = "A self-hostable platform for organising the things you care about."
 requires-python = ">=3.14"
 
 dependencies = [
@@ -568,6 +568,9 @@ shell = "uv run --locked --only-group release calver-scm --format plain version"
 interpreter = ["powershell", "posix"]
 cwd = "backend"
 
+[tool.poe.groups.run.tasks._docker-description]
+cmd = "python scripts/project_description.py"
+
 [tool.poe.groups.run.tasks._docker-commit-sha]
 cmd = "python scripts/git_build_info.py commit"
 
@@ -583,7 +586,7 @@ cmd = "python scripts/git_build_info.py repository-url"
 [tool.poe.groups.run.tasks.docker-build]
 cmd = "docker buildx bake -f docker-bake.hcl local"
 help = "Build the Menagerist Docker image, with the version and git build info computed on the host (works from a worktree)"
-uses = { VERSION = "_docker-version", COMMIT_SHA = "_docker-commit-sha", BRANCH = "_docker-branch", DIRTY = "_docker-dirty", REPOSITORY_URL = "_docker-repository-url" }
+uses = { VERSION = "_docker-version", DESCRIPTION = "_docker-description", COMMIT_SHA = "_docker-commit-sha", BRANCH = "_docker-branch", DIRTY = "_docker-dirty", REPOSITORY_URL = "_docker-repository-url" }
 
 [tool.poe.groups.run.tasks.docker-config]
 cmd = "docker compose config"

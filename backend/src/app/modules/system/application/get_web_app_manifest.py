@@ -20,12 +20,15 @@ class GetWebAppManifest(UseCase[GetWebAppManifestQuery, WebAppManifest]):
 
     access: ClassVar[Access] = Public()
 
-    def __init__(self, guard: AccessGuard, *, public_origin: str | None) -> None:
+    def __init__(
+        self, guard: AccessGuard, *, description: str, public_origin: str | None
+    ) -> None:
         self._guard = guard
+        self._description = description
         self._public_origin = public_origin
 
     async def _handle(
         self, query: GetWebAppManifestQuery, actor: Actor
     ) -> WebAppManifest:
         """Return the manifest, with URLs on the public origin when one is set."""
-        return WebAppManifest(origin=self._public_origin)
+        return WebAppManifest(description=self._description, origin=self._public_origin)

@@ -65,9 +65,7 @@ class WebAppManifest:
 
     name: str = "Menagerist"
     short_name: str = "Menagerist"
-    description: str = (
-        "A self-hosted platform for organising the things you care about."
-    )
+    description: str
     origin: str | None = None
     display: str = "standalone"
     display_override: tuple[str, ...] = ("standalone", "minimal-ui")

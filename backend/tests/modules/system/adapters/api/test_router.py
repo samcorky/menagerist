@@ -479,6 +479,16 @@ def test_manifest_is_served_without_credentials_with_its_own_headers() -> None:
     assert "set-cookie" not in response.headers
 
 
+def test_manifest_describes_the_app_as_the_api_does() -> None:
+    """The manifest and the API summary both come from the package description."""
+    client = TestClient(create_app())
+
+    description = client.get("/manifest.webmanifest").json()["description"]
+
+    assert description
+    assert description == client.get("/api/openapi.json").json()["info"]["summary"]
+
+
 def test_manifest_omits_an_absent_shortcut_short_name() -> None:
     """Optional fields are left out rather than sent as null, which browsers reject."""
     shortcuts = (
