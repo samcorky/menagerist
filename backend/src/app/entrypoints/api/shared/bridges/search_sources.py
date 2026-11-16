@@ -23,6 +23,13 @@ from app.modules.collections.application.resolve_collection import (
     ResolveCollection,
     ResolveCollectionQuery,
 )
+from app.modules.examples.adapters.api.dependencies import (
+    get_list_example_packs_use_case,
+)
+from app.modules.examples.application.list_example_packs import (
+    ListExamplePacks,
+    ListExamplePacksQuery,
+)
 from app.modules.graph.adapters.api.dependencies import (
     get_list_node_types_use_case,
     get_list_nodes_use_case,
@@ -32,6 +39,10 @@ from app.modules.graph.application.list_node_types import (
     ListNodeTypesQuery,
 )
 from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
+from app.modules.identity.adapters.api.dependencies import get_list_users_use_case
+from app.modules.identity.application.list_users import ListUsers, ListUsersQuery
+from app.modules.presets.adapters.api.dependencies import get_list_presets_use_case
+from app.modules.presets.application.list_presets import ListPresets, ListPresetsQuery
 from app.modules.scheduling.adapters.api.dependencies import get_list_jobs_use_case
 from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
 from app.modules.search.domain.search_hit import SearchHit, SearchKind
@@ -169,6 +180,102 @@ class ItemTypeSource:
         return hits
 
 
+class SavedFieldSource:
+    """Saved fields, field sets and choice lists, matched on name and description.
+
+    The presets are read in full, a page at a time, and filtered here: `ListPresets`
+    can only match a label, without folding accents.
+    """
+
+    kind = SearchKind.SAVED_FIELD
+
+    def __init__(self, use_case: ListPresets) -> None:
+        self._use_case = use_case
+
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
+        """Return the actor's saved fields matching `query`."""
+        hits: list[SearchHit] = []
+        after = None
+        seen = 0
+        while seen < _TYPE_CAP:
+            page = await self._use_case.handle(
+                ListPresetsQuery(after=after, limit=_TYPE_PAGE), actor
+            )
+            seen += len(page)
+            hits.extend(
+                SearchHit(
+                    kind=self.kind,
+                    ref=str(preset.id),
+                    title=preset.label,
+                    description=preset.description,
+                    group=preset.kind,
+                )
+                for preset in page
+                if _mentions(query, preset.label, preset.description)
+            )
+            if len(page) < _TYPE_PAGE:
+                break
+            after = page[-1].id
+        return hits
+
+
+class ExamplePackSource:
+    """Example packs, matched on name and description."""
+
+    kind = SearchKind.EXAMPLE_PACK
+
+    def __init__(self, use_case: ListExamplePacks) -> None:
+        self._use_case = use_case
+
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
+        """Return example packs matching `query`."""
+        packs = await self._use_case.handle(ListExamplePacksQuery(), actor)
+        return [
+            SearchHit(
+                kind=self.kind,
+                ref=status.summary.id,
+                title=status.summary.name,
+                description=status.summary.description,
+            )
+            for status in packs
+            if _mentions(query, status.summary.name, status.summary.description)
+        ]
+
+
+class UserSource:
+    """Accounts, matched on display name and username, for administrators only.
+
+    `ListUsers` refuses anyone without `identity:user:list`, which the search treats
+    as "leave this kind out", so nobody else sees a hint that users are searched.
+    """
+
+    kind = SearchKind.USER
+
+    def __init__(self, use_case: ListUsers) -> None:
+        self._use_case = use_case
+
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
+        """Return accounts matching `query`; only an id, names and the role leave."""
+        listings = await self._use_case.handle(ListUsersQuery(), actor)
+        return [
+            SearchHit(
+                kind=self.kind,
+                ref=str(listing.user.id),
+                title=listing.user.display_name,
+                description=f"@{listing.user.username}",
+                group=listing.user.role.value,
+            )
+            for listing in listings
+            if _mentions(query, listing.user.display_name, listing.user.username)
+        ]
+
+
 class SettingSource:
     """Instance settings, matched on title, description and section."""
 
@@ -235,6 +342,9 @@ def get_search_sources(
     resolver: Annotated[ResolveCollection, Depends(get_resolve_collection_use_case)],
     collections: Annotated[ListCollections, Depends(get_list_collections_use_case)],
     node_types: Annotated[ListNodeTypes, Depends(get_list_node_types_use_case)],
+    presets: Annotated[ListPresets, Depends(get_list_presets_use_case)],
+    packs: Annotated[ListExamplePacks, Depends(get_list_example_packs_use_case)],
+    users: Annotated[ListUsers, Depends(get_list_users_use_case)],
     settings: Annotated[ListSettings, Depends(get_list_settings_use_case)],
     jobs: Annotated[ListJobs, Depends(get_list_jobs_use_case)],
 ) -> list[SearchSource]:
@@ -243,6 +353,9 @@ def get_search_sources(
         ItemSource(nodes, resolver),
         CollectionSource(collections),
         ItemTypeSource(node_types),
+        SavedFieldSource(presets),
+        ExamplePackSource(packs),
+        UserSource(users),
         SettingSource(settings),
         ScheduledTaskSource(jobs),
     ]

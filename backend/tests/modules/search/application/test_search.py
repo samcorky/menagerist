@@ -53,6 +53,28 @@ async def test_ties_fall_back_to_the_kind_order_then_the_title() -> None:
     assert [h.title for h in outcome.hits] == ["Film a", "Film z", "Film b"]
 
 
+async def test_new_kinds_tie_after_item_types_and_before_settings() -> None:
+    """A person's equal match never outranks library content, and settings come last."""
+    order = [
+        SearchKind.ITEM,
+        SearchKind.COLLECTION,
+        SearchKind.ITEM_TYPE,
+        SearchKind.SAVED_FIELD,
+        SearchKind.EXAMPLE_PACK,
+        SearchKind.USER,
+        SearchKind.SETTING,
+        SearchKind.SCHEDULED_TASK,
+    ]
+    sources = [
+        InMemorySearchSource(kind, [hit(kind, f"Film {kind.value}")])
+        for kind in reversed(order)
+    ]
+
+    outcome = await search(*sources).handle(SearchQuery(q="film"), MEMBER)
+
+    assert [h.kind for h in outcome.hits] == order
+
+
 async def test_a_match_on_neither_title_nor_description_still_counts() -> None:
     """A source may match on something the search cannot see."""
     items = InMemorySearchSource(SearchKind.ITEM, [hit(SearchKind.ITEM, "Dune")])

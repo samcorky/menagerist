@@ -6,6 +6,11 @@ import {
 	rankByName,
 	matchPages,
 	paletteLayout,
+	roleLabel,
+	savedFieldKind,
+	EXAMPLE_PACKS_PAGE,
+	SAVED_FIELDS_PAGE,
+	USERS_PAGE,
 	settingPath,
 	taskPath,
 	descriptionSnippet,
@@ -20,6 +25,9 @@ describe('GROUP_CAPS', () => {
 			items: 5,
 			collections: 3,
 			itemTypes: 3,
+			savedFields: 3,
+			packs: 3,
+			users: 3,
 			pages: 4,
 			settings: 4,
 			tasks: 3,
@@ -144,9 +152,12 @@ describe('paletteLayout', () => {
 			'items',
 			'collections',
 			'itemTypes',
+			'savedFields',
+			'packs',
 			'pages',
 			'settings',
-			'tasks'
+			'tasks',
+			'users'
 		]);
 		expect(paletteLayout('/').collection).toBeNull();
 	});
@@ -160,13 +171,20 @@ describe('paletteLayout', () => {
 		expect(paletteLayout('/settings/server').order.slice(0, 2)).toEqual(['settings', 'tasks']);
 		expect(first('/admin')).toBe('settings');
 		expect(first('/items/')).toBe('items');
-		expect(paletteLayout('/settings/server').order).toHaveLength(6);
+		expect(paletteLayout('/settings/server').order).toHaveLength(9);
+	});
+	it('leads with saved fields, example packs or users on the page that holds them', () => {
+		expect(first('/library/saved-fields')).toBe('savedFields');
+		expect(first('/library/examples')).toBe('packs');
+		// The users page leads with people, not the settings every other admin page leads with.
+		expect(paletteLayout('/admin/users').order.slice(0, 1)).toEqual(['users']);
+		expect(paletteLayout('/admin/devices').order[0]).toBe('settings');
 	});
 	it('leads with the collection items on a collection page', () => {
 		const layout = paletteLayout('/collections/my%20films');
 		expect(layout.collection).toBe('my films');
 		expect(layout.order[0]).toBe('collectionItems');
-		expect(layout.order).toHaveLength(7);
+		expect(layout.order).toHaveLength(10);
 		expect(paletteLayout('/collections/%E0%A4%A').collection).toBe('%E0%A4%A');
 	});
 	it('gives no group extra rows when no page leads', () => {
@@ -176,6 +194,25 @@ describe('paletteLayout', () => {
 		const { caps } = paletteLayout('/settings/server');
 		expect(caps.settings).toBe(GROUP_CAPS.settings + 3);
 		expect(caps.tasks).toBe(GROUP_CAPS.tasks);
+	});
+});
+
+describe('saved field and person wording', () => {
+	it('names the three saved field kinds as the Saved fields page does', () => {
+		expect(savedFieldKind('field')).toBe('Field');
+		expect(savedFieldKind('field_set')).toBe('Field group');
+		expect(savedFieldKind('choice_list')).toBe('List');
+		expect(savedFieldKind(null)).toBe('Field');
+	});
+	it('words a role as the Users page does', () => {
+		expect(roleLabel('admin')).toBe('Administrator');
+		expect(roleLabel('member')).toBe('Member');
+		expect(roleLabel(undefined)).toBe('Member');
+	});
+	it('opens the page that holds each kind', () => {
+		expect(SAVED_FIELDS_PAGE).toBe('/library/saved-fields');
+		expect(EXAMPLE_PACKS_PAGE).toBe('/library/examples');
+		expect(USERS_PAGE).toBe('/admin/users');
 	});
 });
 

@@ -13,6 +13,9 @@ class SearchKind(StrEnum):
     ITEM = "item"
     COLLECTION = "collection"
     ITEM_TYPE = "item_type"
+    SAVED_FIELD = "saved_field"
+    EXAMPLE_PACK = "example_pack"
+    USER = "user"
     SETTING = "setting"
     SCHEDULED_TASK = "scheduled_task"
 
@@ -60,15 +63,17 @@ def score(query: str, title: str, description: str | None = None) -> int:
 class SearchHit:
     """One thing found, with enough to show it and to open it.
 
-    `ref` is what the owner calls it: an id for items and collections, a slug
-    for item types, a key for settings and scheduled tasks.
+    `ref` is what the owner calls it: an id for items, collections, saved fields
+    and users, a slug for item types, a pack's id for example packs, a key for
+    settings and scheduled tasks.
     """
 
     kind: SearchKind
     ref: str
     title: str
     description: str | None = None
-    # Where it lives or what it is: an item's type slug, a setting's group.
+    # Where it lives or what it is: an item's type slug, a setting's group, a saved
+    # field's kind, a user's role.
     group: str | None = None
     # A collection's address segment and live item count.
     slug: str | None = None

@@ -22,8 +22,13 @@
 		localScore,
 		orderGroups,
 		paletteLayout,
+		roleLabel,
+		savedFieldKind,
 		settingPath,
 		taskPath,
+		EXAMPLE_PACKS_PAGE,
+		SAVED_FIELDS_PAGE,
+		USERS_PAGE,
 		type PaletteGroup,
 		type StaticRoute
 	} from '$lib/palette-search';
@@ -54,6 +59,9 @@
 		'items',
 		'collections',
 		'itemTypes',
+		'savedFields',
+		'packs',
+		'users',
 		'settings',
 		'tasks',
 		'collectionItems'
@@ -62,6 +70,9 @@
 		items: 'items',
 		collections: 'collections',
 		itemTypes: 'item types',
+		savedFields: 'saved fields',
+		packs: 'example packs',
+		users: 'users',
 		settings: 'settings',
 		tasks: 'scheduled tasks',
 		collectionItems: 'items in this collection'
@@ -71,6 +82,9 @@
 		items: { status: 'ok', rows: [] },
 		collections: { status: 'ok', rows: [] },
 		itemTypes: { status: 'ok', rows: [] },
+		savedFields: { status: 'ok', rows: [] },
+		packs: { status: 'ok', rows: [] },
+		users: { status: 'ok', rows: [] },
 		settings: { status: 'ok', rows: [] },
 		tasks: { status: 'ok', rows: [] },
 		collectionItems: { status: 'ok', rows: [] },
@@ -108,9 +122,22 @@
 	const layout = $derived(paletteLayout(page.url.pathname));
 	const canSettings = $derived(auth.can('settings:instance:read'));
 	const canTasks = $derived(auth.can('scheduling:job:read'));
-	const hint = $derived(
-		`Type to search items, collections, item types and pages${canSettings || canTasks ? ', settings and scheduled tasks' : ''}`
-	);
+	const canUsers = $derived(auth.can('identity:user:list'));
+	// Only what this person may open is named, so nobody learns of a kind they cannot search.
+	const hint = $derived.by(() => {
+		const kinds = [
+			'items',
+			'collections',
+			'item types',
+			'saved fields',
+			'example packs',
+			'pages',
+			...(canSettings ? ['settings'] : []),
+			...(canTasks ? ['scheduled tasks'] : []),
+			...(canUsers ? ['users'] : [])
+		];
+		return `Type to search ${kinds.slice(0, -1).join(', ')} and ${kinds[kinds.length - 1]}`;
+	});
 
 	const pending = $derived(debouncing || loading.length > 0);
 	const okRows = <T,>(state: GroupState<T>): T[] => (state.status === 'ok' ? state.rows : []);
@@ -125,6 +152,9 @@
 			okRows(groups.collectionItems).length +
 			okRows(groups.collections).length +
 			okRows(groups.itemTypes).length +
+			okRows(groups.savedFields).length +
+			okRows(groups.packs).length +
+			okRows(groups.users).length +
 			okRows(groups.settings).length +
 			okRows(groups.tasks).length +
 			groups.pages.length
@@ -149,6 +179,9 @@
 		score('items', otherItems);
 		score('collections', okRows(groups.collections));
 		score('itemTypes', okRows(groups.itemTypes));
+		score('savedFields', okRows(groups.savedFields));
+		score('packs', okRows(groups.packs));
+		score('users', okRows(groups.users));
 		score('settings', okRows(groups.settings));
 		score('tasks', okRows(groups.tasks));
 		score('collectionItems', okRows(groups.collectionItems));
@@ -181,6 +214,12 @@
 				];
 			case 'itemTypes':
 				return okRows(groups.itemTypes).map((r) => `type:${r.ref}`);
+			case 'savedFields':
+				return okRows(groups.savedFields).map((r) => `saved-field:${r.ref}`);
+			case 'packs':
+				return okRows(groups.packs).map((r) => `pack:${r.ref}`);
+			case 'users':
+				return okRows(groups.users).map((r) => `user:${r.ref}`);
 			case 'settings':
 				return okRows(groups.settings).map((r) => `setting:${r.ref}`);
 			case 'tasks':
@@ -383,6 +422,10 @@
 			() => void goto(resolve(`/items?${new URLSearchParams({ type: slug }).toString()}`))
 		);
 	const openPage = (path: StaticRoute) => choose('pages', () => void goto(resolve(path)));
+	// The pages open at the top: none of them takes a link to one row.
+	const openSavedField = () => choose('savedFields', () => void goto(resolve(SAVED_FIELDS_PAGE)));
+	const openPack = () => choose('packs', () => void goto(resolve(EXAMPLE_PACKS_PAGE)));
+	const openUser = () => choose('users', () => void goto(resolve(USERS_PAGE)));
 	const openSetting = (setting: Hit) =>
 		choose(
 			'settings',
@@ -507,6 +550,84 @@
 	{/if}
 {/snippet}
 
+{#snippet savedFieldsGroup()}
+	{#if showFailed('savedFields')}
+		<Command.Group heading="Saved fields">{@render failedRow('savedFields')}</Command.Group>
+	{:else if okRows(groups.savedFields).length > 0}
+		<Command.Group heading="Saved fields">
+			{#each okRows(groups.savedFields) as field (field.ref)}
+				<Command.Item
+					disabled={isStale('savedFields')}
+					value={`saved-field:${field.ref}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={openSavedField}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{field.title}</span>
+						<p class="truncate text-xs text-muted-foreground">{savedFieldKind(field.group)}</p>
+						{#if descriptionSnippet(field.title, field.description, query)}
+							<p class="truncate text-xs text-muted-foreground">
+								{descriptionSnippet(field.title, field.description, query)}
+							</p>
+						{/if}
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
+{#snippet packsGroup()}
+	{#if showFailed('packs')}
+		<Command.Group heading="Example packs">{@render failedRow('packs')}</Command.Group>
+	{:else if okRows(groups.packs).length > 0}
+		<Command.Group heading="Example packs">
+			{#each okRows(groups.packs) as pack (pack.ref)}
+				<Command.Item
+					disabled={isStale('packs')}
+					value={`pack:${pack.ref}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={openPack}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{pack.title}</span>
+						<p class="truncate text-xs text-muted-foreground">Example pack</p>
+						{#if descriptionSnippet(pack.title, pack.description, query)}
+							<p class="truncate text-xs text-muted-foreground">
+								{descriptionSnippet(pack.title, pack.description, query)}
+							</p>
+						{/if}
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
+{#snippet usersGroup()}
+	{#if showFailed('users')}
+		<Command.Group heading="Users">{@render failedRow('users')}</Command.Group>
+	{:else if okRows(groups.users).length > 0}
+		<Command.Group heading="Users">
+			{#each okRows(groups.users) as person (person.ref)}
+				<Command.Item
+					disabled={isStale('users')}
+					value={`user:${person.ref}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={openUser}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{person.title}</span>
+						<p class="truncate text-xs text-muted-foreground">
+							{person.description} · {roleLabel(person.group)}
+						</p>
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
 {#snippet settingsGroup()}
 	{#if showFailed('settings')}
 		<Command.Group heading="Settings">{@render failedRow('settings')}</Command.Group>
@@ -612,6 +733,12 @@
 					{@render collectionsGroup()}
 				{:else if key === 'itemTypes'}
 					{@render itemTypesGroup()}
+				{:else if key === 'savedFields'}
+					{@render savedFieldsGroup()}
+				{:else if key === 'packs'}
+					{@render packsGroup()}
+				{:else if key === 'users'}
+					{@render usersGroup()}
 				{:else if key === 'settings'}
 					{@render settingsGroup()}
 				{:else if key === 'tasks'}

@@ -33,6 +33,9 @@ const KIND_GROUP: Record<SearchKind, AsyncGroupKey> = {
 	item: 'items',
 	collection: 'collections',
 	item_type: 'itemTypes',
+	saved_field: 'savedFields',
+	example_pack: 'packs',
+	user: 'users',
 	setting: 'settings',
 	scheduled_task: 'tasks'
 };
@@ -80,6 +83,9 @@ const emptyGroups = (): Omit<Results, 'pages'> => ({
 	items: { status: 'ok', rows: [] },
 	collections: { status: 'ok', rows: [] },
 	itemTypes: { status: 'ok', rows: [] },
+	savedFields: { status: 'ok', rows: [] },
+	packs: { status: 'ok', rows: [] },
+	users: { status: 'ok', rows: [] },
 	settings: { status: 'ok', rows: [] },
 	tasks: { status: 'ok', rows: [] },
 	collectionItems: { status: 'ok', rows: [] }
