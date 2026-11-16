@@ -30,6 +30,14 @@ class InMemorySignInAttemptRepository:
                 locked[key] = current.locked_until
         return locked
 
+    async def all_locked(self, *, now: datetime) -> dict[ThrottleKey, datetime]:
+        """Return every key locked at `now`, with when its lock ends."""
+        return {
+            key: current.locked_until
+            for key, current in self.windows.items()
+            if current.locked_until is not None and now < current.locked_until
+        }
+
     async def record_failure(
         self, key: ThrottleKey, *, limit: int, window: timedelta, now: datetime
     ) -> AttemptWindow:

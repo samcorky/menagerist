@@ -46,6 +46,18 @@ class SqlAlchemySignInAttemptRepository:
             if until is not None
         }
 
+    async def all_locked(self, *, now: datetime) -> dict[ThrottleKey, datetime]:
+        """Return every key locked at `now`, with when its lock ends."""
+        model = SignInAttemptModel
+        stmt = select(model.key_type, model.key_hash, model.locked_until).where(
+            model.locked_until > now
+        )
+        return {
+            ThrottleKey(kind=ThrottleKind(kind), digest=digest): until
+            for kind, digest, until in (await self._session.execute(stmt)).all()
+            if until is not None
+        }
+
     async def record_failure(
         self, key: ThrottleKey, *, limit: int, window: timedelta, now: datetime
     ) -> AttemptWindow:

@@ -9,6 +9,9 @@ from app.entrypoints.api.shared.bridges.scheduler_jobs_check import SchedulerJob
 from app.entrypoints.api.shared.bridges.scheduler_worker_check import (
     SchedulerWorkerCheck,
 )
+from app.entrypoints.api.shared.bridges.sign_in_protection_check import (
+    SignInProtectionCheck,
+)
 from app.entrypoints.api.shared.settings_reader import get_settings_reader
 from app.modules.system.adapters.persistence.unit_of_work import create_system_uow
 from app.modules.system.adapters.persistence.update_check_store import (
@@ -98,6 +101,7 @@ def _readiness_registry(
             get_storage_check(),
             SchedulerWorkerCheck(session_factory),
             SchedulerJobsCheck(session_factory),
+            SignInProtectionCheck(session_factory),
         ]
     )
 

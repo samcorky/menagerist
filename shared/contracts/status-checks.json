@@ -104,6 +104,21 @@
       "key": "scheduler:failingJobs",
       "unit": "jobs",
       "sample": 2
+    },
+    {
+      "key": "identity:lockedAccounts",
+      "unit": "locked",
+      "sample": 2
+    },
+    {
+      "key": "identity:guessedNames",
+      "unit": "locked",
+      "sample": 2
+    },
+    {
+      "key": "identity:lockedAddresses",
+      "unit": "locked",
+      "sample": 2
     }
   ],
   "states": [

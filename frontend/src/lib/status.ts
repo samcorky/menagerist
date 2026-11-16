@@ -84,6 +84,7 @@ export function formatObservedValue(value: unknown, unit: string | null | undefi
 		if (value === 0) return 'None';
 		return `${value} ${value === 1 ? 'job' : 'jobs'}`;
 	}
+	if (unit === 'locked') return value === 0 ? 'None locked' : `${value} locked`;
 	if (unit === 'exempt hosts') {
 		if (value === 0) return 'No exemptions';
 		return `${value} ${value === 1 ? 'entry skips' : 'entries skip'} the proxy`;

@@ -214,6 +214,11 @@ describe('formatObservedValue for the outbound proxy', () => {
 		expect(formatObservedValue(1, 'jobs')).toBe('1 job');
 		expect(formatObservedValue(3, 'jobs')).toBe('3 jobs');
 	});
+
+	it('counts sign-in locks', () => {
+		expect(formatObservedValue(0, 'locked')).toBe('None locked');
+		expect(formatObservedValue(2, 'locked')).toBe('2 locked');
+	});
 });
 
 describe('releaseViewOf', () => {
