@@ -42,6 +42,10 @@ class SessionNotFoundError(NotFoundError):
     """Raised when a requested session does not exist."""
 
 
+class InvalidDeviceNameError(ValidationError):
+    """Raised when a device name is too long."""
+
+
 class DeviceNotFoundError(NotFoundError):
     """Raised when a requested device does not exist or is someone else's."""
 

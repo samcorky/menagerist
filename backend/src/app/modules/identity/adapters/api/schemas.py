@@ -20,6 +20,7 @@ from app.modules.identity.application.setup_first_admin import SetupFirstAdminCo
 from app.modules.identity.application.sign_in import SignInCommand
 from app.modules.identity.application.update_user import UpdateUserCommand
 from app.modules.identity.domain.api_token import MAX_TOKEN_NAME_LENGTH
+from app.modules.identity.domain.device import MAX_DEVICE_NAME_LENGTH
 from app.modules.identity.domain.session import DisplayMode
 from app.modules.identity.domain.user import (
     MAX_DISPLAY_NAME_LENGTH,
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
     from app.modules.identity.application.setup_first_admin import SetupFirstAdminResult
     from app.modules.identity.application.user_listing import UserListing
     from app.modules.identity.domain.api_token import ApiToken
+    from app.modules.identity.domain.device import Device
     from app.modules.identity.domain.user import User
 
 # Generous bounds only stop absurd bodies; the domain applies the real password rules.
@@ -378,11 +380,13 @@ _ADMIN_SESSION_EXAMPLE: dict[str, Any] = {
     "last_seen_at": "2026-10-10T12:30:00.000000Z",
     "expires_at": "2026-10-11T12:00:00.000000Z",
     "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+    "device_name": "Alice's laptop",
     "display_mode": "browser",
 }
 
 DEVICE_EXAMPLE: dict[str, Any] = {
     "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+    "name": "Alice's laptop",
     "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
     "platform": "Linux",
     "mobile": False,
@@ -459,6 +463,10 @@ class OwnDeviceResponse(BaseModel):
         default=None,
         description="The device's id; null for a session from before devices.",
     )
+    name: str | None = Field(
+        default=None,
+        description="The name its owner gave the browser; null when it has none.",
+    )
     user_agent: str | None = Field(
         default=None, description="The browser's user agent at its last sign-in."
     )
@@ -498,6 +506,7 @@ class OwnDeviceResponse(BaseModel):
             )
         return cls(
             id=device.id,
+            name=device.name,
             user_agent=device.user_agent,
             platform=device.platform,
             mobile=device.mobile,
@@ -538,6 +547,10 @@ class AdminSessionResponse(BaseModel):
         default=None,
         description="The remembered browser this session was started in, if any.",
     )
+    device_name: str | None = Field(
+        default=None,
+        description="The name its owner gave that browser, if it has one.",
+    )
     display_mode: DisplayMode | None = Field(
         default=None,
         description=(
@@ -563,7 +576,78 @@ class AdminSessionResponse(BaseModel):
             last_seen_at=session.last_seen_at,
             expires_at=session.expires_at,
             device_id=session.device_id,
+            device_name=listing.device_name,
             display_mode=session.display_mode,
+        )
+
+
+DEVICE_NAME_EXAMPLE: dict[str, Any] = {
+    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+    "name": "Alice's laptop",
+}
+DEVICE_NAME_SUGGESTION_EXAMPLE: dict[str, Any] = {
+    **DEVICE_NAME_EXAMPLE,
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+    "platform": "Linux",
+    "last_seen_at": "2026-10-10T12:30:00.000000Z",
+}
+
+
+class RenameDeviceRequest(RequestModel):
+    """Request body for naming a device, or clearing its name."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"name": "Alice's laptop"}]}
+    )
+
+    name: str | None = Field(
+        description=(
+            f"The name to give the device, at most {MAX_DEVICE_NAME_LENGTH}"
+            + " characters once trimmed. Null or blank clears it."
+        ),
+    )
+
+
+class DeviceNameResponse(BaseModel):
+    """A device and the name it now has."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [DEVICE_NAME_EXAMPLE]})
+
+    id: uuid.UUID = Field(description="The device's id.")
+    name: str | None = Field(description="Its name; null when it has none.")
+
+    @classmethod
+    def from_domain(cls, device: Device) -> DeviceNameResponse:
+        """Build a response from a `Device`."""
+        return cls(id=device.id, name=device.name)
+
+
+class DeviceNameSuggestionResponse(BaseModel):
+    """An older device of yours whose name this browser could take."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [DEVICE_NAME_SUGGESTION_EXAMPLE]}
+    )
+
+    id: uuid.UUID = Field(description="The older device's id.")
+    name: str = Field(description="The name it would give this browser.")
+    user_agent: str | None = Field(
+        default=None, description="The older browser's user agent at its last sign-in."
+    )
+    platform: str | None = Field(
+        default=None, description="The platform the older browser reported."
+    )
+    last_seen_at: datetime = Field(description="When the older device was last used.")
+
+    @classmethod
+    def from_domain(cls, device: Device) -> DeviceNameSuggestionResponse:
+        """Build a response from a named `Device`."""
+        return cls(
+            id=device.id,
+            name=device.name or "",
+            user_agent=device.user_agent,
+            platform=device.platform,
+            last_seen_at=device.last_seen_at,
         )
 
 

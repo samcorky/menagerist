@@ -1,5 +1,5 @@
 import { expect, request, apiSessionOptions, signInViaApi, test, type Page } from './fixtures';
-import { asUser, createUserViaApi, type E2EUser } from './helpers';
+import { asUser, createUserViaApi, type E2EUser, skipDeviceNamePrompt } from './helpers';
 
 /**
  * Sign-in visibility and account upkeep: last sign-in, display name, disabled and locked accounts.
@@ -14,6 +14,7 @@ const userRow = (page: Page, user: E2EUser) =>
 async function signInThroughForm(page: Page, username: string, password: string) {
 	await page.getByLabel('Username').fill(username);
 	await page.getByLabel('Password', { exact: true }).fill(password);
+	await skipDeviceNamePrompt(page);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 

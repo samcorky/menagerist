@@ -96,8 +96,25 @@ export function describeDevice(info: DeviceInfo): DescribedDevice {
 /** What signing out one row of the devices list ends: a whole device, or one older session. */
 export type DeviceRevoke = { kind: 'device'; id: string } | { kind: 'session'; id: string };
 
+/**
+ * What to show for a device: its name leads and the generated label sits beneath it; an unnamed
+ * device shows the label alone.
+ */
+export function nameDevice(
+	name: string | null | undefined,
+	label: string
+): { title: string; subtitle: string | null } {
+	const trimmed = name?.trim();
+	return trimmed ? { title: trimmed, subtitle: label } : { title: label, subtitle: null };
+}
+
 export interface DeviceRow extends DescribedDevice {
 	key: string;
+	/** The device's id, or `null` for a session from before devices, which cannot be named. */
+	deviceId: string | null;
+	name: string | null;
+	title: string;
+	subtitle: string | null;
 	userAgent: string | null;
 	address: string | null;
 	firstSeen: string;
@@ -121,7 +138,10 @@ export function deviceRow(device: OwnDeviceResponse): DeviceRow {
 	});
 	return {
 		...described,
+		...nameDevice(device.name, described.label),
 		key: device.id ?? `session-${latest?.id}`,
+		deviceId: device.id ?? null,
+		name: device.name ?? null,
 		userAgent: device.user_agent ?? null,
 		address: latest?.client_ip ?? null,
 		firstSeen: device.first_seen_at,

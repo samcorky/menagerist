@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { describeDevice, deviceRow } from '../src/lib/devices';
+import { describeDevice, deviceRow, nameDevice } from '../src/lib/devices';
 import type { OwnDeviceResponse, SessionResponse } from '../src/lib/api/client';
 
 describe('describeDevice', () => {
@@ -263,6 +263,10 @@ describe('deviceRow', () => {
 			label: 'App on Linux (Firefox)',
 			kind: 'desktop',
 			key: 'd1',
+			deviceId: 'd1',
+			name: null,
+			title: 'App on Linux (Firefox)',
+			subtitle: null,
 			userAgent: device().user_agent,
 			address: '192.0.2.1',
 			firstSeen: '2026-09-01T08:00:00Z',
@@ -281,5 +285,33 @@ describe('deviceRow', () => {
 
 	it('marks this device', () => {
 		expect(deviceRow(device({ current: true })).current).toBe(true);
+	});
+
+	it('leads with the name and keeps the generated label as the subtitle', () => {
+		const row = deviceRow(device({ name: "Sam's phone" }));
+		expect(row.title).toBe("Sam's phone");
+		expect(row.subtitle).toBe('App on Linux (Firefox)');
+		expect(row.label).toBe('App on Linux (Firefox)');
+	});
+
+	it('cannot name a session from before devices were remembered', () => {
+		const row = deviceRow(device({ id: null, sessions: [session({ id: 'legacy' })] }));
+		expect(row.deviceId).toBeNull();
+		expect(row.title).toBe(row.label);
+		expect(row.subtitle).toBeNull();
+	});
+});
+
+describe('nameDevice', () => {
+	it('uses the name, or the generated label when there is none', () => {
+		expect(nameDevice("Sam's phone", 'Chrome on Android')).toEqual({
+			title: "Sam's phone",
+			subtitle: 'Chrome on Android'
+		});
+		expect(nameDevice(null, 'Chrome on Android')).toEqual({
+			title: 'Chrome on Android',
+			subtitle: null
+		});
+		expect(nameDevice('   ', 'Chrome on Android').title).toBe('Chrome on Android');
 	});
 });

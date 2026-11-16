@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { createUserViaApi } from './helpers';
+import { createUserViaApi, skipDeviceNamePrompt } from './helpers';
 
 /**
  * Chromium cannot emulate `display-mode` (CDP's `setEmulatedMedia` ignores it), so the page's
@@ -72,6 +72,7 @@ test('signing in from the installed app is shown on the devices list, and change
 	await page.goto('/login');
 	await page.getByLabel('Username').fill(user.username);
 	await page.getByLabel('Password', { exact: true }).fill(user.password);
+	await skipDeviceNamePrompt(page);
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 	await expect(page.getByRole('link', { name: 'Home', exact: true }).first()).toBeVisible();
 	expect(new Set(modes)).toEqual(new Set(['standalone']));

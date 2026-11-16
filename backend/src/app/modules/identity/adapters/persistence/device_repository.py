@@ -27,6 +27,7 @@ def _to_domain(model: DeviceModel) -> Device:
         user_agent=model.user_agent,
         platform=model.platform,
         mobile=model.mobile,
+        name=model.name,
     )
 
 
@@ -42,6 +43,7 @@ def _to_model(device: Device) -> DeviceModel:
         user_agent=device.user_agent,
         platform=device.platform,
         mobile=device.mobile,
+        name=device.name,
     )
 
 

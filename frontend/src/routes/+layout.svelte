@@ -60,6 +60,7 @@
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
 	import SearchPalette from '$lib/components/search-palette.svelte';
 	import CaptureSheet from '$lib/components/capture-sheet.svelte';
+	import DeviceNameDialog from '$lib/components/device-name-dialog.svelte';
 	import { registerShortcut, attachShortcuts } from '$lib/shortcuts.svelte';
 	import ShortcutsHelpDialog from '$lib/components/shortcuts-help-dialog.svelte';
 
@@ -316,6 +317,7 @@
 
 <Toaster richColors position="top-right" offset={{ top: '76px' }} mobileOffset={{ top: '68px' }} />
 <CaptureSheet />
+<DeviceNameDialog />
 {#if !inlineSearch.current}
 	<SearchPalette />
 {/if}

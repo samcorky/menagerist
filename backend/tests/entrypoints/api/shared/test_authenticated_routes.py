@@ -49,6 +49,7 @@ IDENTITY_PREFIXES = (
     "/v1/auth/",
     "/v1/users",
     "/v1/sessions",
+    "/v1/devices",
     "/v1/tokens",
     "/v1/me/password",
     "/v1/me/sessions",

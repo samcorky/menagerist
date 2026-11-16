@@ -6,6 +6,7 @@
 		listOwnSessions,
 		listSessions,
 		listUsers,
+		renameDevice,
 		revokeSession,
 		type AdminSessionResponse,
 		type UserResponse
@@ -13,13 +14,14 @@
 	import { untrack } from 'svelte';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
-	import { describeDevice, formatRelativeTime } from '$lib/devices';
+	import { describeDevice, formatRelativeTime, nameDevice } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
+	import DeviceTitle from '$lib/components/device-title.svelte';
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -119,6 +121,23 @@
 		void loadSessions();
 	}
 
+	async function saveName(deviceId: string, name: string | null): Promise<boolean> {
+		try {
+			const res = await renameDevice({ path: { device_id: deviceId }, body: { name } });
+			if (res.error || !res.data) {
+				toast.error(errorMessage(res.error));
+				return false;
+			}
+			const saved = res.data.name ?? null;
+			sessions = sessions.map((s) => (s.device_id === deviceId ? { ...s, device_name: saved } : s));
+			toast.success(saved ? 'Device named' : 'Device name cleared');
+			return true;
+		} catch {
+			toast.error('Could not save the name.');
+			return false;
+		}
+	}
+
 	async function handleRevoke(sessionId: string) {
 		if (revokingId !== null) return;
 		revokingId = sessionId;
@@ -215,7 +234,15 @@
 						<Table.Cell>
 							<div class="flex items-center gap-2">
 								<DeviceIcon kind={described.kind} class="size-4 shrink-0 text-muted-foreground" />
-								<span title={session.user_agent ?? undefined}>{described.label}</span>
+								<DeviceTitle
+									{...nameDevice(session.device_name, described.label)}
+									name={session.device_name ?? null}
+									label={described.label}
+									userAgent={session.user_agent}
+									onsave={canRevoke && session.device_id
+										? (name) => saveName(session.device_id!, name)
+										: undefined}
+								/>
 							</div>
 						</Table.Cell>
 						<Table.Cell class="text-muted-foreground">{session.client_ip ?? '—'}</Table.Cell>
@@ -267,9 +294,15 @@
 										</div>
 										<div class="space-y-0.5">
 											<div class="flex flex-wrap items-center gap-2">
-												<p class="font-medium" title={session.user_agent ?? undefined}>
-													{described.label}
-												</p>
+												<DeviceTitle
+													{...nameDevice(session.device_name, described.label)}
+													name={session.device_name ?? null}
+													label={described.label}
+													userAgent={session.user_agent}
+													onsave={canRevoke && session.device_id
+														? (name) => saveName(session.device_id!, name)
+														: undefined}
+												/>
 												{#if session.id === currentSessionId}
 													<Badge variant="secondary">This device</Badge>
 												{/if}

@@ -23073,6 +23073,7 @@
                 "example": [
                   {
                     "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                    "name": "Alice's laptop",
                     "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
                     "platform": "Linux",
                     "mobile": false,
@@ -23099,12 +23100,26 @@
               }
             },
             "links": {
+              "RenameOwnDevice": {
+                "operationId": "rename_own_device",
+                "parameters": {
+                  "device_id": "$response.body#/0/id"
+                },
+                "description": "Rename own device with the id from this response."
+              },
               "RevokeOwnDevice": {
                 "operationId": "revoke_own_device",
                 "parameters": {
                   "device_id": "$response.body#/0/id"
                 },
                 "description": "Revoke own device with the id from this response."
+              },
+              "AdoptDeviceName": {
+                "operationId": "adopt_device_name",
+                "parameters": {
+                  "device_id": "$response.body#/0/id"
+                },
+                "description": "Adopt device name with the id from this response."
               }
             }
           },
@@ -23365,6 +23380,503 @@
                       "status": 500,
                       "detail": "An unexpected error occurred.",
                       "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "v1",
+          "Authentication",
+          "Sessions"
+        ],
+        "summary": "Rename Own Device",
+        "description": "Name one of your devices, or clear its name with a blank one.",
+        "operationId": "rename_own_device",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The device to name.",
+              "title": "Device Id"
+            },
+            "description": "The device to name."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameDeviceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceNameResponse"
+                },
+                "example": {
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                  "name": "Alice's laptop"
+                }
+              }
+            },
+            "links": {
+              "RevokeOwnDevice": {
+                "operationId": "revoke_own_device",
+                "parameters": {
+                  "device_id": "$response.body#/id"
+                },
+                "description": "Revoke own device with the id from this response."
+              },
+              "AdoptDeviceName": {
+                "operationId": "adopt_device_name",
+                "parameters": {
+                  "device_id": "$response.body#/id"
+                },
+                "description": "Adopt device name with the id from this response."
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a device name is too long.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidDeviceNameError",
+                  "status": 400,
+                  "detail": "A device name can be at most 60 characters.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested device does not exist or is someone else's.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "DeviceNotFoundError",
+                  "status": 404,
+                  "detail": "That device was not found.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/devices/suggestions": {
+      "get": {
+        "tags": [
+          "v1",
+          "Authentication",
+          "Sessions"
+        ],
+        "summary": "List Device Name Suggestions",
+        "description": "List older devices of yours whose name this browser could take.\n\nOnly unused devices of the same browser, platform and mobile flag are\nlisted, and only while this browser has no name of its own.",
+        "operationId": "list_device_name_suggestions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceNameSuggestionResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Device Name Suggestions",
+                  "description": "Each entry is a `DeviceNameSuggestionResponse`."
+                },
+                "example": [
+                  {
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                    "name": "Alice's laptop",
+                    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
+                    "platform": "Linux",
+                    "last_seen_at": "2026-10-10T12:30:00.000000Z"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/suggestions"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/suggestions"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/suggestions"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/suggestions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/devices/{device_id}/adopt": {
+      "post": {
+        "tags": [
+          "v1",
+          "Authentication",
+          "Sessions"
+        ],
+        "summary": "Adopt Device Name",
+        "description": "Take an older device's name for this browser and forget that device.\n\nThe older device is signed out. Only a device listed by\n`GET /me/devices/suggestions` can be taken.",
+        "operationId": "adopt_device_name",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The older device whose name to take.",
+              "title": "Device Id"
+            },
+            "description": "The older device whose name to take."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceNameResponse"
+                },
+                "example": {
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                  "name": "Alice's laptop"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/adopt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/adopt"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/adopt"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/adopt"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested device does not exist or is someone else's.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "DeviceNotFoundError",
+                  "status": 404,
+                  "detail": "That device's name cannot be reused.",
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/adopt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/adopt"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/adopt"
                     }
                   }
                 }
@@ -24784,6 +25296,7 @@
                     "client_platform": "Linux",
                     "created_at": "2026-10-10T12:00:00.000000Z",
                     "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                    "device_name": "Alice's laptop",
                     "display_mode": "browser",
                     "display_name": "Alice Example",
                     "expires_at": "2026-10-11T12:00:00.000000Z",
@@ -25034,6 +25547,179 @@
                       "status": 500,
                       "detail": "An unexpected error occurred.",
                       "instance": "https://menagerist.example/api/v1/sessions/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "identity:session:revoke"
+      }
+    },
+    "/api/v1/devices/{device_id}": {
+      "patch": {
+        "tags": [
+          "v1",
+          "Sessions"
+        ],
+        "summary": "Rename Device",
+        "description": "Rename any user's device, or clear its name. Administrators only.\n\n**Requires permission:** `identity:session:revoke`",
+        "operationId": "rename_device",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The device to rename.",
+              "title": "Device Id"
+            },
+            "description": "The device to rename."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameDeviceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceNameResponse"
+                },
+                "example": {
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+                  "name": "Alice's laptop"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a device name is too long.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidDeviceNameError",
+                  "status": 400,
+                  "detail": "A device name can be at most 60 characters.",
+                  "instance": "https://menagerist.example/api/v1/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "You do not have permission to do that.",
+                  "instance": "https://menagerist.example/api/v1/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested device does not exist or is someone else's.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "DeviceNotFoundError",
+                  "status": 404,
+                  "detail": "That device was not found.",
+                  "instance": "https://menagerist.example/api/v1/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/devices/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
                     }
                   }
                 }
@@ -27246,6 +27932,18 @@
             "title": "Device Id",
             "description": "The remembered browser this session was started in, if any."
           },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name",
+            "description": "The name its owner gave that browser, if it has one."
+          },
           "display_mode": {
             "anyOf": [
               {
@@ -27276,6 +27974,7 @@
             "client_platform": "Linux",
             "created_at": "2026-10-10T12:00:00.000000Z",
             "device_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+            "device_name": "Alice's laptop",
             "display_mode": "browser",
             "display_name": "Alice Example",
             "expires_at": "2026-10-11T12:00:00.000000Z",
@@ -29813,6 +30512,103 @@
           }
         ]
       },
+      "DeviceNameResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The device's id."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Its name; null when it has none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DeviceNameResponse",
+        "description": "A device and the name it now has.",
+        "examples": [
+          {
+            "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+            "name": "Alice's laptop"
+          }
+        ]
+      },
+      "DeviceNameSuggestionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The older device's id."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name it would give this browser."
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent",
+            "description": "The older browser's user agent at its last sign-in."
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform",
+            "description": "The platform the older browser reported."
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At",
+            "description": "When the older device was last used."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "last_seen_at"
+        ],
+        "title": "DeviceNameSuggestionResponse",
+        "description": "An older device of yours whose name this browser could take.",
+        "examples": [
+          {
+            "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
+            "last_seen_at": "2026-10-10T12:30:00.000000Z",
+            "name": "Alice's laptop",
+            "platform": "Linux",
+            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0"
+          }
+        ]
+      },
       "DisplayMode": {
         "type": "string",
         "enum": [
@@ -32190,6 +32986,18 @@
             "title": "Id",
             "description": "The device's id; null for a session from before devices."
           },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The name its owner gave the browser; null when it has none."
+          },
           "user_agent": {
             "anyOf": [
               {
@@ -32268,6 +33076,7 @@
             "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
             "last_seen_at": "2026-10-10T12:30:00.000000Z",
             "mobile": false,
+            "name": "Alice's laptop",
             "platform": "Linux",
             "sessions": [
               {
@@ -33200,6 +34009,34 @@
             "published_at": "2026-01-01T00:00:00.000000+00:00",
             "status": "update_available",
             "url": "https://github.com/example/menagerist/releases/tag/0.2026.11.0"
+          }
+        ]
+      },
+      "RenameDeviceRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The name to give the device, at most 60 characters once trimmed. Null or blank clears it."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RenameDeviceRequest",
+        "description": "Request body for naming a device, or clearing its name.",
+        "examples": [
+          {
+            "name": "Alice's laptop"
           }
         ]
       },

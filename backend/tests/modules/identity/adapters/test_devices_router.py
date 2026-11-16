@@ -1,9 +1,11 @@
 """Router tests for /api/v1/me/sessions and /api/v1/sessions."""
 
 import uuid
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 import pytest
+import time_machine
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
@@ -581,3 +583,192 @@ async def test_admin_session_list_shows_the_display_mode(api: Api) -> None:
 
     assert sorted(str(s["display_mode"]) for s in sessions) == ["None", "standalone"]
     assert all(s["device_id"] for s in sessions)
+
+
+# --- Naming devices ----------------------------------------
+
+API = "/api/v1"
+FIREFOX_130 = "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0"
+FIREFOX_131 = "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0"
+FIREFOX_HEADERS = {
+    "User-Agent": FIREFOX_130,
+    "Sec-CH-UA-Platform": '"Linux"',
+    "Sec-CH-UA-Mobile": "?0",
+}
+NEWER_FIREFOX_HEADERS = {**FIREFOX_HEADERS, "User-Agent": FIREFOX_131}
+START = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
+
+
+def _current_device(client: TestClient) -> dict[str, Any]:
+    """Return the entry of the device making the request."""
+    devices = client.get(f"{ME}/devices").json()
+    return next(d for d in devices if d["current"])
+
+
+def _patch(
+    client: TestClient, url: str, body: Mapping[str, object], *, csrf: bool = True
+) -> Response:
+    headers = {} if csrf else {"Origin": FOREIGN_ORIGIN}
+    return client.patch(url, json=body, headers=headers)
+
+
+async def test_owner_names_their_device_and_the_name_survives_signing_in_again(
+    api: Api,
+    make_user: MakeUser,
+) -> None:
+    """A name is stored, listed, kept across sign-out and in, and can be cleared."""
+    await api.add_user(make_user, "alice")
+    client, response = api.sign_in("alice", headers=FIREFOX_HEADERS)
+    assert response.status_code == 200
+    device = _current_device(client)
+    assert device["name"] is None
+
+    named = _patch(client, f"{ME}/devices/{device['id']}", {"name": "  Sam's laptop "})
+
+    assert named.status_code == 200
+    assert named.json() == {"id": device["id"], "name": "Sam's laptop"}
+    assert _current_device(client)["name"] == "Sam's laptop"
+
+    assert api.post(client, f"{AUTH}/logout").status_code == 204
+    again = client.post(
+        f"{AUTH}/login",
+        json={"username": "alice", "password": "password-123"},
+        headers=FIREFOX_HEADERS,
+    )
+    assert again.status_code == 200
+    assert _current_device(client)["name"] == "Sam's laptop"
+
+    cleared = _patch(client, f"{ME}/devices/{device['id']}", {"name": ""})
+    assert cleared.json()["name"] is None
+
+
+async def test_a_device_cannot_be_named_by_another_user_or_from_another_site(
+    api: Api,
+    make_user: MakeUser,
+) -> None:
+    """Someone else's device is not found, and a cross-site request is refused."""
+    await api.add_user(make_user, "alice")
+    await api.add_user(make_user, "bob")
+    alice, _ = api.sign_in("alice", headers=FIREFOX_HEADERS)
+    bob, _ = api.sign_in("bob", headers=FIREFOX_HEADERS)
+    alices = _current_device(alice)
+
+    stolen = _patch(bob, f"{ME}/devices/{alices['id']}", {"name": "Bob's now"})
+    assert stolen.status_code == 404
+
+    cross_site = _patch(
+        alice, f"{ME}/devices/{alices['id']}", {"name": "x"}, csrf=False
+    )
+    assert cross_site.status_code == 403
+    assert _current_device(alice)["name"] is None
+
+
+async def test_a_name_that_is_too_long_is_refused(
+    api: Api,
+    make_user: MakeUser,
+) -> None:
+    """The limit is reported as a problem, and the name is unchanged."""
+    await api.add_user(make_user, "alice")
+    client, _ = api.sign_in("alice", headers=FIREFOX_HEADERS)
+    device = _current_device(client)
+
+    response = _patch(client, f"{ME}/devices/{device['id']}", {"name": "x" * 61})
+
+    assert response.status_code == 400
+    assert _current_device(client)["name"] is None
+
+
+def test_naming_needs_a_session(api: Api) -> None:
+    """Signed-out requests are unauthenticated."""
+    response = _patch(api.client, f"{ME}/devices/{uuid.uuid7()}", {"name": "x"})
+    assert response.status_code == 401
+    assert api.client.get(f"{ME}/devices/suggestions").status_code == 401
+
+
+async def test_administrator_renames_a_users_device_and_the_listing_shows_it(
+    api: Api,
+    make_user: MakeUser,
+) -> None:
+    """An administrator can name or clear a device; members cannot."""
+    api.setup()
+    await api.add_user(make_user, "alice")
+    alice, _ = api.sign_in("alice", headers=FIREFOX_HEADERS)
+    device = _current_device(alice)
+
+    refused = _patch(alice, f"{API}/devices/{device['id']}", {"name": "Mine"})
+    assert refused.status_code == 403
+
+    renamed = _patch(api.client, f"{API}/devices/{device['id']}", {"name": "Alice's"})
+    assert renamed.status_code == 200
+    assert renamed.json() == {"id": device["id"], "name": "Alice's"}
+    assert _current_device(alice)["name"] == "Alice's"
+    listed = api.client.get(SESSIONS).json()
+    assert [s["device_name"] for s in listed if s["username"] == "alice"] == ["Alice's"]
+
+    cleared = _patch(api.client, f"{API}/devices/{device['id']}", {"name": None})
+    assert cleared.json()["name"] is None
+
+    missing = _patch(api.client, f"{API}/devices/{uuid.uuid7()}", {"name": "x"})
+    assert missing.status_code == 404
+
+
+async def test_a_new_browser_can_take_the_name_of_an_unused_matching_device(
+    api: Api,
+    make_user: MakeUser,
+) -> None:
+    """Suggestions list matching unused devices; taking one moves the name."""
+    await api.add_user(make_user, "alice")
+    with time_machine.travel(START, tick=False):
+        old, _ = api.sign_in("alice", headers=FIREFOX_HEADERS)
+        old_device = _current_device(old)
+        _patch(old, f"{ME}/devices/{old_device['id']}", {"name": "Desk laptop"})
+
+    with time_machine.travel(START + timedelta(hours=1), tick=False):
+        # Cookies cleared: the same person signs in again as a new browser.
+        fresh, _ = api.sign_in("alice", headers=NEWER_FIREFOX_HEADERS)
+        fresh_device = _current_device(fresh)
+        assert fresh_device["id"] != old_device["id"]
+
+        offered = fresh.get(f"{ME}/devices/suggestions")
+        assert offered.status_code == 200
+        assert [(s["id"], s["name"]) for s in offered.json()] == [
+            (old_device["id"], "Desk laptop")
+        ]
+
+        taken = api.post(fresh, f"{ME}/devices/{old_device['id']}/adopt")
+        assert taken.status_code == 200
+        assert taken.json() == {"id": fresh_device["id"], "name": "Desk laptop"}
+
+        devices = fresh.get(f"{ME}/devices").json()
+        assert [(d["id"], d["name"]) for d in devices] == [
+            (fresh_device["id"], "Desk laptop")
+        ]
+        assert fresh.get(f"{ME}/devices/suggestions").json() == []
+
+
+async def test_only_a_suggested_name_can_be_taken(
+    api: Api,
+    make_user: MakeUser,
+) -> None:
+    """A device that was not offered is reported as not found and kept."""
+    await api.add_user(make_user, "alice")
+    with time_machine.travel(START, tick=False):
+        phone, _ = api.sign_in(
+            "alice",
+            headers={
+                **FIREFOX_HEADERS,
+                "Sec-CH-UA-Platform": '"Android"',
+                "Sec-CH-UA-Mobile": "?1",
+            },
+        )
+        phone_device = _current_device(phone)
+        _patch(phone, f"{ME}/devices/{phone_device['id']}", {"name": "Phone"})
+
+    with time_machine.travel(START + timedelta(hours=1), tick=False):
+        laptop, _ = api.sign_in("alice", headers=FIREFOX_HEADERS)
+
+        assert laptop.get(f"{ME}/devices/suggestions").json() == []
+        refused = api.post(laptop, f"{ME}/devices/{phone_device['id']}/adopt")
+        assert refused.status_code == 404
+        names = {d["name"] for d in laptop.get(f"{ME}/devices").json()}
+        assert "Phone" in names

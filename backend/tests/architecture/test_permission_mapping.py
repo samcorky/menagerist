@@ -98,6 +98,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "identity.CreateUser": "identity:user:create",
     "identity.ListSessions": "identity:session:list",
     "identity.ListUsers": "identity:user:list",
+    "identity.RenameDevice": "identity:session:revoke",
     "identity.ResetPassword": "identity:user:reset_password",
     "identity.RevokeSession": "identity:session:revoke",
     "identity.UnlockUser": "identity:user:unlock",

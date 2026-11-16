@@ -46,6 +46,7 @@ from app.modules.identity.adapters.security.secrets_api_token_generator import (
 from app.modules.identity.adapters.security.session_token_generator import (
     SecretsSessionTokenGenerator,
 )
+from app.modules.identity.application.adopt_device_name import AdoptDeviceName
 from app.modules.identity.application.authenticate_api_token import AuthenticateApiToken
 from app.modules.identity.application.change_password import ChangePassword
 from app.modules.identity.application.client_device import ClientDevice
@@ -58,6 +59,9 @@ from app.modules.identity.application.get_current_user import (
 )
 from app.modules.identity.application.get_setup_status import GetSetupStatus
 from app.modules.identity.application.has_administrator import HasAdministrator
+from app.modules.identity.application.list_device_name_suggestions import (
+    ListDeviceNameSuggestions,
+)
 from app.modules.identity.application.list_grantable_permissions import (
     ListGrantablePermissions,
 )
@@ -66,6 +70,8 @@ from app.modules.identity.application.list_own_devices import ListOwnDevices
 from app.modules.identity.application.list_own_sessions import ListOwnSessions
 from app.modules.identity.application.list_sessions import ListSessions
 from app.modules.identity.application.list_users import ListUsers
+from app.modules.identity.application.rename_device import RenameDevice
+from app.modules.identity.application.rename_own_device import RenameOwnDevice
 from app.modules.identity.application.reset_password import ResetPassword
 from app.modules.identity.application.revoke_other_sessions import RevokeOtherSessions
 from app.modules.identity.application.revoke_own_api_token import RevokeOwnApiToken
@@ -556,6 +562,34 @@ def get_revoke_session_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> RevokeSession:
     return RevokeSession(uow, guard)
+
+
+def get_rename_own_device_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RenameOwnDevice:
+    return RenameOwnDevice(uow, guard)
+
+
+def get_rename_device_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RenameDevice:
+    return RenameDevice(uow, guard)
+
+
+def get_list_device_name_suggestions_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListDeviceNameSuggestions:
+    return ListDeviceNameSuggestions(repos, guard)
+
+
+def get_adopt_device_name_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> AdoptDeviceName:
+    return AdoptDeviceName(uow, guard)
 
 
 def get_session_token(

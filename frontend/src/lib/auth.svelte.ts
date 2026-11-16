@@ -39,6 +39,8 @@ class AuthController {
 	ready = $state(false);
 	/** True when the status check could not reach the server. */
 	loadFailed = $state(false);
+	/** Set by an interactive sign-in so the device-name dialog can ask once, then cleared. */
+	deviceNamePromptDue = $state(false);
 	/** Set by an explicit sign-out so the sign-in page does not ask to return here. */
 	leftOnPurpose = $state(false);
 	/** True when the server ended a live session (it timed out or was revoked), not the person. */
@@ -112,6 +114,7 @@ class AuthController {
 			}
 			// Keep only this account's drafts: another person's never show here.
 			if (this.user) clearDrafts(this.user.id);
+			this.deviceNamePromptDue = true;
 			return { ok: true };
 		} catch {
 			return { ok: false, message: OFFLINE_MESSAGE };
