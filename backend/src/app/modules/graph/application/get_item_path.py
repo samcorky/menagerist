@@ -42,7 +42,7 @@ class GetItemPath(QueryHandler[GraphRepos, GetItemPathQuery, list[Node]]):
             scope=scope,
             item_id=query.item_id,
             relationship=query.relationship,
-            direction="in",
+            toward="holders",
             depth=query.depth,
         )
         # Nearest first from the walk; reversed, a breadcrumb reads root to parent.

@@ -97,6 +97,7 @@ def _relationship_types(
                 reverse_label=item.get("reverseLabel"),
                 description=item.get("description"),
                 directional=bool(item.get("directional", True)),
+                holder=str(item.get("holder") or "none"),
             )
         )
     return tuple(result)

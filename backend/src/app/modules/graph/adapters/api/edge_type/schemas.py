@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,6 +10,13 @@ from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.edge_type import EdgeType
+
+
+HOLDER_DESCRIPTION = (
+    "Which end holds the other, for an item's contents and path: `source` (the "
+    + "source contains the target, as Contains), `target` (the target contains "
+    + "the source, as Located in) or `none`. Needs a direction."
+)
 
 
 class CreateEdgeTypeRequest(RequestModel):
@@ -24,6 +31,7 @@ class CreateEdgeTypeRequest(RequestModel):
                     "reverse_label": "Directed",
                     "description": "Links a film to its director.",
                     "directional": True,
+                    "holder": "none",
                 }
             ]
         }
@@ -41,6 +49,9 @@ class CreateEdgeTypeRequest(RequestModel):
     directional: bool = Field(
         description="Whether the connection has a direction.", default=True
     )
+    holder: Literal["source", "target", "none"] = Field(
+        description=HOLDER_DESCRIPTION, default="none"
+    )
     attributes_schema: dict[str, Any] | None = Field(
         description="Its fields, as a JSON Schema.", default=None
     )
@@ -53,6 +64,7 @@ class CreateEdgeTypeRequest(RequestModel):
             reverse_label=self.reverse_label,
             description=self.description,
             directional=self.directional,
+            holder=self.holder,
             attributes_schema=self.attributes_schema,
         )
 
@@ -74,6 +86,9 @@ class UpdateEdgeTypeRequest(RequestModel):
     directional: bool | None = Field(
         description="Whether the connection has a direction.", default=None
     )
+    holder: Literal["source", "target", "none"] | None = Field(
+        description=HOLDER_DESCRIPTION, default=None
+    )
     attributes_schema: dict[str, Any] | None = Field(
         description="Its fields, as a JSON Schema; replaces them all.", default=None
     )
@@ -86,6 +101,7 @@ class UpdateEdgeTypeRequest(RequestModel):
             reverse_label=self.reverse_label,
             description=self.description,
             directional=self.directional,
+            holder=self.holder,
             attributes_schema=self.attributes_schema,
         )
 
@@ -103,6 +119,7 @@ class EdgeTypeResponse(BaseModel):
                     "reverse_label": "Directed",
                     "description": "Links a film to its director.",
                     "directional": True,
+                    "holder": "none",
                     "attributes_schema": {"type": "object"},
                     "created_at": "2026-08-23T10:14:44.465954Z",
                     "updated_at": "2026-08-23T10:14:44.465954Z",
@@ -119,6 +136,7 @@ class EdgeTypeResponse(BaseModel):
     )
     description: str | None = Field(description="Free text about it.")
     directional: bool = Field(description="Whether the connection has a direction.")
+    holder: Literal["source", "target", "none"] = Field(description=HOLDER_DESCRIPTION)
     attributes_schema: dict[str, Any] | None = Field(
         description="Its fields, as a JSON Schema."
     )
@@ -135,6 +153,7 @@ class EdgeTypeResponse(BaseModel):
             reverse_label=edge_type.reverse_label,
             description=edge_type.description,
             directional=edge_type.directional,
+            holder=edge_type.holder,
             attributes_schema=edge_type.attributes_schema,
             created_at=edge_type.created_at,
             updated_at=edge_type.updated_at,

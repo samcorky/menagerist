@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,6 +35,7 @@ BUNDLE_EXAMPLE: dict[str, Any] = {
             "reverse_label": "Written by",
             "description": None,
             "directional": True,
+            "holder": "none",
             "attributes_schema": None,
         }
     ],
@@ -159,8 +160,20 @@ class BundleRelationshipTypeEntry(BaseModel):
     directional: bool = Field(
         default=True, description="Whether it reads one way, not both."
     )
+    holder: Literal["source", "target", "none"] = Field(
+        default="none",
+        description="Which end holds the other: `source`, `target` or `none`.",
+    )
     attributes_schema: dict[str, Any] | None = Field(
         default=None, description="Its fields, as an item type's are."
+    )
+
+
+class BundleRelationshipTypeExport(BundleRelationshipTypeEntry):
+    """A connection type as exported: every field is written, `holder` included."""
+
+    holder: Literal["source", "target", "none"] = Field(
+        description="Which end holds the other: `source`, `target` or `none`."
     )
 
 
@@ -276,7 +289,7 @@ class BundleFileResponse(BaseModel):
     presets: list[BundlePresetEntry] = Field(
         description="The saved lists, fields and groups; each `ref` is its id."
     )
-    relationship_types: list[BundleRelationshipTypeEntry] = Field(
+    relationship_types: list[BundleRelationshipTypeExport] = Field(
         description="The connection types exported."
     )
     item_types: list[BundleItemTypeEntry] = Field(

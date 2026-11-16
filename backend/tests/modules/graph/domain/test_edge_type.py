@@ -154,3 +154,48 @@ def test_update_rejects_empty_or_blank_label(label: str) -> None:
 
     with pytest.raises(ValidationError, match="label must be provided"):
         et.update(label=label)
+
+
+def _located_in(**extra: object) -> EdgeType:
+    return EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id,
+        slug="located-in",
+        label="Located in",
+        **extra,  # type: ignore[arg-type]
+    )
+
+
+def test_holder_defaults_to_none_and_can_be_set_and_cleared() -> None:
+    """Neither end holds the other until said; `none` clears it again."""
+    et = _located_in()
+    seen = [et.holder]
+    et.update(holder="target")
+    seen.append(et.holder)
+    et.update(label="Kept in")
+    seen.append(et.holder)
+    et.update(holder="none")
+    seen.append(et.holder)
+
+    assert seen == ["none", "target", "target", "none"]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"holder": "middle"},
+        {"holder": "source", "directional": False},
+    ],
+)
+def test_a_holder_needs_a_known_end_and_a_direction(extra: dict[str, object]) -> None:
+    """Only `source`, `target` or `none`, and only with a direction."""
+    with pytest.raises(ValidationError):
+        _located_in(**extra)
+
+
+def test_dropping_the_direction_of_a_holding_relationship_is_refused() -> None:
+    """The holder has to be cleared in the same change."""
+    et = _located_in(holder="target")
+    with pytest.raises(ValidationError, match="no direction"):
+        et.update(directional=False)
+    et.update(directional=False, holder="none")
+    assert (et.directional, et.holder) == (False, "none")

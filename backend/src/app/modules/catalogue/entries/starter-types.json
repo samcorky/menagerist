@@ -48,14 +48,16 @@
       "label": "Part of",
       "reverseLabel": "Has part",
       "description": null,
-      "directional": true
+      "directional": true,
+      "holder": "target"
     },
     {
       "slug": "located-in",
       "label": "Located in",
       "reverseLabel": "Contains",
       "description": null,
-      "directional": true
+      "directional": true,
+      "holder": "target"
     },
     {
       "slug": "created-by",

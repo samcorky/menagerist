@@ -32,12 +32,14 @@ def test_parses_a_pack(pack_data: dict[str, Any]) -> None:
 def test_parses_optional_fields(pack_data: dict[str, Any]) -> None:
     """Optional fields are carried through when given."""
     pack_data["relationship_types"][0]["directional"] = False
+    pack_data["relationship_types"][0]["holder"] = "target"
     pack_data["item_types"][0]["attributes_schema"] = {"type": "object"}
     pack_data["items"][0]["attributes"] = {"k": 1}
 
     pack = parse_pack(pack_data)
 
     assert pack.relationship_types[0].directional is False
+    assert pack.relationship_types[0].holder == "target"
     assert pack.item_types[0].attributes_schema == {"type": "object"}
     assert pack.items[0].attributes == {"k": 1}
 
@@ -67,6 +69,8 @@ _BAD: list[tuple[list[str | int], object]] = [
     (["relationship_types", 0, "directional"], "yes"),
     (["relationship_types", 0, "directional"], 1),
     (["relationship_types", 0, "attributes_schema"], []),
+    (["relationship_types", 0, "holder"], 3),
+    (["relationship_types", 0, "holder"], "middle"),
     (["item_types", 0, "attributes_schema"], "x"),
     (["presets", 0, "definition"], []),
     (["connections", 0, "attributes"], "x"),

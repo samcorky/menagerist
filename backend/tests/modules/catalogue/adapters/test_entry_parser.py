@@ -40,6 +40,7 @@ def _types_entry() -> dict[str, Any]:
                 "reverseLabel": "Has part",
                 "description": None,
                 "directional": True,
+                "holder": "target",
             }
         ],
     }
@@ -58,10 +59,11 @@ def test_a_starter_types_entry_is_parsed() -> None:
     entry = parse_entry(_types_entry())
     assert entry.item_types[0].slug == "person"
     rel = entry.relationship_types[0]
-    assert (rel.ref, rel.reverse_label, rel.directional) == (
+    assert (rel.ref, rel.reverse_label, rel.directional, rel.holder) == (
         "part-of",
         "Has part",
         True,
+        "target",
     )
 
 

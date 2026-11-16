@@ -50,6 +50,7 @@ _RELATIONSHIP_TYPE_KEYS = _TYPE_REQUIRED | {
     "attributes_schema",
     "reverse_label",
     "directional",
+    "holder",
 }
 
 
@@ -131,6 +132,7 @@ def _relationship_type(raw: object, n: int) -> BundleRelationshipType:
         description=_optional_text(entry, "description", where),
         directional=directional,
         attributes_schema=_schema(entry, where),
+        holder=_optional_text(entry, "holder", where) or "none",
     )
 
 
@@ -332,6 +334,7 @@ class MenageristBundleCodec:
                     "reverse_label": r.reverse_label,
                     "description": r.description,
                     "directional": r.directional,
+                    "holder": r.holder,
                     "attributes_schema": r.attributes_schema,
                 }
                 for r in bundle.relationship_types

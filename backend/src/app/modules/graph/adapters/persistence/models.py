@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -176,6 +176,11 @@ class EdgeTypeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
 
     __tablename__ = "edge_types"
     __table_args__ = (
+        CheckConstraint(
+            "holder IN ('source', 'target', 'none') "
+            + "AND (holder = 'none' OR directional)",
+            name="ck_edge_types_holder",
+        ),
         Index(
             "uq_edge_types_owner_slug_live",
             "owner_id",
@@ -193,3 +198,5 @@ class EdgeTypeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     attributes_schema: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB, nullable=True
     )
+    # Backstopped by ck_edge_types_holder; the domain owns the rule.
+    holder: Mapped[str] = mapped_column(default="none", server_default="none")

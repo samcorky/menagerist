@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import structlog
 from sqlalchemy import delete, select
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.graph.domain.edge_type import Holder
     from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
@@ -31,6 +32,7 @@ def _to_domain(model: EdgeTypeModel) -> EdgeType:
         description=model.description,
         directional=model.directional,
         attributes_schema=model.attributes_schema,
+        holder=cast("Holder", model.holder),
         created_at=model.created_at,
         updated_at=model.updated_at,
         deleted_at=model.deleted_at,
@@ -48,6 +50,7 @@ def _to_model(edge_type: EdgeType) -> EdgeTypeModel:
         description=edge_type.description,
         directional=edge_type.directional,
         attributes_schema=edge_type.attributes_schema,
+        holder=edge_type.holder,
         created_at=edge_type.created_at,
         updated_at=edge_type.updated_at,
         deleted_at=edge_type.deleted_at,
