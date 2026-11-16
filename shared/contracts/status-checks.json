@@ -79,6 +79,31 @@
       "key": "scheduler:workerHeartbeat",
       "unit": "state",
       "sample": "stale"
+    },
+    {
+      "key": "scheduler:overdueJobs",
+      "unit": "jobs",
+      "sample": 2
+    },
+    {
+      "key": "scheduler:defaultQueue",
+      "unit": "jobs",
+      "sample": 2
+    },
+    {
+      "key": "scheduler:heavyQueue",
+      "unit": "jobs",
+      "sample": 2
+    },
+    {
+      "key": "scheduler:stuckJobs",
+      "unit": "jobs",
+      "sample": 2
+    },
+    {
+      "key": "scheduler:failingJobs",
+      "unit": "jobs",
+      "sample": 2
     }
   ],
   "states": [

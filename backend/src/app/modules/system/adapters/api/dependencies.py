@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
+from app.entrypoints.api.shared.bridges.scheduler_jobs_check import SchedulerJobsCheck
 from app.entrypoints.api.shared.bridges.scheduler_worker_check import (
     SchedulerWorkerCheck,
 )
@@ -96,6 +97,7 @@ def _readiness_registry(
             ),
             get_storage_check(),
             SchedulerWorkerCheck(session_factory),
+            SchedulerJobsCheck(session_factory),
         ]
     )
 
