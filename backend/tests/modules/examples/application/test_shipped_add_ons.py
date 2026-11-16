@@ -105,10 +105,11 @@ async def test_the_add_on_is_listed_after_the_base_packs() -> None:
     packs = await _CATALOGUE.list_packs()
 
     ids = [p.id for p in packs]
-    assert ids[-1] == "games-extras"
+    assert ids[-2:] == ["games-extras", "storage"]
     assert "soundtracks" not in ids
     by_id = {p.id: p for p in packs}
     assert by_id["games-extras"].requires == ("games",)
+    assert by_id["storage"].requires == ("games",)
     assert by_id["music"].links_with == ("movies",)
     assert by_id["movies"].links_with == ()
     names = [p.name for p in packs]

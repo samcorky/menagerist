@@ -1,0 +1,206 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 7,
+  "id": "storage",
+  "requires": [
+    "games"
+  ],
+  "relationship_types": [
+    {
+      "ref": "located-in",
+      "slug": "storage-located-in",
+      "label": "Located in",
+      "reverse_label": "Contains",
+      "description": "Where something is kept: a game on a shelf, a shelf in a room.",
+      "directional": true,
+      "holder": "target"
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "location",
+      "slug": "storage-location",
+      "icon": "archive",
+      "colour": "amber",
+      "label": "Location",
+      "description": "Somewhere things are kept: a room, a shelf, a box.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Room",
+              "Shelf",
+              "Box",
+              "Drawer",
+              "Cabinet"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kind"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "kind"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "living-room",
+      "type": "location",
+      "name": "Living room",
+      "description": "Where game night happens.",
+      "attributes": {
+        "kind": "Room"
+      }
+    },
+    {
+      "ref": "study",
+      "type": "location",
+      "name": "Study",
+      "description": "The quiet room upstairs.",
+      "attributes": {
+        "kind": "Room"
+      }
+    },
+    {
+      "ref": "tall-bookcase",
+      "type": "location",
+      "name": "Tall bookcase",
+      "description": "Floor to ceiling, by the window.",
+      "attributes": {
+        "kind": "Cabinet"
+      }
+    },
+    {
+      "ref": "top-shelf",
+      "type": "location",
+      "name": "Top shelf",
+      "description": "The big boxes live up here.",
+      "attributes": {
+        "kind": "Shelf"
+      }
+    },
+    {
+      "ref": "tin-box",
+      "type": "location",
+      "name": "Tin box",
+      "description": "An old biscuit tin of small card games.",
+      "attributes": {
+        "kind": "Box"
+      }
+    },
+    {
+      "ref": "study-cupboard",
+      "type": "location",
+      "name": "Study cupboard",
+      "description": "Heavy games and the ones that take an evening.",
+      "attributes": {
+        "kind": "Cabinet"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "tall-bookcase",
+      "to": "living-room",
+      "type": "located-in"
+    },
+    {
+      "from": "top-shelf",
+      "to": "tall-bookcase",
+      "type": "located-in"
+    },
+    {
+      "from": "tin-box",
+      "to": "top-shelf",
+      "type": "located-in"
+    },
+    {
+      "from": "study-cupboard",
+      "to": "study",
+      "type": "located-in"
+    },
+    {
+      "from": "games:lantern-harbour",
+      "to": "top-shelf",
+      "type": "located-in"
+    },
+    {
+      "from": "games:tea-clipper-race",
+      "to": "top-shelf",
+      "type": "located-in"
+    },
+    {
+      "from": "games:pocket-orchard",
+      "to": "tin-box",
+      "type": "located-in"
+    },
+    {
+      "from": "games:cobbled-streets",
+      "to": "study-cupboard",
+      "type": "located-in"
+    },
+    {
+      "from": "games:thornfield-heist",
+      "to": "study-cupboard",
+      "type": "located-in"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "not-put-away",
+      "name": "Not put away yet",
+      "description": "Games we own that are not in any room, shelf or box.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "field",
+              "type": "games-game",
+              "key": "status",
+              "op": "=",
+              "value": "Owned"
+            },
+            {
+              "kind": "connection",
+              "mode": "none",
+              "relationship": "storage-located-in",
+              "direction": "out"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
