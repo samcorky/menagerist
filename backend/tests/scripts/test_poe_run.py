@@ -1,6 +1,7 @@
 """Tests for scripts/poe_run.py: modes, parsers, exit codes and log retention."""
 
 import importlib.util
+import json
 import os
 import sys
 from datetime import UTC, datetime, timedelta
@@ -172,7 +173,9 @@ def test_main_without_files_uses_the_plain_tool(
     """Main without files uses the plain tool."""
     captured: list[_BuildsCommand] = []
 
-    def _capture(task: str, tool: _BuildsCommand, mode: str, workers: str) -> int:
+    def _capture(
+        task: str, tool: _BuildsCommand, mode: str, workers: str, **_: object
+    ) -> int:
         captured.append(tool)
         return 0
 
@@ -189,7 +192,9 @@ def test_main_with_files_scopes_pytest_to_them(
     """Main with files scopes pytest to them."""
     captured: list[_BuildsCommand] = []
 
-    def _capture(task: str, tool: _BuildsCommand, mode: str, workers: str) -> int:
+    def _capture(
+        task: str, tool: _BuildsCommand, mode: str, workers: str, **_: object
+    ) -> int:
         captured.append(tool)
         return 0
 
@@ -643,11 +648,196 @@ def test_ensure_api_client_ignores_a_missing_schema(tmp_path: Path) -> None:
 
 
 def test_main_guards_frontend_tasks_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Frontend tasks check the client first; backend tasks do not."""
-    seen: list[str] = []
-    monkeypatch.setattr(poe_run, "ensure_api_client", lambda: seen.append("x"))
-    monkeypatch.setattr(poe_run, "execute", lambda *a, **k: 0)
+    """Frontend tasks check the client and get the frontend env; backend ones do not."""
+    seen: list[object] = []
+    envs: list[object] = []
+    frontend = {"NAPI_RS_FORCE_WASI": "true"}
+    monkeypatch.setattr(poe_run, "frontend_env", lambda: frontend)
+    monkeypatch.setattr(poe_run, "ensure_api_client", lambda env: seen.append(env))
+
+    def _execute(*_: object, env: object = None, **__: object) -> int:
+        envs.append(env)
+        return 0
+
+    monkeypatch.setattr(poe_run, "execute", _execute)
     for task in ("lint-frontend", "test-backend"):
         with pytest.raises(SystemExit):
             poe_run.main(task)
-    assert seen == ["x"]
+    assert seen == [frontend]
+    assert envs == [frontend, None]
+
+
+# --- CPUs without AVX2 -------------------------------------------------------
+
+
+def test_has_avx2_reads_linux_cpu_flags(tmp_path: Path) -> None:
+    """Only a whole ``avx2`` flag counts; an unreadable cpuinfo assumes AVX2."""
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("model name\t: avx2 lookalike\nflags\t\t: fpu sse4_2 avx\n")
+    assert poe_run.has_avx2("Linux", cpuinfo) is False
+    cpuinfo.write_text("flags\t\t: fpu avx avx2 bmi2\n")
+    assert poe_run.has_avx2("Linux", cpuinfo) is True
+    assert poe_run.has_avx2("Linux", tmp_path / "missing") is True
+
+
+def test_has_avx2_assumes_true_on_other_systems() -> None:
+    """MacOS and anything else keep their native binding."""
+    assert poe_run.has_avx2("Darwin") is True
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="needs kernel32")
+def test_has_avx2_asks_windows() -> None:
+    """The Windows branch asks IsProcessorFeaturePresent and returns a bool."""
+    assert isinstance(poe_run.has_avx2("Windows"), bool)
+
+
+def _lockfile(frontend: Path, version: str = "1.2.19") -> Path:
+    frontend.mkdir(parents=True, exist_ok=True)
+    lock = {"packages": {"node_modules/rolldown": {"version": version}}}
+    (frontend / "package-lock.json").write_text(json.dumps(lock))
+    return frontend
+
+
+def test_rolldown_version_comes_from_the_lockfile(tmp_path: Path) -> None:
+    """The lockfile's version is what ``npm ci`` installs; unreadable gives None."""
+    assert poe_run.rolldown_version(_lockfile(tmp_path / "fe")) == "1.2.19"
+    assert poe_run.rolldown_version(tmp_path / "none") is None
+    (tmp_path / "bad").mkdir()
+    (tmp_path / "bad" / "package-lock.json").write_text('{"packages": {}}')
+    assert poe_run.rolldown_version(tmp_path / "bad") is None
+
+
+def test_wasi_cache_dir_is_per_user() -> None:
+    """The cache follows LOCALAPPDATA on Windows and XDG_CACHE_HOME elsewhere."""
+    win = poe_run.wasi_cache_dir({"LOCALAPPDATA": "C:/local"}, "Windows")
+    assert win == Path("C:/local/menagerist/napi-wasi")
+    linux = poe_run.wasi_cache_dir({"XDG_CACHE_HOME": "/xdg"}, "Linux")
+    assert linux == Path("/xdg/menagerist/napi-wasi")
+    home = Path.home()
+    assert poe_run.wasi_cache_dir({}, "Linux") == home / ".cache/menagerist/napi-wasi"
+    assert (
+        poe_run.wasi_cache_dir({}, "Windows")
+        == home / "AppData/Local/menagerist/napi-wasi"
+    )
+
+
+def _installed(cache: Path, version: str = "1.2.19") -> Path:
+    modules = cache / f"rolldown-{version}" / "node_modules"
+    package = modules / poe_run.WASI_BINDING
+    package.mkdir(parents=True)
+    (package / "package.json").write_text("{}")
+    return modules
+
+
+def test_ensure_wasi_binding_reuses_an_installed_binding(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A cached binding is used without running npm."""
+    modules = _installed(tmp_path)
+    monkeypatch.setattr(
+        poe_run.subprocess, "call", lambda *a, **k: pytest.fail("installed again")
+    )
+    assert poe_run.ensure_wasi_binding("1.2.19", tmp_path) == modules
+
+
+def test_ensure_wasi_binding_installs_the_matching_version(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Npm installs the binding at the lockfile's version into its own prefix."""
+    calls: list[tuple[list[str], object]] = []
+
+    def _call(argv: list[str], cwd: object = None, **_: object) -> int:
+        calls.append((argv, cwd))
+        return 0
+
+    monkeypatch.setattr(poe_run.subprocess, "call", _call)
+    prefix = tmp_path / "rolldown-1.2.19"
+    assert poe_run.ensure_wasi_binding("1.2.19", tmp_path) == prefix / "node_modules"
+    argv, cwd = calls[0]
+    assert cwd == prefix
+    assert argv[-2:] == ["--force", f"{poe_run.WASI_BINDING}@1.2.19"]
+    assert "--no-save" in argv
+    assert "WebAssembly build" in capsys.readouterr().err
+
+
+def test_ensure_wasi_binding_warns_when_npm_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A failed install warns and returns None rather than stopping the task."""
+    monkeypatch.setattr(poe_run.subprocess, "call", lambda *a, **k: 1)
+    assert poe_run.ensure_wasi_binding("1.2.19", tmp_path) is None
+    assert "Illegal instruction" in capsys.readouterr().err
+
+
+def test_frontend_env_leaves_avx2_machines_alone(tmp_path: Path) -> None:
+    """With AVX2 and no explicit flag the environment passes through unchanged."""
+    env = poe_run.frontend_env({"PATH": "p"}, avx2=True, frontend=tmp_path)
+    assert env == {"PATH": "p"}
+
+
+def test_frontend_env_forces_wasi_without_avx2(tmp_path: Path) -> None:
+    """Without AVX2 the flag is ``true`` and the cached binding joins NODE_PATH."""
+    cache = tmp_path / "cache"
+    modules = _installed(cache)
+    env = poe_run.frontend_env(
+        {"NODE_PATH": "existing"},
+        avx2=False,
+        frontend=_lockfile(tmp_path / "fe"),
+        cache=cache,
+    )
+    assert env["NAPI_RS_FORCE_WASI"] == "true"
+    assert env["NODE_PATH"] == os.pathsep.join([str(modules), "existing"])
+
+
+def test_frontend_env_honours_an_explicit_flag(tmp_path: Path) -> None:
+    """``error`` forces the fallback on any CPU; ``0`` turns it off on any CPU."""
+    cache = tmp_path / "cache"
+    modules = _installed(cache)
+    frontend = _lockfile(tmp_path / "fe")
+    forced = poe_run.frontend_env(
+        {"NAPI_RS_FORCE_WASI": "error"}, avx2=True, frontend=frontend, cache=cache
+    )
+    assert forced == {"NAPI_RS_FORCE_WASI": "error", "NODE_PATH": str(modules)}
+    off = {"NAPI_RS_FORCE_WASI": "0"}
+    assert poe_run.frontend_env(off, avx2=False, frontend=frontend) == off
+
+
+def test_frontend_env_without_a_lockfile_only_sets_the_flag(tmp_path: Path) -> None:
+    """Before ``npm ci`` there is no version to install, so only the flag is set."""
+    env = poe_run.frontend_env({}, avx2=False, frontend=tmp_path)
+    assert env == {"NAPI_RS_FORCE_WASI": "true"}
+
+
+def test_frontend_env_keeps_node_path_when_install_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A failed install leaves NODE_PATH as it was."""
+    monkeypatch.setattr(poe_run, "ensure_wasi_binding", lambda *a: None)
+    env = poe_run.frontend_env(
+        {}, avx2=False, frontend=_lockfile(tmp_path / "fe"), cache=tmp_path
+    )
+    assert env == {"NAPI_RS_FORCE_WASI": "true"}
+
+
+def test_npm_runs_in_frontend_with_the_frontend_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The npm entry point passes its arguments through and exits with npm's code."""
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    monkeypatch.setattr(poe_run, "frontend_env", lambda: {"X": "1"})
+
+    def _call(argv: list[str], **kwargs: object) -> int:
+        calls.append((argv, kwargs))
+        return 5
+
+    monkeypatch.setattr(poe_run.subprocess, "call", _call)
+    with pytest.raises(SystemExit) as exc:
+        poe_run.npm("run", "format")
+    assert exc.value.code == 5
+    argv, kwargs = calls[0]
+    assert argv[-2:] == ["run", "format"]
+    assert kwargs == {"cwd": poe_run.ROOT / "frontend", "env": {"X": "1"}}

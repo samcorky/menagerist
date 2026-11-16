@@ -108,9 +108,7 @@ help = "Regenerate the install icons in frontend/static from the Menagerist mark
 deps = ["sync-backend"]
 
 [tool.poe.groups.setup.tasks._run-frontend-generate]
-shell = "npm run generate"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:npm('run', 'generate')"
 
 [tool.poe.groups.setup.tasks.generate-frontend-client]
 sequence = ["dump-schema", "_run-frontend-generate"]
@@ -295,9 +293,7 @@ args = [
 help = "Run full backend test suite and enforce per-layer coverage thresholds"
 
 [tool.poe.groups.quality.tasks.format-frontend]
-shell = "npm run format"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:npm('run', 'format')"
 help = "Format frontend files with Prettier"
 
 [tool.poe.groups.quality.tasks.lint-frontend]
@@ -308,9 +304,7 @@ args = [
 help = "Lint frontend files with Prettier and ESLint"
 
 [tool.poe.groups.quality.tasks.lint-frontend-fix]
-shell = "npm run lint:fix"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:npm('run', 'lint:fix')"
 help = "Lint frontend files with ESLint and apply safe fixes"
 
 [tool.poe.groups.quality.tasks.typecheck-frontend]
@@ -506,9 +500,7 @@ script = "scripts.e2e_migrate:main"
 help = "Create and migrate one database per e2e worker (menagerist_w0..; count from E2E_WORKERS, default CPU cores)"
 
 [tool.poe.groups.database.tasks.e2e-build]
-shell = "npm run build"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:npm('run', 'build')"
 help = "Build the production frontend (frontend/build) that the e2e backends serve"
 
 [tool.poe.groups.database.tasks.e2e-db-down]
@@ -524,9 +516,7 @@ help = "Build sdist+wheel for the menagerist package, after syncing backend depe
 deps = ["sync-backend"]
 
 [tool.poe.groups.run.tasks._run-frontend-build]
-shell = "npm run build"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:npm('run', 'build')"
 
 [tool.poe.groups.run.tasks.build-frontend]
 sequence = ["sync-frontend", "generate-frontend-client", "_run-frontend-build"]
@@ -549,9 +539,7 @@ cmd = "uv pip install -e backend"
 help = "Editable install of the backend package (Windows-friendly alternative to uv sync)"
 
 [tool.poe.groups.run.tasks.serve-frontend]
-shell = "npm run dev -- --host 0.0.0.0"
-interpreter = ["powershell", "posix"]
-cwd = "frontend"
+script = "scripts.poe_run:npm('run', 'dev', '--', '--host', '0.0.0.0')"
 help = "Run the frontend dev server with hot reload"
 
 [tool.poe.groups.run.tasks.serve]
