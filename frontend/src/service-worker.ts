@@ -6,7 +6,7 @@
 // A small worker for resilience, not offline data (see lib/service-worker/policy.ts for what
 // it may touch). It keeps the build's immutable files and the app shell so the app starts quickly,
 // and starts that shell (or, failing that, one offline page) when a page load cannot reach the
-// server.
+// server, including when a proxy answers in its place.
 import { build, version } from '$service-worker';
 import {
 	NAVIGATION_FALLBACKS,
@@ -15,6 +15,7 @@ import {
 	routeFor,
 	staleCaches
 } from '$lib/service-worker/policy';
+import { answeredByProxy } from '$lib/proxy-answer';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 const CURRENT = cacheName(version);
@@ -49,15 +50,21 @@ sw.addEventListener('fetch', (event) => {
 		return;
 	}
 
-	// Network first, and only a failure to connect falls back: an error status from the server is
-	// still the server's answer. The response is never stored.
+	// Network first. A failure to connect falls back, and so does a proxy answering for a server
+	// that is not there (mid-deployment): the app gives every page path its shell, so a 404 or a
+	// gateway error to a page load never comes from it. Any other status is the server's answer.
+	// The response is never stored.
 	event.respondWith(
-		fetch(request).catch(async () => {
-			for (const path of NAVIGATION_FALLBACKS) {
-				const cached = await caches.match(new URL(path, sw.location.origin).href);
-				if (cached) return cached;
-			}
-			return Response.error();
-		})
+		fetch(request)
+			.then((response) => (answeredByProxy(response) ? fallback() : response))
+			.catch(fallback)
 	);
 });
+
+async function fallback(): Promise<Response> {
+	for (const path of NAVIGATION_FALLBACKS) {
+		const cached = await caches.match(new URL(path, sw.location.origin).href);
+		if (cached) return cached;
+	}
+	return Response.error();
+}

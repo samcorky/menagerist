@@ -93,3 +93,60 @@ test('the service worker script is revalidated, not cached for an hour', async (
 	expect(worker.status()).toBe(200);
 	expect(worker.headers()['cache-control']).toBe('no-cache');
 });
+
+test('a proxy standing in mid-deployment shows the app, which comes back by itself', async ({
+	page,
+	context
+}) => {
+	await page.goto('/');
+	await expect(page.getByRole('link', { name: 'Home', exact: true }).first()).toBeVisible();
+	await expect
+		.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null), {
+			message: 'the worker takes control of the page'
+		})
+		.toBe(true);
+
+	// Traefik with no backend for the router: a bare 404 in plain text for everything, the page
+	// load included. The build's own files still come from the worker's cache.
+	const traefik = (route: import('@playwright/test').Route) =>
+		route.fulfill({
+			status: 404,
+			contentType: 'text/plain; charset=utf-8',
+			body: '404 page not found'
+		});
+	await context.route(/\/(items|api\/.*)$/, traefik);
+
+	await page.goto('/items');
+	// The browser is online, so the screen blames the server, not the connection.
+	await expect(page.getByTestId('start-offline')).toContainText("Can't reach Menagerist");
+	await expect(page.getByTestId('start-offline')).toContainText('load by itself');
+	await expect(page.getByText('404 page not found')).toHaveCount(0);
+	await expect(page).toHaveURL(/\/items$/);
+
+	// The deployment finishes: the app notices on its own, with no reload or button press.
+	await context.unroute(/\/(items|api\/.*)$/, traefik);
+	await expect(page.getByRole('heading', { name: 'My items', level: 1 })).toBeVisible({
+		timeout: 15_000
+	});
+	await expect(page.getByTestId('start-offline')).toHaveCount(0);
+});
+
+test('an open page treats a proxy 404 from the API as offline, not as missing', async ({
+	page,
+	context
+}) => {
+	await page.goto('/items');
+	await expect(page.getByRole('heading', { name: 'My items', level: 1 })).toBeVisible();
+
+	const traefik = (route: import('@playwright/test').Route) =>
+		route.fulfill({ status: 404, contentType: 'text/plain', body: '404 page not found' });
+	await context.route('**/api/v1/**', traefik);
+	await page.getByRole('link', { name: 'Collections', exact: true }).first().click();
+	await expect(page.getByText("Can't reach Menagerist").first()).toBeVisible();
+	await expect(page.getByText(/not found/i)).toHaveCount(0);
+
+	await context.unroute('**/api/v1/**', traefik);
+	await expect(page.getByRole('heading', { name: 'Collections', level: 1 })).toBeVisible({
+		timeout: 15_000
+	});
+});

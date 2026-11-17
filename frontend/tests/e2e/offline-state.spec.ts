@@ -29,7 +29,7 @@ for (const { path, link, what } of [
 		await page.getByRole('link', { name: link, exact: true }).first().click();
 
 		const failed = page.getByTestId('load-failed');
-		await expect(failed).toContainText(`You're offline, so ${what} can't load.`);
+		await expect(failed).toContainText(`Can't reach Menagerist, so ${what} can't load.`);
 		await expect(page.getByTestId('offline-banner')).toBeVisible();
 		await expect(page.getByTestId('empty-line')).toHaveCount(0);
 
@@ -94,7 +94,7 @@ for (const { path, heading, what, emptyText } of [
 		const failed = page.getByTestId('load-failed');
 		for (const name of what) {
 			await expect(
-				failed.filter({ hasText: `You're offline, so ${name} can't load.` })
+				failed.filter({ hasText: `Can't reach Menagerist, so ${name} can't load.` })
 			).toBeVisible();
 		}
 		if (emptyText) await expect(page.getByText(emptyText)).toHaveCount(0);
@@ -148,7 +148,7 @@ test('Home shows that it is offline, and loads again from the banner Retry', asy
 	await expect(page.getByPlaceholder('Search your items…')).toBeVisible();
 	await cutApi(page);
 	await page.getByRole('link', { name: 'Home', exact: true }).first().click();
-	await expect(page.getByText("You're offline, so your totals can't load.")).toBeVisible();
+	await expect(page.getByText("Can't reach Menagerist, so your totals can't load.")).toBeVisible();
 	const banner = page.getByTestId('offline-banner');
 	await expect(banner).toBeVisible();
 
@@ -175,7 +175,7 @@ test('Home shows that it is offline, and loads again from the banner Retry', asy
 		await (retried ? route.continue() : route.abort('internetdisconnected'));
 	});
 	await banner.getByRole('button', { name: 'Retry' }).click();
-	await expect(page.getByText("You're offline, so your totals can't load.")).toHaveCount(0);
+	await expect(page.getByText("Can't reach Menagerist, so your totals can't load.")).toHaveCount(0);
 	await expect(banner).toHaveCount(0);
 });
 

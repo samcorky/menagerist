@@ -6,17 +6,9 @@
 	import SurpriseButton from '$lib/components/surprise-button.svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
-	import {
-		Package,
-		Plus,
-		Camera,
-		ChevronRight,
-		CircleCheck,
-		RefreshCw,
-		WifiOff,
-		X
-	} from '@lucide/svelte';
-	import { offlineController } from '$lib/offline.svelte.js';
+	import { Package, Plus, Camera, ChevronRight, CircleCheck, X } from '@lucide/svelte';
+	import { offlineController, unreachableWording } from '$lib/offline.svelte.js';
+	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { auth } from '$lib/auth.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { collectionRouteParams } from '$lib/collections';
@@ -95,7 +87,7 @@
 	const failedNote = (block: Block<unknown> | null) =>
 		block?.status === 'error'
 			? offlineController.offline
-				? "You're offline"
+				? unreachableWording(offlineController.browserOffline).title
 				: "Couldn't load"
 			: '';
 	const firstName = $derived(auth.user?.display_name?.split(' ')[0] ?? '');
@@ -164,20 +156,7 @@
 </svelte:head>
 
 {#snippet retry(what: string)}
-	<div
-		class="flex items-center gap-2 rounded-xl border border-dashed p-3 text-sm text-muted-foreground"
-	>
-		{#if offlineController.offline}
-			<WifiOff class="size-4 shrink-0" />
-			You're offline, so {what} can't load.
-		{:else}
-			Couldn't load {what}.
-		{/if}
-		<Button variant="outline" size="sm" onclick={() => void loadData()}>
-			<RefreshCw class="size-3.5" />
-			Try again
-		</Button>
-	</div>
+	<LoadFailed {what} compact onretry={() => void loadData()} />
 {/snippet}
 
 {#snippet tile(

@@ -54,7 +54,7 @@
 		workerSupported
 	} from '$lib/service-worker-client';
 	import { themeController } from '$lib/theme.svelte.js';
-	import { offlineController } from '$lib/offline.svelte.js';
+	import { offlineController, unreachableWording } from '$lib/offline.svelte.js';
 	import { displayMode } from '$lib/display-mode.svelte.js';
 	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { captureController } from '$lib/capture.svelte.js';
@@ -198,6 +198,13 @@
 	const showPage = $derived(auth.ready && decision.action === 'allow');
 	// Navigation is only useful once signed in and free to use it.
 	const showNav = $derived(auth.signedIn && !auth.passwordExpired);
+	// The start screen when the sign-in check failed: the server unreachable (it is checked again in
+	// the background), the browser offline, or an error the server answered with.
+	const offlineWording = $derived(
+		offlineController.offline
+			? unreachableWording(offlineController.browserOffline)
+			: { title: "Can't reach Menagerist", detail: 'Try again in a moment.' }
+	);
 
 	$effect(() => {
 		if (auth.ready && decision.action === 'redirect') {
@@ -415,9 +422,9 @@
 					>
 						<WifiOff class="size-10 text-muted-foreground/50" />
 						<h1 class="font-heading text-xl font-semibold">
-							{offlineController.offline ? "You're offline" : "Can't reach Menagerist"}
+							{offlineWording.title}
 						</h1>
-						<p class="text-muted-foreground">Check your connection, then try again.</p>
+						<p class="text-muted-foreground">{offlineWording.detail}</p>
 						<Button class="pointer-coarse:h-11" onclick={() => auth.init()}>Try again</Button>
 					</main>
 				{:else}
