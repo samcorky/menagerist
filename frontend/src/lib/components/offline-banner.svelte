@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { RefreshCw, WifiOff } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { offlineController } from '$lib/offline.svelte.js';
+	import { offlineController, unreachableWording } from '$lib/offline.svelte.js';
 </script>
 
 {#if offlineController.offline}
@@ -12,7 +12,7 @@
 	>
 		<p class="flex items-center gap-2">
 			<WifiOff class="size-4 shrink-0 text-muted-foreground" />
-			You're offline. Some things may not load.
+			{unreachableWording(offlineController.browserOffline).title}. Some things may not load.
 		</p>
 		<Button variant="outline" size="sm" onclick={() => offlineController.retry()}>
 			<RefreshCw class="size-3.5" />
