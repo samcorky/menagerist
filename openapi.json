@@ -33317,10 +33317,11 @@
         "enum": [
           "create",
           "unchanged",
-          "conflict"
+          "conflict",
+          "ambiguous"
         ],
         "title": "PlanAction",
-        "description": "What installing would do with one entity."
+        "description": "What installing would do with one entity.\n\n`ambiguous` rows are skipped, with the reason, while the rest is installed."
       },
       "PlanBlockerResponse": {
         "properties": {
@@ -33379,7 +33380,7 @@
               }
             ],
             "title": "Reason",
-            "description": "Why it is unchanged or conflicts."
+            "description": "Why it is unchanged, conflicts or is ambiguous."
           }
         },
         "type": "object",

@@ -14,10 +14,10 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     import_table_name,
     prepare_row,
     read_rows,
+    require_all_tables,
     skip_row,
 )
 from app.modules.backup.domain.errors import (
-    CorruptBackupError,
     ImportCollisionError,
     RestoreTargetNotEmptyError,
 )
@@ -89,8 +89,7 @@ class InMemoryUserDatabaseRestorer:
                     raise ImportCollisionError("Imported identifier already exists.")
                 rows.append(row)
                 _record_identifier(name, row, imported)
-        if seen != set(USER_TABLES):
-            raise CorruptBackupError("User archive is missing content tables.")
+        require_all_tables(seen)
         self.tables.clear()
         self.tables.update(target)
 

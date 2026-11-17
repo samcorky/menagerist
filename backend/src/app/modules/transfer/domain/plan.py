@@ -7,13 +7,16 @@ from app.modules.transfer.domain.entity_kind import EntityKind
 class PlanAction(StrEnum):
     """What applying a plan would do with one entity of the bundle.
 
-    Updating an entity and noticing one that is no longer in the source come with
-    importing a source again (#234).
+    `AMBIGUOUS` is a row whose source key cannot be pinned to one entity: it is
+    skipped, with the reason, and does not stop the rest being applied. Updating an
+    entity and noticing one that is no longer in the source come with importing a
+    source again (#234).
     """
 
     CREATE = "create"
     UNCHANGED = "unchanged"
     CONFLICT = "conflict"
+    AMBIGUOUS = "ambiguous"
 
 
 class ClashPolicy(StrEnum):

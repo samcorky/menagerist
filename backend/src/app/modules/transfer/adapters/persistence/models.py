@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -35,3 +36,27 @@ class RunModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
     entities: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     installed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SourceLinkModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
+    """ORM row for a source link: a source's key for an entity and what was imported."""
+
+    __tablename__ = "source_links"
+    __table_args__ = (
+        Index(
+            "uq_source_links_owner_source_kind_key",
+            "owner_id",
+            "source",
+            "kind",
+            "key",
+            unique=True,
+        ),
+        Index("ix_source_links_owner_id_source", "owner_id", "source"),
+    )
+
+    source: Mapped[str]
+    kind: Mapped[str]
+    key: Mapped[str]
+    entity_id: Mapped[uuid.UUID]
+    fields: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

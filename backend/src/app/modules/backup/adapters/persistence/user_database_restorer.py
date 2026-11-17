@@ -16,6 +16,7 @@ from app.modules.backup.adapters.persistence.user_transfer_rows import (
     import_table_name,
     prepare_row,
     read_rows,
+    require_all_tables,
     skip_row,
 )
 from app.modules.backup.domain.errors import (
@@ -74,8 +75,7 @@ class SqlAlchemyUserDatabaseRestorer(SqlAlchemyDatabaseRestorer):
                         await self._insert_row(connection, tables[name], row)
                         if "id" in row:
                             imported[name].add(str(row["id"]))
-                if seen != set(USER_TABLES):
-                    raise CorruptBackupError("User archive is missing content tables.")
+                require_all_tables(seen)
         except IntegrityError as exc:
             raise ImportCollisionError(
                 "An imported identifier already exists or a reference is invalid."

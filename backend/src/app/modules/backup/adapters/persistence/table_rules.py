@@ -28,6 +28,7 @@ TABLE_RULES = {
             "edge_types",
             "presets",
             "example_installations",
+            "source_links",
             "setting_values",
         ),
         TableRule.KEEP,

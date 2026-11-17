@@ -618,6 +618,19 @@ class GraphPackTarget:
                 is not None
             )
 
+    async def find_items_by_field(
+        self, type_slug: str, key: str, value: str, *, limit: int = 2
+    ) -> list[uuid.UUID]:
+        """Return ids of the actor's items of `type_slug` whose `key` equals `value`."""
+        async with self._stores.read() as repos:
+            if key == "name":
+                return await repos.nodes.ids_with_name(
+                    type_slug, value, scope=self._scope, limit=limit
+                )
+            return await repos.nodes.ids_with_attribute_value(
+                type_slug, key, value, scope=self._scope, limit=limit
+            )
+
     async def create_relationship_type(
         self, spec: BundleRelationshipType, presets: Mapping[str, uuid.UUID]
     ) -> Created:

@@ -1596,3 +1596,25 @@ Links are repointed wherever they live: item types, items' `extra_schema`, other
 **Not chosen:** matching on the visible name (a rename would silently drop a type from stored searches; names aren't unique), a stored status column (status is a field like any other), and a pack-shipped search that lists one condition per type (it misses types added later).
 
 **Content (#241, #349):** the catalogue ships two saved fields: _Status_ (choice: Owned, Wanted; no default, so unset reads as owned and nothing needs backfilling) and _Acquisition_ (a table of Date as a partial date, Price, Source, How (Bought, Gift, Inherited, Traded) and Notes; one row per time it was got). _Acquisition_ replaces the single-row _Purchase details_ field group. In the Board games packs, the game type's _Price paid_ becomes an _Acquisition_ row and gains _Status_. _Wishlist_ becomes a smart collection, `{"kind": "field", "field_kind": "choice", "key": "status", "op": "=", "value": "Wanted"}`, so it also lists the person's own types with a Status field. It uses the key and kind form, not `origin`, so it doesn't depend on which saved field a type's Status came from. A table field still can't be a card highlight, so the latest acquisition isn't shown on cards yet (follow-up).
+
+## Source links (2026-11-17)
+
+**Decision:** an import from a source that can be run again records a link per owner, in `transfer`: source name, entity kind, the source's key, the entity's id, a hash per field as last imported, and when. The `source_links` table has a unique index on (owner, source, kind, key), and the `SourceLinkRepository` port has an in-memory twin as usual. A `Bundle` may name a `source` (`BundleSource`: a name and an optional `key_field`), and each `BundleItem` may carry a `source_key`; a bundle with keys and no source is refused. Planning (`plan_bundle`) uses the links when the caller passes `BundleExtras(links=..., owner_id=...)`:
+
+- a key with a link whose item still exists is `unchanged` ("Already imported from lddb.");
+- a key with no usable link, whose `key_field` value is held by exactly one of the person's items of that type, is `unchanged` and will be linked, not changed;
+- more than one such item, or a key repeated within the file, is `ambiguous`; nothing is merged silently.
+
+Applying creates the link for each item it creates or matches, and re-points a link whose item had gone, so a second run of the same file creates nothing.
+
+**Choices that are not obvious:**
+
+- Links are a table of their own, not more ledger. The run ledger is a JSONB list inside a run, which can't answer "which entity has this key" or enforce one link per key, and the run history is meant to sit on top of links, not hold them.
+- `ambiguous` is a plan action of its own (added to the API's `PlanAction`), not a `conflict`: a conflict stops the whole bundle, and one reissue sharing a UPC should not stop four hundred other rows. The row is skipped with its reason; connections to it are left out and collections drop it. Re-running is safe because linked rows plan as `unchanged`.
+- A hash per field, not a snapshot. #234's three-way comparison only needs to know whether a field changed since the last import. `fields` is JSONB, so values can be added beside the hashes if conflict messages need "was X".
+- The key field may be `name` or an attribute. Matching is exact and case-sensitive, string attributes only (a number in the file is read as its text), and only items of a type: an untyped item is never matched.
+- `source_links` is KEEP in instance backups and travels in the personal export and import, after the other tables, owned by the importer with the item ids unchanged (the import keeps ids). Without it, a re-import on another instance would plan those items as new and duplicate them. The table is optional on import (`OPTIONAL_TABLES`), so an export made before links existed still imports.
+
+**Not in this version:** nothing yet supplies a `source`, so `ImportBundle` ignores keys until #238's codec does; wiring the repository into the import use cases needs a unit of work they don't have today. Updating linked entities and noticing rows gone from the source is #234. Connections between items that already exist are not de-duplicated on a re-run. The frontend's plan summary does not list `ambiguous` rows; #238's preview must.
+
+**Rationale:** #233 asks for imports that can be run again without duplicating or overwriting; #238 (CSV/JSON import) and #234 (updating from a source) both need to find "the entity this row became".

@@ -390,6 +390,36 @@ class InMemoryNodeRepository:
             key=lambda node: node.id,
         )
 
+    async def ids_with_attribute_value(
+        self,
+        type_slug: str,
+        key: str,
+        value: str,
+        *,
+        scope: ContentFilter,
+        limit: int,
+    ) -> builtins.list[uuid.UUID]:
+        """Return ids of non-deleted nodes of `type_slug` whose `key` equals `value`."""
+        found = sorted(
+            node.id
+            for node in self._visible(scope)
+            if node.type == type_slug
+            and isinstance(node.attributes.get(key), str)
+            and node.attributes[key] == value
+        )
+        return found[:limit]
+
+    async def ids_with_name(
+        self, type_slug: str, name: str, *, scope: ContentFilter, limit: int
+    ) -> builtins.list[uuid.UUID]:
+        """Return ids of non-deleted nodes of `type_slug` named exactly `name`."""
+        found = sorted(
+            node.id
+            for node in self._visible(scope)
+            if node.type == type_slug and node.name == name
+        )
+        return found[:limit]
+
     async def count_with_attribute(
         self,
         type_slug: str,

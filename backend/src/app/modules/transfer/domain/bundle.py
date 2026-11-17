@@ -186,6 +186,7 @@ class BundleItem:
     attributes: dict[str, Any] = field(default_factory=dict)
     tags: tuple[str, ...] = ()
     extra_schema: dict[str, Any] | None = None
+    source_key: str | None = None
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -214,14 +215,28 @@ class BundleCollection:
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
+class BundleSource:
+    """A source whose rows can be imported again, such as a database or a sheet.
+
+    `name` identifies the source in source links. `key_field` is the item field
+    (`name` or an attribute key) that finds an item the person made by hand.
+    """
+
+    name: str
+    key_field: str | None = None
+
+
+@dataclass(kw_only=True, frozen=True, eq=False)
 class Bundle:
     """What one import or install brings in, whatever its source.
 
     A source (a file, a catalogue entry) is decoded into a bundle, which is then
-    planned and applied the same way. Refs are unique within each kind.
+    planned and applied the same way. Refs are unique within each kind. A bundle
+    with a `source` gives its items `source_key`s, so they can be linked.
     """
 
     id: str
+    source: BundleSource | None = None
     presets: tuple[BundlePreset, ...] = ()
     relationship_types: tuple[BundleRelationshipType, ...] = ()
     item_types: tuple[BundleItemType, ...] = ()
@@ -247,6 +262,23 @@ class Bundle:
                 raise InvalidBundleError(f"each {name} needs its own ref")
         self._check_size()
         self._check_collections()
+        self._check_source()
+
+    def _check_source(self) -> None:
+        source = self.source
+        if source is None:
+            if any(item.source_key is not None for item in self.items):
+                raise InvalidBundleError(
+                    "items have source keys but there is no source"
+                )
+            return
+        if not source.name.strip():
+            raise InvalidBundleError("a source needs a name")
+        if source.key_field is not None and not source.key_field.strip():
+            raise InvalidBundleError("a source's key field cannot be blank")
+        for item in self.items:
+            if item.source_key is not None and not item.source_key.strip():
+                raise InvalidBundleError(f"item '{item.ref}' has a blank source key")
 
     def _check_size(self) -> None:
         for name, count, limit in (
