@@ -19780,6 +19780,724 @@
         "x-required-permission": "transfer:bundle:read"
       }
     },
+    "/api/v1/imports/items/inspect": {
+      "post": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Inspect Item Import",
+        "description": "Read a CSV file and say what is in it, before importing anything.\n\nReturns the column names, the first rows, how many rows there are, the item\ntype's fields, and a suggested mapping that matches each column to a field by its\nname. Nothing is stored; send the file again to preview and to import.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "inspect_item_import",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectItemImportBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemImportInspectionResponse"
+                },
+                "example": {
+                  "headers": [
+                    "title",
+                    "signed_on",
+                    "authenticated"
+                  ],
+                  "sample_rows": [
+                    {
+                      "title": "Alien #1",
+                      "signed_on": "2019-08",
+                      "authenticated": "yes"
+                    }
+                  ],
+                  "row_count": 1204,
+                  "fields": [
+                    {
+                      "key": "signed_on",
+                      "title": "Signed on",
+                      "kind": "partialdate",
+                      "multiple": false,
+                      "importable": true
+                    }
+                  ],
+                  "suggested_mapping": [
+                    {
+                      "column": "title",
+                      "target": "name"
+                    },
+                    {
+                      "column": "signed_on",
+                      "target": "signed_on"
+                    },
+                    {
+                      "column": "authenticated"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a spreadsheet file or the mapping given for it cannot be imported.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidImportFileError",
+                  "status": 400,
+                  "detail": "You have no item type called 'signature'.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/inspect"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/imports/items/plan": {
+      "post": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Plan Item Import",
+        "description": "See what importing a CSV file would do, without importing anything.\n\nEach row is an item to `create`. A value that cannot be imported, such as a date\nwritten as \"19th Aug\", is a blocker that names its row (the header is row 1) and\nfield; while there are any, the plan is not `ready`.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "plan_item_import",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanItemImportBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPlanResponse"
+                },
+                "example": {
+                  "blockers": [],
+                  "entities": [
+                    {
+                      "action": "unchanged",
+                      "kind": "preset",
+                      "label": "Condition grades",
+                      "reason": "You already have one the same.",
+                      "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+                    }
+                  ],
+                  "ready": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a spreadsheet file or the mapping given for it cannot be imported.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidImportFileError",
+                  "status": 400,
+                  "detail": "You have no item type called 'signature'.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/plan"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/imports/items": {
+      "post": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Import Items",
+        "description": "Import a CSV file as items of one item type.\n\nPlans the file again, as `POST /imports/items/plan` does, and creates the items\nonly if nothing in it is a problem.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "import_items",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportItemsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemImportResultResponse"
+                },
+                "example": {
+                  "items_added": 1204
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a spreadsheet file or the mapping given for it cannot be imported.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidImportFileError",
+                  "status": 400,
+                  "detail": "You have no item type called 'signature'.",
+                  "instance": "https://menagerist.example/api/v1/imports/items"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Returned when a bundle is applied although its plan has conflicts.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "BundleConflictError",
+                  "status": 409,
+                  "detail": "Row 14, Signed on: '19th Aug' is not a date.",
+                  "instance": "https://menagerist.example/api/v1/imports/items"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/imports/items"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
     "/api/v1/collections": {
       "post": {
         "tags": [
@@ -30539,6 +31257,40 @@
           }
         ]
       },
+      "ColumnMappingEntry": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "title": "Column",
+            "description": "The column's name in the file's header row."
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target",
+            "description": "`name`, `description`, `tags`, a field's key, or null to ignore the column."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "column"
+        ],
+        "title": "ColumnMappingEntry",
+        "description": "Where one column of the file goes.",
+        "examples": [
+          {
+            "column": "signed_on",
+            "target": "signed_on"
+          }
+        ]
+      },
       "CoverRequest": {
         "properties": {
           "target_type": {
@@ -32199,6 +32951,50 @@
         "title": "IdentityPermission",
         "description": "Permissions for seeing and managing other people's accounts.\n\nValues read `<module>:<resource>:<action>`."
       },
+      "ImportItemsBody": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "A CSV file with a header row, in UTF-8, up to 10 MB."
+          },
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "description": "The slug of the item type the rows become."
+          },
+          "mapping": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": {
+              "items": {
+                "$ref": "#/components/schemas/ColumnMappingEntry"
+              },
+              "type": "array"
+            },
+            "title": "Mapping",
+            "description": "Where each column goes, as JSON: a list of `column` and `target`.",
+            "examples": [
+              "[{\"column\": \"title\", \"target\": \"name\"}]"
+            ]
+          },
+          "list_separator": {
+            "type": "string",
+            "title": "List Separator",
+            "description": "What separates several choices or tags in one cell.",
+            "default": ","
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "item_type",
+          "mapping"
+        ],
+        "title": "ImportItemsBody",
+        "description": "The multipart form for `import_items`."
+      },
       "ImportPlanResponse": {
         "properties": {
           "ready": {
@@ -32287,6 +33083,28 @@
             "skipped": 1
           }
         ]
+      },
+      "InspectItemImportBody": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "A CSV file with a header row, in UTF-8, up to 10 MB."
+          },
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "description": "The slug of the item type the rows become."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "item_type"
+        ],
+        "title": "InspectItemImportBody",
+        "description": "The multipart form for `inspect_item_import`."
       },
       "InstallOutcomeResponse": {
         "properties": {
@@ -32556,6 +33374,200 @@
             "key": "signed",
             "kind": "boolean",
             "label": "Signed copy"
+          }
+        ]
+      },
+      "ItemImportFieldResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The field's key, used as a mapping target."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The field's name, as people see it."
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "What sort of value it holds, such as `date`."
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options",
+            "description": "The choices it allows, for a choice field."
+          },
+          "multiple": {
+            "type": "boolean",
+            "title": "Multiple",
+            "description": "Whether a cell may hold several choices."
+          },
+          "importable": {
+            "type": "boolean",
+            "title": "Importable",
+            "description": "Whether an import can fill it yet."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it cannot be filled, if it cannot."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "multiple",
+          "importable"
+        ],
+        "title": "ItemImportFieldResponse",
+        "description": "One field of the item type, as an import can fill it.",
+        "examples": [
+          {
+            "importable": true,
+            "key": "signed_on",
+            "kind": "partialdate",
+            "multiple": false,
+            "title": "Signed on"
+          }
+        ]
+      },
+      "ItemImportInspectionResponse": {
+        "properties": {
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Headers",
+            "description": "The file's column names, in order."
+          },
+          "sample_rows": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Sample Rows",
+            "description": "The first few rows as written, each keyed by column name."
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count",
+            "description": "How many rows the file has."
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ItemImportFieldResponse"
+            },
+            "type": "array",
+            "title": "Fields",
+            "description": "The item type's fields."
+          },
+          "suggested_mapping": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnMappingEntry"
+            },
+            "type": "array",
+            "title": "Suggested Mapping",
+            "description": "A first guess, matching each column to a field by name."
+          }
+        },
+        "type": "object",
+        "required": [
+          "headers",
+          "sample_rows",
+          "row_count",
+          "fields",
+          "suggested_mapping"
+        ],
+        "title": "ItemImportInspectionResponse",
+        "description": "What is in a CSV file, the item type's fields, and a mapping to start from.",
+        "examples": [
+          {
+            "fields": [
+              {
+                "importable": true,
+                "key": "signed_on",
+                "kind": "partialdate",
+                "multiple": false,
+                "title": "Signed on"
+              }
+            ],
+            "headers": [
+              "title",
+              "signed_on",
+              "authenticated"
+            ],
+            "row_count": 1204,
+            "sample_rows": [
+              {
+                "authenticated": "yes",
+                "signed_on": "2019-08",
+                "title": "Alien #1"
+              }
+            ],
+            "suggested_mapping": [
+              {
+                "column": "title",
+                "target": "name"
+              },
+              {
+                "column": "signed_on",
+                "target": "signed_on"
+              },
+              {
+                "column": "authenticated"
+              }
+            ]
+          }
+        ]
+      },
+      "ItemImportResultResponse": {
+        "properties": {
+          "items_added": {
+            "type": "integer",
+            "title": "Items Added",
+            "description": "How many items were added."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items_added"
+        ],
+        "title": "ItemImportResultResponse",
+        "description": "What running an import created.",
+        "examples": [
+          {
+            "items_added": 1204
           }
         ]
       },
@@ -34271,6 +35283,50 @@
             "reason": "Add Vinyl first."
           }
         ]
+      },
+      "PlanItemImportBody": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "A CSV file with a header row, in UTF-8, up to 10 MB."
+          },
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "description": "The slug of the item type the rows become."
+          },
+          "mapping": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": {
+              "items": {
+                "$ref": "#/components/schemas/ColumnMappingEntry"
+              },
+              "type": "array"
+            },
+            "title": "Mapping",
+            "description": "Where each column goes, as JSON: a list of `column` and `target`.",
+            "examples": [
+              "[{\"column\": \"title\", \"target\": \"name\"}]"
+            ]
+          },
+          "list_separator": {
+            "type": "string",
+            "title": "List Separator",
+            "description": "What separates several choices or tags in one cell.",
+            "default": ","
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "item_type",
+          "mapping"
+        ],
+        "title": "PlanItemImportBody",
+        "description": "The multipart form for `plan_item_import`."
       },
       "PlannedEntityResponse": {
         "properties": {
@@ -37107,6 +38163,10 @@
     {
       "name": "Bundles",
       "description": "Endpoints for importing and exporting files of saved fields."
+    },
+    {
+      "name": "Imports",
+      "description": "Endpoints for importing spreadsheets as items."
     },
     {
       "name": "Collections",

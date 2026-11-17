@@ -354,6 +354,9 @@ ALLOWED: dict[Route, str] = {
     ("POST", "/api/v1/presets"): CREATES_OWN,
     ("POST", "/api/v1/bundles/import"): CREATES_OWN,
     ("POST", "/api/v1/bundles/import/plan"): CREATES_OWN,
+    ("POST", "/api/v1/imports/items"): CREATES_OWN,
+    ("POST", "/api/v1/imports/items/inspect"): CREATES_OWN,
+    ("POST", "/api/v1/imports/items/plan"): CREATES_OWN,
     ("GET", "/api/v1/bundles/export"): EXPORT_BY_IDS,
     ("POST", "/api/v1/nodes"): CREATES_OWN,
     ("POST", "/api/v1/collections"): CREATES_OWN,
@@ -422,6 +425,13 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
     "attribute_key": lambda _: "cover",
 }
 # Request-body recipes by OpenAPI schema name: kwargs for `client.request`.
+_CSV_IMPORT: dict[str, Any] = {
+    "files": {"file": ("c.csv", b"title\nAlien\n", "text/csv")},
+    "data": {
+        "item_type": "film",
+        "mapping": '[{"column": "title", "target": "name"}]',
+    },
+}
 BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
     "UpdateNodeRequest": lambda s: {"json": {"name": "Stolen"}},
     "DuplicateNodeRequest": lambda s: {"json": {"name": "Stolen copy"}},
@@ -478,6 +488,9 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
         "files": {"file": ("c.jpg", TINY_JPEG, "image/jpeg")},
         "data": {"target_type": "node", "target_id": s.item},
     },
+    "InspectItemImportBody": lambda s: _CSV_IMPORT,
+    "PlanItemImportBody": lambda s: _CSV_IMPORT,
+    "ImportItemsBody": lambda s: _CSV_IMPORT,
     "UpdateCollectionRequest": lambda s: {"json": {"name": "Mine"}},
     "AddItemsRequest": lambda s: {"json": {"item_ids": [s.item2]}},
     "CreateUserRequest": lambda s: {

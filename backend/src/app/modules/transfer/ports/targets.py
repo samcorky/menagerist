@@ -13,6 +13,7 @@ from app.modules.transfer.domain.bundle import (  # noqa: TC001
     BundleRelationshipType,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind  # noqa: TC001
+from app.modules.transfer.domain.tabular import FieldSpec  # noqa: TC001
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -107,6 +108,23 @@ class GraphTarget(Protocol):
 
     async def slug_taken(self, kind: EntityKind, slug: str) -> bool:
         """Whether a live item type or relationship type already has `slug`."""
+        ...
+
+    async def item_type_fields(self, slug: str) -> list[FieldSpec] | None:
+        """Describe the fields of the person's item type `slug`, or `None` if none.
+
+        Archived fields are left out. A field the import cannot fill is described
+        with `importable` false and the reason.
+        """
+        ...
+
+    async def check_item_attributes(
+        self, slug: str, attributes: Mapping[str, Any]
+    ) -> list[str]:
+        """Return a message for each value that breaks the type's schema, if any.
+
+        Each message starts with the field's title. Nothing is stored.
+        """
         ...
 
     async def find_items_by_field(
