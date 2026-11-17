@@ -34,6 +34,7 @@
 	import IconButton from '$lib/components/icon-button.svelte';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import UserMenu from '$lib/components/user-menu.svelte';
+	import { accountMenuInTopBar } from '$lib/account-placement';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { auth } from '$lib/auth.svelte.js';
 	import { guardDecision } from '$lib/auth';
@@ -393,7 +394,9 @@
 					</IconButton>
 				{/if}
 				<ThemeToggle />
-				<UserMenu />
+				{#if accountMenuInTopBar({ sidebarShown: showNav, mode: sidebar.mode })}
+					<UserMenu />
+				{/if}
 			</div>
 		</header>
 
