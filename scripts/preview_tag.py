@@ -1,10 +1,10 @@
 """Work out the throwaway tag a preview image is pushed under.
 
-Run by the ``push-preview`` job in ``.github/workflows/build.yml``. A pull request's
+Run by the ``push`` job in ``.github/workflows/preview-image.yml``. A pull request's
 image is ``pr-<number>``, which closing the pull request deletes; a manual run's is
 ``preview-<branch>``, made safe for a tag. Both prefixes keep a preview off ``edge``,
-``latest`` and the version tags, and are what the scheduled sweep in
-``preview-image.yml`` deletes. It uses only the standard library.
+``latest`` and the version tags, and are what the workflow's scheduled sweep deletes.
+It uses only the standard library.
 """
 
 import os
