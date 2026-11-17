@@ -15,6 +15,7 @@
 	import { sidebar } from '$lib/sidebar.svelte';
 	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
 	import PageScrollLock from '$lib/components/page-scroll-lock.svelte';
+	import UserMenu from '$lib/components/user-menu.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { cn } from '$lib/utils.js';
 
@@ -28,6 +29,8 @@
 	const hubActive = $derived(isManageRoute(pathname) && active === undefined);
 
 	let panel = $state<HTMLElement | null>(null);
+	// The destinations scroll; the footer (Settings, API docs, the account) never moves.
+	let scroller = $state<HTMLElement | null>(null);
 	// Where focus was when the drawer opened, so closing it hands focus back (the burger).
 	let opener: HTMLElement | null = null;
 
@@ -36,16 +39,16 @@
 	let indicator = $state<HTMLElement | null>(null);
 	let placed = $state(false);
 	function place() {
-		if (!panel || !indicator) return;
-		const link = panel.querySelector<HTMLElement>('a[aria-current="page"]');
+		if (!scroller || !indicator) return;
+		const link = scroller.querySelector<HTMLElement>('a[aria-current="page"]');
 		if (!link) {
 			indicator.style.opacity = '0';
 			return;
 		}
 		const box = link.getBoundingClientRect();
-		const within = panel.getBoundingClientRect();
-		const x = box.left - within.left + panel.scrollLeft;
-		const y = box.top - within.top + panel.scrollTop;
+		const within = scroller.getBoundingClientRect();
+		const x = box.left - within.left + scroller.scrollLeft;
+		const y = box.top - within.top + scroller.scrollTop;
 		indicator.style.opacity = '1';
 		indicator.style.width = `${box.width}px`;
 		indicator.style.height = `${box.height}px`;
@@ -55,7 +58,7 @@
 
 	// Follow the current page, the sidebar's width and anything that moves the links.
 	$effect(() => {
-		void [active, sidebar.mode, sidebar.drawerOpen, panel, indicator];
+		void [active, sidebar.mode, sidebar.drawerOpen, scroller, indicator];
 		void tick().then(place);
 	});
 	// Changing between rail and full sidebar moves the links for a moment (headings fold, margins
@@ -79,8 +82,8 @@
 		};
 	});
 	$effect(() => {
-		if (!panel) return;
-		const node = panel;
+		if (!scroller) return;
+		const node = scroller;
 		const observer = new ResizeObserver(place);
 		observer.observe(node);
 		node.addEventListener('animationend', place);
@@ -136,10 +139,12 @@
 		}
 	});
 
-	const linkClass = (current: boolean) =>
+	const linkClass = (current: boolean, footer = false) =>
 		cn(
 			'flex h-8 items-center gap-2 rounded-xl px-2 text-sm text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 pointer-coarse:h-11',
-			current && 'font-medium text-foreground'
+			current && 'font-medium text-foreground',
+			// The sliding highlight lives in the scrolling list, so footer rows mark themselves.
+			current && footer && 'bg-secondary hover:bg-secondary'
 		);
 </script>
 
@@ -151,7 +156,12 @@
 	}}
 />
 
-{#snippet row(item: ManageItem, current: boolean, props: Record<string, unknown> = {})}
+{#snippet row(
+	item: ManageItem,
+	current: boolean,
+	props: Record<string, unknown> = {},
+	footer = false
+)}
 	{@const Icon = item.icon}
 	<!-- The icon sits in the same place in every mode, so changing mode never moves it; the label
 	     stays in the page (and for screen readers) and only fades while the rail clips it. -->
@@ -159,7 +169,7 @@
 		{...props}
 		href={resolve(item.href as '/')}
 		aria-current={current ? 'page' : undefined}
-		class={linkClass(current)}
+		class={linkClass(current, footer)}
 	>
 		<Icon class="size-4 shrink-0" />
 		<span
@@ -171,13 +181,13 @@
 	</a>
 {/snippet}
 
-{#snippet entry(item: ManageItem, current: boolean)}
+{#snippet entry(item: ManageItem, current: boolean, footer = false)}
 	<!-- Always inside a tooltip (off outside the rail), so the row is the same element in both modes
 	     and its label can fade rather than appear. -->
 	<Tooltip.Root disabled={!rail}>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
-				{@render row(item, current, props)}
+				{@render row(item, current, props, footer)}
 			{/snippet}
 		</Tooltip.Trigger>
 		<Tooltip.Content side="right">{item.label}</Tooltip.Content>
@@ -197,46 +207,53 @@
 {/snippet}
 
 {#snippet body()}
-	<span
-		bind:this={indicator}
-		aria-hidden="true"
-		class={cn(
-			'pointer-events-none absolute top-0 left-0 -z-10 rounded-xl bg-secondary opacity-0',
-			placed && 'transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none'
-		)}
-	></span>
-	<ul class="flex flex-col gap-0.5">
-		{#each mainDestinations as item (item.href)}
-			<li>{@render entry(item, active === item.href)}</li>
+	<!-- The list scrolls inside its own box; the padding keeps focus rings clear of its edges. -->
+	<div
+		bind:this={scroller}
+		class="relative isolate -mx-2 -mt-1 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2 pt-1 pb-2"
+	>
+		<span
+			bind:this={indicator}
+			aria-hidden="true"
+			class={cn(
+				'pointer-events-none absolute top-0 left-0 -z-10 rounded-xl bg-secondary opacity-0',
+				placed &&
+					'transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none'
+			)}
+		></span>
+		<ul class="flex flex-col gap-0.5">
+			{#each mainDestinations as item (item.href)}
+				<li>{@render entry(item, active === item.href)}</li>
+			{/each}
+		</ul>
+
+		{#each groups as group (group.label)}
+			{#if group.items.length > 0}
+				<!-- The same section in both modes: the rail folds the heading away and shows a divider. -->
+				<CollapsibleSection
+					id={`nav-${group.label.toLowerCase()}`}
+					title={group.label}
+					heading="p"
+					titleClass="text-xs font-medium text-muted-foreground"
+					forceOpen={group.items.some((item) => item.href === active)}
+					bare={rail}
+					class={cn(
+						'border-t transition-[margin,padding,gap,border-color] duration-200 motion-reduce:transition-none',
+						rail ? 'mt-2 gap-0 border-border pt-2' : 'mt-3 gap-1 border-transparent'
+					)}
+				>
+					<ul class="flex flex-col gap-0.5">
+						{#each group.items as item (item.href)}
+							<li>{@render entry(item, active === item.href)}</li>
+						{/each}
+					</ul>
+				</CollapsibleSection>
+			{/if}
 		{/each}
-	</ul>
-
-	{#each groups as group (group.label)}
-		{#if group.items.length > 0}
-			<!-- The same section in both modes: the rail folds the heading away and shows a divider. -->
-			<CollapsibleSection
-				id={`nav-${group.label.toLowerCase()}`}
-				title={group.label}
-				heading="p"
-				titleClass="text-xs font-medium text-muted-foreground"
-				forceOpen={group.items.some((item) => item.href === active)}
-				bare={rail}
-				class={cn(
-					'border-t transition-[margin,padding,gap,border-color] duration-200 motion-reduce:transition-none',
-					rail ? 'mt-2 gap-0 border-border pt-2' : 'mt-3 gap-1 border-transparent'
-				)}
-			>
-				<ul class="flex flex-col gap-0.5">
-					{#each group.items as item (item.href)}
-						<li>{@render entry(item, active === item.href)}</li>
-					{/each}
-				</ul>
-			</CollapsibleSection>
-		{/if}
-	{/each}
-
-	<div class="mt-auto flex flex-col gap-0.5 pt-3">
-		{@render entry({ href: '/settings', label: 'Settings', icon: Settings }, hubActive)}
+	</div>
+	<!-- Pinned: always in view, however many groups are open above. -->
+	<div class="-mx-2 flex shrink-0 flex-col gap-0.5 border-t px-2 pt-2" data-testid="sidebar-footer">
+		{@render entry({ href: '/settings', label: 'Settings', icon: Settings }, hubActive, true)}
 		<Tooltip.Root disabled={!rail}>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
@@ -245,6 +262,7 @@
 			</Tooltip.Trigger>
 			<Tooltip.Content side="right">API docs</Tooltip.Content>
 		</Tooltip.Root>
+		<UserMenu placement="sidebar" {rail} />
 	</div>
 {/snippet}
 
@@ -271,7 +289,7 @@
 				bind:this={panel}
 				id="app-sidebar"
 				aria-label="Main"
-				class="absolute inset-y-0 left-0 isolate z-10 flex w-64 flex-col overflow-x-hidden overflow-y-auto border-r bg-background p-2 shadow-xl"
+				class="absolute inset-y-0 left-0 isolate z-10 flex w-64 flex-col overflow-hidden border-r bg-background p-2 shadow-xl"
 				style="padding-top: env(safe-area-inset-top); padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom) * 0.5)); padding-left: max(0.5rem, env(safe-area-inset-left))"
 				transition:slideIn
 			>
@@ -285,7 +303,7 @@
 		id="app-sidebar"
 		aria-label="Main"
 		class={cn(
-			'relative isolate flex shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r bg-background p-2 transition-[width] duration-200 ease-out motion-reduce:transition-none',
+			'relative isolate flex shrink-0 flex-col overflow-hidden border-r bg-background p-2 transition-[width] duration-200 ease-out motion-reduce:transition-none',
 			rail ? 'w-12' : 'w-56'
 		)}
 		style="view-transition-name: app-sidebar"

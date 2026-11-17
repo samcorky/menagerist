@@ -40,19 +40,21 @@ test.describe('desktop top bar', () => {
 		).toBeVisible();
 	});
 
-	test('the theme toggle and account button show tooltips', async ({ page }) => {
+	test('the theme toggle shows its tooltip', async ({ page }) => {
 		await page.getByRole('button', { name: 'Toggle theme', exact: true }).hover();
 		await expect(
 			page.locator('[data-slot="tooltip-content"]').filter({ hasText: 'Toggle theme' })
 		).toBeVisible();
-		await page.getByRole('button', { name: /^Account menu for / }).hover();
-		await expect(
-			page.locator('[data-slot="tooltip-content"]').filter({ hasText: /Account menu for / })
-		).toBeVisible();
 	});
 
-	test('the account button still opens its menu', async ({ page }) => {
-		await page.getByRole('button', { name: /^Account menu for / }).click();
+	test('the account menu sits at the foot of the sidebar, not in the top bar', async ({ page }) => {
+		await expect(
+			page.locator('header').getByRole('button', { name: /^Account menu for / })
+		).toHaveCount(0);
+		await page
+			.locator('#app-sidebar')
+			.getByRole('button', { name: /^Account menu for / })
+			.click();
 		await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
 	});
 
