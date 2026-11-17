@@ -10,11 +10,15 @@ if TYPE_CHECKING:
 
 
 class PlanAction(StrEnum):
-    """What installing would do with one entity."""
+    """What installing would do with one entity.
+
+    `ambiguous` rows are skipped, with the reason, while the rest is installed.
+    """
 
     CREATE = "create"
     UNCHANGED = "unchanged"
     CONFLICT = "conflict"
+    AMBIGUOUS = "ambiguous"
 
 
 class PlannedEntityResponse(BaseModel):
@@ -42,7 +46,7 @@ class PlannedEntityResponse(BaseModel):
     label: str = Field(description="Its name, as it would be shown.")
     action: PlanAction
     reason: str | None = Field(
-        default=None, description="Why it is unchanged or conflicts."
+        default=None, description="Why it is unchanged, conflicts or is ambiguous."
     )
 
 

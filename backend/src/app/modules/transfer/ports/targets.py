@@ -109,6 +109,16 @@ class GraphTarget(Protocol):
         """Whether a live item type or relationship type already has `slug`."""
         ...
 
+    async def find_items_by_field(
+        self, type_slug: str, key: str, value: str, *, limit: int = 2
+    ) -> list[uuid.UUID]:
+        """Return ids of the person's items of `type_slug` whose `key` equals `value`.
+
+        `key` is an attribute key, or `name` for the item's name. Matching is exact
+        and case-sensitive. Two ids are enough to tell none, one and ambiguous.
+        """
+        ...
+
     async def create_relationship_type(
         self, spec: BundleRelationshipType, presets: Mapping[str, uuid.UUID]
     ) -> Created:

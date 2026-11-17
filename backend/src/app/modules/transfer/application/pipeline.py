@@ -9,13 +9,14 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
-from app.modules.transfer.application.content_hash import preset_key
+from app.modules.transfer.application.content_hash import item_field_hashes, preset_key
 from app.modules.transfer.application.extras import (
     Adoption,
     BundleExtras,
     Key,
     connection_ref,
 )
+from app.modules.transfer.domain.bundle import BundleSource, split_ref
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.errors import BundleConflictError, InvalidBundleError
 from app.modules.transfer.domain.plan import (
@@ -25,6 +26,9 @@ from app.modules.transfer.domain.plan import (
     PlanBlocker,
     PlannedEntity,
 )
+from app.modules.transfer.domain.source_link import SourceLink
+from app.modules.transfer.ports.source_link_repository import SourceLinkRepository
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     import uuid
@@ -96,7 +100,7 @@ async def plan_bundle(
     planner = _Planner(bundle, extras)
     planner.presets(await presets.existing(bundle.presets))
     await planner.types(graph, clash)
-    planner.items()
+    await planner.items(graph)
     await planner.items_fit(graph)
     planner.connections()
     planner.collections()
@@ -118,6 +122,28 @@ def _fields_used(items: Sequence[BundleItem], type_ref: str) -> set[str]:
     return used
 
 
+@dataclass(kw_only=True, frozen=True, eq=False)
+class _Keyed:
+    """What planning needs to link a bundle's items to their source keys."""
+
+    source: BundleSource
+    links: SourceLinkRepository
+    scope: ContentFilter
+    counts: Counter[str | None]
+
+
+def _key_value(spec: BundleItem, key_field: str) -> str | None:
+    """The text of the item's `key_field` that finds a hand-made item, if it has one.
+
+    A number is read as its text. A blank or non-text value finds nothing.
+    """
+    value: object = spec.name if key_field == "name" else spec.attributes.get(key_field)
+    if isinstance(value, bool) or not isinstance(value, str | int | float):
+        return None
+    text = str(value)
+    return text if text.strip() else None
+
+
 class _Planner:
     """Decides each entity in apply order, so later kinds see earlier choices."""
 
@@ -129,6 +155,9 @@ class _Planner:
         # Item types the file names whose slug the person already uses: ref to slug.
         self._reused_types: dict[str, str] = {}
         self._taken_back: set[Key] = set()
+        # Items applying leaves as they are, and the ones whose key is ambiguous.
+        self._not_created: set[str] = set()
+        self._ambiguous_refs: set[str] = set()
         # Item ids and names known before anything is created: adopted and external.
         self._item_ids: dict[str, uuid.UUID] = {}
         self._item_names: dict[str, str] = {}
@@ -212,16 +241,101 @@ class _Planner:
             )
             self._add(kind, ref, label, PlanAction.CONFLICT, reason)
 
-    def items(self) -> None:
-        """Plan each item, taking back one an earlier install kept."""
+    async def items(self, graph: GraphTarget) -> None:
+        """Plan each item: taken back, linked to its source key, or created.
+
+        An item with a source key is `unchanged` when an earlier import made it or a
+        hand-made item has its key field's value, and `ambiguous` when its key
+        names more than one item.
+        """
+        keyed = self._keyed_items()
         for spec in self._bundle.items:
             adoption = self._take_back(EntityKind.ITEM, spec.ref, spec.name)
             if adoption is not None:
                 self._item_ids[spec.ref] = adoption.record.entity_id
                 self._item_names[spec.ref] = adoption.content["name"]
-            else:
-                self._item_names[spec.ref] = spec.name
+                continue
+            self._item_names[spec.ref] = spec.name
+            if keyed is None or spec.source_key is None:
                 self._add(EntityKind.ITEM, spec.ref, spec.name, PlanAction.CREATE)
+            else:
+                await self._keyed_item(spec, keyed, graph)
+
+    def _keyed_items(self) -> _Keyed | None:
+        """Return what planning needs to link items, or `None` if it cannot."""
+        source = self._bundle.source
+        links = self._extras.links
+        owner_id = self._extras.owner_id
+        if source is None or links is None or owner_id is None:
+            return None
+        return _Keyed(
+            source=source,
+            links=links,
+            scope=ContentFilter.of(owner_id),
+            counts=Counter(i.source_key for i in self._bundle.items if i.source_key),
+        )
+
+    async def _keyed_item(
+        self, spec: BundleItem, keyed: _Keyed, graph: GraphTarget
+    ) -> None:
+        key = cast("str", spec.source_key)
+        ref, name = spec.ref, spec.name
+        if keyed.counts[key] > 1:
+            self._ambiguous(
+                ref, name, f"Another row in this file has the same key '{key}'."
+            )
+            return
+        link = await keyed.links.get_by_key(
+            keyed.source.name, EntityKind.ITEM, key, scope=keyed.scope
+        )
+        if link is not None and await graph.inspect(EntityKind.ITEM, link.entity_id):
+            self._extras.linked[ref] = self._item_ids[ref] = link.entity_id
+            self._skip(ref, name, f"Already imported from {keyed.source.name}.")
+            return
+        # No link, or one whose item has gone: look for an item the person made.
+        field = keyed.source.key_field
+        slug = self._item_type_slug(spec.type_ref)
+        value = _key_value(spec, field) if field is not None else None
+        if field is None or slug is None or value is None:
+            self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE)
+            return
+        found = await graph.find_items_by_field(slug, field, value)
+        if len(found) > 1:
+            self._ambiguous(
+                ref,
+                name,
+                f"More than one of your items has {field} '{value}'. "
+                + "Make it unique, then try again.",
+            )
+        elif found:
+            self._extras.matched[ref] = self._item_ids[ref] = found[0]
+            self._skip(
+                ref,
+                name,
+                "Matches your existing item. It will be linked, not changed.",
+            )
+        else:
+            self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE)
+
+    def _skip(self, ref: str, name: str, reason: str) -> None:
+        self._not_created.add(ref)
+        self._add(EntityKind.ITEM, ref, name, PlanAction.UNCHANGED, reason)
+
+    def _ambiguous(self, ref: str, name: str, reason: str) -> None:
+        self._not_created.add(ref)
+        self._ambiguous_refs.add(ref)
+        self._add(EntityKind.ITEM, ref, name, PlanAction.AMBIGUOUS, reason)
+
+    def _item_type_slug(self, type_ref: str | None) -> str | None:
+        """The slug of the item type `type_ref`, in this bundle or a required pack."""
+        if type_ref is None:
+            return None
+        for spec in self._bundle.item_types:
+            if spec.ref == type_ref:
+                return spec.slug
+        pack_id, local = split_ref(type_ref)
+        found = self._extras.external.get((EntityKind.ITEM_TYPE, pack_id or "", local))
+        return None if found is None else found.slug
 
     async def items_fit(self, graph: GraphTarget) -> None:
         """Block when items would go under a type the person has that lacks a field.
@@ -255,6 +369,12 @@ class _Planner:
             source = self._item_names.get(spec.source_ref, spec.source_ref)
             target = self._item_names.get(spec.target_ref, spec.target_ref)
             label = f"{source} to {target}"
+            if {spec.source_ref, spec.target_ref} & self._ambiguous_refs:
+                reason = "Left out: an item it joins has an ambiguous key."
+                self._add(
+                    EntityKind.CONNECTION, ref, label, PlanAction.UNCHANGED, reason
+                )
+                continue
             kept = self._extras.adoptions.get((EntityKind.CONNECTION, ref))
             source_id = self._item_ids.get(spec.source_ref)
             target_id = self._item_ids.get(spec.target_ref)
@@ -283,6 +403,8 @@ class _Planner:
         styles = self._extras.cover_styles
         for spec in self._bundle.items:
             if covers is None or spec.type_ref is None or spec.type_ref not in styles:
+                continue
+            if spec.ref in self._not_created:
                 continue
             name = self._item_names[spec.ref]
             if (EntityKind.ITEM, spec.ref) in self._taken_back:
@@ -339,6 +461,11 @@ class _Applier:
         self._graph = graph
         self._extras = extras
         self._created: Counter[EntityKind] = Counter()
+        self._ambiguous = {
+            e.ref
+            for e in plan.entities
+            if e.kind is EntityKind.ITEM and e.action is PlanAction.AMBIGUOUS
+        }
         self._preset_ids: dict[str, uuid.UUID] = {}
         self._type_slugs: dict[str, str] = {}
         self._relationship_slugs: dict[str, str] = {}
@@ -421,16 +548,61 @@ class _Applier:
                 self._item_names[spec.ref] = adoption.content["name"]
                 await self._took_back(adoption, spec.ref, spec.name)
                 continue
+            if spec.ref in self._ambiguous:
+                continue
+            existing = self._extras.linked.get(spec.ref)
+            matched = self._extras.matched.get(spec.ref)
+            if existing is not None or matched is not None:
+                # Made by an earlier import, or by the person: as they have it.
+                self._item_ids[spec.ref] = cast("uuid.UUID", existing or matched)
+                self._item_names[spec.ref] = spec.name
+                if matched is not None:
+                    await self._link(spec, matched)
+                continue
+            if self._action(kind, spec.ref) is PlanAction.UNCHANGED:
+                continue  # left as it is; these extras did not plan it
             type_ref = spec.type_ref
             type_slug = self._type_slugs[type_ref] if type_ref else None
             created = await self._graph.create_item(spec, type_slug=type_slug)
             self._item_ids[spec.ref] = created.entity_id
             self._item_names[spec.ref] = spec.name
             await self._made(kind, spec.ref, spec.name, created)
+            await self._link(spec, created.entity_id)
+
+    async def _link(self, spec: BundleItem, entity_id: uuid.UUID) -> None:
+        """Link the item to its source key, re-pointing a link whose item had gone."""
+        source = self._bundle.source
+        links = self._extras.links
+        owner_id = self._extras.owner_id
+        if source is None or links is None or owner_id is None:
+            return
+        if spec.source_key is None:
+            return
+        fields = item_field_hashes(spec)
+        scope = ContentFilter.of(owner_id)
+        link = await links.get_by_key(
+            source.name, EntityKind.ITEM, spec.source_key, scope=scope
+        )
+        if link is None:
+            await links.add(
+                SourceLink.create(
+                    owner_id=owner_id,
+                    source=source.name,
+                    kind=EntityKind.ITEM,
+                    key=spec.source_key,
+                    entity_id=entity_id,
+                    fields=fields,
+                )
+            )
+        else:
+            link.record_import(entity_id, fields)
+            await links.save(link)
 
     async def connections(self) -> None:
         """Create the connections, or take back the ones that still join the same."""
         for n, spec in enumerate(self._bundle.connections):
+            if {spec.source_ref, spec.target_ref} & self._ambiguous:
+                continue
             source = self._item_names[spec.source_ref]
             target = self._item_names[spec.target_ref]
             ref = connection_ref(n)
@@ -450,7 +622,10 @@ class _Applier:
     async def collections(self) -> None:
         """Create the collections, or take back the ones an earlier install kept."""
         for spec in self._bundle.collections:
-            missing = [ref for ref in spec.item_refs if ref not in self._item_ids]
+            refs = [r for r in spec.item_refs if r not in self._ambiguous]
+            if spec.item_refs and not refs:
+                continue
+            missing = [ref for ref in refs if ref not in self._item_ids]
             if missing:
                 raise InvalidBundleError(
                     f"Collection '{spec.name}' names items that were not created: "
@@ -464,7 +639,7 @@ class _Applier:
             if target is None:
                 raise InvalidBundleError("This source cannot make collections.")
             created = await target.create_collection(
-                spec, item_ids=[self._item_ids[ref] for ref in spec.item_refs]
+                spec, item_ids=[self._item_ids[ref] for ref in refs]
             )
             await self._made(kind, spec.ref, spec.name, created)
 

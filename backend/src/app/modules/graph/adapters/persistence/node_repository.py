@@ -467,6 +467,46 @@ class SqlAlchemyNodeRepository:
         await self._session.execute(stmt)
         await self._session.flush()
 
+    async def ids_with_attribute_value(
+        self,
+        type_slug: str,
+        key: str,
+        value: str,
+        *,
+        scope: ContentFilter,
+        limit: int,
+    ) -> builtins.list[uuid.UUID]:
+        """Return ids of non-deleted nodes of `type_slug` whose `key` equals `value`."""
+        logger.debug("finding nodes by attribute value", type_slug=type_slug, key=key)
+        stmt = (
+            select(NodeModel.id)
+            .where(
+                _in_scope(scope),
+                NodeModel.type == type_slug,
+                NodeModel.attributes.contains({key: value}),
+            )
+            .order_by(NodeModel.id)
+            .limit(limit)
+        )
+        return list((await self._session.execute(stmt)).scalars())
+
+    async def ids_with_name(
+        self, type_slug: str, name: str, *, scope: ContentFilter, limit: int
+    ) -> builtins.list[uuid.UUID]:
+        """Return ids of non-deleted nodes of `type_slug` named exactly `name`."""
+        logger.debug("finding nodes by name", type_slug=type_slug)
+        stmt = (
+            select(NodeModel.id)
+            .where(
+                _in_scope(scope),
+                NodeModel.type == type_slug,
+                NodeModel.name == name,
+            )
+            .order_by(NodeModel.id)
+            .limit(limit)
+        )
+        return list((await self._session.execute(stmt)).scalars())
+
     async def count_with_attribute(
         self,
         type_slug: str,

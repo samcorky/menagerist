@@ -17,6 +17,7 @@ from app.modules.transfer.application.removal import inspect_record
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.plan import PlanBlocker
 from app.modules.transfer.domain.run import EntityRecord, Run, adoptable_records
+from app.modules.transfer.ports.source_link_repository import SourceLinkRepository
 from app.modules.transfer.ports.targets import (
     CollectionTarget,
     CoverTarget,
@@ -83,7 +84,10 @@ class BundleExtras:
     `pack:ref` references name. `blockers` stop the plan whatever else it holds.
     `covers` draws a cover for each item whose type has a style in `cover_styles`
     (by item type ref, required packs' types included). `ledger` records each entity
-    as it is made.
+    as it is made. `links` and `owner_id` let a bundle with a `source` find the items
+    an earlier import made, and link the ones it makes. Planning fills `linked` (item
+    ref to the item an earlier import made) and `matched` (item ref to a hand-made
+    item its key found), which applying reads.
     """
 
     adoptions: Mapping[Key, Adoption] = field(default_factory=dict)
@@ -93,6 +97,10 @@ class BundleExtras:
     covers: CoverTarget | None = None
     collections: CollectionTarget | None = None
     ledger: Ledger | None = None
+    links: SourceLinkRepository | None = None
+    owner_id: uuid.UUID | None = None
+    linked: dict[str, uuid.UUID] = field(default_factory=dict)
+    matched: dict[str, uuid.UUID] = field(default_factory=dict)
 
 
 class RunLedger:

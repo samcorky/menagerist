@@ -1,4 +1,8 @@
-from app.modules.transfer.application.content_hash import content_hash
+from app.modules.transfer.application.content_hash import (
+    content_hash,
+    item_field_hashes,
+)
+from app.modules.transfer.domain.bundle import BundleItem
 
 
 def test_key_order_does_not_matter_at_any_depth() -> None:
@@ -33,3 +37,38 @@ def test_a_non_ascii_hash_is_pinned() -> None:
     assert content_hash({"x": "café 🎵"}) == (
         "3d74485af66a2a1ccb81748610e6e948dee41585de84bb66873322a28c3563c8"
     )
+
+
+def _item(**changes: object) -> BundleItem:
+    base: dict[str, object] = {
+        "ref": "r",
+        "name": "Alien",
+        "description": "Sci-fi",
+        "tags": ("a", "b"),
+        "attributes": {"year": 1979, "format": "dvd"},
+    }
+    return BundleItem(**(base | changes))  # type: ignore[arg-type]
+
+
+def test_item_field_hashes_names_every_field() -> None:
+    """One hash each for name, description, tags and every attribute."""
+    assert set(item_field_hashes(_item())) == {
+        "name",
+        "description",
+        "tags",
+        "attributes.year",
+        "attributes.format",
+    }
+
+
+def test_item_field_hashes_are_stable_across_attribute_order() -> None:
+    """Reordering attributes leaves every hash unchanged."""
+    reordered = _item(attributes={"format": "dvd", "year": 1979})
+    assert item_field_hashes(_item()) == item_field_hashes(reordered)
+
+
+def test_item_field_hashes_change_only_for_the_changed_field() -> None:
+    """Changing one attribute changes only its own hash."""
+    before = item_field_hashes(_item())
+    after = item_field_hashes(_item(attributes={"year": 1980, "format": "dvd"}))
+    assert {k for k in before if before[k] != after[k]} == {"attributes.year"}

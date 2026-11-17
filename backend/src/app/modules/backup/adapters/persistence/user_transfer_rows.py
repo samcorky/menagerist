@@ -19,6 +19,7 @@ OWNED_TABLES = frozenset(
         "collections",
         "media_assets",
         "example_installations",
+        "source_links",
     }
 )
 # Content tables whose soft-deleted rows an export leaves out and an import skips.
@@ -37,7 +38,10 @@ USER_TABLES = (
     "collection_members",
     "media_attachments",
     "node_favourites",
+    "source_links",
 )
+# Tables an archive made before they existed may lack; importing it adds no rows.
+OPTIONAL_TABLES = frozenset({"source_links"})
 MAX_ROW_BYTES = 16 * 1024 * 1024
 
 
@@ -74,6 +78,12 @@ def import_table_name(member_name: str, seen: set[str]) -> str:
     name = USER_TABLES[len(seen)]
     seen.add(name)
     return name
+
+
+def require_all_tables(seen: set[str]) -> None:
+    """Refuse an archive that lacks a content table, apart from optional ones."""
+    if set(USER_TABLES) - OPTIONAL_TABLES - seen:
+        raise CorruptBackupError("User archive is missing content tables.")
 
 
 async def read_rows(chunks: AsyncIterator[bytes]) -> AsyncIterator[dict[str, object]]:

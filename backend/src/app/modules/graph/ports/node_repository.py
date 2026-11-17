@@ -182,6 +182,31 @@ class NodeRepository(Protocol):
         """Null out `type` on all non-deleted nodes that reference `type_slug`."""
         ...
 
+    async def ids_with_attribute_value(
+        self,
+        type_slug: str,
+        key: str,
+        value: str,
+        *,
+        scope: ContentFilter,
+        limit: int,
+    ) -> builtins.list[uuid.UUID]:
+        """Return ids of non-deleted nodes of `type_slug` whose `key` equals `value`.
+
+        Only a string attribute equal to `value` matches, not a list holding it.
+        Ordered by id, at most `limit`.
+        """
+        ...
+
+    async def ids_with_name(
+        self, type_slug: str, name: str, *, scope: ContentFilter, limit: int
+    ) -> builtins.list[uuid.UUID]:
+        """Return ids of non-deleted nodes of `type_slug` named exactly `name`.
+
+        Case-sensitive. Ordered by id, at most `limit`.
+        """
+        ...
+
     async def count_with_attribute(
         self,
         type_slug: str,

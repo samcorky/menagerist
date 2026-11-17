@@ -64,6 +64,7 @@ class SqlAlchemyUserDatabaseSnapshot(SqlAlchemyDatabaseSnapshot):
             "collections",
             "media_assets",
             "example_installations",
+            "source_links",
         ):
             predicates[name] = tables[name].c.owner_id == owner_id
         # Soft-deleted content is left out.
