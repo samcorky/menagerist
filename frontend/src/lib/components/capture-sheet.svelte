@@ -1,16 +1,26 @@
 <script lang="ts">
-	import { Camera, X } from '@lucide/svelte';
+	import { Camera, ScanBarcode, X } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
-	import { createNode, stageMedia, attachMedia } from '$lib/api/client';
+	import { createNode, stageMedia, attachMedia, type NodeTypeResponse } from '$lib/api/client';
 	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
 	import TypePicker from '$lib/components/type-picker.svelte';
+	import BarcodeScanner from '$lib/components/barcode-scanner.svelte';
+	import {
+		NEW_BARCODE_DETAIL,
+		scanFields,
+		scannedAttributes,
+		suggestScanField
+	} from '$lib/barcode/scan-field';
+	import { loadItemTypes } from '$lib/palette-sources';
+	import type { AttributesSchema } from '$lib/schema-types';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { NativeSelect } from '$lib/components/ui/native-select/index.js';
 
 	let name = $state('');
 	let selectedType = $state<string | null>(null);
@@ -18,6 +28,29 @@
 	let saving = $state(false);
 	let stagedAsset = $state<StagedPhoto | null>(null);
 	let staging = $state(false);
+	let scannerOpen = $state(false);
+	let code = $state<string | null>(null);
+	let types = $state<NodeTypeResponse[]>([]);
+
+	// Types are read only once a code is scanned, to offer the chosen type's fields.
+	$effect(() => {
+		if (code !== null)
+			void loadItemTypes()
+				.then((all) => (types = all))
+				.catch(() => {});
+	});
+
+	const typeSchema = $derived(
+		(types.find((type) => type.slug === selectedType)?.attributes_schema as
+			AttributesSchema | null | undefined) ?? null
+	);
+	const codeFields = $derived(scanFields(typeSchema));
+	// Follows the type until the person picks a field themselves.
+	let codeField = $derived(suggestScanField(codeFields) ?? NEW_BARCODE_DETAIL);
+
+	function scanned() {
+		return code === null ? null : scannedAttributes(code, codeField, typeSchema);
+	}
 
 	async function handlePhotoChange(e: Event) {
 		const file = (e.target as HTMLInputElement).files?.[0] ?? null;
@@ -43,7 +76,14 @@
 	async function save() {
 		if (!name.trim() || saving || creatingType) return;
 		saving = true;
-		const result = await createNode({ body: { name: name.trim(), type: selectedType || null } });
+		const barcode = scanned();
+		const result = await createNode({
+			body: {
+				name: name.trim(),
+				type: selectedType || null,
+				...(barcode && { attributes: barcode.attributes, extra_schema: barcode.extraSchema })
+			}
+		});
 		if (result.error || !result.data) {
 			toast.error("Couldn't save", { description: errorMessage(result.error) });
 			saving = false;
@@ -61,11 +101,17 @@
 	}
 
 	function openFullForm() {
-		captureController.setPendingHandoff({ name, selectedType, stagedPhoto: stagedAsset });
+		captureController.setPendingHandoff({
+			name,
+			selectedType,
+			stagedPhoto: stagedAsset,
+			barcode: scanned()
+		});
 		captureController.hide();
 		name = '';
 		selectedType = null;
 		stagedAsset = null;
+		code = null;
 		void goto(resolve('/items/new'));
 	}
 
@@ -79,6 +125,7 @@
 		selectedType = null;
 		if (stagedAsset) URL.revokeObjectURL(stagedAsset.previewUrl);
 		stagedAsset = null;
+		code = null;
 	}
 </script>
 
@@ -141,8 +188,67 @@
 			<!-- Item type -->
 			<div class="space-y-1.5">
 				<Label class="text-xs text-muted-foreground">Item type</Label>
-				<TypePicker bind:value={selectedType} bind:creating={creatingType} />
+				<TypePicker
+					bind:value={selectedType}
+					bind:creating={creatingType}
+					oncreate={(type) => (types = [...types, type])}
+				/>
 			</div>
+
+			<!-- Barcode -->
+			{#if code === null}
+				<Button
+					variant="outline"
+					class="w-full pointer-coarse:h-11"
+					onclick={() => (scannerOpen = true)}
+				>
+					<ScanBarcode class="size-4" />
+					Scan barcode
+				</Button>
+			{:else}
+				<div class="space-y-2 rounded-lg border border-border p-3">
+					<div class="flex items-center justify-between gap-2">
+						<div class="min-w-0">
+							<p class="text-xs text-muted-foreground">Barcode</p>
+							<p class="truncate font-mono text-sm">{code}</p>
+						</div>
+						<div class="flex shrink-0 items-center gap-1">
+							<Button
+								variant="ghost"
+								size="sm"
+								class="pointer-coarse:h-11"
+								onclick={() => (scannerOpen = true)}
+							>
+								Scan again
+							</Button>
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label="Remove barcode"
+								class="pointer-coarse:size-11"
+								onclick={() => (code = null)}
+							>
+								<X class="size-4" />
+							</Button>
+						</div>
+					</div>
+					{#if codeFields.length > 0}
+						<div class="space-y-1.5">
+							<Label for="capture-barcode-field" class="text-xs text-muted-foreground">
+								Save in
+							</Label>
+							<NativeSelect id="capture-barcode-field" bind:value={codeField}>
+								{#each codeFields as field (field.key)}
+									<option value={field.key}>{field.label}</option>
+								{/each}
+								<option value={NEW_BARCODE_DETAIL}>A new Barcode detail</option>
+							</NativeSelect>
+						</div>
+					{:else}
+						<p class="text-xs text-muted-foreground">Saved as a Barcode detail.</p>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Footer -->
 			<div class="flex items-center justify-between">
@@ -164,3 +270,5 @@
 		</div>
 	</ResponsiveDialog.Content>
 </ResponsiveDialog.Root>
+
+<BarcodeScanner bind:open={scannerOpen} onDetected={(scannedCode) => (code = scannedCode)} />

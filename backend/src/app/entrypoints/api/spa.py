@@ -60,7 +60,9 @@ _NO_CACHE = "no-store, no-cache, must-revalidate"
 _SHELL_CSP = "; ".join(
     [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
+        # The barcode scanner's fallback detector is WebAssembly, for browsers
+        # without a native BarcodeDetector; this allows compiling it, not eval.
+        "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
         "style-src 'self' 'unsafe-inline'",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' blob: data:",
@@ -73,6 +75,8 @@ _SHELL_HEADERS: dict[str, str] = {
     "X-Frame-Options": "SAMEORIGIN",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Cross-Origin-Opener-Policy": "same-origin",
+    # The API default denies the camera; the app's own pages scan barcodes with it.
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=(self)",
 }
 
 
