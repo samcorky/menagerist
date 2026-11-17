@@ -65,6 +65,7 @@ async def restore_backup(
     """Select the setup gate when no accounts exist and run the restore."""
     from sqlalchemy import func, select
 
+    from app.entrypoints.api.shared.backup_dependencies import get_picture_files
     from app.modules.backup.adapters.persistence.database_restorer import (
         SqlAlchemyDatabaseRestorer,
     )
@@ -103,6 +104,7 @@ async def restore_backup(
                 instance_workspace(get_backup_settings()),
                 guard,
                 progress=progress,
+                pictures=get_picture_files(),
             ).handle(
                 RestoreBackupCommand(
                     backup_id=backup_id, replace=replace, setup_only=setup_only

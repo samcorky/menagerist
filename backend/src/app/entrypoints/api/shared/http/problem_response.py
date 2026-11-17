@@ -17,6 +17,7 @@ from app.shared_kernel.errors import (
     NotFoundError,
     TooManyRequestsError,
     UnauthenticatedError,
+    UnavailableError,
     ValidationError,
 )
 from app.shared_kernel.outbound_http import OutboundHttpError
@@ -34,6 +35,7 @@ _STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
     ForbiddenError: 403,
     UnauthenticatedError: 401,
     TooManyRequestsError: 429,
+    UnavailableError: 503,
 }
 
 # Most specific first: a `MenageristError` that is not a domain rule is the

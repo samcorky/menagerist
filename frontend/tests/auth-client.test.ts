@@ -361,3 +361,17 @@ describe('more auth behaviour', () => {
 		expect(getEtag('/api/v1/fresh')?.etag).toBe('"v2"');
 	});
 });
+
+describe('adoptUser', () => {
+	it('shows the account a write returned, such as a new picture', () => {
+		auth.user = user as unknown as typeof auth.user;
+		auth.adoptUser({ ...user, avatar_version: '0123456789abcdef' } as never);
+		expect(auth.user?.avatar_version).toBe('0123456789abcdef');
+	});
+
+	it('ignores another account, so an admin edit never swaps who is signed in', () => {
+		auth.user = user as unknown as typeof auth.user;
+		auth.adoptUser({ ...user, id: 'u2', display_name: 'Other' } as never);
+		expect(auth.user?.id).toBe('u1');
+	});
+});

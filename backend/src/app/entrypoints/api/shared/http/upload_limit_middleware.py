@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from starlette.datastructures import Headers
 
 from app.entrypoints.api.shared.http.problem_response import problem_response
+from app.modules.identity.domain.avatar import MAX_AVATAR_BYTES
 from app.platform.config import get_backup_settings, get_media_settings
 
 if TYPE_CHECKING:
@@ -20,6 +21,7 @@ _DRAIN_BYTES = 256 * 1024 * 1024
 _DRAIN_SECONDS = 30.0
 
 _UPLOAD_PATHS = frozenset({"/api/v1/media", "/api/v1/media/attachments"})
+_AVATAR_PATH = "/api/v1/me/avatar"
 _BACKUP_PATHS = frozenset(
     {
         "/api/v1/backups/upload",
@@ -36,12 +38,20 @@ PAYLOAD_TOO_LARGE_RESPONSE: dict[int | str, dict[str, Any]] = problem_response(
 )
 
 
-def _is_upload(scope: Scope) -> bool:
-    return (
-        scope["type"] == "http"
-        and scope["method"] == "POST"
-        and scope["path"] in _UPLOAD_PATHS | _BACKUP_PATHS
-    )
+def _limit_for(scope: Scope) -> int | None:
+    """The byte limit for a guarded upload route, or `None` for anything else."""
+    if scope["type"] != "http":
+        return None
+    method, path = scope["method"], scope["path"]
+    if method == "PUT" and path == _AVATAR_PATH:
+        return MAX_AVATAR_BYTES + _OVERHEAD_ALLOWANCE
+    if method != "POST":
+        return None
+    if path in _BACKUP_PATHS:
+        return get_backup_settings().max_upload_size
+    if path in _UPLOAD_PATHS:
+        return get_media_settings().max_upload_size + _OVERHEAD_ALLOWANCE
+    return None
 
 
 async def _refuse(scope: Scope, send: Send) -> None:
@@ -150,15 +160,11 @@ class UploadLimitMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Pass other requests on untouched; guard the upload routes."""
-        if not _is_upload(scope):
+        limit = _limit_for(scope)
+        if limit is None:
             await self._app(scope, receive, send)
             return
 
-        limit = (
-            get_backup_settings().max_upload_size
-            if scope["path"] in _BACKUP_PATHS
-            else get_media_settings().max_upload_size + _OVERHEAD_ALLOWANCE
-        )
         declared = Headers(scope=scope).get("content-length")
         if declared is not None and declared.isdigit() and int(declared) > limit:
             await _refuse(scope, send)

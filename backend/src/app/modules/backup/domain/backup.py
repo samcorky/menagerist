@@ -30,6 +30,27 @@ class MediaFileRef:
     sha256: str
 
 
+# The square sizes an account picture is stored at; identity's `AVATAR_SIZES`,
+# repeated because backups import no other module (a bridge test keeps them equal).
+PICTURE_SIZES: frozenset[int] = frozenset({64, 128, 256})
+
+
+@dataclass(frozen=True, kw_only=True)
+class PictureFileRef:
+    """One stored size of an account picture: whose, which version, how big."""
+
+    user_id: UUID
+    version: str
+    pixels: int
+    size: int
+    sha256: str
+
+    @property
+    def member(self) -> str:
+        """Where the file sits inside an archive."""
+        return f"avatars/{self.user_id}/{self.version}-{self.pixels}.webp"
+
+
 @dataclass(frozen=True, kw_only=True)
 class BackupManifest:
     """Versioned description of an instance archive's contents."""
@@ -46,6 +67,7 @@ class BackupManifest:
     tables: list[TableDigest] = field(default_factory=list)
     media: list[MediaFileRef] = field(default_factory=list)
     media_missing: list[UUID] = field(default_factory=list)
+    pictures: list[PictureFileRef] = field(default_factory=list)
     from_revision: str | None = None
     to_revision: str | None = None
 

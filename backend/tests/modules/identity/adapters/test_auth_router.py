@@ -175,6 +175,8 @@ def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
         "disabled",
         "last_login_at",
         "locked_until",
+        "avatar_version",
+        "avatar_source",
         "created_at",
         "updated_at",
     }

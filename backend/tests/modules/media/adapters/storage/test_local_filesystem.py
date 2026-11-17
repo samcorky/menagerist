@@ -328,3 +328,22 @@ async def test_copy_of_a_missing_file_fails_and_leaves_nothing_behind(
         await storage.copy(source.id, target.id, MediaStatus.ATTACHED)
 
     assert not [p for p in tmp_path.rglob("*") if p.is_file()]
+
+
+async def test_list_files_ignores_avatars_directory(tmp_path: Path) -> None:
+    """Account pictures share the media folder but are never offered for clean-up."""
+    storage = _storage(tmp_path)
+    pictures = tmp_path / "avatars" / str(SYSTEM_ACTOR.id)
+    pictures.mkdir(parents=True)
+    old = pictures / "0123456789abcdef-64.webp"
+    old.write_bytes(b"x")
+    os.utime(old, (0, 0))
+
+    found = [
+        item
+        async for item in storage.list_files(
+            older_than=datetime.now(UTC) + timedelta(days=1)
+        )
+    ]
+
+    assert found == []

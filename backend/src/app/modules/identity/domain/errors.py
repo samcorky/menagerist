@@ -4,6 +4,7 @@ from app.shared_kernel.errors import (
     NotFoundError,
     TooManyRequestsError,
     UnauthenticatedError,
+    UnavailableError,
     ValidationError,
 )
 
@@ -107,3 +108,15 @@ class ApiTokenLimitError(ConflictError):
 
 class ApiTokenNotFoundError(NotFoundError):
     """Raised when a requested token does not exist."""
+
+
+class InvalidAvatarError(ValidationError):
+    """Raised when a file or crop cannot be used as an account's picture."""
+
+
+class AvatarNotFoundError(NotFoundError):
+    """Raised when an account has no picture at the requested version or size."""
+
+
+class CatServiceUnavailableError(UnavailableError):
+    """Raised when Random cat cannot get a cat from the cat service."""

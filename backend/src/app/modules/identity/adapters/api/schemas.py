@@ -20,6 +20,7 @@ from app.modules.identity.application.setup_first_admin import SetupFirstAdminCo
 from app.modules.identity.application.sign_in import SignInCommand
 from app.modules.identity.application.update_user import UpdateUserCommand
 from app.modules.identity.domain.api_token import MAX_TOKEN_NAME_LENGTH
+from app.modules.identity.domain.avatar import AvatarSource
 from app.modules.identity.domain.device import MAX_DEVICE_NAME_LENGTH
 from app.modules.identity.domain.session import DisplayMode
 from app.modules.identity.domain.user import (
@@ -52,6 +53,8 @@ _USER_EXAMPLE: dict[str, Any] = {
     "disabled": False,
     "last_login_at": "2026-10-11T08:30:00.000000Z",
     "locked_until": None,
+    "avatar_version": "3f9c2a7b1d4e8f60",
+    "avatar_source": "upload",
     "created_at": "2026-10-10T12:00:00.000000Z",
     "updated_at": "2026-10-10T12:00:00.000000Z",
 }
@@ -303,6 +306,21 @@ class UserResponse(BaseModel):
             + " Only filled in by the administrator user list and update."
         ),
     )
+    avatar_version: str | None = Field(
+        default=None,
+        description=(
+            "Names the account's current picture and changes whenever it does; null"
+            + " when the account shows its initials. Load it from"
+            + " `/users/{id}/avatar/{size}?v={avatar_version}`."
+        ),
+    )
+    avatar_source: AvatarSource | None = Field(
+        default=None,
+        description=(
+            "Where the picture came from: an upload, the cat service, or a cat drawn"
+            + " in the browser; null without a picture."
+        ),
+    )
     created_at: datetime = Field(description="When the account was created.")
     updated_at: datetime = Field(description="When the account last changed.")
 
@@ -325,6 +343,8 @@ class UserResponse(BaseModel):
             disabled=user.disabled,
             last_login_at=user.last_login_at,
             locked_until=locked_until,
+            avatar_version=user.avatar.version if user.avatar else None,
+            avatar_source=user.avatar.source if user.avatar else None,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )

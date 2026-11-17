@@ -118,3 +118,47 @@ async def test_corrupt_upload_keeps_setup_empty() -> None:
         )
     assert await target.is_empty()
     assert await store.list() == []
+
+
+async def test_first_run_restore_brings_pictures_back() -> None:
+    """Moving to a new host restores account pictures with the accounts."""
+    import hashlib
+    from uuid import uuid7
+
+    from app.modules.backup.adapters.media.in_memory_picture_files import (
+        InMemoryPictureFiles,
+    )
+    from app.modules.backup.domain.backup import PictureFileRef
+
+    source = InMemoryPictureFiles()
+    ref = PictureFileRef(
+        user_id=uuid7(),
+        version="0123456789abcdef",
+        pixels=64,
+        size=3,
+        sha256=hashlib.sha256(b"cat").hexdigest(),
+    )
+    await source.write(ref, _chunks(b"cat"))
+    store = InMemoryBackupStore()
+    summary = await CreateBackup(
+        store,
+        InMemoryDatabaseSnapshot("revision", {"data/users.ndjson": b'{"id":"a"}\n'}),
+        InMemoryMediaFiles(),
+        get_access_guard(),
+        app_version="test",
+        pictures=source,
+    ).handle(CreateBackupCommand(), SYSTEM_ACTOR)
+    archive = b"".join([chunk async for chunk in store.read_bytes(summary.id)])
+
+    target = InMemoryPictureFiles()
+    await RestoreOnFirstRun(
+        InMemorySetupGate(),
+        InMemoryBackupStore(),
+        InMemoryDatabaseRestorer("revision"),
+        InMemoryMediaFiles(),
+        InMemoryBackupWorkspace(),
+        get_access_guard(),
+        pictures=target,
+    ).handle(RestoreOnFirstRunCommand(stream=_chunks(archive)), ANONYMOUS_ACTOR)
+
+    assert target.files == source.files

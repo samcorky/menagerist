@@ -7,6 +7,7 @@ from app.platform.config.backup import BackupSettings
 from app.platform.config.media import MediaSettings
 from app.platform.storage_probe import (
     DirectoryState,
+    avatar_directory,
     hint,
     probe_directory,
     storage_directories,
@@ -83,12 +84,22 @@ def test_storage_directories_lists_staging_only_when_configured(tmp_path: Path) 
     backups = BackupSettings(path=tmp_path / "backups")
     assert storage_directories(media, backups) == {
         "media": tmp_path / "media",
+        "avatars": tmp_path / "media" / "avatars",
         "backup": tmp_path / "backups",
     }
 
     staged = BackupSettings(path=tmp_path / "backups", staging_path=tmp_path / "tmp")
     assert storage_directories(media, staged) == {
         "media": tmp_path / "media",
+        "avatars": tmp_path / "media" / "avatars",
         "backup": tmp_path / "backups",
         "backupStaging": tmp_path / "tmp",
     }
+
+
+def test_storage_directories_include_avatars(tmp_path: Path) -> None:
+    """Account pictures live in their own folder inside media and are checked too."""
+    media = MediaSettings(storage_path=tmp_path / "media")
+    directories = storage_directories(media, BackupSettings(path=tmp_path / "b"))
+    assert directories["avatars"] == avatar_directory(media)
+    assert avatar_directory(media) == tmp_path / "media" / "avatars"

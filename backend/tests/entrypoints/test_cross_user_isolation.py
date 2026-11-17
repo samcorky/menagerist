@@ -315,6 +315,13 @@ ALLOWED: dict[Route, str] = {
     ("GET", "/api/v1/me"): OWN_SESSION,
     ("PATCH", "/api/v1/me"): OWN_SESSION,
     ("POST", "/api/v1/me/password"): OWN_SESSION,
+    ("PUT", "/api/v1/me/avatar"): OWN_SESSION,
+    ("POST", "/api/v1/me/avatar/cat"): OWN_SESSION,
+    ("DELETE", "/api/v1/me/avatar"): OWN_SESSION,
+    (
+        "GET",
+        "/api/v1/users/{user_id}/avatar/{size}",
+    ): "pictures show who people are, so every signed-in person may load them",
     ("GET", "/api/v1/me/permissions"): OWN_SESSION,
     ("GET", "/api/v1/me/devices"): OWN_SESSION,
     ("DELETE", "/api/v1/me/devices/{device_id}"): OWN_SESSION,
@@ -393,6 +400,7 @@ PATH_PARAMS: dict[str, Callable[[Seed], str]] = {
     "pack_id": lambda _: PACK_ID,
     "entry_id": lambda _: "condition-grades",
     "key": lambda _: "rating",
+    "size": lambda _: "64",
 }
 QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
     "q": lambda _: "xenomorph",

@@ -51,6 +51,7 @@ async def create_backup(
 ) -> BackupSummary:
     """Build and run a verified backup, as the system actor unless given one."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.entrypoints.api.shared.backup_dependencies import get_picture_files
     from app.modules.backup.adapters.persistence.database_snapshot import (
         SqlAlchemyDatabaseSnapshot,
     )
@@ -70,6 +71,7 @@ async def create_backup(
             get_access_guard(),
             app_version=load_app_info().version,
             progress=progress,
+            pictures=get_picture_files(),
         ).handle(
             CreateBackupCommand(
                 label=label, from_revision=from_revision, to_revision=to_revision

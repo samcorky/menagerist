@@ -21,6 +21,11 @@ class DirectoryProbe:
     free_bytes: int | None
 
 
+def avatar_directory(media: MediaSettings) -> Path:
+    """Where account pictures are stored: inside media, so backups include them."""
+    return media.storage_path / "avatars"
+
+
 def storage_directories(
     media: MediaSettings, backup: BackupSettings
 ) -> dict[str, Path]:
@@ -29,7 +34,11 @@ def storage_directories(
     The staging directory is listed only when one is configured: it is where a
     restore keeps a copy of your media, so it needs room and write access too.
     """
-    directories = {"media": media.storage_path, "backup": backup.path}
+    directories = {
+        "media": media.storage_path,
+        "avatars": avatar_directory(media),
+        "backup": backup.path,
+    }
     if backup.staging_path is not None:
         directories["backupStaging"] = backup.staging_path
     return directories

@@ -43,6 +43,10 @@ class UnauthenticatedError(DomainError):
     """Raised when the caller has not proved who they are."""
 
 
+class UnavailableError(DomainError):
+    """Raised when a service the request depends on cannot be used right now."""
+
+
 class TooManyRequestsError(DomainError):
     """Raised when the caller must wait before trying again."""
 

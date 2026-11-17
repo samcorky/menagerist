@@ -33,10 +33,13 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import UserAvatar from '$lib/components/user-avatar.svelte';
 
 	let sessions = $state<AdminSessionResponse[]>([]);
 	let users = $state<UserResponse[]>([]);
 	let selectedUserId = $state<string>('');
+	// Each person's current picture, from the users list the filter already loads.
+	const pictures = $derived(new Map(users.map((u) => [u.id, u.avatar_version ?? null])));
 	let loading = $state(true);
 	let loadFailed = $state(false);
 	// The filter the shown rows were loaded for; rows for another user are never kept.
@@ -228,8 +231,19 @@
 					})}
 					<Table.Row>
 						<Table.Cell class="font-medium">
-							<div>{session.display_name}</div>
-							<div class="text-xs font-normal text-muted-foreground">@{session.username}</div>
+							<div class="flex items-center gap-2">
+								<UserAvatar
+									userId={session.user_id}
+									displayName={session.display_name ?? session.username ?? ''}
+									avatarVersion={pictures.get(session.user_id)}
+									size="md"
+									decorative
+								/>
+								<div>
+									<div>{session.display_name}</div>
+									<div class="text-xs font-normal text-muted-foreground">@{session.username}</div>
+								</div>
+							</div>
 						</Table.Cell>
 						<Table.Cell>
 							<div class="flex items-center gap-2">
@@ -307,7 +321,14 @@
 													<Badge variant="secondary">This device</Badge>
 												{/if}
 											</div>
-											<p class="text-xs text-muted-foreground">
+											<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
+												<UserAvatar
+													userId={session.user_id}
+													displayName={session.display_name ?? session.username ?? ''}
+													avatarVersion={pictures.get(session.user_id)}
+													size="sm"
+													decorative
+												/>
 												{session.display_name} (@{session.username})
 											</p>
 										</div>

@@ -17,7 +17,12 @@ from app.platform.config.backup import get_backup_settings
 from app.platform.config.media import get_media_settings
 from app.platform.config.release import get_release_settings
 from app.platform.database import get_session_factory
-from app.platform.storage_probe import hint, probe_directory, storage_directories
+from app.platform.storage_probe import (
+    avatar_directory,
+    hint,
+    probe_directory,
+    storage_directories,
+)
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
 if TYPE_CHECKING:
@@ -48,6 +53,20 @@ async def warn_if_no_administrator() -> None:
         return
     if not exists:
         logger.warning(NO_ADMINISTRATOR_WARNING)
+
+
+async def ensure_avatar_directory() -> None:
+    """Create the pictures folder, so a fresh install does not report it missing.
+
+    A failure is left to `warn_if_storage_not_writable`, which explains it.
+    """
+    path = avatar_directory(get_media_settings())
+    try:
+        # Only inside an existing media folder: a missing one is an unmounted volume,
+        # which `warn_if_storage_not_writable` must still report.
+        await asyncio.to_thread(path.mkdir, exist_ok=True)
+    except OSError:
+        logger.debug("pictures folder not created", path=str(path), exc_info=True)
 
 
 async def warn_if_storage_not_writable() -> None:
@@ -116,6 +135,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Run start-up checks once per worker, then serve."""
     log_build_info()
     log_instance_settings()
+    await ensure_avatar_directory()
     await warn_if_storage_not_writable()
     await warn_if_cors_open()
     await warn_if_no_administrator()

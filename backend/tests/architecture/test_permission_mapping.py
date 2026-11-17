@@ -95,7 +95,9 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "graph.UpdateNode": "graph:item:write",
     "graph.UpdateNodeType": "graph:type:write",
     "graph.ValidateQuery": "graph:type:read",
+    "identity.ClearUserAvatar": "identity:user:update",
     "identity.CreateUser": "identity:user:create",
+    "identity.GetUserAvatar": "identity:picture:read",
     "identity.ListSessions": "identity:session:list",
     "identity.ListUsers": "identity:user:list",
     "identity.RenameDevice": "identity:session:revoke",
@@ -168,6 +170,7 @@ EXPECTED_CATALOGUE: frozenset[str] = frozenset(
         "graph:node_type:purge_attribute",
         "graph:type:read",
         "graph:type:write",
+        "identity:picture:read",
         "identity:session:list",
         "identity:session:revoke",
         "identity:user:create",
@@ -227,6 +230,6 @@ def test_every_non_admin_permission_is_a_member_permission(name: str) -> None:
 
 
 def test_catalogue_is_pinned() -> None:
-    """The permission catalogue (17 admin-only, 24 member) changes deliberately."""
+    """The permission catalogue (17 admin-only, 25 member) changes deliberately."""
     assert {p.value for p in ALL_PERMISSIONS} == EXPECTED_CATALOGUE
-    assert len(EXPECTED_CATALOGUE) == 41
+    assert len(EXPECTED_CATALOGUE) == 42

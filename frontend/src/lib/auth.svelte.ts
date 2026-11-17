@@ -208,6 +208,11 @@ class AuthController {
 		}
 	}
 
+	/** Show the account a write returned, such as a new picture, without a refetch. */
+	adoptUser(user: UserResponse): void {
+		if (this.user?.id === user.id) this.user = user;
+	}
+
 	/** Start fresh: nothing cached for the previous person may show for the next. */
 	private beginSession(): void {
 		clearAllEtags();

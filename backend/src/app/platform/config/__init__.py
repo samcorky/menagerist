@@ -1,5 +1,6 @@
 from app.platform.config._base import MenageristBaseSettings
 from app.platform.config.api import ApiSettings, get_api_settings
+from app.platform.config.avatars import AvatarSettings, get_avatar_settings
 from app.platform.config.backup import BackupSettings, get_backup_settings
 from app.platform.config.database import DatabaseSettings, get_database_settings
 from app.platform.config.identity import IdentitySettings, get_identity_settings
@@ -26,6 +27,7 @@ from app.platform.config.terminal import TerminalSettings, get_terminal_settings
 # are not part of it.
 INSTANCE_SETTINGS = (
     get_api_settings,
+    get_avatar_settings,
     get_backup_settings,
     get_database_settings,
     get_identity_settings,
@@ -43,6 +45,7 @@ INSTANCE_SETTINGS = (
 # reference lists all of them; the settings page keeps only their tunable fields.
 ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
     ApiSettings,
+    AvatarSettings,
     BackupSettings,
     DatabaseSettings,
     IdentitySettings,
@@ -63,6 +66,7 @@ __all__ = [
     "ALL_SETTINGS",
     "INSTANCE_SETTINGS",
     "ApiSettings",
+    "AvatarSettings",
     "BackupSettings",
     "DatabaseSettings",
     "IdentityCliSettings",
@@ -80,6 +84,7 @@ __all__ = [
     "SharedDataSettings",
     "TerminalSettings",
     "get_api_settings",
+    "get_avatar_settings",
     "get_backup_settings",
     "get_database_settings",
     "get_identity_cli_settings",

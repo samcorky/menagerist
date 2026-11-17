@@ -12,6 +12,7 @@ from app.entrypoints.api.shared.http import upload_limit_middleware
 from app.entrypoints.api.shared.http.upload_limit_middleware import (
     UploadLimitMiddleware,
 )
+from app.modules.identity.domain.avatar import MAX_AVATAR_BYTES
 from app.platform.config.backup import BackupSettings
 from app.platform.config.media import MediaSettings
 
@@ -284,10 +285,13 @@ async def test_body_within_the_limit_passes_through() -> None:
         ("POST", "/api/v1/nodes"),
         ("PATCH", "/api/v1/media"),
         ("POST", "/api/v1/media/x"),
+        ("PUT", "/api/v1/media"),
+        ("POST", "/api/v1/me/avatar"),
+        ("PUT", "/api/v1/me/avatar/cat"),
     ],
 )
 async def test_other_requests_are_not_limited(method: str, path: str) -> None:
-    """Only the two upload routes are guarded."""
+    """Only the upload routes, by method and path, are guarded."""
     big = [(b"content-length", str(LIMIT * 100).encode())]
 
     sent, _ = await _call(method, path, big, [b"x"])
@@ -422,3 +426,16 @@ def test_chunked_oversize_through_the_app_is_413() -> None:
     )
 
     assert response.status_code == 413
+
+
+async def test_avatar_put_over_limit_is_413_before_auth() -> None:
+    """A picture upload is capped at 5 MB plus the multipart allowance."""
+    limit = MAX_AVATAR_BYTES + ALLOWANCE
+    over = [(b"content-length", str(limit + 1).encode())]
+    sent, reads = await _call("PUT", "/api/v1/me/avatar", over, [b"x"])
+    assert sent[0]["status"] == 413
+    assert reads == 1
+
+    within = [(b"content-length", str(limit).encode())]
+    sent, _ = await _call("PUT", "/api/v1/me/avatar", within, [b"x"])
+    assert sent[0]["status"] == 204

@@ -3,10 +3,14 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends
 
 from app.entrypoints.api.shared.backup_media_files import BackupMediaFiles
+from app.entrypoints.api.shared.backup_picture_files import BackupPictureFiles
 from app.entrypoints.api.shared.bridges.backup_setup_gate import (
     get_setup_gate as get_setup_gate,
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.modules.identity.adapters.storage.local_avatar_storage import (
+    LocalAvatarStorage,
+)
 from app.modules.media.adapters.persistence.media_asset_repository import (
     SqlAlchemyMediaAssetRepository,
 )
@@ -15,6 +19,7 @@ from app.modules.media.adapters.storage.local_filesystem import (
 )
 from app.platform.config.media import get_media_settings
 from app.platform.database import get_session_factory
+from app.platform.storage_probe import avatar_directory
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -23,6 +28,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.backup.ports.media_files import MediaFiles
+    from app.modules.backup.ports.picture_files import PictureFiles
     from app.shared_kernel.actor import Actor
 
 
@@ -35,6 +41,13 @@ async def get_media_files(
             SqlAlchemyMediaAssetRepository(session),
             LocalFilesystemMediaStorage(get_media_settings().storage_path),
         )
+
+
+def get_picture_files() -> PictureFiles:
+    """Return account picture files for instance backups and restores."""
+    return BackupPictureFiles(
+        LocalAvatarStorage(avatar_directory(get_media_settings()))
+    )
 
 
 async def get_user_media_files(

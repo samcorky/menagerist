@@ -16,6 +16,7 @@ from app.shared_kernel.errors import (
     NotFoundError,
     TooManyRequestsError,
     UnauthenticatedError,
+    UnavailableError,
 )
 from app.shared_kernel.outbound_http import OutboundFailure, OutboundHttpError
 
@@ -39,6 +40,16 @@ def test_unauthenticated_maps_to_401() -> None:
     assert response.headers["content-type"] == "application/problem+json"
     assert response.json()["type"] == "about:blank"
     assert response.json()["title"] == "UnauthenticatedError"
+
+
+def test_unavailable_error_maps_to_503() -> None:
+    """A service the request depends on being unavailable answers 503."""
+    response = _client(UnavailableError("The cat service is not available.")).get(
+        "/boom"
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "The cat service is not available."
 
 
 def test_too_many_requests_maps_to_429_with_retry_after() -> None:

@@ -79,6 +79,7 @@ EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
     {
         "identity.AdoptDeviceName",
         "identity.ChangePassword",
+        "identity.ClearOwnAvatar",
         "identity.CreateApiToken",
         "identity.ListDeviceNameSuggestions",
         "identity.ListGrantablePermissions",
@@ -91,6 +92,8 @@ EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
         "identity.RevokeOwnDevice",
         "identity.RevokeOwnSession",
         "identity.RotateApiToken",
+        "identity.SetOwnAvatar",
+        "identity.SetOwnAvatarFromCatService",
         "identity.SetOwnDisplayName",
         "search.Search",
     }

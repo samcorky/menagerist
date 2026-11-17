@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.backup_dependencies import (
     get_media_files,
+    get_picture_files,
     get_setup_gate,
 )
 from app.entrypoints.api.shared.progress import make_reporter
@@ -36,6 +37,7 @@ from app.modules.backup.ports.backup_workspace import BackupWorkspace
 from app.modules.backup.ports.database_restorer import DatabaseRestorer
 from app.modules.backup.ports.database_snapshot import DatabaseSnapshot
 from app.modules.backup.ports.media_files import MediaFiles
+from app.modules.backup.ports.picture_files import PictureFiles
 from app.modules.backup.ports.progress_store import ProgressStore
 from app.modules.backup.ports.setup_gate import SetupGate
 from app.platform.app_info import load_app_info
@@ -79,10 +81,16 @@ def get_create_backup(
     snapshot: Annotated[DatabaseSnapshot, Depends(get_database_snapshot)],
     media: Annotated[MediaFiles, Depends(get_media_files)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    pictures: Annotated[PictureFiles, Depends(get_picture_files)],
 ) -> CreateBackup:
-    """Compose verified instance creation with original media and app metadata."""
+    """Compose verified instance creation with media, pictures and app metadata."""
     return CreateBackup(
-        store, snapshot, media, guard, app_version=load_app_info().version
+        store,
+        snapshot,
+        media,
+        guard,
+        app_version=load_app_info().version,
+        pictures=pictures,
     )
 
 
@@ -152,6 +160,7 @@ def get_restore_on_first_run(
     workspace: Annotated[BackupWorkspace, Depends(get_backup_workspace)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
     progress_store: Annotated[ProgressStore, Depends(get_restore_progress_store)],
+    pictures: Annotated[PictureFiles, Depends(get_picture_files)],
 ) -> RestoreOnFirstRun:
     """Compose anonymous restoration behind the existing identity setup gate."""
     return RestoreOnFirstRun(
@@ -163,6 +172,7 @@ def get_restore_on_first_run(
         guard,
         max_upload_size=get_backup_settings().max_upload_size,
         progress=make_reporter(progress_store),
+        pictures=pictures,
     )
 
 

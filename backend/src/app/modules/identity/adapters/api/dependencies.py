@@ -19,8 +19,15 @@ from app.modules.identity.adapters.api.cookies import (
     session_cookie_name,
     session_cookie_value,
 )
+from app.modules.identity.adapters.cats.cataas_picture_source import CataasPictureSource
+from app.modules.identity.adapters.cats.disabled_cat_picture_source import (
+    DisabledCatPictureSource,
+)
 from app.modules.identity.adapters.claim.unwired_existing_data_claim import (
     UnwiredExistingDataClaim,
+)
+from app.modules.identity.adapters.imaging.pillow_avatar_processor import (
+    PillowAvatarProcessor,
 )
 from app.modules.identity.adapters.persistence.unit_of_work import (
     build_identity_repos,
@@ -46,9 +53,14 @@ from app.modules.identity.adapters.security.secrets_api_token_generator import (
 from app.modules.identity.adapters.security.session_token_generator import (
     SecretsSessionTokenGenerator,
 )
+from app.modules.identity.adapters.storage.local_avatar_storage import (
+    LocalAvatarStorage,
+)
 from app.modules.identity.application.adopt_device_name import AdoptDeviceName
 from app.modules.identity.application.authenticate_api_token import AuthenticateApiToken
 from app.modules.identity.application.change_password import ChangePassword
+from app.modules.identity.application.clear_own_avatar import ClearOwnAvatar
+from app.modules.identity.application.clear_user_avatar import ClearUserAvatar
 from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.application.create_api_token import CreateApiToken
 from app.modules.identity.application.create_user import CreateUser
@@ -58,6 +70,7 @@ from app.modules.identity.application.get_current_user import (
     ResolvedSession,
 )
 from app.modules.identity.application.get_setup_status import GetSetupStatus
+from app.modules.identity.application.get_user_avatar import GetUserAvatar
 from app.modules.identity.application.has_administrator import HasAdministrator
 from app.modules.identity.application.list_device_name_suggestions import (
     ListDeviceNameSuggestions,
@@ -79,6 +92,10 @@ from app.modules.identity.application.revoke_own_device import RevokeOwnDevice
 from app.modules.identity.application.revoke_own_session import RevokeOwnSession
 from app.modules.identity.application.revoke_session import RevokeSession
 from app.modules.identity.application.rotate_api_token import RotateApiToken
+from app.modules.identity.application.set_own_avatar import SetOwnAvatar
+from app.modules.identity.application.set_own_avatar_from_cat_service import (
+    SetOwnAvatarFromCatService,
+)
 from app.modules.identity.application.set_own_display_name import SetOwnDisplayName
 from app.modules.identity.application.setup_first_admin import SetupFirstAdmin
 from app.modules.identity.application.sign_in import SignIn
@@ -94,12 +111,22 @@ from app.modules.identity.domain.session import DisplayMode
 from app.modules.identity.domain.throttle import ThrottlePolicy
 from app.modules.identity.domain.user import User
 from app.modules.identity.ports.api_token_generator import ApiTokenGenerator
+from app.modules.identity.ports.avatar_image_processor import AvatarImageProcessor
+from app.modules.identity.ports.avatar_storage import AvatarStorage
+from app.modules.identity.ports.cat_picture_source import CatPictureSource
 from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
 from app.modules.identity.ports.password_hasher import PasswordHasher
 from app.modules.identity.ports.session_token_generator import SessionTokenGenerator
 from app.modules.identity.ports.unit_of_work import IdentityRepos, IdentityUnitOfWork
-from app.platform.config import IdentitySettings, get_identity_settings
+from app.platform.config import (
+    IdentitySettings,
+    get_avatar_settings,
+    get_identity_settings,
+    get_media_settings,
+)
 from app.platform.database import get_session_factory
+from app.platform.outbound_http import outbound_http
+from app.platform.storage_probe import avatar_directory
 from app.shared_kernel.access_guard import AccessGuard
 from app.shared_kernel.actor import ANONYMOUS_ACTOR, Actor
 
@@ -457,6 +484,67 @@ def get_set_own_display_name_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> SetOwnDisplayName:
     return SetOwnDisplayName(uow, guard)
+
+
+def get_avatar_image_processor() -> AvatarImageProcessor:
+    """Return the Pillow picture processor."""
+    return PillowAvatarProcessor()
+
+
+def get_avatar_storage() -> AvatarStorage:
+    """Return picture storage inside the media folder, so backups include it."""
+    return LocalAvatarStorage(avatar_directory(get_media_settings()))
+
+
+def get_cat_picture_source() -> CatPictureSource:
+    """Return the cat service, or a stand-in that refuses when it is turned off."""
+    settings = get_avatar_settings()
+    if not settings.cat_service_enabled:
+        return DisabledCatPictureSource()
+    return CataasPictureSource(outbound_http(), settings.cat_service_url)
+
+
+def get_set_own_avatar_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    processor: Annotated[AvatarImageProcessor, Depends(get_avatar_image_processor)],
+    storage: Annotated[AvatarStorage, Depends(get_avatar_storage)],
+) -> SetOwnAvatar:
+    return SetOwnAvatar(uow, guard, processor, storage)
+
+
+def get_set_own_avatar_from_cat_service_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    cats: Annotated[CatPictureSource, Depends(get_cat_picture_source)],
+    processor: Annotated[AvatarImageProcessor, Depends(get_avatar_image_processor)],
+    storage: Annotated[AvatarStorage, Depends(get_avatar_storage)],
+) -> SetOwnAvatarFromCatService:
+    return SetOwnAvatarFromCatService(uow, guard, cats, processor, storage)
+
+
+def get_clear_own_avatar_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    storage: Annotated[AvatarStorage, Depends(get_avatar_storage)],
+) -> ClearOwnAvatar:
+    return ClearOwnAvatar(uow, guard, storage)
+
+
+def get_clear_user_avatar_use_case(
+    uow: Annotated[IdentityUnitOfWork, Depends(get_identity_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    storage: Annotated[AvatarStorage, Depends(get_avatar_storage)],
+) -> ClearUserAvatar:
+    return ClearUserAvatar(uow, guard, storage)
+
+
+def get_get_user_avatar_use_case(
+    repos: Annotated[IdentityRepos, Depends(get_identity_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    storage: Annotated[AvatarStorage, Depends(get_avatar_storage)],
+) -> GetUserAvatar:
+    return GetUserAvatar(repos, guard, storage)
 
 
 def get_create_user_use_case(

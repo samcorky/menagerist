@@ -76,6 +76,7 @@ def test_startup_log_does_not_contain_the_password(
     assert PASSWORD not in str(logs)
     assert [entry["group"] for entry in logs] == [
         "ApiSettings",
+        "AvatarSettings",
         "BackupSettings",
         "DatabaseSettings",
         "IdentitySettings",

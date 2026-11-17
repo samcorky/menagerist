@@ -2,10 +2,22 @@
 	import Page from '$lib/components/page.svelte';
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import { resolve } from '$app/paths';
-	import { Copy, Check, KeyRound, Laptop, LockOpen, Plus, Dices, Pencil, X } from '@lucide/svelte';
+	import {
+		Copy,
+		Check,
+		ImageOff,
+		KeyRound,
+		Laptop,
+		LockOpen,
+		Plus,
+		Dices,
+		Pencil,
+		X
+	} from '@lucide/svelte';
 	import { tick, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
+		clearUserAvatar,
 		createUser,
 		listOwnSessions,
 		listSessions,
@@ -35,6 +47,7 @@
 	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import UserAvatar from '$lib/components/user-avatar.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
 	import HiddenUsername from '$lib/components/hidden-username.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
@@ -66,6 +79,7 @@
 
 	let disableTarget = $state<UserResponse | null>(null);
 	let confirmResetTarget = $state<UserResponse | null>(null);
+	let removePictureTarget = $state<UserResponse | null>(null);
 	let resetTarget = $state<UserResponse | null>(null);
 	let resetPassword = $state('');
 	let resetting = $state(false);
@@ -282,6 +296,23 @@
 		disableTarget = null;
 	}
 
+	async function confirmRemovePicture() {
+		const target = removePictureTarget;
+		if (!target) return;
+		rowBusy = target.id;
+		rowError = null;
+		const result = await clearUserAvatar({ path: { user_id: target.id } });
+		rowBusy = null;
+		removePictureTarget = null;
+		if (result.error || !result.data) {
+			rowError = { id: target.id, message: errorMessage(result.error) };
+			return;
+		}
+		const updated = result.data;
+		users = users.map((u) => (u.id === updated.id ? updated : u));
+		if (updated.id === auth.user?.id) await auth.refresh();
+	}
+
 	function confirmReset() {
 		if (confirmResetTarget) openReset(confirmResetTarget);
 		confirmResetTarget = null;
@@ -399,6 +430,14 @@
 		</form>
 	{:else}
 		<div class="flex items-center gap-1.5">
+			<UserAvatar
+				userId={user.id}
+				displayName={user.display_name}
+				avatarVersion={user.avatar_version}
+				size="md"
+				decorative
+				class="mr-1"
+			/>
 			<p class="font-heading font-semibold tracking-tight">{user.display_name}</p>
 			{#if canUpdate}
 				<Button
@@ -475,6 +514,20 @@
 		>
 			<LockOpen class="size-4" />
 			{#if !compact}Unlock{/if}
+		</Button>
+	{/if}
+	{#if canUpdate && user.avatar_version}
+		<Button
+			variant="outline"
+			size={compact ? 'icon' : 'default'}
+			class={size}
+			title="Remove picture"
+			aria-label={compact ? 'Remove picture' : undefined}
+			disabled={rowBusy === user.id}
+			onclick={() => (removePictureTarget = user)}
+		>
+			<ImageOff class="size-4" />
+			{#if !compact}Remove picture{/if}
 		</Button>
 	{/if}
 	{#if canListSessions}
@@ -793,6 +846,19 @@
 		if (!open) disableTarget = null;
 	}}
 	onConfirm={() => void confirmDisable()}
+/>
+
+<ConfirmDialog
+	open={removePictureTarget !== null}
+	title="Remove the picture for {removePictureTarget?.display_name}?"
+	description="Their initials show instead until they choose a new picture."
+	confirmLabel="Remove picture"
+	busyLabel="Removing…"
+	busy={rowBusy !== null && rowBusy === removePictureTarget?.id}
+	onOpenChange={(open) => {
+		if (!open) removePictureTarget = null;
+	}}
+	onConfirm={() => void confirmRemovePicture()}
 />
 
 <ConfirmDialog
