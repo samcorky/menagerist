@@ -190,7 +190,7 @@ jobs:
             echo
             echo "Digest: \`${DIGEST}\`"
             echo
-            echo 'Every push while the `preview-image` label is on replaces it. The tag is deleted when the pull request closes, or after 14 days without a push.'
+            echo "Every push while the \`preview-image\` label is on replaces it. The tag is deleted when the pull request closes, or after 14 days without a push."
           } | tee "${RUNNER_TEMP}/preview-comment.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post or update the comment
