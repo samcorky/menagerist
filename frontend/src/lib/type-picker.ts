@@ -26,6 +26,8 @@ export function buildTypeItems(args: {
 	query: string;
 	/** Offer "No item type" (only while nothing is typed). */
 	allowClear: boolean;
+	/** Offer a Create row for a name nothing has (default true). */
+	allowCreate?: boolean;
 }): ComboboxItem[] {
 	const text = args.query.trim();
 	const countOf = (type: TypeLike) => args.counts.get(type.slug) ?? 0;
@@ -58,7 +60,7 @@ export function buildTypeItems(args: {
 	const exists = args.types.some(
 		(type) => foldText(type.label) === foldText(text) || type.slug === slugify(text)
 	);
-	if (text && !exists) {
+	if (text && !exists && args.allowCreate !== false) {
 		items.push({ value: CREATE_PREFIX + text, label: `Create “${text}”`, group: NEW });
 	}
 	return items;

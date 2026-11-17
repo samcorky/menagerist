@@ -17,6 +17,7 @@
 		creating = $bindable(false),
 		nodeTypes = undefined,
 		allowClear = true,
+		allowCreate = true,
 		disabled = false,
 		onchange,
 		oncreate,
@@ -32,6 +33,8 @@
 		nodeTypes?: NodeTypeResponse[];
 		/** Offer "No item type". */
 		allowClear?: boolean;
+		/** Let a name typed here create a new type. */
+		allowCreate?: boolean;
 		disabled?: boolean;
 		onchange?: (slug: string | null) => void;
 		/** Called with a type this picker just created, so the page can add it to its own list. */
@@ -58,7 +61,7 @@
 	});
 
 	const bySlug = $derived(new Map(types.map((type) => [type.slug, type])));
-	const items = $derived(buildTypeItems({ types, counts, query, allowClear }));
+	const items = $derived(buildTypeItems({ types, counts, query, allowClear, allowCreate }));
 	const selectedType = $derived(value ? bySlug.get(value) : undefined);
 	const selectedItem = $derived<ComboboxItem | undefined>(
 		value ? { value, label: selectedType?.label ?? value } : undefined
@@ -110,7 +113,7 @@
 	onsearch={(text) => (query = text)}
 	placeholder="Choose an item type…"
 	searchPlaceholder="Search item types…"
-	emptyText="No item types yet. Type a name to create one."
+	emptyText={allowCreate ? 'No item types yet. Type a name to create one.' : 'No item types match.'}
 	aria-label="Item type"
 	{...restProps}
 />

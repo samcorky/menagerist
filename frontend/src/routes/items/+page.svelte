@@ -20,7 +20,8 @@
 		SearchX,
 		LayoutGrid,
 		SlidersHorizontal,
-		TriangleAlert
+		TriangleAlert,
+		Upload
 	} from '@lucide/svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
@@ -497,9 +498,14 @@
 <Page width="fluid">
 	<div class="flex items-center justify-between gap-4">
 		<h1 class="font-heading text-3xl font-semibold tracking-tight">My items</h1>
-		<IconButton label="New item" variant="default" onclick={() => goto(resolve('/items/new'))}>
-			<Plus />
-		</IconButton>
+		<div class="flex items-center gap-1">
+			<IconButton label="Import from a CSV" onclick={() => goto(resolve('/items/import'))}>
+				<Upload />
+			</IconButton>
+			<IconButton label="New item" variant="default" onclick={() => goto(resolve('/items/new'))}>
+				<Plus />
+			</IconButton>
+		</div>
 	</div>
 
 	<div class="flex flex-wrap items-center gap-2">

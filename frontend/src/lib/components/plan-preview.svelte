@@ -9,6 +9,7 @@
 		busy = false,
 		confirmLabel = 'Add',
 		busyLabel = 'Adding…',
+		cancelLabel = 'Cancel',
 		onCancel,
 		onConfirm
 	}: {
@@ -20,6 +21,7 @@
 		busy?: boolean;
 		confirmLabel?: string;
 		busyLabel?: string;
+		cancelLabel?: string;
 		onCancel: () => void;
 		onConfirm: () => void;
 	} = $props();
@@ -94,7 +96,7 @@
 			disabled={busy}
 			onclick={onCancel}
 		>
-			Cancel
+			{cancelLabel}
 		</Button>
 		{#if summary?.canAdd}
 			<Button type="button" class="pointer-coarse:h-11" disabled={busy} onclick={onConfirm}>
