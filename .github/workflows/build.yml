@@ -1,11 +1,26 @@
 name: Build
 
-# Builds the image and smoke tests it. Nothing is pushed.
+# Builds the image and smoke tests it. Nothing is pushed unless `preview` is set.
 # ci.yml calls it on pull requests and pushes to main, publish.yml calls it before it
-# publishes, and it can be run by hand.
+# publishes, preview-image.yml calls it with `preview` for a labelled pull request, and
+# it can be run by hand.
+#
+# With `preview`, the push-preview job pushes the image that was just smoke tested, not a
+# rebuild, under a throwaway tag (pr-<number>, or preview-<branch> for a manual run; see
+# scripts/preview_tag.py). Only that job may write packages.
 on:
   workflow_dispatch:
+    inputs:
+      preview:
+        description: Push the tested image to GHCR as preview-<branch>, for deployed testing
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      preview:
+        description: Push the tested image to GHCR under a throwaway preview tag
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,7 +69,7 @@ jobs:
             echo "branch=${BRANCH}"
             echo "timestamp=${timestamp}"
           } | tee -a "$GITHUB_OUTPUT"
-          echo "No tags: this image is built as menagerist:local and not pushed."
+          echo "Built as menagerist:local; pushed as a preview: ${{ inputs.preview }}."
 
       - name: Build the image
         uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
@@ -90,3 +105,99 @@ jobs:
           name: image-size
           path: ${{ runner.temp }}/image-size.json
           retention-days: 1
+
+      # The push job runs on another runner, so it gets the tested image as a file.
+      - name: Save the image for the preview push
+        if: inputs.preview
+        run: docker save menagerist:local | gzip -1 > "${RUNNER_TEMP}/preview-image.tar.gz"
+
+      - name: Upload the image for the preview push
+        if: inputs.preview
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: preview-image
+          path: ${{ runner.temp }}/preview-image.tar.gz
+          # Already gzipped.
+          compression-level: 0
+          retention-days: 1
+
+  push-preview:
+    name: Push the preview image
+    needs: build
+    if: inputs.preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+    steps:
+      - name: Checkout the tag script and the comment action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/actions/pr-comment
+            scripts/preview_tag.py
+          sparse-checkout-cone-mode: false
+
+      - name: Work out the tag
+        id: tag
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: python3 scripts/preview_tag.py
+
+      - name: Download the tested image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: preview-image
+          path: ${{ runner.temp }}/preview-image
+
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the image
+        id: push
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.tag }}
+        run: |
+          gunzip -c "${RUNNER_TEMP}/preview-image/preview-image.tar.gz" | docker load
+          docker tag menagerist:local "$IMAGE"
+          docker push "$IMAGE"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE")"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Write the comment
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          {
+            echo '<!-- preview-image -->'
+            echo '### Preview image'
+            echo
+            echo "Commit \`${COMMIT}\` passed the smoke test and was pushed for deployed testing (linux/amd64):"
+            echo
+            echo '```sh'
+            echo "docker pull ${IMAGE}"
+            echo '```'
+            echo
+            echo "Digest: \`${DIGEST}\`"
+            echo
+            echo 'Every push while the `preview-image` label is on replaces it. The tag is deleted when the pull request closes, or after 14 days without a push.'
+          } | tee "${RUNNER_TEMP}/preview-comment.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update the comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: ./.github/actions/pr-comment
+        with:
+          marker: "<!-- preview-image -->"
+          body-file: ${{ runner.temp }}/preview-comment.md
+          pr-number: ${{ github.event.pull_request.number }}
+          token: ${{ github.token }}

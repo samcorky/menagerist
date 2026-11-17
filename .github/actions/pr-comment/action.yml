@@ -1,0 +1,40 @@
+name: Pull request comment
+description: >-
+  Post a comment on a pull request, or update the one an earlier run posted, so each
+  kind of report keeps a single comment. The comment is found by the marker its body
+  starts with. The caller's token needs pull-requests write.
+
+inputs:
+  marker:
+    description: An HTML comment the body starts with, for example <!-- image-size -->.
+    required: true
+  body-file:
+    description: Path to the comment's Markdown, starting with the marker.
+    required: true
+  pr-number:
+    description: The pull request to comment on.
+    required: true
+  token:
+    description: A token that may write pull request comments.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Post or update the comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        MARKER: ${{ inputs.marker }}
+        BODY_FILE: ${{ inputs.body-file }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+      run: |
+        existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+          --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${MARKER}\"))) | .id" | head -n 1)
+        if [ -n "$existing" ]; then
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+            -F body=@"$BODY_FILE"
+        else
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            -F body=@"$BODY_FILE"
+        fi

@@ -42,6 +42,7 @@ EVERYTHING = {"backend": True, "frontend": True, "e2e": True, "image": True}
             ".github/workflows/api-breaking-changes.yml",
             ".github/workflows/autofix.yml",
             ".github/workflows/codeql.yml",
+            ".github/workflows/preview-image.yml",
             ".github/workflows/publish.yml",
             ".github/workflows/release.yml",
         ],

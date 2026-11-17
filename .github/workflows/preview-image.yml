@@ -1,0 +1,74 @@
+name: Preview image
+
+# A pull request with the `preview-image` label gets its image pushed to GHCR as
+# pr-<number> through build.yml, the same build and smoke test CI runs, so it can be
+# deployed for testing. Adding the label pushes it and every later push replaces it.
+# Closing the pull request deletes the tag, and a daily sweep deletes any pr-* or
+# preview-* tag (preview-* comes from running Build by hand with "preview") that has not
+# been pushed for 14 days. edge, latest and the version tags never match either pattern.
+# Pull requests from forks are skipped: their token cannot write packages.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened, closed]
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  # A newer push replaces a preview build still running, and closing the pull request
+  # stops it. Any other label being added gets a group of its own, so the labeller does
+  # not cancel a preview build.
+  group: >-
+    ${{ github.event.action == 'labeled' && github.event.label.name != 'preview-image'
+    && github.run_id || format('preview-image-{0}', github.event.pull_request.number || github.run_id) }}
+  cancel-in-progress: true
+
+jobs:
+  push:
+    name: Build and push the preview image
+    if: >-
+      ${{ github.event_name == 'pull_request' && github.event.action != 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && contains(github.event.pull_request.labels.*.name, 'preview-image')
+      && (github.event.action != 'labeled' || github.event.label.name == 'preview-image') }}
+    uses: ./.github/workflows/build.yml
+    with:
+      preview: true
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+
+  delete:
+    name: Delete the pull request's preview tag
+    if: >-
+      ${{ github.event_name == 'pull_request' && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && contains(github.event.pull_request.labels.*.name, 'preview-image') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - name: Delete pr-${{ github.event.pull_request.number }}
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-tags: pr-${{ github.event.pull_request.number }}
+
+  sweep:
+    name: Delete stale preview tags
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - name: Delete pr-* and preview-* tags older than 14 days
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-tags: pr-*,preview-*
+          older-than: 14 days
