@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import UserAvatar from '$lib/components/user-avatar.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -616,6 +617,13 @@
 					class="pointer-coarse:min-h-11"
 					onSelect={openUser}
 				>
+					<UserAvatar
+						userId={person.ref}
+						displayName={person.title}
+						avatarVersion={person.avatar_version}
+						size="md"
+						decorative
+					/>
 					<div class="min-w-0 flex-1">
 						<span class="block truncate font-medium">{person.title}</span>
 						<p class="truncate text-xs text-muted-foreground">

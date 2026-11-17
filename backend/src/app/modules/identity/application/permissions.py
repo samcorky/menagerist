@@ -4,7 +4,7 @@ from app.shared_kernel.permission import PermissionEnum
 
 
 class IdentityPermission(PermissionEnum):
-    """Permissions for managing other people's accounts.
+    """Permissions for seeing and managing other people's accounts.
 
     Values read `<module>:<resource>:<action>`.
     """
@@ -16,6 +16,7 @@ class IdentityPermission(PermissionEnum):
     UNLOCK_USER = "identity:user:unlock"
     LIST_SESSIONS = "identity:session:list"
     REVOKE_SESSION = "identity:session:revoke"
+    VIEW_PICTURES = "identity:picture:read"
 
     def implied(self) -> frozenset[Self]:
         """Return what holding this permission also grants.

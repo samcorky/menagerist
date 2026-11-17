@@ -30,6 +30,10 @@ class SearchHitResponse(BaseModel):
         default=False,
         description="Whether an item is in the collection the search was asked about.",
     )
+    avatar_version: str | None = Field(
+        default=None,
+        description="A user's current picture version; null shows their initials.",
+    )
     score: int = Field(description="How well it matches; higher is better.")
 
     model_config = ConfigDict(

@@ -17,6 +17,15 @@ API entrypoint settings.
 | `MENAGERIST_API_FRONTEND_DIST_PATH` | path | unset | any | Built frontend directory; unset in API-only mode. |
 | `MENAGERIST_API_TRUSTED_PROXIES` | comma-separated list of IP addresses or networks | `127.0.0.1` | `*` on its own | Trusted proxy IPs/CIDRs (CSV); '*' trusts all peers. |
 
+## Avatars
+
+Where Random cat gets its cats.
+
+| Variable | Type | Default | Allowed values | Notes |
+| --- | --- | --- | --- | --- |
+| `MENAGERIST_AVATARS_CAT_SERVICE_ENABLED` | true or false | `true` | any | Whether this instance ever contacts the cat service for Random cat. Off makes the button draw a cat in the browser instead. Set by the deployment, so an administrator cannot turn it back on from the interface. |
+| `MENAGERIST_AVATARS_CAT_SERVICE_URL` | text | `https://cataas.com` | any | Base address of a cataas-compatible service. The server asks it for `/avatar/<random seed>` and stores the reply like an upload; browsers never contact it. |
+
 ## Backup
 
 Instance backup storage, retention and upload limits.

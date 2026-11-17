@@ -181,7 +181,8 @@ async def test_warns_when_storage_cannot_be_used(
 async def test_stays_quiet_when_media_storage_is_writable(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """A writable media directory needs no startup warning."""
+    """A writable media directory, pictures folder included, needs no warning."""
+    (tmp_path / "avatars").mkdir()
     monkeypatch.setattr(
         startup,
         "get_media_settings",
@@ -217,7 +218,8 @@ async def test_probe_errors_are_skipped_at_debug_level(
     with capture_logs() as logs:
         await startup.warn_if_storage_not_writable()
 
-    assert [entry["log_level"] for entry in logs] == ["debug", "debug"]
+    # Media, its pictures folder and backups.
+    assert [entry["log_level"] for entry in logs] == ["debug", "debug", "debug"]
 
 
 @pytest.mark.parametrize(
@@ -373,3 +375,44 @@ async def test_the_lifespan_starts_and_cancels_the_update_check(
 
 async def _noop() -> None:
     return None
+
+
+async def test_ensure_avatar_directory_creates_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A fresh install gets its pictures folder, so the status check finds it."""
+    (tmp_path / "media").mkdir()
+    monkeypatch.setattr(
+        startup,
+        "get_media_settings",
+        lambda: SimpleNamespace(storage_path=tmp_path / "media"),
+    )
+    await startup.ensure_avatar_directory()
+    assert (tmp_path / "media" / "avatars").is_dir()
+
+
+async def test_ensure_avatar_directory_leaves_a_missing_media_path_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An unmounted media volume is still reported, not papered over by a mkdir."""
+    monkeypatch.setattr(
+        startup,
+        "get_media_settings",
+        lambda: SimpleNamespace(storage_path=tmp_path / "media"),
+    )
+    await startup.ensure_avatar_directory()
+    assert not (tmp_path / "media").exists()
+
+
+async def test_ensure_avatar_directory_failure_is_not_a_startup_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An unwritable media path is reported by the storage warning, not here."""
+    blocker = tmp_path / "media"
+    blocker.write_text("a file where the folder should be")
+    monkeypatch.setattr(
+        startup, "get_media_settings", lambda: SimpleNamespace(storage_path=blocker)
+    )
+    with capture_logs() as logs:
+        await startup.ensure_avatar_directory()
+    assert not [entry for entry in logs if entry["log_level"] == "warning"]

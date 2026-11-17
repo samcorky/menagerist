@@ -20,10 +20,12 @@ from app.shared_kernel.cqrs import UseCase
 from app.shared_kernel.progress import NULL_PROGRESS, Phase
 
 if TYPE_CHECKING:
+    from app.modules.backup.domain.backup import PictureFileRef
     from app.modules.backup.ports.backup_store import BackupStore
     from app.modules.backup.ports.backup_writer import BackupWriter
     from app.modules.backup.ports.database_snapshot import DatabaseSnapshot
     from app.modules.backup.ports.media_files import MediaFiles
+    from app.modules.backup.ports.picture_files import PictureFiles
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
     from app.shared_kernel.progress import ProgressReporter
@@ -63,11 +65,13 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
         *,
         app_version: str,
         progress: ProgressReporter | None = None,
+        pictures: PictureFiles | None = None,
     ) -> None:
         self._guard = guard
         self._store = store
         self._snapshot = snapshot
         self._media = media
+        self._pictures = pictures
         self._app_version = app_version
         self._progress = progress or NULL_PROGRESS
 
@@ -90,6 +94,27 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
                     )
             await self._progress.advance()
         return missing
+
+    async def _add_pictures(
+        self, writer: BackupWriter, refs: list[PictureFileRef]
+    ) -> list[PictureFileRef]:
+        """Archive each picture file; one that vanished since listing is left out."""
+        if self._pictures is None:
+            return []
+        added = []
+        for ref in refs:
+            try:
+                digest = await writer.add(ref.member, self._pictures.open(ref))
+            except MediaFileMissingError:
+                logger.warning("backup picture missing", member=ref.member)
+            else:
+                if digest.sha256 != ref.sha256 or digest.size != ref.size:
+                    raise CorruptBackupError(
+                        f"Picture {ref.member} changed while it was archived."
+                    )
+                added.append(ref)
+            await self._progress.advance()
+        return added
 
     async def _handle(
         self, request: CreateBackupCommand, actor: Actor
@@ -116,8 +141,12 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
                         )
                     )
             refs = await self._media.list_files()
-            await self._progress.start("media", len(refs))
+            picture_refs = (
+                await self._pictures.list_files() if self._pictures is not None else []
+            )
+            await self._progress.start("media", len(refs) + len(picture_refs))
             missing = await self._add_media(writer, refs)
+            pictures = await self._add_pictures(writer, picture_refs)
             stored = await writer.finish(
                 BackupManifest(
                     app_version=self._app_version,
@@ -128,6 +157,7 @@ class CreateBackup(UseCase[CreateBackupCommand, BackupSummary]):
                     tables=tables,
                     media=refs,
                     media_missing=missing,
+                    pictures=pictures,
                     from_revision=request.from_revision,
                     to_revision=request.to_revision,
                 )

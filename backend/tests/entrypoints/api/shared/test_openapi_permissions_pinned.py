@@ -35,6 +35,7 @@ EXPECTED: dict[tuple[str, str], str] = {
     ("/api/v1/users", "get"): "identity:user:list",
     ("/api/v1/users", "post"): "identity:user:create",
     ("/api/v1/users/{user_id}", "patch"): "identity:user:update",
+    ("/api/v1/users/{user_id}/avatar", "delete"): "identity:user:update",
     ("/api/v1/users/{user_id}/password", "post"): "identity:user:reset_password",
     ("/api/v1/users/{user_id}/unlock", "post"): "identity:user:unlock",
     ("/api/v1/system/version/check", "post"): "system:release:check",

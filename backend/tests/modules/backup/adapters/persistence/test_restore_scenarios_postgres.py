@@ -258,12 +258,29 @@ async def test_restore_refused_across_a_real_migration(
             role=Role.ADMIN,
             now=datetime.now(UTC),
         )
-        async with factory.begin() as session:
-            await SqlAlchemyUserRepository(session).add(user)
         node_id = uuid7()
         async with engine.begin() as connection:
-            # The ORM repository targets head's schema (node_favourites), not
-            # this older revision's `nodes.favourite` column, so insert directly.
+            # The ORM repositories target head's schema (node_favourites, the
+            # users' picture columns), not this older revision's, so insert directly.
+            await connection.execute(
+                text(
+                    """
+                    INSERT INTO users
+                        (id, username, display_name, password_hash, role,
+                         password_expired, disabled, created_at, updated_at)
+                    VALUES
+                        (:id, :username, :display_name, :password_hash, :role,
+                         false, false, now(), now())
+                    """
+                ),
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "display_name": user.display_name,
+                    "password_hash": user.password_hash,
+                    "role": user.role.value,
+                },
+            )
             await connection.execute(
                 text(
                     """

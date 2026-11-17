@@ -30,6 +30,7 @@ CONTENT = [
     "graph:node_type:purge_attribute",
     "graph:type:read",
     "graph:type:write",
+    "identity:picture:read",
     "media:item:read",
     "media:item:write",
     "presets:preset:read",
@@ -70,7 +71,7 @@ def test_an_admin_sees_every_permission_sorted(as_user: Callable[..., None]) -> 
 
 
 def test_a_member_sees_the_content_set(as_user: Callable[..., None]) -> None:
-    """Members hold the content permissions, expanded, and no admin ones."""
+    """Members hold the content permissions and picture viewing, and no admin ones."""
     app = create_app()
     as_user(app, uuid.uuid4(), "member")
     response = TestClient(app).get(URL)

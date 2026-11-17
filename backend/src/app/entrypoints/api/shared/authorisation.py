@@ -6,6 +6,7 @@ from app.modules.catalogue.application.permissions import CataloguePermission
 from app.modules.collections.application.permissions import CollectionPermission
 from app.modules.examples.application.permissions import ExamplePermission
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.media.application.permissions import MediaPermission
 from app.modules.presets.application.permissions import PresetPermission
 from app.modules.transfer.application.permissions import TransferPermission
@@ -45,12 +46,15 @@ CONTENT_PERMISSIONS: frozenset[Permission] = frozenset(
     }
 )
 
-# Granted to every signed-in member.
-MEMBER_PERMISSIONS: frozenset[Permission] = CONTENT_PERMISSIONS
+# Granted to every signed-in member: their content, and seeing who people are.
+MEMBER_PERMISSIONS: frozenset[Permission] = CONTENT_PERMISSIONS | {
+    IdentityPermission.VIEW_PICTURES,
+}
 
 # What a token may be granted: the content permissions minus the backup ones, the
 # irreversible purges and the type deletions, which stay with a signed-in person.
 TOKEN_GRANTABLE_PERMISSIONS: frozenset[Permission] = MEMBER_PERMISSIONS - {
+    IdentityPermission.VIEW_PICTURES,
     GraphPermission.ITEM_PURGE,
     GraphPermission.DELETE_NODE_TYPE,
     GraphPermission.DELETE_EDGE_TYPE,

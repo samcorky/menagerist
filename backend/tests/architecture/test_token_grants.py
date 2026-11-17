@@ -24,6 +24,7 @@ from app.modules.graph.application.promote_extra_schema_field import (
 )
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.application.update_node_type import UpdateNodeType
+from app.modules.identity.application.permissions import IdentityPermission
 from app.modules.media.application.attach_media import AttachMedia
 from app.modules.media.application.copy_item_media import CopyItemMedia
 from app.modules.media.application.stage_media import StageMedia
@@ -64,7 +65,7 @@ def _needs(use_case: UseCaseType) -> str:
 
 
 def test_grantable_set_is_member_content_minus_backups() -> None:
-    """Tokens get content permissions, never admin or backup ones."""
+    """Tokens get content permissions, never admin, backup or picture ones."""
     assert TOKEN_GRANTABLE_PERMISSIONS <= MEMBER_PERMISSIONS
     assert not TOKEN_GRANTABLE_PERMISSIONS & ADMIN_ONLY_ACTIONS
     assert not any(isinstance(p, BackupPermission) for p in TOKEN_GRANTABLE_PERMISSIONS)
@@ -79,6 +80,7 @@ def test_grantable_set_is_member_content_minus_backups() -> None:
             GraphPermission.PURGE_NODE_TYPE_ATTRIBUTE,
             GraphPermission.PURGE_EDGE_TYPE_ATTRIBUTE,
             CollectionPermission.COLLECTION_PURGE,
+            IdentityPermission.VIEW_PICTURES,
         }
         == TOKEN_GRANTABLE_PERMISSIONS
     )

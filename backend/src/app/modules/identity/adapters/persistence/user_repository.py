@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.identity.adapters.persistence.models import UserModel
+from app.modules.identity.domain.avatar import Avatar, AvatarSource
 from app.modules.identity.domain.errors import UsernameTakenError
 from app.modules.identity.domain.user import Role, User
 from app.platform.advisory_locks import AdvisoryLock
@@ -28,13 +29,29 @@ def _to_domain(model: UserModel) -> User:
         password_expired=model.password_expired,
         disabled=model.disabled,
         last_login_at=model.last_login_at,
+        avatar=_avatar_from(model),
         created_at=model.created_at,
         updated_at=model.updated_at,
     )
 
 
+def _avatar_from(model: UserModel) -> Avatar | None:
+    if (
+        model.avatar_version is None
+        or model.avatar_source is None
+        or model.avatar_updated_at is None
+    ):
+        return None
+    return Avatar(
+        version=model.avatar_version,
+        source=AvatarSource(model.avatar_source),
+        updated_at=model.avatar_updated_at,
+    )
+
+
 def _to_model(user: User) -> UserModel:
     """Convert a domain entity into its ORM row."""
+    avatar = user.avatar
     return UserModel(
         id=user.id,
         username=user.username,
@@ -44,6 +61,9 @@ def _to_model(user: User) -> UserModel:
         password_expired=user.password_expired,
         disabled=user.disabled,
         last_login_at=user.last_login_at,
+        avatar_version=avatar.version if avatar else None,
+        avatar_source=avatar.source.value if avatar else None,
+        avatar_updated_at=avatar.updated_at if avatar else None,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )

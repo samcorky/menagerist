@@ -11,6 +11,7 @@ from app.modules.identity.adapters.persistence.session_repository import (
 from app.modules.identity.adapters.persistence.user_repository import (
     SqlAlchemyUserRepository,
 )
+from app.modules.identity.domain.avatar import Avatar, AvatarSource
 from app.modules.identity.domain.errors import UsernameTakenError
 from app.modules.identity.domain.session import Session
 from app.modules.identity.domain.user import Role, User
@@ -58,6 +59,39 @@ async def test_user_round_trips_every_field(db_session: AsyncSession) -> None:
     )
     assert stored.last_login_at == NOW
     assert (stored.created_at, stored.updated_at) == (user.created_at, user.updated_at)
+
+
+async def test_avatar_round_trips(db_session: AsyncSession) -> None:
+    """A stored picture reads back with its version, source and time."""
+    repo = SqlAlchemyUserRepository(db_session)
+    user = _user()
+    avatar = Avatar(version="0123456789abcdef", source=AvatarSource.CAT, updated_at=NOW)
+    user.set_avatar(avatar)
+    await repo.add(user)
+    db_session.expire_all()
+
+    stored = await repo.get(user.id)
+
+    assert stored is not None
+    assert stored.avatar == avatar
+
+
+async def test_no_avatar_round_trips_as_none(db_session: AsyncSession) -> None:
+    """An account without a picture reads back without one, also after clearing."""
+    repo = SqlAlchemyUserRepository(db_session)
+    user = _user()
+    user.set_avatar(
+        Avatar(version="0123456789abcdef", source=AvatarSource.UPLOAD, updated_at=NOW)
+    )
+    await repo.add(user)
+    user.clear_avatar()
+    await repo.save(user)
+    db_session.expire_all()
+
+    stored = await repo.get(user.id)
+
+    assert stored is not None
+    assert stored.avatar is None
 
 
 async def test_user_lookup_is_case_insensitive(db_session: AsyncSession) -> None:

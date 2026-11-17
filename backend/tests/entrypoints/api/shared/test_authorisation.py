@@ -51,12 +51,14 @@ CONTENT_VALUES = frozenset(
 
 
 def test_the_default_member_grant_is_the_content_set() -> None:
-    """Members hold the content permissions and none of the admin ones."""
-    assert MEMBER_PERMISSIONS == CONTENT_PERMISSIONS
+    """Members hold the content permissions, can see pictures, and no admin ones."""
+    assert (
+        CONTENT_PERMISSIONS | {IdentityPermission.VIEW_PICTURES} == MEMBER_PERMISSIONS
+    )
     assert frozenset(CONTENT_PERMISSIONS) == CONTENT_VALUES
     assert not CONTENT_PERMISSIONS & ADMIN_ONLY_ACTIONS
     assert ALL_PERMISSIONS - MEMBER_PERMISSIONS == ADMIN_ONLY_ACTIONS
-    assert len(ALL_PERMISSIONS) == 41
+    assert len(ALL_PERMISSIONS) == 42
 
 
 def test_the_admin_only_set_matches_the_catalogue() -> None:
@@ -115,11 +117,11 @@ async def test_unknown_permissions_are_denied_to_everyone() -> None:
 
 
 def test_effective_permissions_by_role() -> None:
-    """Admin and system get everything; members get the content set."""
+    """Admin and system get everything; members get their set."""
     adapter = RoleAuthorisationAdapter()
     assert adapter.effective_permissions(ADMIN) == ALL_PERMISSIONS
     assert adapter.effective_permissions(SYSTEM_ACTOR) == ALL_PERMISSIONS
-    assert adapter.effective_permissions(MEMBER) == expand(CONTENT_PERMISSIONS)
+    assert adapter.effective_permissions(MEMBER) == expand(MEMBER_PERMISSIONS)
 
 
 async def test_granted_permissions_expand_through_implications() -> None:

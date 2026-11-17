@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
+from app.modules.identity.domain.avatar import Avatar
 from app.modules.identity.domain.errors import InvalidPasswordError, InvalidUserError
 from app.shared_kernel.mixins import Identifiable, Timestamped
 
@@ -71,6 +72,7 @@ class User(Identifiable, Timestamped):
     password_expired: bool = False
     disabled: bool = False
     last_login_at: datetime | None = None
+    avatar: Avatar | None = None
 
     @classmethod
     def create(
@@ -132,6 +134,16 @@ class User(Identifiable, Timestamped):
     def enable(self) -> None:
         """Let this account sign in again."""
         self.disabled = False
+        self.touch()
+
+    def set_avatar(self, avatar: Avatar) -> None:
+        """Show `avatar` as this account's picture."""
+        self.avatar = avatar
+        self.touch()
+
+    def clear_avatar(self) -> None:
+        """Go back to the initials default."""
+        self.avatar = None
         self.touch()
 
     def record_sign_in(self, now: datetime) -> None:

@@ -8,10 +8,12 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from app.modules.backup.domain.backup import (
+    PICTURE_SIZES,
     BackupManifest,
     BackupSummary,
     MediaFileRef,
     MemberDigest,
+    PictureFileRef,
     TableDigest,
 )
 from app.modules.backup.domain.errors import CorruptBackupError
@@ -26,6 +28,10 @@ if TYPE_CHECKING:
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _TABLE = re.compile(r"data/[a-z][a-z0-9_]*\.ndjson")
+_PICTURE = re.compile(
+    r"avatars/(?P<user>[0-9a-f-]{36})/[0-9a-f]{16}-(?P<pixels>[0-9]+)\.webp"
+)
+_VERSION = re.compile(r"[0-9a-f]{16}")
 
 
 def validate_member_name(name: str) -> None:
@@ -36,6 +42,13 @@ def validate_member_name(name: str) -> None:
         asset_id = name.removeprefix("media/")
         try:
             if str(UUID(asset_id)) == asset_id:
+                return
+        except ValueError:
+            pass
+    picture = _PICTURE.fullmatch(name)
+    if picture and int(picture["pixels"]) in PICTURE_SIZES:
+        try:
+            if str(UUID(picture["user"])) == picture["user"]:
                 return
         except ValueError:
             pass
@@ -112,6 +125,21 @@ def _media(value: object) -> MediaFileRef:
     )
 
 
+def _picture(value: object) -> PictureFileRef:
+    picture = _object(value)
+    ref = PictureFileRef(
+        user_id=UUID(_text(picture, "user_id")),
+        version=_text(picture, "version"),
+        pixels=_integer(picture, "pixels"),
+        size=_integer(picture, "size"),
+        sha256=_digest(picture),
+    )
+    if _VERSION.fullmatch(ref.version) is None:
+        raise CorruptBackupError("Invalid picture version in backup manifest.")
+    validate_member_name(ref.member)
+    return ref
+
+
 def manifest_bytes(manifest: BackupManifest) -> bytes:
     """Encode the manifest, omitting migration fields on ordinary backups."""
     payload = asdict(manifest)
@@ -145,6 +173,13 @@ def parse_manifest(data: bytes) -> BackupManifest:
             media_missing=[
                 UUID(str(value)) for value in _array(payload, "media_missing")
             ],
+            # Archives made before pictures were backed up have no list.
+            pictures=[
+                _picture(value)
+                for value in (
+                    _array(payload, "pictures") if "pictures" in payload else []
+                )
+            ],
             from_revision=_optional_text(payload, "from_revision"),
             to_revision=_optional_text(payload, "to_revision"),
         )
@@ -152,7 +187,12 @@ def parse_manifest(data: bytes) -> BackupManifest:
         raise CorruptBackupError("Invalid or incomplete backup manifest.") from exc
     names = [table.name for table in manifest.tables]
     assets = [ref.asset_id for ref in manifest.media]
-    if len(set(names)) != len(names) or len(set(assets)) != len(assets):
+    pictures = [ref.member for ref in manifest.pictures]
+    if (
+        len(set(names)) != len(names)
+        or len(set(assets)) != len(assets)
+        or len(set(pictures)) != len(pictures)
+    ):
         raise CorruptBackupError("Duplicate entries in backup manifest.")
     if not set(manifest.media_missing) <= set(assets):
         raise CorruptBackupError("Missing media must have a manifest record.")
@@ -260,6 +300,24 @@ def _manifest_findings(
                 findings,
                 name,
                 str(media.size),
+                str(member.size),
+                FindingKind.MEDIA_MISMATCH,
+            )
+    for picture in manifest.pictures:
+        expected.add(picture.member)
+        member = actual.get(picture.member)
+        _compare(
+            findings,
+            picture.member,
+            picture.sha256,
+            None if member is None else member.sha256,
+            FindingKind.MEDIA_MISMATCH,
+        )
+        if member is not None:
+            _compare(
+                findings,
+                picture.member,
+                str(picture.size),
                 str(member.size),
                 FindingKind.MEDIA_MISMATCH,
             )

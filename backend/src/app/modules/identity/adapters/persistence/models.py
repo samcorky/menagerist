@@ -21,6 +21,10 @@ class UserModel(IdentifiableMixin, TimestampedMixin, Base):
     password_expired: Mapped[bool]
     disabled: Mapped[bool]
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # All three are set together, or all are null (the initials default).
+    avatar_version: Mapped[str | None]
+    avatar_source: Mapped[str | None]
+    avatar_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SessionModel(IdentifiableMixin, Base):

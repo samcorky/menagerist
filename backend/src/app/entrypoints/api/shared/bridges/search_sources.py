@@ -261,7 +261,10 @@ class UserSource:
     async def find(
         self, query: str, limit: int, actor: Actor, *, collection: str | None = None
     ) -> list[SearchHit]:
-        """Return accounts matching `query`; only an id, names and the role leave."""
+        """Return accounts matching `query`.
+
+        Only an id, the names, the role and the picture version leave.
+        """
         listings = await self._use_case.handle(ListUsersQuery(), actor)
         return [
             SearchHit(
@@ -270,6 +273,9 @@ class UserSource:
                 title=listing.user.display_name,
                 description=f"@{listing.user.username}",
                 group=listing.user.role.value,
+                avatar_version=(
+                    listing.user.avatar.version if listing.user.avatar else None
+                ),
             )
             for listing in listings
             if _mentions(query, listing.user.display_name, listing.user.username)

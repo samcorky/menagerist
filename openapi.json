@@ -22575,6 +22575,8 @@
                   "$ref": "#/components/schemas/UserResponse"
                 },
                 "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
                   "created_at": "2026-10-10T12:00:00.000000Z",
                   "disabled": false,
                   "display_name": "Alice Example",
@@ -22693,6 +22695,8 @@
                   "$ref": "#/components/schemas/UserResponse"
                 },
                 "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
                   "created_at": "2026-10-10T12:00:00.000000Z",
                   "disabled": false,
                   "display_name": "Alice Example",
@@ -22877,6 +22881,8 @@
                   "$ref": "#/components/schemas/UserResponse"
                 },
                 "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
                   "created_at": "2026-10-10T12:00:00.000000Z",
                   "disabled": false,
                   "display_name": "Alice Example",
@@ -24459,6 +24465,8 @@
                 },
                 "example": [
                   {
+                    "avatar_source": "upload",
+                    "avatar_version": "3f9c2a7b1d4e8f60",
                     "created_at": "2026-10-10T12:00:00.000000Z",
                     "disabled": false,
                     "display_name": "Alice Example",
@@ -24493,6 +24501,13 @@
                   "user_id": "$response.body#/0/id"
                 },
                 "description": "Unlock user with the id from this response."
+              },
+              "ClearUserAvatar": {
+                "operationId": "clear_user_avatar",
+                "parameters": {
+                  "user_id": "$response.body#/0/id"
+                },
+                "description": "Clear user avatar with the id from this response."
               }
             }
           },
@@ -24587,6 +24602,8 @@
                   "$ref": "#/components/schemas/UserResponse"
                 },
                 "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
                   "created_at": "2026-10-10T12:00:00.000000Z",
                   "disabled": false,
                   "display_name": "Alice Example",
@@ -24620,6 +24637,13 @@
                   "user_id": "$response.body#/id"
                 },
                 "description": "Unlock user with the id from this response."
+              },
+              "ClearUserAvatar": {
+                "operationId": "clear_user_avatar",
+                "parameters": {
+                  "user_id": "$response.body#/id"
+                },
+                "description": "Clear user avatar with the id from this response."
               }
             }
           },
@@ -24795,6 +24819,8 @@
                   "$ref": "#/components/schemas/UserResponse"
                 },
                 "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
                   "created_at": "2026-10-10T12:00:00.000000Z",
                   "disabled": false,
                   "display_name": "Alice Example",
@@ -24821,6 +24847,13 @@
                   "user_id": "$response.body#/id"
                 },
                 "description": "Unlock user with the id from this response."
+              },
+              "ClearUserAvatar": {
+                "operationId": "clear_user_avatar",
+                "parameters": {
+                  "user_id": "$response.body#/id"
+                },
+                "description": "Clear user avatar with the id from this response."
               }
             }
           },
@@ -25239,6 +25272,880 @@
           }
         },
         "x-required-permission": "identity:user:unlock"
+      }
+    },
+    "/api/v1/me/avatar": {
+      "put": {
+        "tags": [
+          "v1",
+          "Users"
+        ],
+        "summary": "Set your picture",
+        "description": "Make a file your picture.\n\nThe server applies the photo's orientation, then keeps the square named by\n`crop_x`, `crop_y` and `crop_size` (pixels of the upright image, all three or\nnone; without them, the largest centred square), and stores it at 64, 128 and\n256 pixels with its metadata removed.",
+        "operationId": "set_own_avatar",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOwnAvatarBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a file or crop cannot be used as an account's picture.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidAvatarError",
+                  "status": 400,
+                  "detail": "That file can't be used as a picture.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than the upload limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Payload Too Large",
+                  "status": 413,
+                  "detail": "The upload is larger than this server allows.",
+                  "instance": "/api/v1/me/avatar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/avatar"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "v1",
+          "Users"
+        ],
+        "summary": "Go back to your initials",
+        "description": "Remove your picture, so your initials show instead.",
+        "operationId": "clear_own_avatar",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/avatar/cat": {
+      "post": {
+        "tags": [
+          "v1",
+          "Users"
+        ],
+        "summary": "Use a random cat as your picture",
+        "description": "Fetch a new random cat on the server and make it your picture.\n\nThe browser never contacts the cat service. A 503 means the service is turned\noff or gave nothing usable; the app then draws a cat itself and uploads it.",
+        "operationId": "set_own_avatar_from_cat_service",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a file or crop cannot be used as an account's picture.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidAvatarError",
+                  "status": 400,
+                  "detail": "That file can't be used as a picture.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Returned when Random cat cannot get a cat from the cat service.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "CatServiceUnavailableError",
+                  "status": 503,
+                  "detail": "The cat service is not available.",
+                  "instance": "https://menagerist.example/api/v1/me/avatar/cat"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/avatar": {
+      "delete": {
+        "tags": [
+          "v1",
+          "Users"
+        ],
+        "summary": "Remove someone's picture",
+        "description": "Remove an account's picture. Administrators only.\n\n**Requires permission:** `identity:user:update`",
+        "operationId": "clear_user_avatar",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The user's id.",
+              "title": "User Id"
+            },
+            "description": "The user's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
+                  "created_at": "2026-10-10T12:00:00.000000Z",
+                  "disabled": false,
+                  "display_name": "Alice Example",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e50",
+                  "last_login_at": "2026-10-11T08:30:00.000000Z",
+                  "password_expired": false,
+                  "role": "member",
+                  "updated_at": "2026-10-10T12:00:00.000000Z",
+                  "username": "alice"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "You do not have permission to do that.",
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested user does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "UserNotFoundError",
+                  "status": 404,
+                  "detail": "That account does not exist.",
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "identity:user:update"
+      }
+    },
+    "/api/v1/users/{user_id}/avatar/{size}": {
+      "get": {
+        "tags": [
+          "v1",
+          "Users"
+        ],
+        "summary": "Load someone's picture",
+        "description": "Return one size (64, 128 or 256) of an account's current picture as WebP.\n\n**Requires permission:** `identity:picture:read`",
+        "operationId": "get_user_avatar",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The user's id.",
+              "title": "User Id"
+            },
+            "description": "The user's id."
+          },
+          {
+            "name": "size",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Width and height in pixels: 64, 128 or 256.",
+              "title": "Size"
+            },
+            "description": "Width and height in pixels: 64, 128 or 256."
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The account's `avatar_version`; old versions are 404.",
+              "title": "V"
+            },
+            "description": "The account's `avatar_version`; old versions are 404."
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The picture, cacheable for a year at this address.",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "The picture's WebP bytes."
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "The version and size, for conditional requests.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "`private, max-age=31536000, immutable`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Your cached copy is current."
+          },
+          "401": {
+            "description": "Returned when a request needs a signed-in session and has none.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "unauthenticated",
+                  "title": "SessionRequiredError",
+                  "status": 401,
+                  "detail": "Sign in to continue.",
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar/size"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "You do not have permission to do that.",
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar/size"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when an account has no picture at the requested version or size.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "AvatarNotFoundError",
+                  "status": 404,
+                  "detail": "That picture does not exist.",
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar/size"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar/size"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/users/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/avatar/size"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "identity:picture:read"
       }
     },
     "/api/v1/sessions": {
@@ -27194,6 +28101,8 @@
                     "collections": 2
                   },
                   "user": {
+                    "avatar_source": "upload",
+                    "avatar_version": "3f9c2a7b1d4e8f60",
                     "created_at": "2026-10-10T12:00:00.000000Z",
                     "disabled": false,
                     "display_name": "Alice Example",
@@ -27349,6 +28258,8 @@
                   "$ref": "#/components/schemas/UserResponse"
                 },
                 "example": {
+                  "avatar_source": "upload",
+                  "avatar_version": "3f9c2a7b1d4e8f60",
                   "created_at": "2026-10-10T12:00:00.000000Z",
                   "disabled": false,
                   "display_name": "Alice Example",
@@ -28177,6 +29088,16 @@
             "setup_required": true
           }
         ]
+      },
+      "AvatarSource": {
+        "type": "string",
+        "enum": [
+          "upload",
+          "cat",
+          "drawn"
+        ],
+        "title": "AvatarSource",
+        "description": "Where an account's picture came from."
       },
       "BackupPermission": {
         "type": "string",
@@ -31272,10 +32193,11 @@
           "identity:user:reset_password",
           "identity:user:unlock",
           "identity:session:list",
-          "identity:session:revoke"
+          "identity:session:revoke",
+          "identity:picture:read"
         ],
         "title": "IdentityPermission",
-        "description": "Permissions for managing other people's accounts.\n\nValues read `<module>:<resource>:<action>`."
+        "description": "Permissions for seeing and managing other people's accounts.\n\nValues read `<module>:<resource>:<action>`."
       },
       "ImportPlanResponse": {
         "properties": {
@@ -34266,6 +35188,18 @@
             "description": "Whether an item is in the collection the search was asked about.",
             "default": false
           },
+          "avatar_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Version",
+            "description": "A user's current picture version; null shows their initials."
+          },
           "score": {
             "type": "integer",
             "title": "Score",
@@ -34477,6 +35411,68 @@
           }
         ]
       },
+      "SetOwnAvatarBody": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "A JPEG, PNG, WebP or GIF of at most 5 MB."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "drawn"
+            ],
+            "title": "Source",
+            "description": "`drawn` for a cat the browser drew when the service failed.",
+            "default": "upload"
+          },
+          "crop_x": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop X",
+            "description": "Left edge of the square to keep, in pixels."
+          },
+          "crop_y": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop Y",
+            "description": "Top edge of the square to keep, in pixels."
+          },
+          "crop_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop Size",
+            "description": "Side of the square to keep, in pixels."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "SetOwnAvatarBody",
+        "description": "The multipart form for `set_own_avatar`."
+      },
       "SettingJson": {
         "anyOf": [
           {
@@ -34676,6 +35672,8 @@
               "collections": 2
             },
             "user": {
+              "avatar_source": "upload",
+              "avatar_version": "3f9c2a7b1d4e8f60",
               "created_at": "2026-10-10T12:00:00.000000Z",
               "disabled": false,
               "display_name": "Alice Example",
@@ -35460,6 +36458,29 @@
             "title": "Locked Until",
             "description": "When a sign-in lockout on this username ends; null when not locked. Only filled in by the administrator user list and update."
           },
+          "avatar_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Version",
+            "description": "Names the account's current picture and changes whenever it does; null when the account shows its initials. Load it from `/users/{id}/avatar/{size}?v={avatar_version}`."
+          },
+          "avatar_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AvatarSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the picture came from: an upload, the cat service, or a cat drawn in the browser; null without a picture."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -35488,6 +36509,8 @@
         "description": "An account as returned by the API; never includes credentials.",
         "examples": [
           {
+            "avatar_source": "upload",
+            "avatar_version": "3f9c2a7b1d4e8f60",
             "created_at": "2026-10-10T12:00:00.000000Z",
             "disabled": false,
             "display_name": "Alice Example",

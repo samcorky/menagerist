@@ -1,11 +1,15 @@
 import io
-import warnings
 
 import structlog
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.modules.media.domain.errors import ImageTooLargeError
 from app.modules.media.ports.image_processor import ThumbnailResult
+from app.platform.imaging import (
+    ImageTooManyPixelsError,
+    UndecodableImageError,
+    open_image_safely,
+)
 
 logger = structlog.get_logger()
 
@@ -38,19 +42,16 @@ class PillowImageProcessor:
         logger.debug(
             "generating thumbnail", max_dimension=max_dimension, input_bytes=len(data)
         )
-        # Pillow's own check, at open time, uses the larger limit; the per-format
-        # limit is applied below. It warns above this and raises above twice it.
-        Image.MAX_IMAGE_PIXELS = max(MAX_IMAGE_PIXELS, MAX_JPEG_PIXELS)
         try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("error", Image.DecompressionBombWarning)
-                loaded = Image.open(io.BytesIO(data))
-            is_jpeg = loaded.format == "JPEG"
-            if loaded.width * loaded.height > (
-                MAX_JPEG_PIXELS if is_jpeg else MAX_IMAGE_PIXELS
-            ):
-                raise ImageTooLargeError("That image has too many pixels.")
-            if is_jpeg:
+            loaded = open_image_safely(
+                data, max_pixels=MAX_IMAGE_PIXELS, max_jpeg_pixels=MAX_JPEG_PIXELS
+            )
+        except ImageTooManyPixelsError as error:
+            raise ImageTooLargeError("That image has too many pixels.") from error
+        except UndecodableImageError:
+            return None
+        try:
+            if loaded.format == "JPEG":
                 loaded.draft(loaded.mode, (max_dimension, max_dimension))
             image: Image.Image = ImageOps.exif_transpose(loaded)
             image.thumbnail((max_dimension, max_dimension))

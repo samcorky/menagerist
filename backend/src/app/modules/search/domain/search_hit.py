@@ -82,6 +82,8 @@ class SearchHit:
     attributes: dict[str, Any] | None = field(default=None, hash=False)
     # An item that belongs to the collection the search was asked about.
     in_collection: bool = False
+    # A person's current picture, so their row can show it; None shows initials.
+    avatar_version: str | None = None
     score: int = 0
 
     def rated(self, value: int) -> SearchHit:
@@ -96,6 +98,7 @@ class SearchHit:
             item_count=self.item_count,
             attributes=self.attributes,
             in_collection=self.in_collection,
+            avatar_version=self.avatar_version,
             score=value,
         )
 

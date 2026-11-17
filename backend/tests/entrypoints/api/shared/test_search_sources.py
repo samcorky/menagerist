@@ -38,6 +38,7 @@ from app.modules.identity.adapters.persistence.in_memory_user_repository import 
     InMemoryUserRepository,
 )
 from app.modules.identity.application.list_users import ListUsers
+from app.modules.identity.domain.avatar import Avatar, AvatarSource
 from app.modules.identity.domain.user import Role, User
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
@@ -208,15 +209,22 @@ async def _users() -> UserSource:
         ("alice", "Alice Émile", Role.MEMBER),
         ("jsmith", "Jo Smith", Role.ADMIN),
     ):
-        await repos.users.add(
-            User.create(
-                username=username,
-                display_name=display_name,
-                password_hash="x",
-                role=role,
-                now=datetime(2026, 11, 16, tzinfo=UTC),
-            )
+        user = User.create(
+            username=username,
+            display_name=display_name,
+            password_hash="x",
+            role=role,
+            now=datetime(2026, 11, 16, tzinfo=UTC),
         )
+        if username == "jsmith":
+            user.set_avatar(
+                Avatar(
+                    version="0123456789abcdef",
+                    source=AvatarSource.CAT,
+                    updated_at=datetime(2026, 11, 16, tzinfo=UTC),
+                )
+            )
+        await repos.users.add(user)
     return UserSource(ListUsers(repos, get_access_guard()))
 
 
@@ -233,6 +241,17 @@ async def test_an_administrator_finds_users_by_name_or_username() -> None:
     assert [h.title for h in by_username] == ["Jo Smith"]
 
 
+async def test_user_search_hit_carries_avatar_version() -> None:
+    """A person's row can show their picture, or their initials without one."""
+    source = await _users()
+
+    with_picture = await source.find("jsmith", 10, ADMIN)
+    without = await source.find("alice", 10, ADMIN)
+
+    assert [h.avatar_version for h in with_picture] == ["0123456789abcdef"]
+    assert [h.avatar_version for h in without] == [None]
+
+
 async def test_users_are_for_administrators_only() -> None:
     """A member is refused, so the search leaves the kind out with no hint of it."""
     source = await _users()
@@ -242,7 +261,7 @@ async def test_users_are_for_administrators_only() -> None:
 
 
 async def test_a_user_hit_carries_no_more_than_the_users_page_shows() -> None:
-    """A hit holds an id, names and the role; nothing about credentials or locks."""
+    """A hit holds an id, names, the role and picture; no credentials or locks."""
     source = await _users()
 
     (found,) = await source.find("alice", 10, ADMIN)
@@ -257,6 +276,7 @@ async def test_a_user_hit_carries_no_more_than_the_users_page_shows() -> None:
         "item_count",
         "attributes",
         "in_collection",
+        "avatar_version",
         "score",
     }
     assert found.attributes is None

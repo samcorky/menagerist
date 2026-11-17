@@ -7,8 +7,11 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import UserAvatar from '$lib/components/user-avatar.svelte';
 
 	const name = $derived(auth.user?.display_name ?? '');
+	const userId = $derived(auth.user?.id ?? '');
+	const avatarVersion = $derived(auth.user?.avatar_version ?? null);
 
 	async function handleSignOut() {
 		const result = await auth.signOut();
@@ -32,7 +35,7 @@
 									class="pointer-coarse:size-11"
 									aria-label="Account menu for {name}"
 								>
-									<UserRound class="size-4" />
+									<UserAvatar {userId} displayName={name} {avatarVersion} size="sm" decorative />
 								</Button>
 							{/snippet}
 						</DropdownMenu.Trigger>
@@ -42,7 +45,10 @@
 			<Tooltip.Content>Account menu for {name}</Tooltip.Content>
 		</Tooltip.Root>
 		<DropdownMenu.Content align="end" class="min-w-52">
-			<DropdownMenu.Label class="truncate">{name}</DropdownMenu.Label>
+			<DropdownMenu.Label class="flex items-center gap-2">
+				<UserAvatar {userId} displayName={name} {avatarVersion} size="md" decorative />
+				<span class="truncate">{name}</span>
+			</DropdownMenu.Label>
 			<DropdownMenu.Separator />
 			<DropdownMenu.Item
 				class="pointer-coarse:min-h-11"

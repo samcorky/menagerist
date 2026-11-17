@@ -24,6 +24,7 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import DeviceTitle from '$lib/components/device-title.svelte';
+	import AccountPicture from '$lib/components/account-picture.svelte';
 	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
@@ -223,6 +224,8 @@
 	{/if}
 
 	{#if !forced}
+		<AccountPicture />
+
 		<form class="max-w-md space-y-4" onsubmit={handleRename}>
 			<h2 class="font-heading text-lg font-semibold">Display name</h2>
 

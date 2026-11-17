@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.modules.backup.ports.backup_workspace import BackupWorkspace
     from app.modules.backup.ports.database_restorer import DatabaseRestorer
     from app.modules.backup.ports.media_files import MediaFiles
+    from app.modules.backup.ports.picture_files import PictureFiles
     from app.modules.backup.ports.setup_gate import SetupGate
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
@@ -50,12 +51,14 @@ class RestoreOnFirstRun(UseCase[RestoreOnFirstRunCommand, None]):
         *,
         max_upload_size: int = 8 * 1024**3,
         progress: ProgressReporter | None = None,
+        pictures: PictureFiles | None = None,
     ) -> None:
         self._gate, self._store, self._restorer = gate, store, restorer
         self._media, self._workspace = media, workspace
         self._max_size = max_upload_size
         self._guard = guard
         self._progress = progress or NULL_PROGRESS
+        self._pictures = pictures
 
     async def _handle(self, request: RestoreOnFirstRunCommand, actor: Actor) -> None:
         """Verify and restore only while first-run setup remains open."""
@@ -79,6 +82,7 @@ class RestoreOnFirstRun(UseCase[RestoreOnFirstRunCommand, None]):
                     uploaded.id,
                     setup_only=True,
                     progress=self._progress,
+                    pictures=self._pictures,
                 )
             finally:
                 await self._store.delete(uploaded.id)
