@@ -99,8 +99,11 @@ jobs:
               ...context.repo,
               issue_number: context.payload.pull_request.number,
             });
-            // `area: ...` labels say where a change is, not what it is, so they do not count.
-            const kinds = labels.filter((l) => !l.name.startsWith('area: '));
+            // `area: ...` labels say where a change is, not what it is, and `preview-image`
+            // only asks for an image to test, so neither counts.
+            const kinds = labels.filter(
+              (l) => !l.name.startsWith('area: ') && l.name !== 'preview-image',
+            );
             const found = labels.length ? labels.map((l) => l.name).join(', ') : 'none';
             if (kinds.length === 0) {
               core.setFailed(

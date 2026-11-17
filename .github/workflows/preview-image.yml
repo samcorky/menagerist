@@ -1,0 +1,155 @@
+name: Preview image
+
+# A pull request with the `preview-image` label gets its image pushed to GHCR as
+# pr-<number>, so it can be deployed for testing. build.yml builds and smoke tests it,
+# the same as CI, and hands over the tested image; the push job here pushes that image,
+# not a rebuild. Adding the label pushes it and every later push replaces it. Running
+# this workflow by hand on a branch pushes preview-<branch> (scripts/preview_tag.py).
+# Closing the pull request deletes its tag, and a daily sweep deletes any pr-* or
+# preview-* tag not pushed for 14 days. edge, latest and the version tags never match
+# either pattern. Pull requests from forks are skipped: their token cannot write
+# packages. Only the push and cleanup jobs may write packages.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened, closed]
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  # A newer push replaces a preview build still running, and closing the pull request
+  # stops it. Any other label being added gets a group of its own, so the labeller does
+  # not cancel a preview build.
+  group: >-
+    ${{ github.event.action == 'labeled' && github.event.label.name != 'preview-image'
+    && github.run_id || format('preview-image-{0}', github.event.pull_request.number || github.ref_name) }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and smoke test
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'pull_request' && github.event.action != 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && contains(github.event.pull_request.labels.*.name, 'preview-image')
+      && (github.event.action != 'labeled' || github.event.label.name == 'preview-image')) }}
+    uses: ./.github/workflows/build.yml
+    with:
+      preview: true
+    permissions:
+      contents: read
+
+  push:
+    name: Push the preview image
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+    steps:
+      - name: Checkout the tag script and the comment action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/actions/pr-comment
+            scripts/preview_tag.py
+          sparse-checkout-cone-mode: false
+
+      - name: Work out the tag
+        id: tag
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: python3 scripts/preview_tag.py
+
+      - name: Download the tested image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: preview-image
+          path: ${{ runner.temp }}/preview-image
+
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the image
+        id: push
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.tag }}
+        run: |
+          gunzip -c "${RUNNER_TEMP}/preview-image/preview-image.tar.gz" | docker load
+          docker tag menagerist:local "$IMAGE"
+          docker push "$IMAGE"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE")"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest#*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Write the comment
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          {
+            echo '<!-- preview-image -->'
+            echo '### Preview image'
+            echo
+            echo "Commit \`${COMMIT}\` passed the smoke test and was pushed for deployed testing (linux/amd64):"
+            echo
+            echo '```sh'
+            echo "docker pull ${IMAGE}"
+            echo '```'
+            echo
+            echo "Digest: \`${DIGEST}\`"
+            echo
+            echo "Every push while the \`preview-image\` label is on replaces it. The tag is deleted when the pull request closes, or after 14 days without a push."
+          } | tee "${RUNNER_TEMP}/preview-comment.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post or update the comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: ./.github/actions/pr-comment
+        with:
+          marker: "<!-- preview-image -->"
+          body-file: ${{ runner.temp }}/preview-comment.md
+          pr-number: ${{ github.event.pull_request.number }}
+          token: ${{ github.token }}
+
+  delete:
+    name: Delete the pull request's preview tag
+    if: >-
+      ${{ github.event_name == 'pull_request' && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && contains(github.event.pull_request.labels.*.name, 'preview-image') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - name: Delete pr-${{ github.event.pull_request.number }}
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-tags: pr-${{ github.event.pull_request.number }}
+
+  sweep:
+    name: Delete stale preview tags
+    if: ${{ github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - name: Delete pr-* and preview-* tags older than 14 days
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-tags: pr-*,preview-*
+          older-than: 14 days
