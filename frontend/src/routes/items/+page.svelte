@@ -499,7 +499,11 @@
 	<div class="flex items-center justify-between gap-4">
 		<h1 class="font-heading text-3xl font-semibold tracking-tight">My items</h1>
 		<div class="flex items-center gap-1">
-			<IconButton label="Import from a CSV" onclick={() => goto(resolve('/items/import'))}>
+			<IconButton
+				label="Import from a CSV"
+				labelOnTouch={false}
+				onclick={() => goto(resolve('/items/import'))}
+			>
 				<Upload />
 			</IconButton>
 			<IconButton label="New item" variant="default" onclick={() => goto(resolve('/items/new'))}>
