@@ -2,10 +2,20 @@ name: Build
 
 # Builds the image and smoke tests it. Nothing is pushed.
 # ci.yml calls it on pull requests and pushes to main, publish.yml calls it before it
-# publishes, and it can be run by hand.
+# publishes, preview-image.yml calls it with `preview`, and it can be run by hand.
+#
+# With `preview`, the tested image is also uploaded as the `preview-image` artifact, so
+# preview-image.yml can push exactly what passed. Every job here stays read-only: a
+# called workflow may not ask for more than its caller grants, even in a job it skips,
+# so a job that writes packages would stop ci.yml and publish.yml from starting.
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      preview:
+        description: Also upload the tested image as the preview-image artifact
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -89,4 +99,19 @@ jobs:
         with:
           name: image-size
           path: ${{ runner.temp }}/image-size.json
+          retention-days: 1
+
+      # preview-image.yml pushes it from another runner, so it gets the image as a file.
+      - name: Save the image for the preview push
+        if: inputs.preview
+        run: docker save menagerist:local | gzip -1 > "${RUNNER_TEMP}/preview-image.tar.gz"
+
+      - name: Upload the image for the preview push
+        if: inputs.preview
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: preview-image
+          path: ${{ runner.temp }}/preview-image.tar.gz
+          # Already gzipped.
+          compression-level: 0
           retention-days: 1

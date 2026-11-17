@@ -542,7 +542,9 @@ jobs:
       - name: Checkout the comment script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          sparse-checkout: scripts/coverage_comment.py
+          sparse-checkout: |
+            .github/actions/pr-comment
+            scripts/coverage_comment.py
           sparse-checkout-cone-mode: false
 
       - name: Download the coverage reports
@@ -555,6 +557,7 @@ jobs:
       # coverage-reports/ instead of a folder named after it, so find the tables rather than
       # naming their paths. Sorted, backend comes before frontend.
       - name: Build the comment
+        id: comment
         run: |
           mapfile -t tables < <(find coverage-reports -name component-coverage.md | sort)
           if [ "${#tables[@]}" -eq 0 ]; then
@@ -562,23 +565,16 @@ jobs:
             exit 0
           fi
           python3 scripts/coverage_comment.py "${tables[@]}" --output "$RUNNER_TEMP/coverage-comment.md"
+          echo "built=true" >> "$GITHUB_OUTPUT"
 
       - name: Post or update the comment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          [ -f "$RUNNER_TEMP/coverage-comment.md" ] || exit 0
-          marker='<!-- component-coverage -->'
-          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
-          if [ -n "$existing" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
-              -F body=@"$RUNNER_TEMP/coverage-comment.md"
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-              -F body=@"$RUNNER_TEMP/coverage-comment.md"
-          fi
+        if: ${{ steps.comment.outputs.built == 'true' }}
+        uses: ./.github/actions/pr-comment
+        with:
+          marker: "<!-- component-coverage -->"
+          body-file: ${{ runner.temp }}/coverage-comment.md
+          pr-number: ${{ github.event.pull_request.number }}
+          token: ${{ github.token }}
 
   image-size-comment:
     name: Comment the image size on the pull request
@@ -598,6 +594,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
+            .github/actions/pr-comment
             scripts/image_size_comment.py
             scripts/measure_image_size.py
           sparse-checkout-cone-mode: false
@@ -642,20 +639,12 @@ jobs:
 
       - name: Post or update the comment
         if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          marker='<!-- image-size -->'
-          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
-          if [ -n "$existing" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
-              -F body=@"$RUNNER_TEMP/image-size-comment.md"
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-              -F body=@"$RUNNER_TEMP/image-size-comment.md"
-          fi
+        uses: ./.github/actions/pr-comment
+        with:
+          marker: "<!-- image-size -->"
+          body-file: ${{ runner.temp }}/image-size-comment.md
+          pr-number: ${{ github.event.pull_request.number }}
+          token: ${{ github.token }}
 
   ci-passed:
     name: CI passed
