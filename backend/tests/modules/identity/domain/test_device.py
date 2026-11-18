@@ -12,6 +12,7 @@ from app.modules.identity.domain.errors import InvalidDeviceNameError
 from app.modules.identity.domain.session import (
     MAX_CLIENT_PLATFORM_LENGTH,
     MAX_USER_AGENT_LENGTH,
+    DisplayMode,
     clean_text,
 )
 from app.modules.identity.domain.user import User
@@ -198,7 +199,11 @@ CHROME_129 = _webkit("X11; Linux x86_64", "Chrome/129.0.0.0 Safari/537.36")
 
 
 def _browser(
-    user_agent: str | None, platform: str | None, *, mobile: bool | None
+    user_agent: str | None,
+    platform: str | None,
+    *,
+    mobile: bool | None,
+    display_mode: DisplayMode | None = None,
 ) -> Device:
     return Device.create(
         user_id=uuid.uuid7(),
@@ -208,6 +213,7 @@ def _browser(
         user_agent=user_agent,
         platform=platform,
         mobile=mobile,
+        display_mode=display_mode,
     )
 
 
@@ -251,3 +257,72 @@ def test_a_browser_with_no_known_platform_matches_nothing() -> None:
     no_platform = _browser(FIREFOX_130, None, mobile=False)
 
     assert not no_platform.is_same_kind_of_browser(no_platform)
+
+
+def test_create_records_the_display_mode() -> None:
+    """A browser that first signs in installed is remembered as installed."""
+    device = _browser(
+        FIREFOX_130, "Linux", mobile=False, display_mode=DisplayMode.STANDALONE
+    )
+
+    assert device.display_mode is DisplayMode.STANDALONE
+    assert device.installed is True
+
+
+def test_a_device_with_no_reported_display_mode_is_not_installed() -> None:
+    """An older client sends no display mode, which is not evidence of the app."""
+    device = _device()
+
+    assert device.display_mode is None
+    assert device.installed is False
+
+
+def test_signing_in_from_the_installed_app_marks_the_device() -> None:
+    """The first standalone sign-in records the installed app."""
+    device = _browser(FIREFOX_130, "Linux", mobile=False)
+
+    device.seen(NOW + timedelta(days=1), ttl=TTL, display_mode=DisplayMode.STANDALONE)
+
+    assert device.installed is True
+
+
+@pytest.mark.parametrize("later", [DisplayMode.BROWSER, None])
+def test_being_installed_sticks(later: DisplayMode | None) -> None:
+    """A browser-tab or missing display mode never downgrades the installed app."""
+    device = _browser(
+        FIREFOX_130, "Linux", mobile=False, display_mode=DisplayMode.STANDALONE
+    )
+
+    device.seen(NOW + timedelta(days=1), ttl=TTL, display_mode=later)
+
+    assert device.display_mode is DisplayMode.STANDALONE
+
+
+def test_a_browser_tab_is_recorded_when_nothing_is_known_yet() -> None:
+    """With no mode recorded, a browser-tab sign-in is still worth keeping."""
+    device = _browser(FIREFOX_130, "Linux", mobile=False)
+
+    device.seen(NOW + timedelta(days=1), ttl=TTL, display_mode=DisplayMode.BROWSER)
+
+    assert device.display_mode is DisplayMode.BROWSER
+    assert device.installed is False
+
+
+def test_the_installed_app_and_a_browser_tab_are_different_kinds() -> None:
+    """The same browser installed and in a tab must not take each other's name."""
+    app = _browser(
+        FIREFOX_130, "Linux", mobile=False, display_mode=DisplayMode.STANDALONE
+    )
+    tab = _browser(FIREFOX_130, "Linux", mobile=False, display_mode=DisplayMode.BROWSER)
+
+    assert not app.is_same_kind_of_browser(tab)
+    assert not tab.is_same_kind_of_browser(app)
+
+
+@pytest.mark.parametrize("mode", [DisplayMode.STANDALONE, DisplayMode.BROWSER, None])
+def test_the_same_kind_matches_itself(mode: DisplayMode | None) -> None:
+    """Two browsers of the same kind still match, whichever kind that is."""
+    here = _browser(FIREFOX_130, "Linux", mobile=False, display_mode=mode)
+    there = _browser(FIREFOX_131, "Linux", mobile=False, display_mode=mode)
+
+    assert here.is_same_kind_of_browser(there)

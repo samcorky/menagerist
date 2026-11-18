@@ -5,6 +5,7 @@ from sqlalchemy import CursorResult, delete, select
 
 from app.modules.identity.adapters.persistence.models import DeviceModel
 from app.modules.identity.domain.device import Device
+from app.modules.identity.domain.session import DisplayMode
 
 if TYPE_CHECKING:
     import uuid
@@ -13,6 +14,14 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger()
+
+
+def _display_mode(value: str | None) -> DisplayMode | None:
+    """Read a stored display mode, ignoring one this version does not know."""
+    try:
+        return None if value is None else DisplayMode(value)
+    except ValueError:
+        return None
 
 
 def _to_domain(model: DeviceModel) -> Device:
@@ -27,6 +36,7 @@ def _to_domain(model: DeviceModel) -> Device:
         user_agent=model.user_agent,
         platform=model.platform,
         mobile=model.mobile,
+        display_mode=_display_mode(model.display_mode),
         name=model.name,
     )
 
@@ -43,6 +53,7 @@ def _to_model(device: Device) -> DeviceModel:
         user_agent=device.user_agent,
         platform=device.platform,
         mobile=device.mobile,
+        display_mode=device.display_mode,
         name=device.name,
     )
 

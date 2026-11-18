@@ -7,6 +7,7 @@ from app.modules.identity.domain.errors import InvalidDeviceNameError
 from app.modules.identity.domain.session import (
     MAX_CLIENT_PLATFORM_LENGTH,
     MAX_USER_AGENT_LENGTH,
+    DisplayMode,
     clean_text,
 )
 from app.shared_kernel.mixins import Identifiable
@@ -57,6 +58,7 @@ class Device(Identifiable):
     user_agent: str | None = None
     platform: str | None = None
     mobile: bool | None = None
+    display_mode: DisplayMode | None = None
     name: str | None = None
 
     @classmethod
@@ -70,6 +72,7 @@ class Device(Identifiable):
         user_agent: str | None = None,
         platform: str | None = None,
         mobile: bool | None = None,
+        display_mode: DisplayMode | None = None,
     ) -> Device:
         """Remember a browser first seen at `now`, for `ttl` after its last sign-in."""
         device = cls(
@@ -81,7 +84,12 @@ class Device(Identifiable):
             expires_at=now + ttl,
         )
         device.seen(
-            now, ttl=ttl, user_agent=user_agent, platform=platform, mobile=mobile
+            now,
+            ttl=ttl,
+            user_agent=user_agent,
+            platform=platform,
+            mobile=mobile,
+            display_mode=display_mode,
         )
         return device
 
@@ -93,13 +101,21 @@ class Device(Identifiable):
         user_agent: str | None = None,
         platform: str | None = None,
         mobile: bool | None = None,
+        display_mode: DisplayMode | None = None,
     ) -> None:
-        """Record a sign-in at `now` with the browser's current details."""
+        """Record a sign-in at `now` with the browser's current details.
+
+        Being the installed app sticks: a browser-tab or missing display mode
+        never clears it, because the header is absent on older clients and the
+        same device signs in from both the installed app and a tab.
+        """
         self.last_seen_at = now
         self.expires_at = now + ttl
         self.user_agent = clean_text(user_agent, MAX_USER_AGENT_LENGTH)
         self.platform = clean_text(platform, MAX_CLIENT_PLATFORM_LENGTH)
         self.mobile = mobile
+        if display_mode is DisplayMode.STANDALONE or self.display_mode is None:
+            self.display_mode = display_mode
 
     def rename(self, name: str | None) -> None:
         """Give the device a name, or clear it with a blank one.
@@ -114,11 +130,18 @@ class Device(Identifiable):
             )
         self.name = trimmed or None
 
+    @property
+    def installed(self) -> bool:
+        """Whether this browser has signed in as the installed app."""
+        return self.display_mode is DisplayMode.STANDALONE
+
     def is_same_kind_of_browser(self, other: Device) -> bool:
-        """Whether `other` has the same browser family, platform and mobile flag.
+        """Whether `other` is the same browser family, platform, mobile flag and kind.
 
         A suggestion aid only: nothing reliably identifies a browser once its
         cookie is gone. A missing family, platform or mobile flag never matches.
+        The installed app and a browser tab are different kinds, so neither is
+        offered the other's name.
         """
         family = browser_family(self.user_agent)
         return (
@@ -128,6 +151,7 @@ class Device(Identifiable):
             and family == browser_family(other.user_agent)
             and self.platform == other.platform
             and self.mobile == other.mobile
+            and self.installed == other.installed
         )
 
     def is_expired(self, now: datetime) -> bool:

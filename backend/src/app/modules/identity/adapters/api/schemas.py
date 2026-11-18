@@ -410,6 +410,7 @@ DEVICE_EXAMPLE: dict[str, Any] = {
     "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
     "platform": "Linux",
     "mobile": False,
+    "display_mode": "standalone",
     "first_seen_at": "2026-09-01T08:00:00.000000Z",
     "last_seen_at": "2026-10-10T12:30:00.000000Z",
     "current": True,
@@ -496,6 +497,13 @@ class OwnDeviceResponse(BaseModel):
     mobile: bool | None = Field(
         default=None, description="Whether the browser reported a mobile device."
     )
+    display_mode: DisplayMode | None = Field(
+        default=None,
+        description=(
+            "Whether this browser has signed in as the installed app; once it has,"
+            + " it stays `standalone`. Absent for a browser that never reported one."
+        ),
+    )
     first_seen_at: datetime = Field(
         description="When this browser was first remembered for the account."
     )
@@ -519,6 +527,7 @@ class OwnDeviceResponse(BaseModel):
                 user_agent=only.user_agent,
                 platform=only.client_platform,
                 mobile=only.client_mobile,
+                display_mode=only.display_mode,
                 first_seen_at=only.created_at,
                 last_seen_at=latest,
                 current=own.current,
@@ -530,6 +539,7 @@ class OwnDeviceResponse(BaseModel):
             user_agent=device.user_agent,
             platform=device.platform,
             mobile=device.mobile,
+            display_mode=device.display_mode,
             first_seen_at=device.created_at,
             last_seen_at=max(latest, device.last_seen_at),
             current=own.current,
