@@ -1618,3 +1618,21 @@ Applying creates the link for each item it creates or matches, and re-points a l
 **Not in this version:** nothing yet supplies a `source`, so `ImportBundle` ignores keys until #238's codec does; wiring the repository into the import use cases needs a unit of work they don't have today. Updating linked entities and noticing rows gone from the source is #234. Connections between items that already exist are not de-duplicated on a re-run. The frontend's plan summary does not list `ambiguous` rows; #238's preview must.
 
 **Rationale:** #233 asks for imports that can be run again without duplicating or overwriting; #238 (CSV/JSON import) and #234 (updating from a source) both need to find "the entity this row became".
+
+## Importing a CSV into one item type (2026-11-17)
+
+**Decision:** `POST /imports/items/inspect`, `/plan` and `""` (#550) read a CSV on the server and turn it into items of one existing item type through the transfer pipeline. The file travels with every call (multipart: `file`, `item_type`, `mapping`, `list_separator`); nothing is stored between calls. `InspectItemImport` returns the headers, the first five rows, the row count, the type's fields and a suggested mapping (a header matches a field by key or title, ignoring case, spaces, hyphens and underscores; `title`, `notes` and `tags` match the item's name, description and tags). `PlanItemImport` and `ImportItems` convert every cell, build a `Bundle` of one item type and its items, and call `plan_bundle` and `apply_bundle`; the run plans again, so a stale preview is harmless.
+
+**Choices that are not obvious:**
+
+- The server parses, with the standard library's `csv` module, so large files, pictures and a later command-line import share one set of rules; the browser only uploads. The first slice is stateless, capped at 10 MB and 5,000 rows (`transfer/domain/tabular.py`); larger files need a stored upload and a background job (#552).
+- One bad value blocks the run. Each problem is a plan blocker (`InvalidCellError`) naming the spreadsheet row (the header is row 1) and the field, such as "Row 14, Signed on: '19th Aug' is not a date, use 2019, 2019-08 or 2019-08-19." Twenty are listed, then "and N more problems." A row with a problem is left out of the planned items. Skipping bad rows and importing the rest waits until a re-import is safe (#556).
+- Values are converted by the field's shape (`transfer/application/cell_values.py`): text as written, numbers, yes/no (`yes`, `y`, `true`, `1` and the opposites), a choice matched to an option ignoring case, several choices split on a separator, a date as `YYYY-MM-DD`, a partial date as `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. A blank cell leaves the field out. After conversion the value is also checked against the type's own schema, so a rule such as a maximum length is reported as a problem too.
+- The graph module describes the type's fields (`GraphTarget.item_type_fields`) and checks values (`check_item_attributes`); `transfer` does not import it. Money, duration, quantity, list, checklist, table, cron and opaque fields are reported as "cannot be imported yet", and mapping a column to one is refused.
+- The item type must exist; the import never creates one, and the preview leaves the type out of what it lists as added. A bundle takes its own `item_limit`, which this import raises to the row limit; the default stays 500.
+- It reuses `transfer:bundle:import`, so no new permission or token grant. Domain validation errors are a 400 as elsewhere; a mapping that is not valid JSON is a 422.
+- The run response is `items_added`, not `created`, because the API linter reads a property named `created` as a date.
+
+**Not in this slice:** JSON, pictures, connections, a key column and re-import, saved mappings, export and large files; they are sub-issues of #238 (#552 to #558). Sample rows and plan entries do not yet carry links, so running the same file twice adds every item twice until #556.
+
+**Rationale:** #238 asks for a spreadsheet importer that every other importer builds on. The conversion and the plan are the same whatever reads the file, so the first slice keeps the file reading small and puts the rules where later sources can reuse them.

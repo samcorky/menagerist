@@ -18,6 +18,10 @@ from app.entrypoints.api.shared.bridges.collection_definitions import (
 )
 from app.entrypoints.api.shared.bridges.collection_items import GraphItemLookup
 from app.entrypoints.api.shared.bridges.preset_usage import GraphPresetUsage
+from app.entrypoints.api.shared.bridges.transfer_fields import (
+    attribute_problems,
+    field_specs,
+)
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.collections.adapters.persistence.in_memory_collection_repository import (  # noqa: E501
     InMemoryCollectionRepository,
@@ -62,7 +66,11 @@ from app.modules.graph.adapters.persistence.unit_of_work import (
     create_graph_uow,
     create_in_memory_graph_uow,
 )
-from app.modules.graph.application.choice_lists import LIST_KEY, NAMESPACE
+from app.modules.graph.application.choice_lists import (
+    LIST_KEY,
+    NAMESPACE,
+    resolve_choice_lists,
+)
 from app.modules.graph.application.create_edge import CreateEdge, CreateEdgeCommand
 from app.modules.graph.application.create_edge_type import (
     CreateEdgeType,
@@ -156,6 +164,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from app.modules.graph.domain.edge_type import Holder
+    from app.modules.transfer.domain.tabular import FieldSpec
     from app.shared_kernel.access_guard import AccessGuard
 
 _PAGE = 1
@@ -723,6 +732,28 @@ class GraphPackTarget:
             return None
         properties = (node_type.attributes_schema or {}).get("properties", {})
         return frozenset(properties)
+
+    async def _resolved_schema(self, slug: str) -> dict[str, Any] | None:
+        """The person's item type `slug` as a schema with its choice lists filled in."""
+        async with self._stores.read() as repos:
+            node_type = await repos.node_types.get_by_slug(slug, scope=self._scope)
+        if node_type is None:
+            return None
+        schema = node_type.attributes_schema or {"type": "object", "properties": {}}
+        async with self._stores.choice_lists(self._scope) as source:
+            return await resolve_choice_lists(schema, source)
+
+    async def item_type_fields(self, slug: str) -> list[FieldSpec] | None:
+        """Describe the fields of the person's item type `slug`, or `None`."""
+        schema = await self._resolved_schema(slug)
+        return None if schema is None else field_specs(schema)
+
+    async def check_item_attributes(
+        self, slug: str, attributes: Mapping[str, Any]
+    ) -> list[str]:
+        """Return a message for each value that breaks the type's schema."""
+        schema = await self._resolved_schema(slug)
+        return [] if schema is None else attribute_problems(schema, attributes)
 
     async def read_items(self, item_ids: Sequence[uuid.UUID]) -> list[BundleItem]:
         """Return the person's items with `item_ids`, each `ref` its id."""
