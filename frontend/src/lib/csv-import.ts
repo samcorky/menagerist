@@ -1,5 +1,6 @@
 import type {
 	ColumnMappingEntry,
+	CsvEncoding,
 	ItemImportFieldResponse,
 	ItemImportInspectionResponse
 } from '$lib/api/client';
@@ -89,4 +90,15 @@ export function rowsAndColumns(
 	const rows = inspection.row_count;
 	const columns = inspection.headers.length;
 	return `${count(rows)} ${rows === 1 ? 'row' : 'rows'}, ${count(columns)} ${columns === 1 ? 'column' : 'columns'}`;
+}
+
+const ENCODING_NAMES: Record<CsvEncoding, string> = {
+	utf_8: 'UTF-8',
+	utf_16: 'UTF-16',
+	windows_1252: 'Windows-1252'
+};
+
+/** An encoding as people know it, for "Read as ...". */
+export function encodingName(encoding: CsvEncoding): string {
+	return ENCODING_NAMES[encoding];
 }

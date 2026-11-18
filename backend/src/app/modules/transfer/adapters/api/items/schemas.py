@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.transfer.domain.tabular import CsvEncoding
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
@@ -31,6 +32,7 @@ INSPECT_EXAMPLE: dict[str, Any] = {
         {"column": "signed_on", "target": "signed_on"},
         {"column": "authenticated", "target": None},
     ],
+    "encoding": "utf_8",
 }
 
 
@@ -88,6 +90,7 @@ class ItemImportInspectionResponse(BaseModel):
     suggested_mapping: list[ColumnMappingEntry] = Field(
         description="A first guess, matching each column to a field by name."
     )
+    encoding: CsvEncoding = Field(description="What the file was read as.")
 
     @classmethod
     def from_domain(cls, found: ItemImportInspection) -> ItemImportInspectionResponse:
@@ -114,6 +117,7 @@ class ItemImportInspectionResponse(BaseModel):
                 ColumnMappingEntry(column=m.column, target=m.target)
                 for m in found.suggested_mapping
             ],
+            encoding=found.encoding,
         )
 
 

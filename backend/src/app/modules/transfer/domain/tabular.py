@@ -1,6 +1,16 @@
 """What importing a spreadsheet needs to know: limits, fields, mappings, problems."""
 
 from dataclasses import dataclass
+from enum import StrEnum
+
+
+class CsvEncoding(StrEnum):
+    """The encodings a CSV file is read in."""
+
+    UTF_8 = "utf_8"
+    UTF_16 = "utf_16"
+    WINDOWS_1252 = "windows_1252"
+
 
 MAX_IMPORT_BYTES = 10 * 1024 * 1024
 MAX_IMPORT_ROWS = 5000

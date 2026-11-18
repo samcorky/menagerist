@@ -8,6 +8,7 @@ from app.modules.transfer.domain.tabular import (
     MAX_IMPORT_BYTES,
     MAX_IMPORT_ROWS,
     ColumnMapping,
+    CsvEncoding,
     FieldSpec,
 )
 
@@ -103,10 +104,43 @@ def test_a_file_over_the_byte_limit_is_refused() -> None:
         read_csv(b"t" * (MAX_IMPORT_BYTES + 1))
 
 
-def test_text_that_is_not_utf8_is_refused() -> None:
-    """The message says what encoding to use."""
-    with pytest.raises(InvalidImportFileError, match="UTF-8"):
-        read_csv(b"title\n\xff\xfe\n")
+def test_utf8_is_read_with_or_without_a_mark() -> None:
+    """Accents survive, and the encoding is reported."""
+    plain = read_csv("title\nRené\n".encode())
+    marked = read_csv("\ufefftitle\nRené\n".encode())
+    assert plain.rows == marked.rows == (("René",),)
+    assert plain.encoding == marked.encoding == CsvEncoding.UTF_8
+
+
+@pytest.mark.parametrize(
+    "mark_and_codec", [(b"\xff\xfe", "utf-16-le"), (b"\xfe\xff", "utf-16-be")]
+)
+def test_utf16_is_read_by_its_mark(mark_and_codec: tuple[bytes, str]) -> None:
+    """Excel's "Unicode Text" starts with a UTF-16 byte-order mark."""
+    mark, codec = mark_and_codec
+    data = mark + "title\tyear\nDéjà Vu\t1987\n".encode(codec)
+    table = read_csv(data)
+    assert table.headers == ("title", "year")
+    assert table.rows == (("Déjà Vu", "1987"),)
+    assert table.encoding == CsvEncoding.UTF_16
+
+
+def test_windows_1252_is_the_fallback() -> None:
+    """Excel's plain CSV on Western Windows is not valid UTF-8."""
+    table = read_csv("title\nRené\nDéjà Vu\n€5\n".encode("cp1252"))
+    assert table.rows == (("René",), ("Déjà Vu",), ("€5",))
+    assert table.encoding == CsvEncoding.WINDOWS_1252
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"title\nbad \x81 byte\n", b"title\n\x00\x01\x02\n"],
+    ids=["byte Windows-1252 leaves undefined", "binary"],
+)
+def test_bytes_no_listed_encoding_reads_are_refused(data: bytes) -> None:
+    """The message says what encodings are understood."""
+    with pytest.raises(InvalidImportFileError, match="UTF-8, UTF-16 or Windows-1252"):
+        read_csv(data)
 
 
 def test_suggestions_match_key_then_title_ignoring_case_and_separators() -> None:

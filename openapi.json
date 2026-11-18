@@ -19842,7 +19842,8 @@
                     {
                       "column": "authenticated"
                     }
-                  ]
+                  ],
+                  "encoding": "utf_8"
                 }
               }
             }
@@ -32057,6 +32058,16 @@
           }
         ]
       },
+      "CsvEncoding": {
+        "type": "string",
+        "enum": [
+          "utf_8",
+          "utf_16",
+          "windows_1252"
+        ],
+        "title": "CsvEncoding",
+        "description": "The encodings a CSV file is read in."
+      },
       "DefinitionWarningResponse": {
         "properties": {
           "path": {
@@ -32957,7 +32968,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "A CSV file with a header row, in UTF-8, up to 10 MB."
+            "description": "A CSV file with a header row, up to 10 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
           },
           "item_type": {
             "type": "string",
@@ -33090,7 +33101,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "A CSV file with a header row, in UTF-8, up to 10 MB."
+            "description": "A CSV file with a header row, up to 10 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
           },
           "item_type": {
             "type": "string",
@@ -33499,6 +33510,10 @@
             "type": "array",
             "title": "Suggested Mapping",
             "description": "A first guess, matching each column to a field by name."
+          },
+          "encoding": {
+            "$ref": "#/components/schemas/CsvEncoding",
+            "description": "What the file was read as."
           }
         },
         "type": "object",
@@ -33507,12 +33522,14 @@
           "sample_rows",
           "row_count",
           "fields",
-          "suggested_mapping"
+          "suggested_mapping",
+          "encoding"
         ],
         "title": "ItemImportInspectionResponse",
         "description": "What is in a CSV file, the item type's fields, and a mapping to start from.",
         "examples": [
           {
+            "encoding": "utf_8",
             "fields": [
               {
                 "importable": true,
@@ -35290,7 +35307,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "A CSV file with a header row, in UTF-8, up to 10 MB."
+            "description": "A CSV file with a header row, up to 10 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
           },
           "item_type": {
             "type": "string",

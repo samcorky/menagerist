@@ -50,7 +50,10 @@ _NOT_RUN = error_response(
 
 _FILE = Annotated[
     UploadFile,
-    File(description="A CSV file with a header row, in UTF-8, up to 10 MB."),
+    File(
+        description="A CSV file with a header row, up to 10 MB, in UTF-8, UTF-16 or "
+        + "Windows-1252 (what Excel's plain CSV writes)."
+    ),
 ]
 _ITEM_TYPE = Annotated[
     str, Form(description="The slug of the item type the rows become.")
