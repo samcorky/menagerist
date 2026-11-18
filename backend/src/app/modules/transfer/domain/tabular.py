@@ -24,7 +24,7 @@ _CODECS = {
 }
 
 
-class DateOrder(StrEnum):
+class DayMonthOrder(StrEnum):
     """Which of the first two numbers of `03/04/2019` is the day."""
 
     DAY_FIRST = "day_first"
@@ -32,10 +32,10 @@ class DateOrder(StrEnum):
 
 
 @dataclass(kw_only=True, frozen=True)
-class DateOrderGuess:
+class DayMonthOrderGuess:
     """A suggested date order, and whether the values prove it."""
 
-    order: DateOrder
+    order: DayMonthOrder
     certain: bool
 
 

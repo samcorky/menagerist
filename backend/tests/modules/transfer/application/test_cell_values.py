@@ -4,10 +4,10 @@ import pytest
 
 from app.modules.transfer.application.cell_values import (
     convert_cell,
-    suggest_date_order,
+    suggest_day_month_order,
 )
 from app.modules.transfer.domain.errors import CellValueError
-from app.modules.transfer.domain.tabular import DateOrder, FieldSpec
+from app.modules.transfer.domain.tabular import DayMonthOrder, FieldSpec
 
 
 def _field(**overrides: object) -> FieldSpec:
@@ -22,9 +22,10 @@ def _field(**overrides: object) -> FieldSpec:
 
 
 def _convert(
-    text: str, order: DateOrder = DateOrder.DAY_FIRST, **overrides: object
+    text: str, order: DayMonthOrder = DayMonthOrder.DAY_FIRST, **overrides: object
 ) -> object:
-    return convert_cell(text, _field(**overrides), list_separator=",", date_order=order)
+    field = _field(**overrides)
+    return convert_cell(text, field, list_separator=",", day_month_order=order)
 
 
 def test_text_is_used_as_written_without_surrounding_space() -> None:
@@ -178,7 +179,8 @@ def test_two_digit_years_pivot_at_fifty(text: str, stored: str) -> None:
 def test_three_parts_follow_the_chosen_order() -> None:
     """03/04/2019 is 3 April or 4 March, as chosen."""
     assert _convert("03/04/2019", kind="date") == "2019-04-03"
-    assert _convert("03/04/2019", DateOrder.MONTH_FIRST, kind="date") == "2019-03-04"
+    month_first = _convert("03/04/2019", DayMonthOrder.MONTH_FIRST, kind="date")
+    assert month_first == "2019-03-04"
 
 
 def test_an_impossible_three_part_date_is_refused() -> None:
@@ -186,7 +188,7 @@ def test_an_impossible_three_part_date_is_refused() -> None:
     with pytest.raises(CellValueError, match="is not a date"):
         _convert("31/04/2019", kind="date")
     with pytest.raises(CellValueError, match="is not a date"):
-        _convert("19/08/2019", DateOrder.MONTH_FIRST, kind="date")
+        _convert("19/08/2019", DayMonthOrder.MONTH_FIRST, kind="date")
 
 
 def test_a_column_may_mix_shapes() -> None:
@@ -205,26 +207,26 @@ def test_a_plain_date_refuses_a_value_with_no_day(text: str) -> None:
 
 def test_suggest_none_without_three_part_dates() -> None:
     """With nothing ambiguous to read, no choice is offered."""
-    assert suggest_date_order(["2019-08-19", "Oct-18", "08/2019", "x"]) is None
+    assert suggest_day_month_order(["2019-08-19", "Oct-18", "08/2019", "x"]) is None
 
 
 def test_suggest_day_first_when_a_first_number_is_over_twelve() -> None:
     """19/08/2019 can only be day first."""
-    guess = suggest_date_order(["03/04/2019", "19/08/2019"])
+    guess = suggest_day_month_order(["03/04/2019", "19/08/2019"])
     assert guess is not None
-    assert (guess.order, guess.certain) == (DateOrder.DAY_FIRST, True)
+    assert (guess.order, guess.certain) == (DayMonthOrder.DAY_FIRST, True)
 
 
 def test_suggest_month_first_when_a_second_number_is_over_twelve() -> None:
     """08/19/2019 can only be month first."""
-    guess = suggest_date_order(["03/04/2019", "08/19/2019"])
+    guess = suggest_day_month_order(["03/04/2019", "08/19/2019"])
     assert guess is not None
-    assert (guess.order, guess.certain) == (DateOrder.MONTH_FIRST, True)
+    assert (guess.order, guess.certain) == (DayMonthOrder.MONTH_FIRST, True)
 
 
 def test_suggest_day_first_unsure_when_nothing_decides() -> None:
     """Without evidence, or with conflicting evidence, day first is a guess."""
     for cells in (["03/04/2019"], ["19/08/2019", "08/19/2019"]):
-        guess = suggest_date_order(cells)
+        guess = suggest_day_month_order(cells)
         assert guess is not None
-        assert (guess.order, guess.certain) == (DateOrder.DAY_FIRST, False)
+        assert (guess.order, guess.certain) == (DayMonthOrder.DAY_FIRST, False)

@@ -3,10 +3,10 @@
 import math
 import re
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from app.modules.transfer.domain.errors import CellValueError
-from app.modules.transfer.domain.tabular import DateOrder, DateOrderGuess
+from app.modules.transfer.domain.tabular import DayMonthOrder, DayMonthOrderGuess
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -40,7 +40,7 @@ def convert_cell(
     field: FieldSpec,
     *,
     list_separator: str,
-    date_order: DateOrder = DateOrder.DAY_FIRST,
+    day_month_order: DayMonthOrder = DayMonthOrder.DAY_FIRST,
 ) -> str | int | float | bool | list[str] | None:
     """Return the value `text` gives for `field`, or `None` to leave the field out.
 
@@ -56,16 +56,16 @@ def convert_cell(
         return _choices(text, field, list_separator)
     if field.options is not None:
         return _choice(text, field.options)
-    return _scalar(text, field, date_order)
+    return _scalar(text, field, day_month_order)
 
 
 def _scalar(
-    text: str, field: FieldSpec, date_order: DateOrder
+    text: str, field: FieldSpec, day_month_order: DayMonthOrder
 ) -> str | int | float | bool:
     if field.kind == "date":
-        return _date(text, date_order)
+        return _date(text, day_month_order)
     if field.kind == "partialdate":
-        return _partial_date(text, date_order)
+        return _partial_date(text, day_month_order)
     if field.json_type == "string":
         return text
     if field.json_type in {"number", "integer"}:
@@ -88,7 +88,15 @@ def _choices(text: str, field: FieldSpec, separator: str) -> list[str]:
     return [_choice(part, options) for part in parts]
 
 
-def _date(text: str, order: DateOrder) -> str:
+class _ParsedDate(NamedTuple):
+    """The parts of a date as written; a month or day left out is None."""
+
+    year: int
+    month: int | None
+    day: int | None
+
+
+def _date(text: str, order: DayMonthOrder) -> str:
     year, month, day = _read_date(text, order, _DATE_HINT)
     if day is None:
         raise CellValueError(
@@ -98,7 +106,7 @@ def _date(text: str, order: DateOrder) -> str:
     return f"{year:04d}-{month:02d}-{day:02d}"
 
 
-def _partial_date(text: str, order: DateOrder) -> str:
+def _partial_date(text: str, order: DayMonthOrder) -> str:
     year, month, day = _read_date(text, order, _PARTIAL_HINT)
     if month is None:
         return f"{year:04d}"
@@ -107,9 +115,7 @@ def _partial_date(text: str, order: DateOrder) -> str:
     return f"{year:04d}-{month:02d}-{day:02d}"
 
 
-def _read_date(
-    text: str, order: DateOrder, hint: str
-) -> tuple[int, int | None, int | None]:
+def _read_date(text: str, order: DayMonthOrder, hint: str) -> _ParsedDate:
     """Return the year and, if written, the month and day of a date in any shape."""
     found = _find_date(text, order)
     if found is not None:
@@ -121,24 +127,22 @@ def _read_date(
     raise CellValueError(f"'{text}' is not a date, {hint}")
 
 
-def _find_date(
-    text: str, order: DateOrder
-) -> tuple[int, int | None, int | None] | None:
+def _find_date(text: str, order: DayMonthOrder) -> _ParsedDate | None:
     if found := _PARTIAL_DATE.match(text):
         year, month, day = found.groups()
-        return int(year), _optional(month), _optional(day)
+        return _ParsedDate(int(year), _optional(month), _optional(day))
     if found := _MONTH_YEAR.match(text):
-        return int(found[2]), int(found[1]), None
+        return _ParsedDate(int(found[2]), int(found[1]), None)
     if found := _MONTH_NAME.match(text):
         month = _MONTHS.get(found[1].casefold())
-        return None if month is None else (_year(found[2]), month, None)
+        return None if month is None else _ParsedDate(_year(found[2]), month, None)
     if found := _THREE_PARTS.match(text):
         first, second = int(found[1]), int(found[2])
-        if order is DateOrder.DAY_FIRST:
+        if order is DayMonthOrder.DAY_FIRST:
             day, month = first, second
         else:
             day, month = second, first
-        return _year(found[3]), month, day
+        return _ParsedDate(_year(found[3]), month, day)
     return None
 
 
@@ -154,7 +158,7 @@ def _year(digits: str) -> int:
     return 2000 + year if year < _PIVOT else 1900 + year
 
 
-def suggest_date_order(cells: Iterable[str]) -> DateOrderGuess | None:
+def suggest_day_month_order(cells: Iterable[str]) -> DayMonthOrderGuess | None:
     """Suggest a date order from the cells written as three numbers, if there are any.
 
     A first number over 12 can only be a day and a second over 12 only a day in the
@@ -171,9 +175,9 @@ def suggest_date_order(cells: Iterable[str]) -> DateOrderGuess | None:
     if not seen:
         return None
     if second_is_day and not first_is_day:
-        return DateOrderGuess(order=DateOrder.MONTH_FIRST, certain=True)
-    return DateOrderGuess(
-        order=DateOrder.DAY_FIRST, certain=first_is_day and not second_is_day
+        return DayMonthOrderGuess(order=DayMonthOrder.MONTH_FIRST, certain=True)
+    return DayMonthOrderGuess(
+        order=DayMonthOrder.DAY_FIRST, certain=first_is_day and not second_is_day
     )
 
 

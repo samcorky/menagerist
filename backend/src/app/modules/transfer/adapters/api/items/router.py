@@ -37,7 +37,7 @@ from app.modules.transfer.domain.errors import (
 from app.modules.transfer.domain.tabular import (
     MAX_IMPORT_BYTES,
     ColumnMapping,
-    DateOrder,
+    DayMonthOrder,
 )
 from app.shared_kernel.actor import Actor
 
@@ -73,8 +73,8 @@ _SEPARATOR = Annotated[
     str,
     Form(description="What separates several choices or tags in one cell."),
 ]
-_DATE_ORDER = Annotated[
-    DateOrder,
+_DAY_MONTH_ORDER = Annotated[
+    DayMonthOrder,
     Form(
         description="Which number of a date written as `03/04/2019` is the day. "
         + "Two-digit years: 00 to 49 are 2000 to 2049, 50 to 99 are 1950 to 1999."
@@ -138,7 +138,7 @@ async def plan_item_import(
     use_case: Annotated[PlanItemImport, Depends(get_plan_item_import_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     list_separator: _SEPARATOR = ",",
-    date_order: _DATE_ORDER = DateOrder.DAY_FIRST,
+    day_month_order: _DAY_MONTH_ORDER = DayMonthOrder.DAY_FIRST,
 ) -> ImportPlanResponse:
     """See what importing a CSV file would do, without importing anything.
 
@@ -151,7 +151,7 @@ async def plan_item_import(
         item_type=item_type,
         mapping=_mapping(mapping),
         list_separator=list_separator,
-        date_order=date_order,
+        day_month_order=day_month_order,
     )
     return ImportPlanResponse.from_domain(await use_case.handle(request, actor))
 
@@ -170,7 +170,7 @@ async def import_items(
     use_case: Annotated[ImportItems, Depends(get_import_items_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     list_separator: _SEPARATOR = ",",
-    date_order: _DATE_ORDER = DateOrder.DAY_FIRST,
+    day_month_order: _DAY_MONTH_ORDER = DayMonthOrder.DAY_FIRST,
 ) -> ItemImportResultResponse:
     """Import a CSV file as items of one item type.
 
@@ -182,7 +182,7 @@ async def import_items(
         item_type=item_type,
         mapping=_mapping(mapping),
         list_separator=list_separator,
-        date_order=date_order,
+        day_month_order=day_month_order,
     )
     applied = await use_case.handle(request, actor)
     return ItemImportResultResponse.from_domain(applied, EntityKind.ITEM)
