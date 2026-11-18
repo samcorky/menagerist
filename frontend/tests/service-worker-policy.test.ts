@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
 	CACHE_PREFIX,
+	LOGO_URL,
 	NAVIGATION_FALLBACKS,
 	OFFLINE_URL,
 	SHELL_FILES,
@@ -62,6 +63,21 @@ describe('the offline fallbacks', () => {
 			expect(SHELL_FILES).toContain(path);
 			expect(routeFor(get(path, 'navigate'), ORIGIN, PRECACHED)).toBe('asset');
 		}
+	});
+});
+
+describe('the header mark', () => {
+	it('is precached and answered from the cache, so the offline screen keeps its logo', () => {
+		expect(SHELL_FILES).toContain(LOGO_URL);
+		expect(routeFor(get(LOGO_URL, 'no-cors'), ORIGIN, PRECACHED)).toBe('asset');
+	});
+
+	it('is the file the header draws', () => {
+		const layout = readFileSync(
+			fileURLToPath(new URL('../src/routes/+layout.svelte', import.meta.url)),
+			'utf8'
+		);
+		expect(layout).toContain(`url(${LOGO_URL})`);
 	});
 });
 
