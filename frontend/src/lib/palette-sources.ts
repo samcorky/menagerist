@@ -46,10 +46,17 @@ const ITEM_TYPE_PAGE = 100;
 export const ITEM_TYPE_CAP = 1000;
 
 let typesPromise: Promise<NodeTypeResponse[]> | null = null;
+let typesLoaded: NodeTypeResponse[] | null = null;
 
 /** Clears the cached item type list (tests). */
 export function resetItemTypeCache(): void {
 	typesPromise = null;
+	typesLoaded = null;
+}
+
+/** The item types already loaded this session, or null before the first load finishes. */
+export function cachedItemTypes(): NodeTypeResponse[] | null {
+	return typesLoaded;
 }
 
 /** Pages through every item type by cursor, stopping at a short page or {@link ITEM_TYPE_CAP}. */
@@ -72,9 +79,14 @@ export function loadItemTypes(): Promise<NodeTypeResponse[]> {
 	if (!typesPromise) {
 		const attempt = fetchItemTypes();
 		typesPromise = attempt;
-		attempt.catch(() => {
-			if (typesPromise === attempt) typesPromise = null;
-		});
+		void attempt.then(
+			(types) => {
+				if (typesPromise === attempt) typesLoaded = types;
+			},
+			() => {
+				if (typesPromise === attempt) typesPromise = null;
+			}
+		);
 	}
 	return typesPromise;
 }
@@ -88,9 +100,14 @@ export function refreshItemTypes(): Promise<NodeTypeResponse[]> {
 	const previous = typesPromise;
 	const attempt = fetchItemTypes();
 	typesPromise = attempt;
-	attempt.catch(() => {
-		if (typesPromise === attempt) typesPromise = previous;
-	});
+	void attempt.then(
+		(types) => {
+			if (typesPromise === attempt) typesLoaded = types;
+		},
+		() => {
+			if (typesPromise === attempt) typesPromise = previous;
+		}
+	);
 	return attempt;
 }
 
