@@ -13,6 +13,9 @@ test.afterEach(({ request }) => cleanUp(request));
 test('installs a pack, shows the Home line, and keeps it dismissed after reload', async ({
 	page
 }) => {
+	// Home's greeting changes between 00:00 and 05:00, so fix the browser's clock to the morning.
+	await page.clock.setFixedTime(new Date('2026-06-15T10:00:00'));
+
 	await install(page, MUSIC);
 
 	await page.goto('/items');
@@ -163,6 +166,9 @@ test('the empty-state link opens the examples page, and only shows with no items
 	page,
 	request
 }) => {
+	// Home's greeting changes between 00:00 and 05:00, so fix the browser's clock to the morning.
+	await page.clock.setFixedTime(new Date('2026-06-15T10:00:00'));
+
 	const link = page.getByRole('link', { name: 'Or look around with some examples' });
 
 	const probe = await request.get('/api/v1/nodes?limit=1');

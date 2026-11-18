@@ -23,6 +23,8 @@ for (const { path, link, what } of [
 	}) => {
 		await page.goto('/');
 		await expect(page.getByRole('link', { name: 'Home', exact: true }).first()).toBeVisible();
+		// Let Home finish its own requests first, or its alerts join the page's once the API is cut.
+		await page.waitForLoadState('networkidle');
 
 		// Navigate inside the app: the sign-in check has already passed, so only the page's own data fails.
 		await cutApi(page);
