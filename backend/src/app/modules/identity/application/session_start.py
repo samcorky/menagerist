@@ -96,6 +96,7 @@ async def start_session(
             user_agent=client.user_agent,
             platform=client.platform,
             mobile=client.mobile,
+            display_mode=client.display_mode,
         )
         await repos.devices.save(remembered)
         kept_token = device_token
@@ -109,6 +110,7 @@ async def start_session(
             user_agent=client.user_agent,
             platform=client.platform,
             mobile=client.mobile,
+            display_mode=client.display_mode,
         )
         await repos.devices.add(remembered)
     session = Session.create(

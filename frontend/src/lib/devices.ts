@@ -7,7 +7,7 @@ export interface DeviceInfo {
 	userAgent?: string | null;
 	platform?: string | null;
 	mobile?: boolean | null;
-	/** How the app was shown when the session started; `standalone` is the installed app. */
+	/** How the app was shown; `standalone` is the installed app. */
 	displayMode?: DisplayMode | null;
 }
 
@@ -128,8 +128,9 @@ export interface DeviceRow extends DescribedDevice {
 }
 
 /**
- * One row of the devices list. The newest session supplies the address and display mode; a
- * session from before devices were remembered has no device id and is signed out on its own.
+ * One row of the devices list. The device carries the display mode, so the label does not
+ * change with whichever session is newest; the newest session supplies the address. A session
+ * from before devices were remembered has no device id and is signed out on its own.
  */
 export function deviceRow(device: OwnDeviceResponse): DeviceRow {
 	const latest = device.sessions[0];
@@ -137,7 +138,7 @@ export function deviceRow(device: OwnDeviceResponse): DeviceRow {
 		userAgent: device.user_agent,
 		platform: device.platform,
 		mobile: device.mobile,
-		displayMode: latest?.display_mode
+		displayMode: device.display_mode
 	});
 	return {
 		...described,
