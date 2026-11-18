@@ -232,11 +232,13 @@ class Bundle:
 
     A source (a file, a catalogue entry) is decoded into a bundle, which is then
     planned and applied the same way. Refs are unique within each kind. A bundle
-    with a `source` gives its items `source_key`s, so they can be linked.
+    with a `source` gives its items `source_key`s, so they can be linked. A source
+    that reads whole spreadsheets may raise `item_limit` above the default.
     """
 
     id: str
     source: BundleSource | None = None
+    item_limit: int = MAX_ITEMS
     presets: tuple[BundlePreset, ...] = ()
     relationship_types: tuple[BundleRelationshipType, ...] = ()
     item_types: tuple[BundleItemType, ...] = ()
@@ -282,7 +284,7 @@ class Bundle:
 
     def _check_size(self) -> None:
         for name, count, limit in (
-            ("items", len(self.items), MAX_ITEMS),
+            ("items", len(self.items), self.item_limit),
             ("connections", len(self.connections), MAX_CONNECTIONS),
             ("collections", len(self.collections), MAX_COLLECTIONS),
         ):

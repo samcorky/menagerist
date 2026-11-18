@@ -1,0 +1,109 @@
+import { test, expect, type APIRequestContext, type Page } from './fixtures';
+import { ownedData, uniqueName } from './helpers';
+
+/**
+ * Importing a CSV into an item type: choose the file and type, match columns, preview, add.
+ * Every test makes its own item type and removes the items it added, as the database is shared.
+ */
+const { makeItemType, cleanUp } = ownedData();
+
+let prefix = '';
+
+test.afterEach(async ({ request }) => {
+	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
+		id: string;
+		name: string;
+	}[];
+	for (const node of nodes.filter((n) => n.name.startsWith(prefix))) {
+		await request.delete(`/api/v1/nodes/${node.id}`);
+	}
+	await cleanUp(request);
+});
+
+const SCHEMA = {
+	type: 'object',
+	properties: {
+		position: { title: 'Position', type: 'string', 'x-menagerist': { kind: 'text' } },
+		authenticated: { title: 'Authenticated', type: 'boolean', 'x-menagerist': { kind: 'boolean' } }
+	}
+};
+
+async function makeType(request: APIRequestContext) {
+	const type = await makeItemType(request, uniqueName('Signature'));
+	const res = await request.patch(`/api/v1/node-types/${type.id}`, {
+		data: { attributes_schema: SCHEMA }
+	});
+	expect(res.ok(), await res.text()).toBeTruthy();
+	return type;
+}
+
+function csv(rows: string[]): { name: string; mimeType: string; buffer: Buffer } {
+	return {
+		name: 'signatures.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from(['Title,Position,Authenticated', ...rows].join('\n') + '\n')
+	};
+}
+
+async function chooseFileAndType(page: Page, file: ReturnType<typeof csv>, typeLabel: string) {
+	await page.goto('/items/import');
+	await page.locator('input[type=file]').setInputFiles(file);
+	await page.getByRole('combobox', { name: 'Item type' }).click();
+	await page.getByPlaceholder('Search item types…').fill(typeLabel);
+	await page.getByRole('option', { name: new RegExp(typeLabel) }).click();
+	await page.getByRole('button', { name: 'Next' }).click();
+}
+
+test('import a CSV into a type', async ({ page, request }) => {
+	const type = await makeType(request);
+	prefix = uniqueName('Sig').replace(/\W+/g, '');
+	const rows = [`${prefix}A,cover,yes`, `${prefix}B,back,no`];
+
+	await chooseFileAndType(page, csv(rows), type.label);
+
+	// Columns are matched by name to begin with.
+	await expect(page.getByLabel('Title')).toHaveValue('name');
+	await expect(page.getByLabel('Position')).toHaveValue('position');
+
+	await page.getByRole('button', { name: 'Preview' }).click();
+	await expect(page.getByText('Will be added')).toBeVisible();
+	await page.getByRole('button', { name: 'Add 2 items' }).click();
+
+	await expect(page).toHaveURL(/\/items$/);
+	await expect(page.getByText(`${prefix}A`).first()).toBeVisible();
+});
+
+test('a bad value stops the import and names where it is', async ({ page, request }) => {
+	const type = await makeType(request);
+	prefix = uniqueName('Sig').replace(/\W+/g, '');
+
+	await chooseFileAndType(page, csv([`${prefix}A,cover,yes`, `${prefix}B,back,maybe`]), type.label);
+	await page.getByRole('button', { name: 'Preview' }).click();
+
+	await expect(page.getByText(/Row 3, Authenticated/)).toBeVisible();
+	await expect(page.getByRole('button', { name: /^Add / })).toHaveCount(0);
+
+	// Leave that column out and the rest can go ahead.
+	await page.getByRole('button', { name: 'Back' }).click();
+	await page.getByLabel('Authenticated').selectOption({ label: "Don't import" });
+	await page.getByRole('button', { name: 'Preview' }).click();
+	await expect(page.getByRole('button', { name: 'Add 2 items' })).toBeVisible();
+});
+
+test('a file the server refuses is explained on the first step', async ({ page, request }) => {
+	const type = await makeType(request);
+	prefix = uniqueName('Sig').replace(/\W+/g, '');
+	const repeated = {
+		name: 'repeated.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from('Title,Title\nA,B\n')
+	};
+
+	await chooseFileAndType(page, repeated, type.label);
+
+	await expect(page.getByRole('alert')).toContainText(/header/i);
+	// The person can choose another file without reloading.
+	await page.locator('input[type=file]').setInputFiles(csv([`${prefix}A,cover,yes`]));
+	await page.getByRole('button', { name: 'Next' }).click();
+	await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible();
+});

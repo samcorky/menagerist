@@ -8,6 +8,7 @@ vi.mock('$lib/api/client', () => ({ listNodeTypes, searchEverything: searchApi }
 import {
 	ITEM_TYPE_CAP,
 	loadItemTypes,
+	refreshItemTypes,
 	resetItemTypeCache,
 	searchEverything,
 	type Results,
@@ -236,6 +237,33 @@ describe('loadItemTypes', () => {
 		listNodeTypes.mockResolvedValue({ data: [type('Film')] });
 		await expect(loadItemTypes()).resolves.toEqual([type('Film')]);
 		expect(listNodeTypes).toHaveBeenCalledTimes(3);
+	});
+});
+
+describe('refreshItemTypes', () => {
+	it('fetches again and later callers get the fresh list', async () => {
+		listNodeTypes.mockResolvedValueOnce({ data: [type('Film')] });
+		await loadItemTypes();
+		listNodeTypes.mockResolvedValueOnce({ data: [type('Film'), type('Signature')] });
+		await expect(refreshItemTypes()).resolves.toEqual([type('Film'), type('Signature')]);
+		await expect(loadItemTypes()).resolves.toEqual([type('Film'), type('Signature')]);
+		expect(listNodeTypes).toHaveBeenCalledTimes(2);
+	});
+
+	it('keeps the list it already had when the refresh fails', async () => {
+		listNodeTypes.mockResolvedValueOnce({ data: [type('Film')] });
+		await loadItemTypes();
+		listNodeTypes.mockRejectedValueOnce(new Error('boom'));
+		await expect(refreshItemTypes()).rejects.toThrow();
+		await expect(loadItemTypes()).resolves.toEqual([type('Film')]);
+		expect(listNodeTypes).toHaveBeenCalledTimes(2);
+	});
+
+	it('leaves nothing cached when there was nothing before and it fails', async () => {
+		listNodeTypes.mockRejectedValueOnce(new Error('boom'));
+		await expect(refreshItemTypes()).rejects.toThrow();
+		listNodeTypes.mockResolvedValueOnce({ data: [type('Film')] });
+		await expect(loadItemTypes()).resolves.toEqual([type('Film')]);
 	});
 });
 

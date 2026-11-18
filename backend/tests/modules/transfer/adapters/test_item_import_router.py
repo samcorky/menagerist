@@ -1,0 +1,208 @@
+"""The CSV item import routes: inspect, plan and run."""
+
+import json
+import uuid
+from typing import TYPE_CHECKING, Any
+
+from starlette.testclient import TestClient
+
+from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.bridges.transfer_targets import (
+    get_collection_pack_target,
+    get_graph_pack_target,
+    get_preset_pack_target,
+)
+from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.modules.presets.adapters.api.dependencies import get_preset_repos
+from app.modules.transfer.domain.tabular import MAX_IMPORT_BYTES
+from app.shared_kernel.actor import Actor
+from app.shared_kernel.content_filter import ContentFilter
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from tests.modules.conftest import Shared
+
+ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
+READ_ONLY = Actor(
+    id=uuid.UUID(int=0xA1),
+    roles=frozenset({"member"}),
+    grants=frozenset({"transfer:bundle:read"}),
+)
+TYPE_FILE: dict[str, Any] = {
+    "format": "menagerist-bundle",
+    "version": 2,
+    "presets": [],
+    "relationship_types": [],
+    "item_types": [
+        {
+            "ref": "signature",
+            "slug": "signature",
+            "label": "Signature",
+            "attributes_schema": {
+                "type": "object",
+                "properties": {
+                    "signed_on": {
+                        "type": "string",
+                        "title": "Signed on",
+                        "pattern": "^[0-9]{4}(-[0-9]{2})?(-[0-9]{2})?$",
+                        "x-menagerist": {"kind": "partialdate"},
+                    },
+                    "authenticated": {
+                        "type": "boolean",
+                        "title": "Authenticated",
+                        "x-menagerist": {"kind": "boolean"},
+                    },
+                },
+            },
+        }
+    ],
+}
+CSV = b"title,signed_on,authenticated\nAlien #1,2019-08,yes\nHulk 181,2021,no\n"
+MAPPING = [
+    {"column": "title", "target": "name"},
+    {"column": "signed_on", "target": "signed_on"},
+    {"column": "authenticated", "target": "authenticated"},
+]
+
+
+def _client(shared: Shared, actor: Actor = ALICE) -> TestClient:
+    app: FastAPI = create_app()
+    targets = shared.targets(actor)
+    app.dependency_overrides[get_preset_pack_target] = lambda: targets.presets
+    app.dependency_overrides[get_graph_pack_target] = lambda: targets.graph
+    app.dependency_overrides[get_collection_pack_target] = lambda: targets.collections
+    app.dependency_overrides[get_preset_repos] = lambda: shared.preset_repos
+    app.dependency_overrides[get_current_actor] = lambda: actor
+    return TestClient(app)
+
+
+def _with_type(shared: Shared) -> TestClient:
+    client = _client(shared)
+    assert client.post("/api/v1/bundles/import", json=TYPE_FILE).status_code == 200
+    return client
+
+
+def _post(
+    client: TestClient,
+    path: str,
+    data: bytes = CSV,
+    mapping: object = MAPPING,
+    **extra: str,
+) -> Any:  # noqa: ANN401
+    form = {"item_type": "signature", "mapping": json.dumps(mapping), **extra}
+    return client.post(
+        f"/api/v1/imports/items{path}",
+        files={"file": ("signatures.csv", data, "text/csv")},
+        data=form,
+    )
+
+
+def test_inspect_returns_headers_rows_and_suggestions(shared: Shared) -> None:
+    """The first call describes the file and suggests a mapping."""
+    client = _with_type(shared)
+
+    response = _post(client, "/inspect")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["headers"] == ["title", "signed_on", "authenticated"]
+    assert body["row_count"] == 2
+    assert body["sample_rows"][0] == {
+        "title": "Alien #1",
+        "signed_on": "2019-08",
+        "authenticated": "yes",
+    }
+    assert {f["key"] for f in body["fields"]} == {"signed_on", "authenticated"}
+    assert {m["column"]: m["target"] for m in body["suggested_mapping"]} == {
+        "title": "name",
+        "signed_on": "signed_on",
+        "authenticated": "authenticated",
+    }
+
+
+def test_plan_for_a_good_file_is_ready_and_lists_items(shared: Shared) -> None:
+    """A clean file previews as ready, with one entry per item."""
+    client = _with_type(shared)
+
+    response = _post(client, "/plan")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["ready"] is True
+    assert [e["label"] for e in body["entities"]] == ["Alien #1", "Hulk 181"]
+    assert {e["action"] for e in body["entities"]} == {"create"}
+
+
+def test_plan_reports_problems_as_blockers_and_is_not_ready(shared: Shared) -> None:
+    """A bad cell blocks the plan and names its row and field."""
+    client = _with_type(shared)
+    bad = b"title,signed_on,authenticated\nAlien,19th Aug,yes\n"
+
+    response = _post(client, "/plan", data=bad)
+
+    body = response.json()
+    assert body["ready"] is False
+    assert body["blockers"][0]["reason"].startswith("Row 2, Signed on: '19th Aug'")
+
+
+async def test_run_creates_items_and_returns_counts(shared: Shared) -> None:
+    """Running creates the items."""
+    client = _with_type(shared)
+
+    response = _post(client, "")
+
+    assert response.status_code == 200
+    assert response.json() == {"items_added": 2}
+    nodes = await shared.graph_repos.nodes.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
+    assert sorted(n.name for n in nodes) == ["Alien #1", "Hulk 181"]
+
+
+def test_a_bad_file_is_not_run(shared: Shared) -> None:
+    """A run of a file the plan refused is a conflict, and creates nothing."""
+    client = _with_type(shared)
+    bad = b"title,signed_on,authenticated\nAlien,soon,yes\n"
+
+    response = _post(client, "", data=bad)
+
+    assert response.status_code == 409
+
+
+def test_mapping_that_is_not_json_is_refused(shared: Shared) -> None:
+    """The mapping field must be JSON."""
+    client = _with_type(shared)
+
+    response = _post(client, "/plan", mapping="not json")
+
+    assert response.status_code == 422
+
+
+def test_a_mapping_naming_a_missing_column_is_refused(shared: Shared) -> None:
+    """The problem names the column."""
+    client = _with_type(shared)
+
+    response = _post(client, "/plan", mapping=[{"column": "nope", "target": "name"}])
+
+    assert response.status_code == 400
+    assert "nope" in response.text
+
+
+def test_a_file_over_the_limit_is_refused(shared: Shared) -> None:
+    """A file over the byte limit is refused, naming it."""
+    client = _with_type(shared)
+
+    response = _post(client, "/inspect", data=b"t" * (MAX_IMPORT_BYTES + 1))
+
+    assert response.status_code == 400
+    assert "10 MB" in response.text
+
+
+def test_a_token_without_import_permission_is_forbidden(shared: Shared) -> None:
+    """Importing needs the import permission."""
+    client = _client(shared, READ_ONLY)
+
+    response = _post(client, "/plan")
+
+    assert response.status_code == 403

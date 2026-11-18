@@ -19,7 +19,36 @@ from app.modules.transfer.application.bundle_files import (
     PlanBundleImport,
 )
 from app.modules.transfer.application.codecs import CodecRegistry
+from app.modules.transfer.application.item_import import (
+    ImportItems,
+    InspectItemImport,
+    PlanItemImport,
+)
 from app.shared_kernel.access_guard import AccessGuard
+
+
+def get_inspect_item_import_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
+    graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
+) -> InspectItemImport:
+    return InspectItemImport(guard, presets, graph)
+
+
+def get_plan_item_import_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
+    graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
+) -> PlanItemImport:
+    return PlanItemImport(guard, presets, graph)
+
+
+def get_import_items_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
+    graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
+) -> ImportItems:
+    return ImportItems(guard, presets, graph)
 
 
 @lru_cache(maxsize=1)

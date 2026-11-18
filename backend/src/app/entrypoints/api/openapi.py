@@ -53,6 +53,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Endpoints for importing and exporting files of saved fields.",
     },
     {
+        "name": "Imports",
+        "description": "Endpoints for importing spreadsheets as items.",
+    },
+    {
         "name": "Collections",
         "description": "Endpoints for managing collections of graphs.",
     },

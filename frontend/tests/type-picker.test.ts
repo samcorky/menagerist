@@ -16,6 +16,11 @@ const build = (query = '', over: Partial<Parameters<typeof buildTypeItems>[0]> =
 	buildTypeItems({ types, counts, query, allowClear: false, ...over });
 
 describe('buildTypeItems', () => {
+	it('offers no Create row when creating is not allowed', () => {
+		const items = build('Nothing like it', { allowCreate: false });
+		expect(items.some((item) => item.value.startsWith(CREATE_PREFIX))).toBe(false);
+	});
+
 	it('lists the types in use first, biggest first, with their counts', () => {
 		const used = build().filter((item) => item.group === 'In use');
 		expect(used.map((item) => item.value)).toEqual(['film', 'book']);
