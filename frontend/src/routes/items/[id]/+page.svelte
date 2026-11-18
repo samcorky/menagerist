@@ -64,6 +64,7 @@
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import CoverPlaceholder from '$lib/components/cover-placeholder.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
+	import { itemPreviewFor } from '$lib/item-preview';
 	import NodeSummary from '$lib/components/node-summary.svelte';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
 	import { auth } from '$lib/auth.svelte.js';
@@ -702,7 +703,7 @@
 	{:else if loadFailed}
 		<LoadFailed what="this item" onretry={() => void load()} />
 	{:else if loading}
-		<ItemDetailSkeleton />
+		<ItemDetailSkeleton preview={itemPreviewFor(nodeId)} />
 	{:else}
 		<!-- Cover on the left (sticky), details in the middle, a side panel from 1400px. -->
 		<div

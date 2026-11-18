@@ -5,6 +5,7 @@
 	import type { MatchContext } from '$lib/search-context';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import NodeCover from './node-cover.svelte';
+	import { rememberItemPreview } from '$lib/item-preview';
 	import TypeIcon from './type-icon.svelte';
 	import NodeSummary from './node-summary.svelte';
 	import TagList from './tag-list.svelte';
@@ -54,13 +55,22 @@
 	}
 </script>
 
-<a href={resolve('/items/[id]', { id: item.id })} class="group block" onkeydown={handleKeydown}>
+<a
+	href={resolve('/items/[id]', { id: item.id })}
+	class="group block"
+	onclick={() => rememberItemPreview(item)}
+	onkeydown={handleKeydown}
+>
 	<div
 		class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
 	>
 		<!-- Cover image, or the item type's icon and colour (§7b) -->
 		<div class="min-h-0 flex-1 overflow-hidden">
-			<NodeCover nodeId={item.id} class="h-full w-full">
+			<NodeCover
+				nodeId={item.id}
+				thumbnailUrl={item.cover_thumbnail_url ?? null}
+				class="h-full w-full"
+			>
 				<div class="flex h-full w-full items-center justify-center bg-muted">
 					<TypeIcon
 						icon={typeIcon}

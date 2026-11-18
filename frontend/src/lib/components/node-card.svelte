@@ -6,6 +6,7 @@
 	import * as Item from '$lib/components/ui/item/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import NodeCover from './node-cover.svelte';
+	import { rememberItemPreview } from '$lib/item-preview';
 	import NodeSummary from './node-summary.svelte';
 	import TypeIcon from './type-icon.svelte';
 	import TagList from './tag-list.svelte';
@@ -54,10 +55,15 @@
 
 <Item.Root variant="outline">
 	{#snippet child({ props })}
-		<a {...props} href={resolve('/items/[id]', { id: item.id })} onkeydown={handleKeydown}>
+		<a
+			{...props}
+			href={resolve('/items/[id]', { id: item.id })}
+			onclick={() => rememberItemPreview(item)}
+			onkeydown={handleKeydown}
+		>
 			<!-- A small cover, or the item type's icon and colour when there is none. -->
 			<div class="size-12 shrink-0 overflow-hidden rounded-lg">
-				<NodeCover nodeId={item.id} class="size-12">
+				<NodeCover nodeId={item.id} thumbnailUrl={item.cover_thumbnail_url ?? null} class="size-12">
 					<TypeIcon icon={typeIcon} colour={typeColour} boxed class="size-12 rounded-lg text-2xl" />
 				</NodeCover>
 			</div>
