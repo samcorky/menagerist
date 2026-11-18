@@ -18,7 +18,7 @@ from app.modules.transfer.domain.errors import (
     InvalidImportFileError,
 )
 from app.modules.transfer.domain.plan import PlanAction
-from app.modules.transfer.domain.tabular import ColumnMapping
+from app.modules.transfer.domain.tabular import ColumnMapping, CsvEncoding
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -319,6 +319,7 @@ async def test_inspect_returns_headers_samples_count_fields_and_suggestions(
     )
     assert len(result.sample_rows) == 5
     assert result.row_count == 8
+    assert result.encoding == CsvEncoding.UTF_8
     assert {f.key for f in result.fields} >= {"signed_on", "position", "value"}
     targets = {m.column: m.target for m in result.suggested_mapping}
     assert targets == {

@@ -22,6 +22,7 @@
 		assignTarget,
 		choicesFrom,
 		confirmText,
+		encodingName,
 		hasName,
 		itemsToAdd,
 		mappingJson,
@@ -170,7 +171,7 @@
 				{#if step === 'choose'}
 					Each row of the file becomes an item.
 				{:else if step === 'match' && inspection}
-					{rowsAndColumns(inspection)}.
+					{rowsAndColumns(inspection)}. Read as {encodingName(inspection.encoding)}.
 				{/if}
 			</Card.Description>
 		</Card.Header>

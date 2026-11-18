@@ -1,16 +1,18 @@
 """Read a CSV file into headers and rows, and suggest where its columns go."""
 
+import codecs
 import csv
 import io
 import re
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, NamedTuple
 
 from app.modules.transfer.domain.errors import InvalidImportFileError
 from app.modules.transfer.domain.tabular import (
     MAX_IMPORT_BYTES,
     MAX_IMPORT_ROWS,
     ColumnMapping,
+    CsvEncoding,
     FieldSpec,
 )
 
@@ -33,32 +35,64 @@ class CsvTable:
     rows: tuple[tuple[str, ...], ...]
     # The spreadsheet row of each of `rows`; the header is row 1, blank lines count.
     numbers: tuple[int, ...] = ()
+    # The encoding the bytes were read as, named as people know it.
+    encoding: CsvEncoding = CsvEncoding.UTF_8
 
 
 def read_csv(data: bytes) -> CsvTable:
-    """Read `data` as UTF-8 CSV.
+    """Read `data` as CSV in UTF-8, UTF-16 or Windows-1252.
 
     Row numbers in messages follow a spreadsheet: the header is row 1.
 
     Raises:
-        InvalidImportFileError: the file is too big, empty, not UTF-8, or its
-            headers or rows are not usable.
+        InvalidImportFileError: the file is too big, empty, in no encoding read
+            here, or its headers or rows are not usable.
     """
     if len(data) > MAX_IMPORT_BYTES:
         raise InvalidImportFileError(
             f"The file is over the {MAX_IMPORT_BYTES // (1024 * 1024)} MB limit."
         )
-    try:
-        text = data.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        raise InvalidImportFileError("The file is not UTF-8 text.") from None
+    text, encoding = _decode(data)
     if not text.strip():
         raise InvalidImportFileError("The file is empty.")
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text))
     try:
-        return _table(reader)
+        return replace(_table(reader), encoding=encoding)
     except csv.Error as error:
         raise InvalidImportFileError(f"The file is not valid CSV: {error}") from None
+
+
+class _Decoded(NamedTuple):
+    text: str
+    encoding: CsvEncoding
+
+
+_UTF16_MARKS = (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)
+
+
+def _decode(data: bytes) -> _Decoded:
+    """Return the text of `data` and the encoding it was read as.
+
+    A byte-order mark names the encoding. Without one, text that is valid UTF-8 is
+    UTF-8 (text in a legacy encoding almost never is), and anything else is read as
+    Windows-1252, which is what Excel's plain "CSV" writes on Western Windows.
+    """
+    candidates: Sequence[CsvEncoding]
+    if data.startswith(_UTF16_MARKS):
+        candidates = (CsvEncoding.UTF_16,)
+    elif b"\0" in data:
+        # Text in UTF-8 or Windows-1252 has no NUL; binary files nearly always do.
+        candidates = ()
+    else:
+        candidates = (CsvEncoding.UTF_8, CsvEncoding.WINDOWS_1252)
+    for encoding in candidates:
+        try:
+            return _Decoded(data.decode(encoding.codec), encoding)
+        except UnicodeDecodeError:
+            continue
+    raise InvalidImportFileError(
+        "The file is not text in UTF-8, UTF-16 or Windows-1252."
+    )
 
 
 def _delimiter(text: str) -> str:

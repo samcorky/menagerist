@@ -108,6 +108,7 @@ def test_inspect_returns_headers_rows_and_suggestions(shared: Shared) -> None:
     body = response.json()
     assert body["headers"] == ["title", "signed_on", "authenticated"]
     assert body["row_count"] == 2
+    assert body["encoding"] == "utf_8"
     assert body["sample_rows"][0] == {
         "title": "Alien #1",
         "signed_on": "2019-08",
@@ -206,3 +207,14 @@ def test_a_token_without_import_permission_is_forbidden(shared: Shared) -> None:
     response = _post(client, "/plan")
 
     assert response.status_code == 403
+
+
+def test_inspect_reads_an_excel_windows_1252_file(shared: Shared) -> None:
+    """Accents from Excel's plain CSV come through, and the encoding is reported."""
+    client = _with_type(shared)
+    data = "title,signed_on\nRené,2019\n".encode("cp1252")
+
+    body = _post(client, "/inspect", data=data).json()
+
+    assert body["encoding"] == "windows_1252"
+    assert body["sample_rows"][0]["title"] == "René"

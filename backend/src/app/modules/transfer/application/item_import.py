@@ -32,6 +32,7 @@ from app.modules.transfer.domain.tabular import (
     MAX_LISTED_PROBLEMS,
     CellProblem,
     ColumnMapping,
+    CsvEncoding,
     FieldSpec,
 )
 from app.shared_kernel.access import Access, Requires
@@ -69,6 +70,7 @@ class ItemImportInspection:
     row_count: int
     fields: tuple[FieldSpec, ...]
     suggested_mapping: tuple[ColumnMapping, ...]
+    encoding: CsvEncoding
 
 
 def build_item_bundle(
@@ -263,6 +265,7 @@ class InspectItemImport(_ItemImport, UseCase[ItemImportRequest, ItemImportInspec
             row_count=len(table.rows),
             fields=tuple(fields),
             suggested_mapping=tuple(suggest_mapping(table.headers, fields)),
+            encoding=table.encoding,
         )
 
 

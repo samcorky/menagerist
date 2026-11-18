@@ -107,3 +107,23 @@ test('a file the server refuses is explained on the first step', async ({ page, 
 	await page.getByRole('button', { name: 'Next' }).click();
 	await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible();
 });
+
+test('an Excel file in Windows-1252 is read and says so', async ({ page, request }) => {
+	const type = await makeType(request);
+	prefix = uniqueName('Sig').replace(/\W+/g, '');
+	// 0xE9 is "é" in Windows-1252 and is not valid UTF-8.
+	const excel = {
+		name: 'excel.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.concat([
+			Buffer.from(`Title,Position,Authenticated\n${prefix}Ren`),
+			Buffer.from([0xe9]),
+			Buffer.from(',cover,yes\n')
+		])
+	};
+
+	await chooseFileAndType(page, excel, type.label);
+
+	await expect(page.getByText('Read as Windows-1252')).toBeVisible();
+	await expect(page.getByText(`${prefix}René`)).toBeVisible();
+});
