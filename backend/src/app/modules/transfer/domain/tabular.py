@@ -11,6 +11,18 @@ class CsvEncoding(StrEnum):
     UTF_16 = "utf_16"
     WINDOWS_1252 = "windows_1252"
 
+    @property
+    def codec(self) -> str:
+        """The name of the Python codec that reads it (UTF-8 also drops a mark)."""
+        return _CODECS[self]
+
+
+_CODECS = {
+    CsvEncoding.UTF_8: "utf-8-sig",
+    CsvEncoding.UTF_16: "utf-16",
+    CsvEncoding.WINDOWS_1252: "cp1252",
+}
+
 
 MAX_IMPORT_BYTES = 10 * 1024 * 1024
 MAX_IMPORT_ROWS = 5000

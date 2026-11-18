@@ -5,7 +5,7 @@ import csv
 import io
 import re
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from app.modules.transfer.domain.errors import InvalidImportFileError
 from app.modules.transfer.domain.tabular import (
@@ -62,27 +62,37 @@ def read_csv(data: bytes) -> CsvTable:
         raise InvalidImportFileError(f"The file is not valid CSV: {error}") from None
 
 
-def _decode(data: bytes) -> tuple[str, CsvEncoding]:
+class _Decoded(NamedTuple):
+    text: str
+    encoding: CsvEncoding
+
+
+_UTF16_MARKS = (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)
+
+
+def _decode(data: bytes) -> _Decoded:
     """Return the text of `data` and the encoding it was read as.
 
     A byte-order mark names the encoding. Without one, text that is valid UTF-8 is
     UTF-8 (text in a legacy encoding almost never is), and anything else is read as
     Windows-1252, which is what Excel's plain "CSV" writes on Western Windows.
     """
-    try:
-        if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
-            return data.decode("utf-16"), CsvEncoding.UTF_16
+    candidates: Sequence[CsvEncoding]
+    if data.startswith(_UTF16_MARKS):
+        candidates = (CsvEncoding.UTF_16,)
+    elif b"\0" in data:
         # Text in UTF-8 or Windows-1252 has no NUL; binary files nearly always do.
-        if b"\0" in data:
-            raise UnicodeDecodeError("utf-8", data, 0, 1, "binary")
+        candidates = ()
+    else:
+        candidates = (CsvEncoding.UTF_8, CsvEncoding.WINDOWS_1252)
+    for encoding in candidates:
         try:
-            return data.decode("utf-8-sig"), CsvEncoding.UTF_8
+            return _Decoded(data.decode(encoding.codec), encoding)
         except UnicodeDecodeError:
-            return data.decode("cp1252"), CsvEncoding.WINDOWS_1252
-    except UnicodeDecodeError:
-        raise InvalidImportFileError(
-            "The file is not text in UTF-8, UTF-16 or Windows-1252."
-        ) from None
+            continue
+    raise InvalidImportFileError(
+        "The file is not text in UTF-8, UTF-16 or Windows-1252."
+    )
 
 
 def _delimiter(text: str) -> str:
