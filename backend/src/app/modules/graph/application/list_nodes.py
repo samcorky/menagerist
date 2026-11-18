@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Callable  # noqa: TC003
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date  # noqa: TC003
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -29,6 +29,7 @@ from app.modules.graph.ports.collection_members import (
     CollectionSource,
     SmartSource,
 )
+from app.modules.graph.ports.item_covers import ItemCovers  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 
@@ -64,6 +65,7 @@ class ListNodesResult:
     items: list[Node]
     total: int
     total_capped: bool = False
+    covers: dict[uuid.UUID, str] = field(default_factory=dict)
 
 
 def _list_filters(query: ListNodesQuery) -> list[Condition]:
@@ -95,11 +97,13 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         repos: GraphRepos,
         guard: AccessGuard,
         collection_members: CollectionMembers | None = None,
+        item_covers: ItemCovers | None = None,
         today: Callable[[], date] = utc_today,
         total_cap: int = TOTAL_CAP,
     ) -> None:
         super().__init__(repos, guard)
         self._collection_members = collection_members
+        self._item_covers = item_covers
         self._today = today
         self._total_cap = total_cap
 
@@ -233,6 +237,17 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
                 exclusions[str(node_type.slug)] = keys
         return exclusions
 
+    async def _with_covers(
+        self, result: ListNodesResult, actor: Actor
+    ) -> ListNodesResult:
+        """Add the cover thumbnail of each listed item that has one."""
+        if self._item_covers is None or not result.items:
+            return result
+        covers = await self._item_covers.thumbnails(
+            [node.id for node in result.items], actor
+        )
+        return replace(result, covers=covers)
+
     async def _handle(self, query: ListNodesQuery, actor: Actor) -> ListNodesResult:
         """Return a page of nodes and total count matching the query."""
         scope = self.scope(actor)
@@ -240,7 +255,7 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         if isinstance(source, SmartSource):
             smart = await self._list_smart(query, source.definition, scope)
             logger.debug("nodes listed", count=len(smart.items), total=smart.total)
-            return smart
+            return await self._with_covers(smart, actor)
         exclusions = (
             await self._search_exclusions(scope) if query.q is not None else None
         )
@@ -266,6 +281,8 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             limit=None if cap is None else cap + 1,
         )
         total, capped = self._capped(counted, cap)
-        result = ListNodesResult(items=items, total=total, total_capped=capped)
+        result = await self._with_covers(
+            ListNodesResult(items=items, total=total, total_capped=capped), actor
+        )
         logger.debug("nodes listed", count=len(result.items), total=result.total)
         return result

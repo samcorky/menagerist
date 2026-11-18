@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { getRandomNode } from '$lib/api/client';
 	import IconButton from '$lib/components/icon-button.svelte';
+	import { rememberItemPreview } from '$lib/item-preview';
 
 	// Opens a random item, from one collection when `collection` is given, else from all of yours.
 	let { collection }: { collection?: string } = $props();
@@ -23,6 +24,8 @@
 			toast.error("Couldn't pick an item");
 			return;
 		}
+		// The item is already in hand, so its page can show the title and cover while it loads.
+		rememberItemPreview(result.data);
 		await goto(resolve('/items/[id]', { id: result.data.id }));
 	}
 </script>

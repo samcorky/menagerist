@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-def _to_domain(model: MediaAssetModel) -> MediaAsset:
+def asset_to_domain(model: MediaAssetModel) -> MediaAsset:
     """Convert an ORM row into the domain entity."""
     return MediaAsset(
         id=model.id,
@@ -88,7 +88,7 @@ class SqlAlchemyMediaAssetRepository:
             select(MediaAssetModel).where(MediaAssetModel.id == asset_id), scope
         )
         model = (await self._session.execute(stmt)).scalar_one_or_none()
-        return None if model is None else _to_domain(model)
+        return None if model is None else asset_to_domain(model)
 
     async def list_expired(
         self,
@@ -112,7 +112,7 @@ class SqlAlchemyMediaAssetRepository:
         if limit is not None:
             stmt = stmt.limit(limit)
         result = await self._session.execute(stmt)
-        return [_to_domain(m) for m in result.scalars()]
+        return [asset_to_domain(m) for m in result.scalars()]
 
     async def existing_ids(self, asset_ids: Collection[uuid.UUID]) -> set[uuid.UUID]:
         """Return which of `asset_ids` have a row, for any owner."""
@@ -134,7 +134,7 @@ class SqlAlchemyMediaAssetRepository:
             scope,
         )
         result = await self._session.execute(stmt)
-        return [_to_domain(m) for m in result.scalars()]
+        return [asset_to_domain(m) for m in result.scalars()]
 
     async def delete(self, asset_id: uuid.UUID) -> None:
         """Hard-delete the asset record."""

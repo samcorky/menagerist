@@ -62,6 +62,7 @@ class DeviceModel(IdentifiableMixin, Base):
     user_agent: Mapped[str | None]
     platform: Mapped[str | None]
     mobile: Mapped[bool | None]
+    display_mode: Mapped[str | None]
     name: Mapped[str | None]
 
 

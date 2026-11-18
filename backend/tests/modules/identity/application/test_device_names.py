@@ -30,7 +30,7 @@ from app.modules.identity.domain.errors import (
     DeviceNotFoundError,
     InvalidDeviceNameError,
 )
-from app.modules.identity.domain.session import Session
+from app.modules.identity.domain.session import DisplayMode, Session
 from app.modules.identity.domain.user import Role
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.actor import Actor
@@ -81,6 +81,7 @@ async def _device(
     mobile: bool = False,
     name: str | None = None,
     seen: timedelta = timedelta(days=30),
+    display_mode: DisplayMode | None = None,
 ) -> Device:
     """Remember a browser last seen `seen` before NOW."""
     device = Device.create(
@@ -91,6 +92,7 @@ async def _device(
         user_agent=agent,
         platform=platform,
         mobile=mobile,
+        display_mode=display_mode,
     )
     device.name = name
     await world.devices.add(device)
@@ -302,7 +304,29 @@ async def test_never_suggests_a_device_that_does_not_match(
     await _device(world, alice.id, agent=CHROME, name="Chrome laptop")
     await _device(world, alice.id, platform="Windows", name="Windows laptop")
     await _device(world, alice.id, mobile=True, name="Phone")
+    await _device(
+        world, alice.id, name="Installed app", display_mode=DisplayMode.STANDALONE
+    )
     current = await _device(world, alice.id, seen=timedelta())
+    current_session = await _session(world, current, active=timedelta())
+
+    assert await _suggest(world, alice.id, current_session) == []
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_the_installed_app_is_not_offered_a_browser_tabs_name(
+    world: World, make_user: MakeUser
+) -> None:
+    """The installed app and the same browser in a tab are different kinds."""
+    alice = make_user("alice")
+    await world.users.add(alice)
+    await _device(world, alice.id, name="Desk laptop", display_mode=DisplayMode.BROWSER)
+    current = await _device(
+        world,
+        alice.id,
+        seen=timedelta(),
+        display_mode=DisplayMode.STANDALONE,
+    )
     current_session = await _session(world, current, active=timedelta())
 
     assert await _suggest(world, alice.id, current_session) == []

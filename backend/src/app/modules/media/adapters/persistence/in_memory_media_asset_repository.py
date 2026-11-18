@@ -20,6 +20,10 @@ class InMemoryMediaAssetRepository:
         found = self._assets.get(asset_id)
         return None if found is None else found.owner_id
 
+    def peek(self, asset_id: uuid.UUID) -> MediaAsset | None:
+        """Return the stored asset, unscoped (for the attachment twin)."""
+        return self._assets.get(asset_id)
+
     async def add(self, asset: MediaAsset) -> None:
         """Persist a new media asset."""
         self._assets[asset.id] = asset

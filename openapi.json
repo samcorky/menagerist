@@ -23803,6 +23803,7 @@
                     "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0",
                     "platform": "Linux",
                     "mobile": false,
+                    "display_mode": "standalone",
                     "first_seen_at": "2026-09-01T08:00:00.000000Z",
                     "last_seen_at": "2026-10-10T12:30:00.000000Z",
                     "current": true,
@@ -34514,6 +34515,18 @@
             "format": "date-time",
             "title": "Updated At",
             "description": "When it last changed."
+          },
+          "cover_thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Thumbnail Url",
+            "description": "Where to fetch its cover's thumbnail. Only lists, searches and the random pick fill it in, so a card can show its picture without a request of its own; null if it has no cover or this response does not say."
           }
         },
         "type": "object",
@@ -35018,6 +35031,17 @@
             "title": "Mobile",
             "description": "Whether the browser reported a mobile device."
           },
+          "display_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisplayMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this browser has signed in as the installed app; once it has, it stays `standalone`. Absent for a browser that never reported one."
+          },
           "first_seen_at": {
             "type": "string",
             "format": "date-time",
@@ -35056,6 +35080,7 @@
         "examples": [
           {
             "current": true,
+            "display_mode": "standalone",
             "first_seen_at": "2026-09-01T08:00:00.000000Z",
             "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e52",
             "last_seen_at": "2026-10-10T12:30:00.000000Z",

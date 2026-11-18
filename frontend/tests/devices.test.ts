@@ -249,6 +249,7 @@ function device(overrides: Partial<OwnDeviceResponse> = {}): OwnDeviceResponse {
 	return {
 		id: 'd1',
 		user_agent: 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0',
+		display_mode: 'standalone',
 		first_seen_at: '2026-09-01T08:00:00Z',
 		last_seen_at: '2026-10-10T12:00:00Z',
 		current: false,
@@ -258,7 +259,7 @@ function device(overrides: Partial<OwnDeviceResponse> = {}): OwnDeviceResponse {
 }
 
 describe('deviceRow', () => {
-	it('describes a remembered browser from its newest session', () => {
+	it('describes a remembered browser from the device itself', () => {
 		expect(deviceRow(device())).toEqual({
 			label: 'App on Linux (Firefox)',
 			kind: 'desktop',
@@ -275,6 +276,18 @@ describe('deviceRow', () => {
 			sessionCount: 2,
 			revoke: { kind: 'device', id: 'd1' }
 		});
+	});
+
+	it('keeps the installed app label when the newest session is a browser tab', () => {
+		const row = deviceRow(
+			device({ sessions: [session({ display_mode: 'browser' }), session({ id: 's0' })] })
+		);
+		expect(row.label).toBe('App on Linux (Firefox)');
+	});
+
+	it('labels a browser-only device without App', () => {
+		const row = deviceRow(device({ display_mode: 'browser' }));
+		expect(row.label).toBe('Firefox on Linux');
 	});
 
 	it('signs out an older session on its own', () => {

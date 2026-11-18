@@ -10,8 +10,12 @@ from testcontainers.community.postgres import PostgresContainer
 
 from app.entrypoints.api import startup
 from app.entrypoints.api.shared import settings_reader
+from app.entrypoints.api.shared.bridges.item_covers import get_item_covers
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.rate_limit import get_rate_limiter
+from app.modules.graph.adapters.persistence.in_memory_item_covers import (
+    InMemoryItemCovers,
+)
 from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
     InMemorySettingValueRepository,
 )
@@ -237,6 +241,10 @@ def _default_actor_for_test_clients(
         original_init(self, app, *args, **kwargs)
         if hasattr(app, "dependency_overrides"):
             app.dependency_overrides.setdefault(get_current_actor, lambda: actor)
+            # No covers, so a list does not reach for the media tables.
+            app.dependency_overrides.setdefault(
+                get_item_covers, lambda: InMemoryItemCovers()
+            )
 
     monkeypatch.setattr(TestClient, "__init__", init)
 

@@ -5,10 +5,12 @@ from app.modules.media.domain.media_attachment import AttachmentKey
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Collection
 
     from app.modules.media.adapters.persistence.in_memory_media_asset_repository import (  # noqa: E501
         InMemoryMediaAssetRepository,
     )
+    from app.modules.media.domain.media_asset import MediaAsset
     from app.modules.media.domain.media_attachment import (
         AttachmentTarget,
         MediaAttachment,
@@ -56,6 +58,27 @@ class InMemoryMediaAttachmentRepository:
         """Return an attachment by id, or ``None`` if missing or unseen."""
         found = self._store.get(attachment_id)
         return found if found is not None and self._visible(found, scope) else None
+
+    async def list_cover_assets(
+        self,
+        target_type: AttachmentTarget,
+        target_ids: Collection[uuid.UUID],
+        *,
+        scope: ContentFilter,
+    ) -> dict[uuid.UUID, MediaAsset]:
+        """Return the cover asset of each target that has one inside `scope`."""
+        covers: dict[uuid.UUID, MediaAsset] = {}
+        for attachment in self._store.values():
+            if (
+                attachment.attribute_key is AttachmentKey.COVER
+                and attachment.target_type == target_type
+                and attachment.target_id in target_ids
+                and self._visible(attachment, scope)
+            ):
+                asset = self._assets.peek(attachment.asset_id)
+                if asset is not None:
+                    covers[attachment.target_id] = asset
+        return covers
 
     async def list_for_target(
         self,

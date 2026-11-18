@@ -10,7 +10,7 @@ from sqlalchemy import update
 from app.modules.identity.adapters.persistence.device_repository import (
     SqlAlchemyDeviceRepository,
 )
-from app.modules.identity.adapters.persistence.models import SessionModel
+from app.modules.identity.adapters.persistence.models import DeviceModel, SessionModel
 from app.modules.identity.adapters.persistence.session_repository import (
     SqlAlchemySessionRepository,
 )
@@ -52,6 +52,7 @@ def _device(user: User, token_hash: str, *, now: datetime = NOW) -> Device:
         user_agent="Firefox",
         platform="Linux",
         mobile=False,
+        display_mode=DisplayMode.STANDALONE,
     )
 
 
@@ -74,6 +75,7 @@ async def test_device_round_trips_and_is_found_by_hash(
     assert stored.user_agent == "Firefox 2"
     assert stored.platform is None
     assert stored.name == "Sam's laptop"
+    assert stored.display_mode is DisplayMode.STANDALONE
     assert stored.last_seen_at == NOW + timedelta(days=1)
     assert (await devices.get(device.id)) is not None
     assert await devices.get(uuid.uuid7()) is None
@@ -177,3 +179,23 @@ async def test_deleting_a_device_cascades_to_its_sessions(
     db_session.expire_all()
 
     assert await sessions.get(session.id) is None
+
+
+async def test_an_unknown_stored_device_display_mode_reads_as_none(
+    db_session: AsyncSession,
+) -> None:
+    """A value written by a newer version is not an error, just unknown."""
+    devices = SqlAlchemyDeviceRepository(db_session)
+    user = await _user(db_session)
+    device = _device(user, "hash-unknown")
+    await devices.add(device)
+    await db_session.execute(
+        update(DeviceModel)
+        .where(DeviceModel.id == device.id)
+        .values(display_mode="fullscreen")
+    )
+    db_session.expire_all()
+
+    stored = await devices.get(device.id)
+    assert stored is not None
+    assert stored.display_mode is None

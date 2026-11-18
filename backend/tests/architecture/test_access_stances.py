@@ -178,6 +178,7 @@ EXPECTED_CONTENT: frozenset[str] = frozenset(
         "media.DeleteMedia",
         "media.DetachMedia",
         "media.GetMedia",
+        "media.ListNodeCovers",
         "media.ListNodeMedia",
         "media.OrphanMedia",
         "media.PromoteMedia",
