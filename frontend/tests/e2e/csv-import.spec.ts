@@ -127,3 +127,38 @@ test('an Excel file in Windows-1252 is read and says so', async ({ page, request
 	await expect(page.getByText('Read as Windows-1252')).toBeVisible();
 	await expect(page.getByText(`${prefix}René`)).toBeVisible();
 });
+
+test('Excel date shapes are read, and the day order can be chosen', async ({ page, request }) => {
+	const type = await makeItemType(request, uniqueName('Dated'));
+	const res = await request.patch(`/api/v1/node-types/${type.id}`, {
+		data: {
+			attributes_schema: {
+				type: 'object',
+				properties: {
+					when: { title: 'When', type: 'string', 'x-menagerist': { kind: 'partialdate' } }
+				}
+			}
+		}
+	});
+	expect(res.ok(), await res.text()).toBeTruthy();
+	prefix = uniqueName('Dat').replace(/\W+/g, '');
+	const file = {
+		name: 'dates.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from(
+			`Title,When\n${prefix}A,Oct-18\n${prefix}B,08/2019\n${prefix}C,03/04/2019\n`
+		)
+	};
+
+	await chooseFileAndType(page, file, type.label);
+
+	// 03/04/2019 settles nothing, so the page says it is guessing.
+	await expect(page.getByLabel('Dates like 03/04/2019')).toHaveValue('day_first');
+	await expect(page.getByText('day first is a guess')).toBeVisible();
+	await page.getByLabel('Dates like 03/04/2019').selectOption('month_first');
+
+	await page.getByRole('button', { name: 'Preview' }).click();
+	await expect(page.getByText('Will be added')).toBeVisible();
+	await page.getByRole('button', { name: 'Add 3 items' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+});

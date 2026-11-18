@@ -10,7 +10,10 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
-from app.modules.transfer.application.cell_values import convert_cell
+from app.modules.transfer.application.cell_values import (
+    convert_cell,
+    suggest_date_order,
+)
 from app.modules.transfer.application.csv_rows import (
     CsvTable,
     read_csv,
@@ -33,6 +36,8 @@ from app.modules.transfer.domain.tabular import (
     CellProblem,
     ColumnMapping,
     CsvEncoding,
+    DateOrder,
+    DateOrderGuess,
     FieldSpec,
 )
 from app.shared_kernel.access import Access, Requires
@@ -59,6 +64,7 @@ class ItemImportRequest:
     item_type: str
     mapping: tuple[ColumnMapping, ...] = ()
     list_separator: str = ","
+    date_order: DateOrder = DateOrder.DAY_FIRST
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
@@ -71,6 +77,8 @@ class ItemImportInspection:
     fields: tuple[FieldSpec, ...]
     suggested_mapping: tuple[ColumnMapping, ...]
     encoding: CsvEncoding
+    # None when no cell is written as three numbers, so there is nothing to choose.
+    date_order: DateOrderGuess | None
 
 
 def build_item_bundle(
@@ -79,6 +87,7 @@ def build_item_bundle(
     fields: Sequence[FieldSpec],
     item_type: str,
     list_separator: str,
+    date_order: DateOrder = DateOrder.DAY_FIRST,
 ) -> tuple[Bundle, list[CellProblem]]:
     """Turn the rows into a bundle of items of `item_type`, with what is wrong.
 
@@ -102,7 +111,12 @@ def build_item_bundle(
                 continue
             field = by_key[key]
             try:
-                value = convert_cell(cells[index], field, list_separator=list_separator)
+                value = convert_cell(
+                    cells[index],
+                    field,
+                    list_separator=list_separator,
+                    date_order=date_order,
+                )
             except CellValueError as error:
                 found.append(
                     CellProblem(row=number, field=field.title, message=str(error))
@@ -207,6 +221,7 @@ class _ItemImport:
             fields,
             request.item_type,
             request.list_separator,
+            request.date_order,
         )
         listed = [(p.row, f"Row {p.row}, {p.field}: {p.message}.") for p in problems]
         for item in bundle.items:
@@ -266,6 +281,7 @@ class InspectItemImport(_ItemImport, UseCase[ItemImportRequest, ItemImportInspec
             fields=tuple(fields),
             suggested_mapping=tuple(suggest_mapping(table.headers, fields)),
             encoding=table.encoding,
+            date_order=suggest_date_order(cell for row in table.rows for cell in row),
         )
 
 
