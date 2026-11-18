@@ -103,7 +103,9 @@ def render_share_image(icon: ET.Element) -> Image.Image:
     gap = round(SHARE_FONT * SHARE_GAP_EM)
     tracking = SHARE_FONT * SHARE_TRACKING_EM
     mark = render(ET.parse(SHARE_LOGO).getroot(), box, rounded=False, ink="#FFFFFF")
-    ink_left = mark.getbbox()[0]
+    ink_box = mark.getbbox()
+    assert ink_box is not None  # the logo draws something
+    ink_left = ink_box[0]
 
     # Where each letter starts. Measuring the text up to a letter keeps the font's
     # kerning; the tracking is added on top, as CSS letter-spacing does.
