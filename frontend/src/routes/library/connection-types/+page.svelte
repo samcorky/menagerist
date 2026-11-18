@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { ArrowLeftRight, Download, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
-	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
+	import ListFoot from '$lib/components/list-foot.svelte';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -13,7 +13,7 @@
 		deleteEdgeType,
 		type EdgeTypeResponse
 	} from '$lib/api/client';
-	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import { errorMessage } from '$lib/api/errors';
 	import { downloadBundle, exportConnectionTypeBundle, presetFilename } from '$lib/preset-packs';
 	import { slugify } from '$lib/utils.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -36,6 +36,8 @@
 	let loading = $state(false);
 	let hasMore = $state(true);
 	let loadFailed = $state(false);
+	// A later page that would not load: the list says so and offers Try again (#588).
+	let pageFailed = $state(false);
 
 	// One editor serves both creating (editingId null) and editing.
 	let editorOpen = $state(false);
@@ -67,15 +69,15 @@
 	async function fetchPage(after?: string) {
 		loading = true;
 		if (!after) loadFailed = false;
+		pageFailed = false;
 		const result = await listEdgeTypes({ query: { after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			if (after) {
-				const { title, description } = networkAwareError(result);
-				toast.error(title, { description });
-			} else {
+			// A later page keeps `hasMore`, so Try again in the list's foot can resume it.
+			if (after) pageFailed = true;
+			else {
 				loadFailed = true;
+				hasMore = false;
 			}
-			hasMore = false;
 		} else {
 			relTypes = after ? [...relTypes, ...result.data] : result.data;
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -83,19 +85,9 @@
 		loading = false;
 	}
 
-	function sentinel(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loading) void fetchPage(relTypes.at(-1)?.id);
-			},
-			{ rootMargin: '200px' }
-		);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
+	function loadMore() {
+		if (!hasMore || loading) return;
+		void fetchPage(relTypes.at(-1)?.id);
 	}
 
 	function openCreate() {
@@ -300,11 +292,15 @@
 		{/if}
 	{/if}
 
-	{#if hasMore}
-		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-			<LoadMoreSpinner {loading} hasRows={relTypes.length > 0} />
-		</div>
-	{/if}
+	<ListFoot
+		{loading}
+		{hasMore}
+		failed={pageFailed}
+		rows={relTypes.length}
+		noun="relationship type"
+		onload={loadMore}
+		onretry={() => void fetchPage(relTypes.at(-1)?.id)}
+	/>
 </Page>
 
 <TypeEditorDialog

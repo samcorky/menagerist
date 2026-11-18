@@ -25,7 +25,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import LoadFailed from '$lib/components/load-failed.svelte';
-	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
+	import ListFoot from '$lib/components/list-foot.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -62,6 +62,14 @@
 	// Stable for this page within a session.
 	const emptyLine = $derived(pickEmptyLine(EMPTY_LINES, page.url.pathname));
 
+	// The foot of a long list, in the same spirit (#588). The count goes beside it.
+	const END_LINES = [
+		"That's the lot.",
+		'You have reached the end of the cabinet.',
+		'Scanning complete. Nothing further ahead.',
+		'The bottom shelf, and all of it catalogued.'
+	];
+
 	const PAGE_SIZE = 50;
 
 	const kinds = [
@@ -77,6 +85,8 @@
 	let loading = $state(true);
 	let loadFailed = $state(false);
 	let hasMore = $state(false);
+	// A later page that would not load: the list says so and offers Try again (#588).
+	let pageFailed = $state(false);
 	let exampleCollectionIds = $state<ReadonlySet<string>>(new Set());
 	let fetchSeq = 0;
 	let searchInput = $state('');
@@ -157,18 +167,18 @@
 		const seq = ++fetchSeq;
 		loading = true;
 		if (!after) loadFailed = false;
+		pageFailed = false;
 		const result = await listCollections({
 			query: { after, limit: PAGE_SIZE, q: q || undefined }
 		});
 		if (seq !== fetchSeq) return;
 		if (result.error || !result.data) {
-			if (after) {
-				const { title, description } = networkAwareError(result);
-				toast.error(title, { description });
-			} else {
+			// A later page keeps `hasMore`, so Try again in the list's foot can resume it.
+			if (after) pageFailed = true;
+			else {
 				loadFailed = true;
+				hasMore = false;
 			}
-			hasMore = false;
 		} else {
 			collections = after ? [...collections, ...result.data] : result.data;
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -192,20 +202,9 @@
 		void loadExampleIds().then((ids) => (exampleCollectionIds = ids.collections));
 	});
 
-	function sentinel(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loading)
-					void fetchPage(collections.at(-1)?.id);
-			},
-			{ rootMargin: '200px' }
-		);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
+	function loadMore() {
+		if (!hasMore || loading) return;
+		void fetchPage(collections.at(-1)?.id);
 	}
 
 	function resetDialog() {
@@ -399,11 +398,17 @@
 		</div>
 	{/if}
 
-	{#if hasMore}
-		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-			<LoadMoreSpinner {loading} hasRows={collections.length > 0} />
-		</div>
-	{/if}
+	<ListFoot
+		{loading}
+		{hasMore}
+		failed={pageFailed}
+		rows={collections.length}
+		noun="collection"
+		lines={END_LINES}
+		lineKey="/collections"
+		onload={loadMore}
+		onretry={() => void fetchPage(collections.at(-1)?.id)}
+	/>
 </Page>
 
 <ResponsiveDialog.Root open={dialogOpen} onOpenChange={handleOpenChange}>
