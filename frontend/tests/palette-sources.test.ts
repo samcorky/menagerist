@@ -6,6 +6,7 @@ const { listNodeTypes, searchApi } = vi.hoisted(() => ({
 }));
 vi.mock('$lib/api/client', () => ({ listNodeTypes, searchEverything: searchApi }));
 import {
+	cachedItemTypes,
 	ITEM_TYPE_CAP,
 	loadItemTypes,
 	refreshItemTypes,
@@ -264,6 +265,26 @@ describe('refreshItemTypes', () => {
 		await expect(refreshItemTypes()).rejects.toThrow();
 		listNodeTypes.mockResolvedValueOnce({ data: [type('Film')] });
 		await expect(loadItemTypes()).resolves.toEqual([type('Film')]);
+	});
+});
+
+describe('cachedItemTypes', () => {
+	it('is null until a load finishes, then holds the list', async () => {
+		expect(cachedItemTypes()).toBeNull();
+		listNodeTypes.mockResolvedValueOnce({ data: [type('Film')] });
+		await loadItemTypes();
+		expect(cachedItemTypes()).toEqual([type('Film')]);
+	});
+
+	it('follows a refresh, and keeps the old list when the refresh fails', async () => {
+		listNodeTypes.mockResolvedValueOnce({ data: [type('Film')] });
+		await loadItemTypes();
+		listNodeTypes.mockResolvedValueOnce({ data: [type('Film'), type('Signature')] });
+		await refreshItemTypes();
+		expect(cachedItemTypes()).toEqual([type('Film'), type('Signature')]);
+		listNodeTypes.mockRejectedValueOnce(new Error('boom'));
+		await expect(refreshItemTypes()).rejects.toThrow();
+		expect(cachedItemTypes()).toEqual([type('Film'), type('Signature')]);
 	});
 });
 

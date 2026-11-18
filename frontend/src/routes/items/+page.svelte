@@ -29,7 +29,7 @@
 	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
 	import { toast } from 'svelte-sonner';
 	import type { CollectionResponse, NodeResponse, NodeTypeResponse } from '$lib/api/client';
-	import { fetchAllNodeTypes } from '$lib/node-types';
+	import { cachedItemTypes, refreshItemTypes } from '$lib/palette-sources';
 	import { fetchItemFields, fetchSavedFields, type ItemField } from '$lib/item-fields';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import QueryBuilder from '$lib/components/query-builder.svelte';
@@ -99,7 +99,8 @@
 	let savedScrollTop = 0;
 
 	let items = $state<NodeResponse[]>([]);
-	let allCategories = $state<NodeTypeResponse[]>([]);
+	// Starts from the list the session already holds, so cards draw with their type's icon at once.
+	let allCategories = $state<NodeTypeResponse[]>(cachedItemTypes() ?? []);
 	let loading = $state(false);
 	let hasMore = $state(true);
 	let selectedType = $state<string | null>(null);
@@ -369,10 +370,16 @@
 	async function fetchCategories() {
 		// Neither call waits for the other: the slower listing must not hold up the type catalogue.
 		await Promise.all([
-			fetchAllNodeTypes().then((types) => {
-				if (types) allCategories = types;
-				categoriesLoaded = true;
-			}),
+			// Refreshed in the background; a failed refresh keeps the list already shown.
+			refreshItemTypes().then(
+				(types) => {
+					allCategories = types;
+					categoriesLoaded = true;
+				},
+				() => {
+					categoriesLoaded = true;
+				}
+			),
 			fetchItemFields().then((fields) => {
 				itemFields = fields;
 			}),
