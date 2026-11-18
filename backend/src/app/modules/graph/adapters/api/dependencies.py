@@ -155,8 +155,9 @@ def get_random_node_use_case(
     list_nodes: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    item_covers: Annotated[MediaItemCovers, Depends(get_item_covers)],
 ) -> RandomNode:
-    return RandomNode(repos, guard, list_nodes)
+    return RandomNode(repos, guard, list_nodes, item_covers=item_covers)
 
 
 def get_count_nodes_use_case(

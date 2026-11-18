@@ -243,9 +243,9 @@ class NodeResponse(BaseModel):
     created_at: datetime = Field(description="When it was created.")
     updated_at: datetime = Field(description="When it last changed.")
     cover_thumbnail_url: str | None = Field(
-        description="Where to fetch its cover's thumbnail. Only lists and searches "
-        + "fill it in, so a card can show its picture without a request of its own; "
-        + "null if it has no cover or this response does not say.",
+        description="Where to fetch its cover's thumbnail. Only lists, searches and "
+        + "the random pick fill it in, so a card can show its picture without a "
+        + "request of its own; null if it has no cover or this response does not say.",
         default=None,
     )
 

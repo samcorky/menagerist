@@ -88,3 +88,15 @@ def test_fetching_one_item_does_not_look_up_its_cover() -> None:
         client.get(f"/api/v1/nodes/{with_cover}").json()["cover_thumbnail_url"] is None
     )
     assert covers.asked == []
+
+
+def test_a_random_pick_gives_its_cover_thumbnail() -> None:
+    """The surprise-me pick carries its cover too, so its page can open with it."""
+    client, covers = _client()
+    with_cover = client.post("/api/v1/nodes", json={"name": "Alien"}).json()["id"]
+    covers.set(uuid.UUID(with_cover), _THUMBNAIL)
+
+    picked = client.get("/api/v1/nodes/random").json()
+
+    assert picked["id"] == with_cover
+    assert picked["cover_thumbnail_url"] == _THUMBNAIL
