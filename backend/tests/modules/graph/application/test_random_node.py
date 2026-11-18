@@ -164,3 +164,17 @@ async def test_a_pick_without_a_cover_has_no_thumbnail(world: World) -> None:
     picked = await world.use_case.handle(ListNodesQuery(), AS_ALICE)
 
     assert picked.cover_thumbnail_url is None
+
+
+async def test_a_pick_without_a_cover_source_has_no_thumbnail(world: World) -> None:
+    """With no cover source wired in, the pick is made without a thumbnail."""
+    await world.item("Mine")
+    guard = InMemoryAccessGuard()
+    lister = ListNodes(
+        world.repos, guard, world.members, today=lambda: date(2026, 10, 29)
+    )
+    bare = RandomNode(world.repos, guard, lister)
+
+    picked = await bare.handle(ListNodesQuery(), AS_ALICE)
+
+    assert picked.cover_thumbnail_url is None
