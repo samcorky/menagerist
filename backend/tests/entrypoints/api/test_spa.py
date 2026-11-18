@@ -66,6 +66,20 @@ def test_shell_is_never_cached_and_carries_the_spa_csp(client: TestClient) -> No
     assert resp.headers["X-Content-Type-Options"] == "nosniff"
 
 
+def test_shell_lets_its_own_pages_use_the_camera_for_barcode_scanning(
+    client: TestClient,
+) -> None:
+    """The scanner needs the camera, and a WebAssembly detector without a native one."""
+    resp = client.get("/items")
+
+    assert "camera=(self)" in resp.headers["Permissions-Policy"]
+    assert "microphone=()" in resp.headers["Permissions-Policy"]
+    assert "'wasm-unsafe-eval'" in resp.headers["Content-Security-Policy"]
+    assert "'unsafe-eval'" not in resp.headers["Content-Security-Policy"].replace(
+        "'wasm-unsafe-eval'", ""
+    )
+
+
 def test_requesting_the_shell_file_directly_gets_shell_headers(
     client: TestClient,
 ) -> None:
@@ -194,6 +208,8 @@ def test_api_responses_keep_their_own_security_headers(app_client: TestClient) -
 
     assert "default-src 'none'" in api.headers["Content-Security-Policy"]
     assert "default-src 'self'" in shell.headers["Content-Security-Policy"]
+    assert "camera=()" in api.headers["Permissions-Policy"]
+    assert "camera=(self)" in shell.headers["Permissions-Policy"]
 
 
 def test_a_missing_dist_directory_fails_at_startup(

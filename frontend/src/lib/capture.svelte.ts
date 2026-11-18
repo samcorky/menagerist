@@ -1,3 +1,5 @@
+import type { AttributesSchema } from '$lib/schema-types';
+
 export type StagedPhoto = {
 	id: string;
 	filename: string;
@@ -8,6 +10,8 @@ export type PendingCapture = {
 	name: string;
 	selectedType: string | null;
 	stagedPhoto: StagedPhoto | null;
+	/** A scanned barcode, already placed in the field the person chose. */
+	barcode: { attributes: Record<string, string>; extraSchema: AttributesSchema | null } | null;
 };
 
 class CaptureController {

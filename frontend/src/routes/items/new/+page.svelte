@@ -117,6 +117,13 @@
 				stagedAsset = pending.stagedPhoto;
 				photoPreview = pending.stagedPhoto.previewUrl;
 			}
+			if (pending.barcode) {
+				attrRows = Object.entries(pending.barcode.attributes).map(([key, value]) => ({
+					key,
+					value
+				}));
+				extraSchema = pending.barcode.extraSchema;
+			}
 		}
 	});
 
