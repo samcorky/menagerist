@@ -39,8 +39,8 @@
 		PASSWORD_MIN_LENGTH
 	} from '$lib/auth';
 	import { isLocked, lastSignIn, lockedLabel, renameDecision } from '$lib/users';
-	import { describeDevice, formatRelativeTime } from '$lib/devices';
-	import { formatIsoDate } from '$lib/format-date';
+	import AdminSessionCard from '$lib/components/admin-session-card.svelte';
+	import { renameUserDevice, withDeviceName } from '$lib/admin-device-name';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
@@ -50,7 +50,6 @@
 	import UserAvatar from '$lib/components/user-avatar.svelte';
 	import DataTable from '$lib/components/data-table.svelte';
 	import HiddenUsername from '$lib/components/hidden-username.svelte';
-	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -165,6 +164,13 @@
 	function openDevices(user: UserResponse) {
 		devicesTarget = user;
 		void loadUserDevices(user.id);
+	}
+
+	async function saveUserDeviceName(deviceId: string, name: string | null): Promise<boolean> {
+		const saved = await renameUserDevice(deviceId, name);
+		if (saved === undefined) return false;
+		userDevices = withDeviceName(userDevices, deviceId, saved);
+		return true;
 	}
 
 	async function handleRevokeUserDevice(sessionId: string) {
@@ -905,58 +911,17 @@
 			{:else}
 				<ul class="space-y-3" aria-label="User devices">
 					{#each userDevices as dev (dev.id)}
-						{@const described = describeDevice({
-							userAgent: dev.user_agent,
-							platform: dev.client_platform,
-							mobile: dev.client_mobile,
-							displayMode: dev.display_mode
-						})}
 						<li>
-							<Card.Root>
-								<Card.Content
-									class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-								>
-									<div class="flex items-start gap-3">
-										<div
-											class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-										>
-											<DeviceIcon kind={described.kind} class="size-5" />
-										</div>
-										<div class="space-y-1">
-											<div class="flex flex-wrap items-center gap-2">
-												<p class="font-medium" title={dev.user_agent ?? undefined}>
-													{described.label}
-												</p>
-												{#if dev.id === currentSessionId}
-													<Badge variant="secondary">This device</Badge>
-												{/if}
-											</div>
-											<p class="text-xs text-muted-foreground">
-												{#if dev.client_ip}
-													{dev.client_ip} &middot;
-												{/if}
-												Signed in {formatIsoDate(dev.created_at.slice(0, 10), 'short')} &middot; Last
-												active {formatRelativeTime(dev.last_seen_at)}
-											</p>
-										</div>
-									</div>
-
-									{#if dev.id !== currentSessionId && canRevokeSessions}
-										<Button
-											type="button"
-											variant="outline"
-											class="shrink-0 pointer-coarse:h-11"
-											disabled={revokingDeviceId === dev.id}
-											onclick={() => handleRevokeUserDevice(dev.id)}
-										>
-											{#if revokingDeviceId === dev.id}
-												<Spinner class="size-4" />
-											{/if}
-											Sign out
-										</Button>
-									{/if}
-								</Card.Content>
-							</Card.Root>
+							<AdminSessionCard
+								session={dev}
+								current={dev.id === currentSessionId}
+								showOwner={false}
+								revoking={revokingDeviceId === dev.id}
+								onrevoke={canRevokeSessions ? () => handleRevokeUserDevice(dev.id) : undefined}
+								onrename={canRevokeSessions && dev.device_id
+									? (name) => saveUserDeviceName(dev.device_id!, name)
+									: undefined}
+							/>
 						</li>
 					{/each}
 				</ul>

@@ -3,7 +3,7 @@ import { createUserViaApi, uniqueName, type E2EUser } from './helpers';
 
 /**
  * Naming devices: the prompt after signing in through the form, dismissing it, renaming from the
- * Account page, and an administrator renaming a user's device.
+ * Account page, an administrator renaming a user's device, and the name on the Users page.
  */
 test.describe.configure({ mode: 'serial' });
 
@@ -119,6 +119,58 @@ test('an administrator can rename a users device', async ({
 	// The owner sees the administrator's name on their own devices page.
 	await memberPage.goto('/settings/account');
 	await expect(memberPage.getByTestId('device-title').filter({ hasText: name })).toHaveCount(1);
+
+	await context.close();
+});
+
+test("a user's devices on the Users page show the name they gave it", async ({
+	page,
+	browser,
+	workerBaseURL,
+	workerSession
+}) => {
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
+	const member = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'name-users' });
+	await adminApi.dispose();
+	const name = uniqueName('Kitchen tablet');
+	const renamed = uniqueName('Hall tablet');
+
+	const context = await signedOutContext(browser, workerBaseURL);
+	const memberPage = await context.newPage();
+	await signInThroughForm(memberPage, member);
+	await prompt(memberPage).getByLabel('Device name').fill(name);
+	await prompt(memberPage).getByRole('button', { name: 'Save name' }).click();
+	await expect(memberPage.getByText('Device named')).toBeVisible();
+
+	await page.goto('/admin/users');
+	const userRow = page
+		.getByRole('table', { name: 'Users' })
+		.getByRole('row')
+		.filter({ hasText: member.username });
+	await userRow.getByRole('button', { name: 'Devices' }).click();
+	// The member also has an unnamed session from being created over the API.
+	const card = page
+		.getByRole('list', { name: 'User devices' })
+		.getByRole('listitem')
+		.filter({ has: page.getByTestId('device-title').getByText(name, { exact: true }) });
+	await expect(card).toHaveCount(1);
+	await expect(card.getByTestId('device-subtitle')).not.toBeEmpty();
+
+	// It can be renamed from there too, as on the Devices page.
+	await card.getByRole('button', { name: 'Rename device' }).click();
+	const form = page.getByRole('list', { name: 'User devices' }).getByLabel('Device name');
+	await form.fill(renamed);
+	await page
+		.getByRole('list', { name: 'User devices' })
+		.getByRole('button', { name: 'Save', exact: true })
+		.click();
+	await expect(page.getByText('Device named')).toBeVisible();
+	await expect(
+		page
+			.getByRole('list', { name: 'User devices' })
+			.getByTestId('device-title')
+			.getByText(renamed, { exact: true })
+	).toBeVisible();
 
 	await context.close();
 });

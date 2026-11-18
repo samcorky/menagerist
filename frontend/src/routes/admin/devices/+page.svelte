@@ -6,7 +6,6 @@
 		listOwnSessions,
 		listSessions,
 		listUsers,
-		renameDevice,
 		revokeSession,
 		type AdminSessionResponse,
 		type UserResponse
@@ -22,11 +21,12 @@
 	import DataTable from '$lib/components/data-table.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import DeviceTitle from '$lib/components/device-title.svelte';
+	import AdminSessionCard from '$lib/components/admin-session-card.svelte';
+	import { renameUserDevice, withDeviceName } from '$lib/admin-device-name';
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as Card from '$lib/components/ui/card/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { NativeSelect } from '$lib/components/ui/native-select/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
@@ -125,20 +125,10 @@
 	}
 
 	async function saveName(deviceId: string, name: string | null): Promise<boolean> {
-		try {
-			const res = await renameDevice({ path: { device_id: deviceId }, body: { name } });
-			if (res.error || !res.data) {
-				toast.error(errorMessage(res.error));
-				return false;
-			}
-			const saved = res.data.name ?? null;
-			sessions = sessions.map((s) => (s.device_id === deviceId ? { ...s, device_name: saved } : s));
-			toast.success(saved ? 'Device named' : 'Device name cleared');
-			return true;
-		} catch {
-			toast.error('Could not save the name.');
-			return false;
-		}
+		const saved = await renameUserDevice(deviceId, name);
+		if (saved === undefined) return false;
+		sessions = withDeviceName(sessions, deviceId, saved);
+		return true;
 	}
 
 	async function handleRevoke(sessionId: string) {
@@ -290,77 +280,17 @@
 		{:else}
 			<ul class="space-y-3 md:hidden" aria-label="Active devices">
 				{#each sessions as session (session.id)}
-					{@const described = describeDevice({
-						userAgent: session.user_agent,
-						platform: session.client_platform,
-						mobile: session.client_mobile,
-						displayMode: session.display_mode
-					})}
 					<li>
-						<Card.Root>
-							<Card.Content class="flex flex-col gap-3 p-4">
-								<div class="flex items-start justify-between gap-3">
-									<div class="flex items-start gap-3">
-										<div
-											class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-										>
-											<DeviceIcon kind={described.kind} class="size-5" />
-										</div>
-										<div class="space-y-0.5">
-											<div class="flex flex-wrap items-center gap-2">
-												<DeviceTitle
-													{...nameDevice(session.device_name, described.label)}
-													name={session.device_name ?? null}
-													label={described.label}
-													userAgent={session.user_agent}
-													onsave={canRevoke && session.device_id
-														? (name) => saveName(session.device_id!, name)
-														: undefined}
-												/>
-												{#if session.id === currentSessionId}
-													<Badge variant="secondary">This device</Badge>
-												{/if}
-											</div>
-											<p class="flex items-center gap-1.5 text-xs text-muted-foreground">
-												<UserAvatar
-													userId={session.user_id}
-													displayName={session.display_name ?? session.username ?? ''}
-													avatarVersion={pictures.get(session.user_id)}
-													size="sm"
-													decorative
-												/>
-												{session.display_name} (@{session.username})
-											</p>
-										</div>
-									</div>
-
-									{#if session.id !== currentSessionId && canRevoke}
-										<Button
-											type="button"
-											variant="outline"
-											class="shrink-0 pointer-coarse:h-11"
-											disabled={revokingId === session.id}
-											onclick={() => handleRevoke(session.id)}
-										>
-											{#if revokingId === session.id}
-												<Spinner class="size-4" />
-											{/if}
-											Sign out
-										</Button>
-									{/if}
-								</div>
-
-								<div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-									{#if session.client_ip}
-										<span>{session.client_ip}</span>
-										<span>&middot;</span>
-									{/if}
-									<span>Signed in {formatIsoDate(session.created_at.slice(0, 10), 'short')}</span>
-									<span>&middot;</span>
-									<span>Last active {formatRelativeTime(session.last_seen_at)}</span>
-								</div>
-							</Card.Content>
-						</Card.Root>
+						<AdminSessionCard
+							{session}
+							current={session.id === currentSessionId}
+							ownerPicture={pictures.get(session.user_id)}
+							revoking={revokingId === session.id}
+							onrevoke={canRevoke ? () => handleRevoke(session.id) : undefined}
+							onrename={canRevoke && session.device_id
+								? (name) => saveName(session.device_id!, name)
+								: undefined}
+						/>
 					</li>
 				{/each}
 			</ul>
