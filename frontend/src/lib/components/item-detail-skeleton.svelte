@@ -1,12 +1,15 @@
 <script lang="ts">
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import type { ItemPreview } from '$lib/item-preview';
 
 	/**
 	 * Placeholder for the item page while it loads. It uses the page's own grid, so the cover,
 	 * details and connections are where the real content lands. Keep the grid classes in step
-	 * with items/[id]/+page.svelte.
+	 * with items/[id]/+page.svelte. When the person came from a list, the item's title and cover
+	 * thumbnail are already known and show at once.
 	 */
+	let { preview = null }: { preview?: ItemPreview | null } = $props();
 </script>
 
 <div
@@ -15,14 +18,26 @@
 	aria-hidden="true"
 >
 	<div data-testid="item-cover" class="lg:col-start-1 lg:row-span-2 lg:row-start-1">
-		<Skeleton class="aspect-[4/3] w-full rounded-xl lg:aspect-[3/4]" />
+		{#if preview?.cover_thumbnail_url}
+			<img
+				src={preview.cover_thumbnail_url}
+				alt=""
+				class="w-full rounded-xl border bg-card object-contain"
+			/>
+		{:else}
+			<Skeleton class="aspect-[4/3] w-full rounded-xl lg:aspect-[3/4]" />
+		{/if}
 	</div>
 
 	<div data-testid="item-main" class="min-w-0 space-y-4 lg:col-start-2 lg:row-start-1">
 		<Card.Root class="overflow-hidden">
 			<Card.Header class="flex flex-row items-start justify-between gap-4 space-y-0">
 				<div class="min-w-0 flex-1">
-					<Skeleton class="h-7 w-48 max-w-full rounded" />
+					{#if preview}
+						<Card.Title class="font-heading text-xl">{preview.name}</Card.Title>
+					{:else}
+						<Skeleton class="h-7 w-48 max-w-full rounded" />
+					{/if}
 					<Skeleton class="mt-2 h-9 w-full max-w-xs rounded-md" />
 				</div>
 				<Skeleton class="size-9 shrink-0 rounded-md" />

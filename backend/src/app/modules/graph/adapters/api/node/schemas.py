@@ -242,11 +242,20 @@ class NodeResponse(BaseModel):
     )
     created_at: datetime = Field(description="When it was created.")
     updated_at: datetime = Field(description="When it last changed.")
+    cover_thumbnail_url: str | None = Field(
+        description="Where to fetch its cover's thumbnail. Only lists, searches and "
+        + "the random pick fill it in, so a card can show its picture without a "
+        + "request of its own; null if it has no cover or this response does not say.",
+        default=None,
+    )
 
     @classmethod
-    def from_domain(cls, node: Node) -> NodeResponse:
+    def from_domain(
+        cls, node: Node, *, cover_thumbnail_url: str | None = None
+    ) -> NodeResponse:
         """Build a response from a domain `Node`."""
         return cls(
+            cover_thumbnail_url=cover_thumbnail_url,
             id=node.id,
             name=node.name,
             type=node.type,
@@ -413,7 +422,12 @@ class NodeSearchResponse(BaseModel):
     def from_result(cls, result: SearchNodesResult) -> NodeSearchResponse:
         """Build a response from a `SearchNodesResult`."""
         return cls(
-            items=[NodeResponse.from_domain(node) for node in result.items],
+            items=[
+                NodeResponse.from_domain(
+                    node, cover_thumbnail_url=result.covers.get(node.id)
+                )
+                for node in result.items
+            ],
             total=result.total,
             total_capped=result.total_capped,
             next_cursor=result.next_cursor,

@@ -7,7 +7,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import NodeSkeleton from '$lib/components/node-skeleton.svelte';
-	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
+	import ListFoot from '$lib/components/list-foot.svelte';
 	import {
 		Download,
 		EyeOff,
@@ -156,6 +156,8 @@
 	let itemTypes = $state<NodeTypeResponse[]>([]);
 	let loading = $state(false);
 	let hasMore = $state(false);
+	// A later page that would not load: the list's foot says so and offers Try again (#588).
+	let pageFailed = $state(false);
 	let itemsFailed = $state(false);
 	let fetchSeq = 0;
 	let collectionSeq = 0;
@@ -231,6 +233,13 @@
 		})
 	);
 	let narrowedTotal = $state<{ total: number; capped: boolean } | null>(null);
+	// The end-of-list count. A smart collection reports a figure for everything it matched, so it
+	// cannot stand for a list the Examples filter has hidden rows from: there the rows are counted.
+	const countableTotal = $derived(
+		narrowedTotal && !narrowedTotal.capped && shownItems.length === items.length
+			? narrowedTotal.total
+			: null
+	);
 	let searchWarnings = $state<SearchWarning[]>([]);
 	let tooLarge = $state(false);
 	let adhocError = $state<BuilderError | null>(null);
@@ -570,6 +579,7 @@
 	async function fetchPage(id: string, search: string, type: string, after?: string) {
 		const seq = ++fetchSeq;
 		loading = true;
+		pageFailed = false;
 		if (!after) {
 			itemsFailed = false;
 			firstPageLoaded = false;
@@ -588,13 +598,12 @@
 			notFound = true;
 			hasMore = false;
 		} else if (result.error || !result.data) {
-			if (after) {
-				const { title, description } = networkAwareError(result);
-				toast.error(title, { description });
-			} else {
+			// A later page keeps `hasMore`, so Try again in the list's foot can resume it.
+			if (after) pageFailed = true;
+			else {
 				itemsFailed = true;
+				hasMore = false;
 			}
-			hasMore = false;
 		} else {
 			items = after ? [...items, ...result.data] : result.data;
 			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -641,6 +650,7 @@
 		if (!current) return;
 		const seq = ++fetchSeq;
 		loading = true;
+		pageFailed = false;
 		if (!more) {
 			itemsFailed = false;
 			firstPageLoaded = false;
@@ -677,14 +687,14 @@
 				adhocError = { message, path: at?.part === 'adhoc' ? at.path : null };
 				items = [];
 				hasMore = false;
+				hasMore = false;
 			} else if (more) {
-				toast.error(e instanceof SearchError ? e.title : 'Something went wrong', {
-					description: e instanceof SearchError ? e.description : undefined
-				});
+				// Retryable: the rows already loaded stay, and the foot offers Try again (#588).
+				pageFailed = true;
 			} else {
 				itemsFailed = true;
+				hasMore = false;
 			}
-			hasMore = false;
 		}
 		if (!more) firstPageLoaded = true;
 		loading = false;
@@ -771,21 +781,14 @@
 		wasConditionsOpen = open;
 	});
 
-	function sentinel(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loading)
-					if (smart) void fetchSmart(true);
-					else void fetchPage(canonicalId, q, selectedType, items.at(-1)?.id);
-			},
-			{ rootMargin: '200px' }
-		);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
+	function nextPage() {
+		if (smart) void fetchSmart(true);
+		else void fetchPage(canonicalId, q, selectedType, items.at(-1)?.id);
+	}
+
+	function loadMore() {
+		if (!hasMore || loading) return;
+		nextPage();
 	}
 
 	function openAdd(event: MouseEvent) {
@@ -1356,11 +1359,16 @@
 			</div>
 		{/if}
 
-		{#if hasMore}
-			<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-				<LoadMoreSpinner {loading} hasRows={shownItems.length > 0} />
-			</div>
-		{/if}
+		<ListFoot
+			{loading}
+			{hasMore}
+			failed={pageFailed}
+			rows={shownItems.length}
+			total={countableTotal}
+			noun="item"
+			onload={loadMore}
+			onretry={nextPage}
+		/>
 	{/if}
 </Page>
 

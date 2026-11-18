@@ -2,7 +2,9 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Collection
 
+    from app.modules.media.domain.media_asset import MediaAsset
     from app.modules.media.domain.media_attachment import (
         AttachmentTarget,
         MediaAttachment,
@@ -44,6 +46,19 @@ class MediaAttachmentRepository(Protocol):
         scope: ContentFilter,
     ) -> list[MediaAttachment]:
         """Return the attachments on the target whose asset is inside `scope`."""
+        ...
+
+    async def list_cover_assets(
+        self,
+        target_type: AttachmentTarget,
+        target_ids: Collection[uuid.UUID],
+        *,
+        scope: ContentFilter,
+    ) -> dict[uuid.UUID, MediaAsset]:
+        """Return the cover asset of each target that has one inside `scope`.
+
+        One query for every target, so a page of items costs a single lookup.
+        """
         ...
 
     async def list_for_asset(

@@ -1,0 +1,64 @@
+/**
+ * The wording and paging rules for the bottom of an infinite list (#588).
+ *
+ * A list's foot says one of four things: nothing yet, "Loading more…", the end
+ * of the list, or that the next page failed and can be retried. The end state
+ * carries the factual count, and may add one of the page's own flavour lines in
+ * the spirit of the empty-state lines (#102). Errors stay plain (design §11).
+ */
+
+import { pickEmptyLine } from '$lib/empty-lines';
+
+/** What the foot of a list is currently saying. */
+export type ListEndState = 'idle' | 'loading' | 'end' | 'failed';
+
+/**
+ * How far before the list's foot the next page starts loading.
+ *
+ * The old 200px rarely hid the request: a page of rows is taller than that, so
+ * a steady scroller reached the spinner before the rows arrived. A viewport and
+ * a half buys roughly a screen of reading while the page is in flight, without
+ * fetching pages nobody scrolls to.
+ */
+export function loadAheadMargin(viewportHeight: number): string {
+	const height = Number.isFinite(viewportHeight) && viewportHeight > 0 ? viewportHeight : 800;
+	return `${Math.round(height * 1.5)}px`;
+}
+
+/** Decides what the foot of a list should show. */
+export function listEndState(paging: {
+	loading: boolean;
+	hasMore: boolean;
+	failed: boolean;
+	rows: number;
+}): ListEndState {
+	if (paging.failed) return 'failed';
+	if (paging.loading) return paging.rows > 0 ? 'loading' : 'idle';
+	// An empty list has its own empty state to speak for it (design §11).
+	if (paging.hasMore || paging.rows === 0) return 'idle';
+	return 'end';
+}
+
+/** "1,204 items", or "1,204 collections" for whatever the list holds. */
+export function countedEnd(rows: number, total: number | null, noun: string): string {
+	const counted = total ?? rows;
+	const plural = counted === 1 ? noun : `${noun}s`;
+	return `${counted.toLocaleString('en-GB')} ${plural}`;
+}
+
+/** The whole end-of-list sentence: the count, after a flavour line where there is one. */
+export function endMessage(
+	rows: number,
+	total: number | null,
+	noun: string,
+	lines: readonly string[],
+	key: string
+): string {
+	const counted = countedEnd(rows, total, noun);
+	// A short list ends in plain sight; a line there would be noise.
+	if (lines.length === 0 || rows < 20) return `That's everything - ${counted}.`;
+	return `${pickEmptyLine(lines, key)} ${counted} in all.`;
+}
+
+/** The plain line for a next page that would not load. Never a flavour line (design §11). */
+export const LOAD_MORE_FAILED = "We couldn't load any more.";

@@ -18,6 +18,10 @@ from app.entrypoints.api.shared.bridges.item_companions import (
     ItemCompanionCopier,
     get_item_companions,
 )
+from app.entrypoints.api.shared.bridges.item_covers import (
+    MediaItemCovers,
+    get_item_covers,
+)
 from app.entrypoints.api.shared.bridges.item_dependents import (
     ItemDependentsPurger,
     get_item_dependents,
@@ -142,16 +146,18 @@ def get_list_nodes_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     collection_members: Annotated[CollectionsMembers, Depends(get_collection_members)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    item_covers: Annotated[MediaItemCovers, Depends(get_item_covers)],
 ) -> ListNodes:
-    return ListNodes(repos, guard, collection_members)
+    return ListNodes(repos, guard, collection_members, item_covers=item_covers)
 
 
 def get_random_node_use_case(
     list_nodes: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    item_covers: Annotated[MediaItemCovers, Depends(get_item_covers)],
 ) -> RandomNode:
-    return RandomNode(repos, guard, list_nodes)
+    return RandomNode(repos, guard, list_nodes, item_covers=item_covers)
 
 
 def get_count_nodes_use_case(
@@ -165,8 +171,9 @@ def get_count_nodes_use_case(
 def get_search_nodes_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    item_covers: Annotated[MediaItemCovers, Depends(get_item_covers)],
 ) -> SearchNodes:
-    return SearchNodes(repos, guard)
+    return SearchNodes(repos, guard, item_covers=item_covers)
 
 
 def get_search_node_counts_use_case(

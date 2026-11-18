@@ -15,7 +15,7 @@
 		Library
 	} from '@lucide/svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
-	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
+	import ListFoot from '$lib/components/list-foot.svelte';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
@@ -27,7 +27,7 @@
 		listPresets,
 		type PresetResponse
 	} from '$lib/api/client';
-	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import { errorMessage } from '$lib/api/errors';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import PlanPreviewDialog from '$lib/components/plan-preview-dialog.svelte';
@@ -63,30 +63,36 @@
 	let fields = $state<PresetResponse[]>([]);
 	let fieldsLoading = $state(false);
 	let fieldsHasMore = $state(true);
+	// A later page that would not load: the list's foot says so and offers Try again (#588).
+	let fieldsPageFailed = $state(false);
 	let fieldsLoadFailed = $state(false);
 
 	let lists = $state<PresetResponse[]>([]);
 	let listsLoading = $state(false);
 	let listsHasMore = $state(true);
+	// A later page that would not load: the list's foot says so and offers Try again (#588).
+	let listsPageFailed = $state(false);
 	let listsLoadFailed = $state(false);
 
 	let fieldSets = $state<PresetResponse[]>([]);
 	let fieldSetsLoading = $state(false);
 	let fieldSetsHasMore = $state(true);
+	// A later page that would not load: the list's foot says so and offers Try again (#588).
+	let fieldSetsPageFailed = $state(false);
 	let fieldSetsLoadFailed = $state(false);
 
 	async function fetchFields(after?: string) {
 		fieldsLoading = true;
+		fieldsPageFailed = false;
 		if (!after) fieldsLoadFailed = false;
 		const result = await listPresets({ query: { kind: 'field', after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			if (after) {
-				const { title, description } = networkAwareError(result);
-				toast.error(title, { description });
-			} else {
+			// A later page keeps hasMore, so Try again in the list's foot can resume it.
+			if (after) fieldsPageFailed = true;
+			else {
 				fieldsLoadFailed = true;
+				fieldsHasMore = false;
 			}
-			fieldsHasMore = false;
 		} else {
 			fields = after ? [...fields, ...result.data] : result.data;
 			fieldsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -96,16 +102,16 @@
 
 	async function fetchLists(after?: string) {
 		listsLoading = true;
+		listsPageFailed = false;
 		if (!after) listsLoadFailed = false;
 		const result = await listPresets({ query: { kind: 'choice_list', after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			if (after) {
-				const { title, description } = networkAwareError(result);
-				toast.error(title, { description });
-			} else {
+			// A later page keeps hasMore, so Try again in the list's foot can resume it.
+			if (after) listsPageFailed = true;
+			else {
 				listsLoadFailed = true;
+				listsHasMore = false;
 			}
-			listsHasMore = false;
 		} else {
 			lists = after ? [...lists, ...result.data] : result.data;
 			listsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -115,16 +121,16 @@
 
 	async function fetchFieldSets(after?: string) {
 		fieldSetsLoading = true;
+		fieldSetsPageFailed = false;
 		if (!after) fieldSetsLoadFailed = false;
 		const result = await listPresets({ query: { kind: 'field_set', after, limit: PAGE_SIZE } });
 		if (result.error || !result.data) {
-			if (after) {
-				const { title, description } = networkAwareError(result);
-				toast.error(title, { description });
-			} else {
+			// A later page keeps hasMore, so Try again in the list's foot can resume it.
+			if (after) fieldSetsPageFailed = true;
+			else {
 				fieldSetsLoadFailed = true;
+				fieldSetsHasMore = false;
 			}
-			fieldSetsHasMore = false;
 		} else {
 			fieldSets = after ? [...fieldSets, ...result.data] : result.data;
 			fieldSetsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
@@ -132,36 +138,14 @@
 		fieldSetsLoading = false;
 	}
 
-	function fieldsSentinel(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && fieldsHasMore && !fieldsLoading)
-					void fetchFields(fields.at(-1)?.id);
-			},
-			{ rootMargin: '200px' }
-		);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
+	function loadFieldsMore() {
+		if (!fieldsHasMore || fieldsLoading) return;
+		void fetchFields(fields.at(-1)?.id);
 	}
 
-	function listsSentinel(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && listsHasMore && !listsLoading)
-					void fetchLists(lists.at(-1)?.id);
-			},
-			{ rootMargin: '200px' }
-		);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
+	function loadListsMore() {
+		if (!listsHasMore || listsLoading) return;
+		void fetchLists(lists.at(-1)?.id);
 	}
 
 	function handleDelete(preset: PresetResponse, collection: 'fields' | 'lists' | 'fieldSets') {
@@ -221,20 +205,9 @@
 		return Array.isArray(properties) ? properties.length : undefined;
 	}
 
-	function fieldSetsSentinel(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && fieldSetsHasMore && !fieldSetsLoading)
-					void fetchFieldSets(fieldSets.at(-1)?.id);
-			},
-			{ rootMargin: '200px' }
-		);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
+	function loadFieldSetsMore() {
+		if (!fieldSetsHasMore || fieldSetsLoading) return;
+		void fetchFieldSets(fieldSets.at(-1)?.id);
 	}
 
 	let busy = $state(false);
@@ -667,11 +640,15 @@
 			{/if}
 		{/if}
 
-		{#if fieldsHasMore}
-			<div use:fieldsSentinel class="flex justify-center py-2" aria-hidden="true">
-				<LoadMoreSpinner loading={fieldsLoading} hasRows={fields.length > 0} />
-			</div>
-		{/if}
+		<ListFoot
+			loading={fieldsLoading}
+			hasMore={fieldsHasMore}
+			failed={fieldsPageFailed}
+			rows={fields.length}
+			noun="saved field"
+			onload={loadFieldsMore}
+			onretry={() => void fetchFields(fields.at(-1)?.id)}
+		/>
 	</CollapsibleSection>
 
 	<CollapsibleSection id="saved-fields-lists" title="Lists" count={lists.length} class="gap-3">
@@ -708,11 +685,15 @@
 			{/if}
 		{/if}
 
-		{#if listsHasMore}
-			<div use:listsSentinel class="flex justify-center py-2" aria-hidden="true">
-				<LoadMoreSpinner loading={listsLoading} hasRows={lists.length > 0} />
-			</div>
-		{/if}
+		<ListFoot
+			loading={listsLoading}
+			hasMore={listsHasMore}
+			failed={listsPageFailed}
+			rows={lists.length}
+			noun="saved list"
+			onload={loadListsMore}
+			onretry={() => void fetchLists(lists.at(-1)?.id)}
+		/>
 	</CollapsibleSection>
 
 	<CollapsibleSection
@@ -754,11 +735,15 @@
 			{/if}
 		{/if}
 
-		{#if fieldSetsHasMore}
-			<div use:fieldSetsSentinel class="flex justify-center py-2" aria-hidden="true">
-				<LoadMoreSpinner loading={fieldSetsLoading} hasRows={fieldSets.length > 0} />
-			</div>
-		{/if}
+		<ListFoot
+			loading={fieldSetsLoading}
+			hasMore={fieldSetsHasMore}
+			failed={fieldSetsPageFailed}
+			rows={fieldSets.length}
+			noun="field group"
+			onload={loadFieldSetsMore}
+			onretry={() => void fetchFieldSets(fieldSets.at(-1)?.id)}
+		/>
 	</CollapsibleSection>
 	{#if editingList}
 		{#key editSession}
