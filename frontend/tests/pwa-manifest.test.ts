@@ -22,6 +22,23 @@ describe('app.html', () => {
 		expect(pngSize(STATIC + 'apple-touch-icon.png')).toBe('180x180');
 	});
 
+	it('gives a pasted link a preview, with a share image of the size it declares', () => {
+		for (const tag of [
+			'<meta property="og:title" content="Menagerist" />',
+			'<meta property="og:type" content="website" />',
+			'<meta property="og:image" content="/share-image.png" />',
+			'<meta property="og:image:width" content="1200" />',
+			'<meta property="og:image:height" content="630" />',
+			'<meta name="twitter:card" content="summary_large_image" />'
+		]) {
+			expect(APP_HTML).toContain(tag);
+		}
+		expect(APP_HTML).toMatch(/<meta\s+name="description"\s+content="[^"]+"/);
+		expect(APP_HTML).toMatch(/<meta\s+property="og:description"\s+content="[^"]+"/);
+		expect(APP_HTML).toMatch(/<meta property="og:image:alt" content="[^"]+" \/>/);
+		expect(pngSize(STATIC + 'share-image.png')).toBe('1200x630');
+	});
+
 	it('starts with the light theme colour and switches to the dark one on first paint', () => {
 		expect(APP_HTML).toContain(`<meta name="theme-color" content="${THEME_COLOURS.light}" />`);
 		expect(APP_HTML).toContain(`dark ? '${THEME_COLOURS.dark}' : '${THEME_COLOURS.light}'`);
