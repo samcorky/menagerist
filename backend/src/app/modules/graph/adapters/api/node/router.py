@@ -620,7 +620,10 @@ async def list_nodes(
     if result.total_capped:
         response.headers["Total-Count-Capped"] = "true"
 
-    return [NodeResponse.from_domain(node) for node in result.items[:limit]]
+    return [
+        NodeResponse.from_domain(node, cover_thumbnail_url=result.covers.get(node.id))
+        for node in result.items[:limit]
+    ]
 
 
 @router.patch(

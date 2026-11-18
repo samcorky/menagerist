@@ -1,7 +1,8 @@
 """Search items with a saved-able condition tree."""
 
+import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date  # noqa: TC003
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -18,6 +19,7 @@ from app.modules.graph.domain.query import (
     QueryWarning,
     SortKey,
 )
+from app.modules.graph.ports.item_covers import ItemCovers  # noqa: TC001
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 
@@ -83,6 +85,7 @@ class SearchNodesResult:
     total_capped: bool
     next_cursor: str | None
     warnings: list[QueryWarning]
+    covers: dict[uuid.UUID, str] = field(default_factory=dict)
 
 
 class SearchNodes(QueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult]):
@@ -96,8 +99,10 @@ class SearchNodes(QueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult])
         guard: AccessGuard,
         today: Callable[[], date] = utc_today,
         total_cap: int = TOTAL_CAP,
+        item_covers: ItemCovers | None = None,
     ) -> None:
         super().__init__(repos, guard)
+        self._item_covers = item_covers
         self._today = today
         self._total_cap = total_cap
 
@@ -137,8 +142,15 @@ class SearchNodes(QueryHandler[GraphRepos, SearchNodesQuery, SearchNodesResult])
                 Cursor(sort_values=last.sort_values, id=last.node.id)
             )
         logger.debug("nodes searched", count=len(page), total=total)
+        items = [hit.node for hit in page]
+        covers = (
+            await self._item_covers.thumbnails([node.id for node in items], actor)
+            if self._item_covers is not None and items
+            else {}
+        )
         return SearchNodesResult(
-            items=[hit.node for hit in page],
+            covers=covers,
+            items=items,
             total=total,
             total_capped=counted > self._total_cap,
             next_cursor=next_cursor,
