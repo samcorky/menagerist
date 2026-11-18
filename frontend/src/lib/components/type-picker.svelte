@@ -6,7 +6,7 @@
 	import Combobox from '$lib/components/ui/combobox/combobox.svelte';
 	import type { ComboboxItem } from '$lib/components/ui/combobox/combobox';
 	import TypeIcon from '$lib/components/type-icon.svelte';
-	import { loadItemTypes, resetItemTypeCache } from '$lib/palette-sources';
+	import { refreshItemTypes, resetItemTypeCache } from '$lib/palette-sources';
 	import { CREATE_PREFIX, NONE_VALUE, buildTypeItems, createdLabel } from '$lib/type-picker';
 	import { slugify } from '$lib/utils.js';
 
@@ -47,7 +47,7 @@
 
 	$effect(() => {
 		if (!nodeTypes)
-			void loadItemTypes()
+			void refreshItemTypes()
 				.then((all) => (types = all))
 				.catch(() => {});
 		void countNodeTypes().then((result) => {

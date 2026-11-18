@@ -79,6 +79,21 @@ export function loadItemTypes(): Promise<NodeTypeResponse[]> {
 	return typesPromise;
 }
 
+/**
+ * Fetches the list again and makes it the cached one. The cached list never learns of a type made
+ * elsewhere (another page, an example pack, another device), so whatever shows a choice of types
+ * calls this when it opens. A failed refresh leaves the list already held in place.
+ */
+export function refreshItemTypes(): Promise<NodeTypeResponse[]> {
+	const previous = typesPromise;
+	const attempt = fetchItemTypes();
+	typesPromise = attempt;
+	attempt.catch(() => {
+		if (typesPromise === attempt) typesPromise = previous;
+	});
+	return attempt;
+}
+
 const emptyGroups = (): Omit<Results, 'pages'> => ({
 	items: { status: 'ok', rows: [] },
 	collections: { status: 'ok', rows: [] },
