@@ -24,6 +24,21 @@ _CODECS = {
 }
 
 
+class DayMonthOrder(StrEnum):
+    """Which of the first two numbers of `03/04/2019` is the day."""
+
+    DAY_FIRST = "day_first"
+    MONTH_FIRST = "month_first"
+
+
+@dataclass(kw_only=True, frozen=True)
+class DayMonthOrderGuess:
+    """A suggested date order, and whether the values prove it."""
+
+    order: DayMonthOrder
+    certain: bool
+
+
 MAX_IMPORT_BYTES = 10 * 1024 * 1024
 MAX_IMPORT_ROWS = 5000
 # Problems a preview lists by name; the rest are counted.

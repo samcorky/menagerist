@@ -1,6 +1,7 @@
 import type {
 	ColumnMappingEntry,
 	CsvEncoding,
+	DayMonthOrder,
 	ItemImportFieldResponse,
 	ItemImportInspectionResponse
 } from '$lib/api/client';
@@ -91,6 +92,11 @@ export function rowsAndColumns(
 	const columns = inspection.headers.length;
 	return `${count(rows)} ${rows === 1 ? 'row' : 'rows'}, ${count(columns)} ${columns === 1 ? 'column' : 'columns'}`;
 }
+
+export const DATE_ORDERS: { value: DayMonthOrder; label: string }[] = [
+	{ value: 'day_first', label: 'Day first (19/08/2019 is 19 August)' },
+	{ value: 'month_first', label: 'Month first (08/19/2019 is 19 August)' }
+];
 
 const ENCODING_NAMES: Record<CsvEncoding, string> = {
 	utf_8: 'UTF-8',

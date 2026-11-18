@@ -19843,7 +19843,8 @@
                       "column": "authenticated"
                     }
                   ],
-                  "encoding": "utf_8"
+                  "encoding": "utf_8",
+                  "day_month_order_certain": false
                 }
               }
             }
@@ -32068,6 +32069,15 @@
         "title": "CsvEncoding",
         "description": "The encodings a CSV file is read in."
       },
+      "DayMonthOrder": {
+        "type": "string",
+        "enum": [
+          "day_first",
+          "month_first"
+        ],
+        "title": "DayMonthOrder",
+        "description": "Which of the first two numbers of `03/04/2019` is the day."
+      },
       "DefinitionWarningResponse": {
         "properties": {
           "path": {
@@ -32995,6 +33005,11 @@
             "title": "List Separator",
             "description": "What separates several choices or tags in one cell.",
             "default": ","
+          },
+          "day_month_order": {
+            "$ref": "#/components/schemas/DayMonthOrder",
+            "description": "Which number of a date written as `03/04/2019` is the day. Two-digit years: 00 to 49 are 2000 to 2049, 50 to 99 are 1950 to 1999.",
+            "default": "day_first"
           }
         },
         "type": "object",
@@ -33514,6 +33529,22 @@
           "encoding": {
             "$ref": "#/components/schemas/CsvEncoding",
             "description": "What the file was read as."
+          },
+          "day_month_order": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DayMonthOrder"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which number of a date written as `03/04/2019` is the day, suggested from the values; null when no value is written that way."
+          },
+          "day_month_order_certain": {
+            "type": "boolean",
+            "title": "Day Month Order Certain",
+            "description": "Whether the values prove the suggested order, or it is a guess."
           }
         },
         "type": "object",
@@ -33523,12 +33554,14 @@
           "row_count",
           "fields",
           "suggested_mapping",
-          "encoding"
+          "encoding",
+          "day_month_order_certain"
         ],
         "title": "ItemImportInspectionResponse",
         "description": "What is in a CSV file, the item type's fields, and a mapping to start from.",
         "examples": [
           {
+            "day_month_order_certain": false,
             "encoding": "utf_8",
             "fields": [
               {
@@ -35334,6 +35367,11 @@
             "title": "List Separator",
             "description": "What separates several choices or tags in one cell.",
             "default": ","
+          },
+          "day_month_order": {
+            "$ref": "#/components/schemas/DayMonthOrder",
+            "description": "Which number of a date written as `03/04/2019` is the day. Two-digit years: 00 to 49 are 2000 to 2049, 50 to 99 are 1950 to 1999.",
+            "default": "day_first"
           }
         },
         "type": "object",

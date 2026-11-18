@@ -218,3 +218,31 @@ def test_inspect_reads_an_excel_windows_1252_file(shared: Shared) -> None:
 
     assert body["encoding"] == "windows_1252"
     assert body["sample_rows"][0]["title"] == "René"
+
+
+def test_plan_reads_excel_dates_in_the_chosen_order(shared: Shared) -> None:
+    """13/04/2019 is a date day first, and no date month first."""
+    client = _with_type(shared)
+    data = b"title,signed_on,authenticated\nAlien,13/04/2019,yes\nHulk,Oct-18,no\n"
+
+    day_first = _post(client, "/plan", data=data, day_month_order="day_first")
+    month_first = _post(client, "/plan", data=data, day_month_order="month_first")
+
+    assert day_first.json()["ready"] is True
+    assert month_first.json()["ready"] is False
+    assert "Row 2, Signed on" in str(month_first.json())
+
+
+def test_inspect_suggests_a_day_month_order(shared: Shared) -> None:
+    """A value like 19/08/2019 proves day first; no such value suggests nothing."""
+    client = _with_type(shared)
+    data = b"title,signed_on,authenticated\nAlien,19/08/2019,yes\n"
+
+    body = _post(client, "/inspect", data=data).json()
+    plain = _post(client, "/inspect").json()
+
+    assert (body["day_month_order"], body["day_month_order_certain"]) == (
+        "day_first",
+        True,
+    )
+    assert (plain["day_month_order"], plain["day_month_order_certain"]) == (None, False)

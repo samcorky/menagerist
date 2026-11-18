@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.transfer.domain.tabular import CsvEncoding
+from app.modules.transfer.domain.tabular import CsvEncoding, DayMonthOrder
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
@@ -33,6 +33,8 @@ INSPECT_EXAMPLE: dict[str, Any] = {
         {"column": "authenticated", "target": None},
     ],
     "encoding": "utf_8",
+    "day_month_order": None,
+    "day_month_order_certain": False,
 }
 
 
@@ -91,10 +93,19 @@ class ItemImportInspectionResponse(BaseModel):
         description="A first guess, matching each column to a field by name."
     )
     encoding: CsvEncoding = Field(description="What the file was read as.")
+    day_month_order: DayMonthOrder | None = Field(
+        default=None,
+        description="Which number of a date written as `03/04/2019` is the day, "
+        + "suggested from the values; null when no value is written that way.",
+    )
+    day_month_order_certain: bool = Field(
+        description="Whether the values prove the suggested order, or it is a guess."
+    )
 
     @classmethod
     def from_domain(cls, found: ItemImportInspection) -> ItemImportInspectionResponse:
         """Build from what inspecting the file found."""
+        guess = found.day_month_order
         return cls(
             headers=list(found.headers),
             sample_rows=[
@@ -118,6 +129,8 @@ class ItemImportInspectionResponse(BaseModel):
                 for m in found.suggested_mapping
             ],
             encoding=found.encoding,
+            day_month_order=guess.order if guess else None,
+            day_month_order_certain=guess.certain if guess else False,
         )
 
 

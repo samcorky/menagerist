@@ -6,6 +6,7 @@
 		importItems,
 		inspectItemImport,
 		planItemImport,
+		type DayMonthOrder,
 		type ItemImportInspectionResponse
 	} from '$lib/api/client';
 	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
@@ -22,6 +23,7 @@
 		assignTarget,
 		choicesFrom,
 		confirmText,
+		DATE_ORDERS,
 		encodingName,
 		hasName,
 		itemsToAdd,
@@ -50,6 +52,7 @@
 	let file = $state<File | null>(null);
 	let itemType = $state<string | null>(null);
 	let separator = $state(',');
+	let dateOrder = $state<DayMonthOrder>('day_first');
 	let inspection = $state<ItemImportInspectionResponse | null>(null);
 	let choices = $state<ColumnChoice[]>([]);
 	let plan = $state<ImportPlan | null>(null);
@@ -89,6 +92,7 @@
 		}
 		inspection = result.data;
 		choices = choicesFrom(result.data.suggested_mapping);
+		dateOrder = result.data.day_month_order ?? 'day_first';
 		step = 'match';
 	}
 
@@ -109,7 +113,8 @@
 			file: file!,
 			item_type: itemType!,
 			mapping: mappingJson(choices),
-			list_separator: separator
+			list_separator: separator,
+			day_month_order: dateOrder
 		};
 	}
 
@@ -280,6 +285,36 @@
 						{/each}
 					</ul>
 				</div>
+
+				{#if inspection?.day_month_order}
+					<div class="space-y-1.5">
+						<label class="text-sm font-medium" for="csv-date-order">Dates like 03/04/2019</label>
+						<NativeSelect
+							id="csv-date-order"
+							class="w-full sm:w-80 pointer-coarse:[&_select]:min-h-11"
+							value={dateOrder}
+							onchange={(e) => (dateOrder = e.currentTarget.value as DayMonthOrder)}
+						>
+							{#each DATE_ORDERS as option (option.value)}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</NativeSelect>
+						<p class="text-xs text-muted-foreground">
+							{inspection.day_month_order_certain
+								? 'Chosen from the dates in the file.'
+								: 'The dates do not settle this, so day first is a guess.'}
+							Two-digit years from 00 to 49 are 2000 to 2049, and 50 to 99 are 1950 to 1999.
+						</p>
+					</div>
+				{/if}
+
+				{#if inspection?.fields.some((f) => f.kind === 'date' || f.kind === 'partialdate')}
+					<p class="text-xs text-muted-foreground">
+						Excel shows <span class="font-mono">Oct-18</span> for a full date it formatted as month and
+						year, and saves it that way. To keep the day, set the column to dd/mm/yyyy before saving as
+						CSV.
+					</p>
+				{/if}
 
 				{#if !named}
 					<p class="text-sm text-muted-foreground">Choose a column for Name.</p>
