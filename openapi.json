@@ -34514,6 +34514,18 @@
             "format": "date-time",
             "title": "Updated At",
             "description": "When it last changed."
+          },
+          "cover_thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Thumbnail Url",
+            "description": "Where to fetch its cover's thumbnail. Only lists, searches and the random pick fill it in, so a card can show its picture without a request of its own; null if it has no cover or this response does not say."
           }
         },
         "type": "object",

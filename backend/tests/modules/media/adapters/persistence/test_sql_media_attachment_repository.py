@@ -156,3 +156,52 @@ async def test_concurrent_set_cover_calls_serialise_to_one_cover(
             await connection.execute(text("DELETE FROM media_attachments"))
             await connection.execute(text("DELETE FROM media_assets"))
         await engine.dispose()
+
+
+async def test_cover_assets_come_back_for_each_target_in_one_lookup(
+    db_session: AsyncSession,
+) -> None:
+    """Covers of several targets arrive together; plain attachments are not covers."""
+    repo = SqlAlchemyMediaAttachmentRepository(db_session)
+    has_cover, plain_only, nothing = uuid.uuid7(), uuid.uuid7(), uuid.uuid7()
+    cover, plain = await _asset(db_session), await _asset(db_session)
+    await repo.add(
+        MediaAttachment.for_node(
+            asset_id=cover.id, node_id=has_cover, attribute_key=AttachmentKey.COVER
+        )
+    )
+    await repo.add(MediaAttachment.for_node(asset_id=plain.id, node_id=plain_only))
+
+    found = await repo.list_cover_assets(
+        AttachmentTarget.NODE,
+        [has_cover, plain_only, nothing],
+        scope=ContentFilter.everyone(),
+    )
+
+    assert {target: asset.id for target, asset in found.items()} == {
+        has_cover: cover.id
+    }
+
+
+async def test_cover_assets_stay_inside_the_scope(db_session: AsyncSession) -> None:
+    """Someone else's cover is not returned, and no targets means no query."""
+    repo = SqlAlchemyMediaAttachmentRepository(db_session)
+    node_id = uuid.uuid7()
+    asset = await _asset(db_session)
+    await repo.add(
+        MediaAttachment.for_node(
+            asset_id=asset.id, node_id=node_id, attribute_key=AttachmentKey.COVER
+        )
+    )
+
+    stranger = ContentFilter.of(uuid.uuid7())
+    assert (
+        await repo.list_cover_assets(AttachmentTarget.NODE, [node_id], scope=stranger)
+        == {}
+    )
+    assert (
+        await repo.list_cover_assets(
+            AttachmentTarget.NODE, [], scope=ContentFilter.everyone()
+        )
+        == {}
+    )

@@ -4,6 +4,9 @@ import structlog
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
+from app.modules.media.adapters.persistence.media_asset_repository import (
+    asset_to_domain,
+)
 from app.modules.media.adapters.persistence.models import (
     MediaAssetModel,
     MediaAttachmentModel,
@@ -18,10 +21,12 @@ from app.platform.orm_mixins import owned_by
 
 if TYPE_CHECKING:
     import uuid
+    from collections.abc import Collection
 
     from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.media.domain.media_asset import MediaAsset
     from app.shared_kernel.content_filter import ContentFilter
 
 logger = structlog.get_logger()
@@ -125,6 +130,29 @@ class SqlAlchemyMediaAttachmentRepository:
         )
         result = await self._session.execute(stmt)
         return [self._to_domain(r) for r in result.scalars()]
+
+    async def list_cover_assets(
+        self,
+        target_type: AttachmentTarget,
+        target_ids: Collection[uuid.UUID],
+        *,
+        scope: ContentFilter,
+    ) -> dict[uuid.UUID, MediaAsset]:
+        """Return the cover asset of each target that has one inside `scope`."""
+        if not target_ids:
+            return {}
+        stmt = (
+            select(MediaAttachmentModel.target_id, MediaAssetModel)
+            .join(MediaAssetModel, MediaAssetModel.id == MediaAttachmentModel.asset_id)
+            .where(
+                MediaAttachmentModel.target_type == target_type.value,
+                MediaAttachmentModel.attribute_key == AttachmentKey.COVER,
+                MediaAttachmentModel.target_id.in_(target_ids),
+                owned_by(MediaAssetModel, scope.user_id),
+            )
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return {target_id: asset_to_domain(model) for target_id, model in rows}
 
     async def list_for_asset(
         self, asset_id: uuid.UUID, *, scope: ContentFilter

@@ -14,6 +14,9 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
 from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
     InMemoryEdgeTypeRepository,
 )
+from app.modules.graph.adapters.persistence.in_memory_item_covers import (
+    InMemoryItemCovers,
+)
 from app.modules.graph.adapters.persistence.in_memory_node_repository import (
     InMemoryNodeRepository,
 )
@@ -53,7 +56,8 @@ class World:
         lister = ListNodes(
             self.repos, guard, self.members, today=lambda: date(2026, 10, 29)
         )
-        self.use_case = RandomNode(self.repos, guard, lister)
+        self.covers = InMemoryItemCovers()
+        self.use_case = RandomNode(self.repos, guard, lister, item_covers=self.covers)
 
     async def item(
         self, name: str, *, owner: uuid.UUID = ALICE, type: str = "film"
@@ -77,7 +81,7 @@ async def test_picks_one_of_the_callers_own_items(world: World) -> None:
 
     picked = await world.use_case.handle(ListNodesQuery(), AS_ALICE)
 
-    assert picked.id == mine.id
+    assert picked.node.id == mine.id
 
 
 async def test_nothing_to_pick_is_not_found(world: World) -> None:
@@ -94,7 +98,7 @@ async def test_respects_the_list_filters(world: World) -> None:
 
     picked = await world.use_case.handle(ListNodesQuery(type="book"), AS_ALICE)
 
-    assert picked.id == book.id
+    assert picked.node.id == book.id
 
 
 async def test_picks_from_a_static_collection(world: World) -> None:
@@ -108,7 +112,7 @@ async def test_picks_from_a_static_collection(world: World) -> None:
         ListNodesQuery(collection=collection), AS_ALICE
     )
 
-    assert picked.id == inside.id
+    assert picked.node.id == inside.id
 
 
 async def test_picks_from_a_smart_collection(world: World) -> None:
@@ -122,7 +126,7 @@ async def test_picks_from_a_smart_collection(world: World) -> None:
         ListNodesQuery(collection=collection), AS_ALICE
     )
 
-    assert picked.id == film.id
+    assert picked.node.id == film.id
 
 
 async def test_a_smart_collection_with_a_stale_definition_has_nothing(
@@ -141,3 +145,36 @@ async def test_an_unknown_collection_is_not_found(world: World) -> None:
     """A collection that does not exist is reported, not treated as empty."""
     with pytest.raises(CollectionNotFoundError):
         await world.use_case.handle(ListNodesQuery(collection=uuid.uuid7()), AS_ALICE)
+
+
+async def test_the_pick_carries_its_cover_thumbnail(world: World) -> None:
+    """The item picked comes with where its cover thumbnail is, if it has one."""
+    mine = await world.item("Mine")
+    world.covers.set(mine.id, "/api/v1/media/abc/thumbnail")
+
+    picked = await world.use_case.handle(ListNodesQuery(), AS_ALICE)
+
+    assert picked.cover_thumbnail_url == "/api/v1/media/abc/thumbnail"
+
+
+async def test_a_pick_without_a_cover_has_no_thumbnail(world: World) -> None:
+    """An item with no cover has no thumbnail to carry."""
+    await world.item("Mine")
+
+    picked = await world.use_case.handle(ListNodesQuery(), AS_ALICE)
+
+    assert picked.cover_thumbnail_url is None
+
+
+async def test_a_pick_without_a_cover_source_has_no_thumbnail(world: World) -> None:
+    """With no cover source wired in, the pick is made without a thumbnail."""
+    await world.item("Mine")
+    guard = InMemoryAccessGuard()
+    lister = ListNodes(
+        world.repos, guard, world.members, today=lambda: date(2026, 10, 29)
+    )
+    bare = RandomNode(world.repos, guard, lister)
+
+    picked = await bare.handle(ListNodesQuery(), AS_ALICE)
+
+    assert picked.cover_thumbnail_url is None

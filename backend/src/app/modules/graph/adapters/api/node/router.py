@@ -360,7 +360,7 @@ async def get_random_node(
     Takes the same `type`, `favourite` and `collection` filters as `GET /node`
     and picks from what they match; `q` is ignored. 404 when nothing matches.
     """
-    node = await use_case.handle(
+    picked = await use_case.handle(
         ListNodesQuery(
             type=filters.type,
             favourite=filters.favourite,
@@ -368,7 +368,9 @@ async def get_random_node(
         ),
         actor,
     )
-    return NodeResponse.from_domain(node)
+    return NodeResponse.from_domain(
+        picked.node, cover_thumbnail_url=picked.cover_thumbnail_url
+    )
 
 
 @router.get(
@@ -620,7 +622,10 @@ async def list_nodes(
     if result.total_capped:
         response.headers["Total-Count-Capped"] = "true"
 
-    return [NodeResponse.from_domain(node) for node in result.items[:limit]]
+    return [
+        NodeResponse.from_domain(node, cover_thumbnail_url=result.covers.get(node.id))
+        for node in result.items[:limit]
+    ]
 
 
 @router.patch(

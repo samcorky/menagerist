@@ -111,6 +111,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "media.DeleteMedia": "media:item:write",
     "media.DetachMedia": "media:item:write",
     "media.GetMedia": "media:item:read",
+    "media.ListNodeCovers": "media:item:read",
     "media.ListNodeMedia": "media:item:read",
     "media.OrphanMedia": "media:item:write",
     "media.PromoteMedia": "media:item:write",
