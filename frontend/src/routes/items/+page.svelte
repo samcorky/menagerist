@@ -26,7 +26,7 @@
 	import { captureController } from '$lib/capture.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import NodeSkeleton from '$lib/components/node-skeleton.svelte';
-	import LoadMoreSpinner from '$lib/components/load-more-spinner.svelte';
+	import ListFoot from '$lib/components/list-foot.svelte';
 	import { toast } from 'svelte-sonner';
 	import type { CollectionResponse, NodeResponse, NodeTypeResponse } from '$lib/api/client';
 	import { cachedItemTypes, refreshItemTypes } from '$lib/palette-sources';
@@ -95,6 +95,14 @@
 	// Stable for this page within a session (hashed from the path, not the filters).
 	const emptyLine = $derived(pickEmptyLine(EMPTY_LINES, page.url.pathname));
 
+	// The foot of a long list, in the same spirit (#588). The count goes beside it.
+	const END_LINES = [
+		"That's your whole menagerie.",
+		'You have reached the end of the shelf.',
+		'Scanning complete. No further signs of life.',
+		'The last of them. Live long and catalogue.'
+	];
+
 	// Persisted outside component so scroll position survives navigation
 	let savedScrollTop = 0;
 
@@ -115,6 +123,8 @@
 	let tooMany = $state(false);
 	// The first page could not be fetched: shown as a failure with Retry, never as an empty list.
 	let loadFailed = $state(false);
+	// A later page that would not load: the list's foot says so and offers Try again (#588).
+	let pageFailed = $state(false);
 	let filtersOpen = $state(false);
 	let filtersFocus = $state<Path | null>(null);
 	let saveOpen = $state(false);
@@ -165,6 +175,9 @@
 	const countLine = $derived(
 		totalLine(total, totalCapped, { loading, appending: loading && items.length > 0 })
 	);
+	// The end-of-list count. The server's figure counts every item it matched, so it cannot
+	// stand for a list the Examples filter has hidden rows from: there the rows are counted.
+	const countableTotal = $derived(totalCapped || shownItems.length !== items.length ? null : total);
 	const catalogue = $derived(
 		buildCatalogue(allCategories, categoriesLoaded, itemFields, savedFields)
 	);
@@ -312,6 +325,7 @@
 			counts.cancel();
 			loadFailed = false;
 		}
+		pageFailed = false;
 		loading = true;
 		const basics = { type: selectedType, q };
 		const result = await loadItemsPage({
@@ -339,6 +353,10 @@
 			marks = mapWarnings(result.warnings, result.prefix);
 			filterError = null;
 			tooMany = false;
+		} else if (result.status === 'failed' && more) {
+			// Only a next page that would not load is retryable: it keeps `hasMore` and the rows
+			// already on screen, and the list's foot offers Try again (#588).
+			pageFailed = true;
 		} else {
 			hasMore = false;
 			if (!more) items = [];
@@ -351,10 +369,7 @@
 						: null;
 				filterError = { message, path };
 			} else filterError = null;
-			if (result.status === 'failed') {
-				if (more) toast.error(result.title, { description: result.description });
-				else loadFailed = true;
-			}
+			if (result.status === 'failed') loadFailed = true;
 		}
 		loading = false;
 	}
@@ -411,19 +426,9 @@
 		});
 	}
 
-	function sentinel(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loading) void fetchPage(true);
-			},
-			{ rootMargin: '200px' }
-		);
-		observer.observe(node);
-		return {
-			destroy() {
-				observer.disconnect();
-			}
-		};
+	function loadMore() {
+		if (!hasMore || loading) return;
+		void fetchPage(true);
 	}
 
 	function focusRef(node: HTMLInputElement) {
@@ -765,11 +770,18 @@
 		</div>
 	{/if}
 
-	{#if hasMore}
-		<div use:sentinel class="flex justify-center py-4" aria-hidden="true">
-			<LoadMoreSpinner {loading} hasRows={shownItems.length > 0} />
-		</div>
-	{/if}
+	<ListFoot
+		{loading}
+		{hasMore}
+		failed={pageFailed}
+		rows={shownItems.length}
+		total={countableTotal}
+		noun="item"
+		lines={END_LINES}
+		lineKey={page.url.pathname}
+		onload={loadMore}
+		onretry={() => void fetchPage(true)}
+	/>
 </Page>
 
 <SaveSmartCollectionDialog bind:open={saveOpen} query={saveQuery} onsaved={savedAsSmart} />
