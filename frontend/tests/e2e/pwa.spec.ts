@@ -60,8 +60,8 @@ test('a launch with no connection starts the real app, and the cache holds nothi
 		})
 		.toBe(true);
 
-	// Cache Storage holds the build's files, the app shell and the last-resort offline page, and
-	// no API response, account page or media.
+	// Cache Storage holds the build's files, the app shell, the last-resort offline page and the
+	// header's mark, and no API response, account page or media.
 	const cached = await page.evaluate(async () => {
 		const paths: string[] = [];
 		for (const name of await caches.keys()) {
@@ -73,7 +73,8 @@ test('a launch with no connection starts the real app, and the cache holds nothi
 	});
 	expect(cached).toContain('/200.html');
 	expect(cached).toContain('/offline.html');
-	const shellFiles = ['/200.html', '/offline.html'];
+	expect(cached).toContain('/logo.svg');
+	const shellFiles = ['/200.html', '/offline.html', '/logo.svg'];
 	expect(cached.filter((p) => !p.startsWith('/_app/') && !shellFiles.includes(p))).toEqual([]);
 
 	// The shell boots the real app, which shows its own offline screen rather than a login

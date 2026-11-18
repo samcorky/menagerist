@@ -15,8 +15,14 @@ export const SHELL_URL = '/200.html';
  */
 export const NAVIGATION_FALLBACKS = [SHELL_URL, OFFLINE_URL];
 
+/**
+ * The header's mark. It is a static file, not part of the build, and the header draws it as a CSS
+ * mask, so without a cached copy the app's own offline screen shows the name with no mark.
+ */
+export const LOGO_URL = '/logo.svg';
+
 /** Extra files to keep beside the build's own files. */
-export const SHELL_FILES = [...NAVIGATION_FALLBACKS];
+export const SHELL_FILES = [...NAVIGATION_FALLBACKS, LOGO_URL];
 
 export type Route =
 	/** A precached file: answer from Cache Storage. */
