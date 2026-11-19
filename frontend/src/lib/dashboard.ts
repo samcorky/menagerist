@@ -95,3 +95,14 @@ export function percent(part: number, total: number): number {
 	if (total <= 0) return 0;
 	return Math.min(100, Math.round((part / total) * 100));
 }
+
+/**
+ * `percent` as text. "<1%" when something is there but rounds to nothing, and ">99%" when
+ * something is missing but rounds to everything, so neither end reads as none or all.
+ */
+export function formatPercent(part: number, total: number): string {
+	const whole = percent(part, total);
+	if (whole === 0 && part > 0 && total > 0) return '<1%';
+	if (whole === 100 && part < total) return '>99%';
+	return `${whole}%`;
+}

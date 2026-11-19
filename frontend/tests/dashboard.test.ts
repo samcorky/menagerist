@@ -12,6 +12,7 @@ import {
 	noPhotoQuery,
 	noTypeQuery,
 	notInCollectionQuery,
+	formatPercent,
 	percent,
 	photoQuery,
 	tidyRows
@@ -154,5 +155,31 @@ describe('percent', () => {
 	it('is 0 with nothing to divide by and never above 100', () => {
 		expect(percent(5, 0)).toBe(0);
 		expect(percent(9, 3)).toBe(100);
+	});
+});
+
+describe('formatPercent', () => {
+	it('reads <1% when something is there but rounds to nothing', () => {
+		expect(formatPercent(1, 400)).toBe('<1%');
+	});
+
+	it('reads >99% when something is missing but it rounds to everything', () => {
+		expect(formatPercent(399, 400)).toBe('>99%');
+	});
+
+	it('keeps 100% for all of them, or more than all', () => {
+		expect(formatPercent(400, 400)).toBe('100%');
+		expect(formatPercent(9, 3)).toBe('100%');
+	});
+
+	it('keeps 0% for a count of zero or nothing to divide by', () => {
+		expect(formatPercent(0, 400)).toBe('0%');
+		expect(formatPercent(0, 0)).toBe('0%');
+		expect(formatPercent(3, 0)).toBe('0%');
+	});
+
+	it('is the plain rounded share otherwise', () => {
+		expect(formatPercent(232, 1284)).toBe('18%');
+		expect(formatPercent(9, 3)).toBe('100%');
 	});
 });
