@@ -14,10 +14,10 @@
 	import { collectionRouteParams } from '$lib/collections';
 	import {
 		favouriteQuery,
+		formatPercent,
 		greeting,
 		itemsHref,
 		noPhotoQuery,
-		percent,
 		tidyRows
 	} from '$lib/dashboard';
 	import { pickEmptyLine } from '$lib/empty-lines';
@@ -312,13 +312,13 @@
 					'stat-favourites',
 					'Favourites',
 					formatCount(s.favourites, false),
-					`${percent(s.favourites, s.items)}% of items`,
+					`${formatPercent(s.favourites, s.items)} of items`,
 					resolve(itemsHref(favouriteQuery()) as '/items')
 				)}
 				{@render tile(
 					'stat-photo',
 					'With a photo',
-					`${percent(s.withPhoto.total, s.items)}%`,
+					formatPercent(s.withPhoto.total, s.items),
 					s.withPhoto.capped
 						? 'most have one'
 						: `${formatCount(Math.max(0, s.items - s.withPhoto.total), false)} still need one`,
