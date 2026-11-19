@@ -56,6 +56,7 @@
 	import { themeController } from '$lib/theme.svelte.js';
 	import { offlineController, unreachableWording } from '$lib/offline.svelte.js';
 	import { displayMode } from '$lib/display-mode.svelte.js';
+	import BackToTop from '$lib/components/back-to-top.svelte';
 	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { searchPaletteController } from '$lib/search-palette.svelte.js';
@@ -407,7 +408,7 @@
 			</div>
 		</header>
 
-		<div class="flex min-h-0 flex-1">
+		<div class="relative flex min-h-0 flex-1">
 			{#if showNav}
 				<AppSidebar />
 			{/if}
@@ -433,6 +434,7 @@
 					</div>
 				{/if}
 			</div>
+			<BackToTop />
 		</div>
 
 		{#if showNav}
