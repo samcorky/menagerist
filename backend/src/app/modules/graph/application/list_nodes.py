@@ -23,6 +23,7 @@ from app.modules.graph.domain.query import (
     ResolvedQuery,
     TextCondition,
     TypeCondition,
+    TypeCount,
 )
 from app.modules.graph.ports.collection_members import (
     CollectionMembers,
@@ -205,6 +206,25 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             favourite=query.favourite,
             attribute_search_exclusions=exclusions,
             ids=None if source is None else source.ids,
+        )
+
+    async def count_types(
+        self, collection_id: uuid.UUID | None, scope: ContentFilter
+    ) -> list[TypeCount]:
+        """Count the items per item type, on one collection or all of them.
+
+        The caller has already passed the access check.
+        """
+        source = await self._resolve_collection(collection_id, scope)
+        if isinstance(source, SmartSource):
+            combined = await self._smart_query(
+                ListNodesQuery(), source.definition, scope
+            )
+            if combined is None:
+                return []
+            return await self._repos.nodes.count_by_type(scope=scope, resolved=combined)
+        return await self._repos.nodes.count_by_type(
+            scope=scope, ids=None if source is None else source.ids
         )
 
     async def random_node(

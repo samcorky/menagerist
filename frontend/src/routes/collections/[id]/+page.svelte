@@ -27,6 +27,7 @@
 	import { toast } from 'svelte-sonner';
 	import {
 		addItemsToCollection,
+		countNodeTypes,
 		deleteCollection,
 		getCollection,
 		listNodes,
@@ -34,6 +35,7 @@
 		updateCollection,
 		type CollectionResponse,
 		type NodeResponse,
+		type NodeTypeCountResponse,
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
@@ -290,8 +292,30 @@
 	let addOpen = $state(false);
 	let addTrigger: HTMLElement | null = null;
 	let headerAddButton = $state<HTMLElement | null>(null);
-	const showTypeFilter = $derived(itemTypes.length > 0 || selectedType !== '');
 	const typeLabels = $derived(Object.fromEntries(itemTypes.map((t) => [t.slug, t.label])));
+	// The types this collection holds, with counts. Untyped items are a row with no slug.
+	let typeCounts = $state<NodeTypeCountResponse[]>([]);
+	// One row is nothing to choose between, unless a type is already selected (say from a link).
+	const showTypeFilter = $derived(typeCounts.length > 1 || selectedType !== '');
+	const typeOptions = $derived.by(() => {
+		const options = typeCounts
+			.filter((row) => row.type !== null)
+			.map((row) => ({ slug: row.type as string, count: row.count as number | null }));
+		// A selected type the collection has none of stays, so it can be cleared.
+		if (selectedType && !options.some((o) => o.slug === selectedType)) {
+			options.push({ slug: selectedType, count: null });
+		}
+		return options;
+	});
+	let typeCountsSeq = 0;
+
+	async function loadTypeCounts(id: string) {
+		if (!id) return;
+		const seq = ++typeCountsSeq;
+		const result = await countNodeTypes({ query: { collection: id } });
+		// A failed count leaves the last good one in place; the filter is only a convenience.
+		if (seq === typeCountsSeq && result.data) typeCounts = result.data;
+	}
 
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
@@ -333,6 +357,11 @@
 			exampleItemIds = ids.items;
 			exampleCollectionIds = ids.collections;
 		});
+	});
+
+	$effect(() => {
+		const id = canonicalId;
+		untrack(() => void loadTypeCounts(id));
 	});
 
 	$effect(() => {
@@ -809,6 +838,7 @@
 	function refreshAfterChange() {
 		void loadCollection(canonicalId, true);
 		void fetchPage(canonicalId, q, selectedType);
+		void loadTypeCounts(canonicalId);
 	}
 
 	async function handleRemove(item: NodeResponse) {
@@ -832,6 +862,7 @@
 		if (id !== collection?.id) return;
 		items = items.filter((i) => i.id !== item.id);
 		void loadCollection(id, true);
+		void loadTypeCounts(id);
 		void tick().then(() => {
 			const next = neighbour
 				? document.querySelector<HTMLElement>(`[data-remove-id="${neighbour.id}"]`)
@@ -1119,8 +1150,12 @@
 						onchange={(e) => selectType(e.currentTarget.value)}
 					>
 						<NativeSelect.Option value="">All types</NativeSelect.Option>
-						{#each itemTypes as type (type.slug)}
-							<NativeSelect.Option value={type.slug}>{type.label}</NativeSelect.Option>
+						{#each typeOptions as option (option.slug)}
+							<NativeSelect.Option value={option.slug}>
+								{typeLabels[option.slug] ?? option.slug}{option.count === null
+									? ''
+									: ` (${option.count})`}
+							</NativeSelect.Option>
 						{/each}
 					</NativeSelect.Root>
 				{/if}

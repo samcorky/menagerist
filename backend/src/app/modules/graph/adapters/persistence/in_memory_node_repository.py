@@ -511,10 +511,23 @@ class InMemoryNodeRepository:
         rows.sort(key=lambda row: (-row.count, row.key, row.kind))
         return rows[:limit]
 
-    async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
+    async def count_by_type(
+        self,
+        *,
+        scope: ContentFilter,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+        resolved: ResolvedQuery | None = None,
+    ) -> builtins.list[TypeCount]:
         """Count live nodes in `scope` per item type; untyped is one `None` row."""
+        nodes = (
+            self._visible(scope)
+            if resolved is None
+            else [hit.node for hit in self._matching(scope, resolved)]
+        )
+        if ids is not None:
+            nodes = [node for node in nodes if node.id in ids]
         counts: dict[str | None, int] = {}
-        for node in self._visible(scope):
+        for node in nodes:
             counts[node.type] = counts.get(node.type, 0) + 1
         rows = [TypeCount(type=slug, count=n) for slug, n in counts.items()]
         rows.sort(key=lambda row: (-row.count, row.type is None, row.type or ""))

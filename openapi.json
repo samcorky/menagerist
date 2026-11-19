@@ -3976,18 +3976,47 @@
           "Nodes"
         ],
         "summary": "Count Node Types",
-        "description": "Count your items per item type, biggest first.\n\nOnly item types that have at least one of your items appear, so the shared\nlist of item types never inflates the numbers. Items with no type are one\nrow whose `type` is null. Counts are exact.\n\n**Requires permission:** `graph:item:read`",
+        "description": "Count your items per item type, biggest first.\n\nOnly item types that have at least one of your items appear, so the shared\nlist of item types never inflates the numbers. Items with no type are one\nrow whose `type` is null. Counts are exact. With `collection`, only that\ncollection's items count, so the rows match what `GET /node` lists for it.\n\n**Requires permission:** `graph:item:read`",
         "operationId": "count_node_types",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Count only the items on this collection. For a smart collection, the items matching its definition.",
+              "title": "Collection"
+            },
+            "description": "Count only the items on this collection. For a smart collection, the items matching its definition."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/NodeTypeCountResponse"
                   },
-                  "type": "array",
                   "title": "Response Count Node Types",
                   "description": "Each entry is a `NodeTypeCountResponse`."
                 },
@@ -4074,6 +4103,49 @@
               }
             }
           },
+          "404": {
+            "description": "Returned when a requested collection does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "CollectionNotFoundError",
+                  "status": 404,
+                  "detail": "Collection 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+                  "instance": "https://menagerist.example/api/v1/nodes/count/types"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/count/types"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -4097,14 +4169,6 @@
             }
           }
         },
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
         "x-required-permission": "graph:item:read"
       }
     },

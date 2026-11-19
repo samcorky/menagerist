@@ -443,18 +443,33 @@ class SqlAlchemyNodeRepository:
             raise reach_rules.ReachTooLargeError
         return found
 
-    async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
+    async def count_by_type(
+        self,
+        *,
+        scope: ContentFilter,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+        resolved: ResolvedQuery | None = None,
+    ) -> builtins.list[TypeCount]:
         """Count live nodes in `scope` per item type; untyped is one NULL row."""
         logger.debug("counting nodes by type")
+        if ids is not None and not ids:
+            return []
         total = func.count()
-        stmt = (
-            select(NodeModel.type, total)
-            .where(_in_scope(scope))
-            .group_by(NodeModel.type)
-            .order_by(total.desc(), NodeModel.type.collate("C").asc().nulls_last())
+        stmt = select(NodeModel.type, total).where(_in_scope(scope))
+        if ids is not None:
+            stmt = stmt.where(_id_in(ids))
+        if resolved is not None:
+            where = compile_where(
+                resolved, QueryEnv(scope=scope, external=self._external)
+            )
+            if where is not None:
+                stmt = stmt.where(where)
+        stmt = stmt.group_by(NodeModel.type).order_by(
+            total.desc(), NodeModel.type.collate("C").asc().nulls_last()
         )
-        result = await self._session.execute(stmt)
-        return [TypeCount(type=slug, count=int(n)) for slug, n in result.all()]
+        result = await self._run(stmt, resolved)
+        rows: Sequence[Any] = result.all()
+        return [TypeCount(type=row[0], count=int(row[1])) for row in rows]
 
     async def clear_type(self, type_slug: str, *, scope: ContentFilter) -> None:
         """Set `type` to NULL on all non-deleted nodes if type matches `type_slug`."""

@@ -10,7 +10,11 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared.bridges.collection_members import get_collection_members
 from app.modules.graph.adapters.api.dependencies import get_graph_repos
+from app.modules.graph.adapters.persistence.in_memory_collection_members import (
+    InMemoryCollectionMembers,
+)
 from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
     InMemoryEdgeRepository,
 )
@@ -25,6 +29,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 )
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
+from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -135,3 +140,38 @@ def test_counts_nothing_with_no_items(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+async def test_counts_only_the_types_on_a_collection(
+    repos: GraphRepos, as_user: Callable[..., None]
+) -> None:
+    """?collection= counts the types of that collection's items alone."""
+    await _seed(repos)
+    mine = await repos.nodes.list(scope=ContentFilter.of(ALICE), after=None, limit=10)
+    on_shelf = [n.id for n in mine if n.type is None]
+    members = InMemoryCollectionMembers()
+    collection = uuid.uuid4()
+    members.add_collection(collection, on_shelf, owner_id=ALICE)
+    app = create_app()
+    app.dependency_overrides[get_graph_repos] = lambda: repos
+    app.dependency_overrides[get_collection_members] = lambda: members
+    as_user(app, ALICE)
+
+    response = TestClient(app).get(TYPES_URL, params={"collection": str(collection)})
+
+    assert response.status_code == 200
+    assert response.json() == [{"type": None, "count": 1}]
+
+
+def test_an_unknown_collection_is_not_found(
+    repos: GraphRepos, as_user: Callable[..., None]
+) -> None:
+    """A collection that does not exist answers 404."""
+    app = create_app()
+    app.dependency_overrides[get_graph_repos] = lambda: repos
+    app.dependency_overrides[get_collection_members] = InMemoryCollectionMembers
+    as_user(app, ALICE)
+
+    response = TestClient(app).get(TYPES_URL, params={"collection": str(uuid.uuid4())})
+
+    assert response.status_code == 404

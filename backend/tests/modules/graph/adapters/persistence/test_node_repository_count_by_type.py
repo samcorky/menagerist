@@ -1,6 +1,7 @@
 """`NodeRepository.count_by_type`, against the in-memory and Postgres adapters."""
 
 import uuid
+from datetime import date
 from typing import TYPE_CHECKING
 
 import pytest
@@ -12,7 +13,13 @@ from app.modules.graph.adapters.persistence.node_repository import (
     SqlAlchemyNodeRepository,
 )
 from app.modules.graph.domain.node import Node
-from app.modules.graph.domain.query import TypeCount
+from app.modules.graph.domain.query import (
+    Group,
+    Query,
+    ResolvedQuery,
+    TypeCondition,
+    TypeCount,
+)
 from app.shared_kernel.content_filter import ContentFilter
 
 if TYPE_CHECKING:
@@ -124,4 +131,54 @@ async def test_counts_only_the_scope_owner_unless_everyone(
     assert await repository.count_by_type(scope=ALL) == [
         TypeCount(type="film", count=2),
         TypeCount(type="book", count=1),
+    ]
+
+
+async def test_ids_keep_only_those_items(repository: NodeRepository) -> None:
+    """`ids` narrows the count to those items; none matches nothing."""
+    film = await _add(repository, "film")
+    await _add(repository, "film")
+    book = await _add(repository, "book")
+
+    assert await repository.count_by_type(scope=A, ids={film.id, book.id}) == [
+        TypeCount(type="book", count=1),
+        TypeCount(type="film", count=1),
+    ]
+    assert await repository.count_by_type(scope=A, ids=set()) == []
+
+
+async def test_a_query_keeps_only_the_items_it_matches(
+    repository: NodeRepository,
+) -> None:
+    """`resolved` narrows the count to the items the query matches."""
+    await _add(repository, "film")
+    await _add(repository, "film")
+    await _add(repository, "book")
+    films = ResolvedQuery(
+        query=Query(where=Group(op="and", children=(TypeCondition(slugs=("film",)),))),
+        field_kinds={},
+        search_exclusions={},
+        today=date(2026, 11, 19),
+    )
+
+    assert await repository.count_by_type(scope=A, resolved=films) == [
+        TypeCount(type="film", count=2)
+    ]
+
+
+async def test_a_query_with_no_conditions_keeps_everything(
+    repository: NodeRepository,
+) -> None:
+    """A query with no `where` matches every live item in scope."""
+    await _add(repository, "film")
+
+    everything = ResolvedQuery(
+        query=Query(where=None),
+        field_kinds={},
+        search_exclusions={},
+        today=date(2026, 11, 19),
+    )
+
+    assert await repository.count_by_type(scope=A, resolved=everything) == [
+        TypeCount(type="film", count=1)
     ]
