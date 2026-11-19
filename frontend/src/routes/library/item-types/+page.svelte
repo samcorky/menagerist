@@ -357,22 +357,22 @@
 							{#if cat.description}
 								<p class="truncate text-sm text-muted-foreground">{cat.description}</p>
 							{/if}
-						</div>
-						{#if itemCounts}
-							{#if itemCount(cat) > 0}
-								<a
-									href="{resolve('/items')}?type={encodeURIComponent(cat.slug)}"
-									data-testid="type-item-count"
-									class="shrink-0 text-xs text-muted-foreground underline-offset-2 hover:underline"
-								>
-									{itemCount(cat) === 1 ? '1 item' : `${itemCount(cat).toLocaleString()} items`}
-								</a>
-							{:else}
-								<span data-testid="type-item-count" class="shrink-0 text-xs text-muted-foreground"
-									>No items yet</span
-								>
+							{#if itemCounts}
+								{#if itemCount(cat) > 0}
+									<a
+										href="{resolve('/items')}?type={encodeURIComponent(cat.slug)}"
+										data-testid="type-item-count"
+										class="block truncate text-xs text-muted-foreground underline-offset-2 hover:underline"
+									>
+										{itemCount(cat) === 1 ? '1 item' : `${itemCount(cat).toLocaleString()} items`}
+									</a>
+								{:else}
+									<p data-testid="type-item-count" class="truncate text-xs text-muted-foreground">
+										No items yet
+									</p>
+								{/if}
 							{/if}
-						{/if}
+						</div>
 						<span class="hidden shrink-0 text-xs text-muted-foreground sm:inline">
 							{fieldCount(cat) === 1 ? '1 field' : `${fieldCount(cat)} fields`}
 						</span>
