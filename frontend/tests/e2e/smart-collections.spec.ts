@@ -432,8 +432,21 @@ test('narrows a smart collection with filters, the search box and a type, withou
 }) => {
 	const tool = await makeTool(request);
 	const names = await seedItems(request, tool);
-	// Saved: weight at least 2 (A, B, C).
-	const smart = await makeSmart(request, uniqueName('Narrow'), weightAtLeast(tool, 2));
+	// A second type keeps the type filter on offer: it only lists types the collection holds.
+	const other = await makeItemType(request, uniqueName('Gadget'));
+	await makeToolItem(request, other, uniqueName('Gizmo'));
+	// Saved: weight at least 2 (A, B, C), or any item of the second type.
+	const smart = await makeSmart(request, uniqueName('Narrow'), {
+		v: 1,
+		where: {
+			op: 'or',
+			children: [
+				{ kind: 'field', type: tool.slug, key: 'weight', op: '>=', value: 2 },
+				{ kind: 'type', in: [other.slug] }
+			]
+		},
+		sort: []
+	});
 	const saved = await definitionOf(request, smart.id);
 
 	await page.goto(`/collections/${smart.id}`);
@@ -443,23 +456,23 @@ test('narrows a smart collection with filters, the search box and a type, withou
 	await expect(narrowedBar(page)).toHaveCount(0);
 
 	await narrowByWeight(page, tool, '5');
-	await expect(narrowedBar(page)).toContainText('Narrowed by 1 filter: 2 of 3 items');
+	await expect(narrowedBar(page)).toContainText('Narrowed by 1 filter: 2 of 4 items');
 	await expect(itemLink(page, names.a)).toHaveCount(0);
 	await expect(page).toHaveURL(/[?&]f=/);
 
 	await page.getByPlaceholder('Search this collection…').fill(names.b);
-	await expect(narrowedBar(page)).toContainText('Narrowed by 2 filters: 1 of 3 items');
+	await expect(narrowedBar(page)).toContainText('Narrowed by 2 filters: 1 of 4 items');
 	await expect(itemLink(page, names.b)).toBeVisible();
 	await expect(itemLink(page, names.c)).toHaveCount(0);
 	await expect(page).toHaveURL(/[?&]q=/);
 
 	await page.getByRole('combobox', { name: 'Item type' }).selectOption(tool.slug);
-	await expect(narrowedBar(page)).toContainText('Narrowed by 3 filters: 1 of 3 items');
+	await expect(narrowedBar(page)).toContainText('Narrowed by 3 filters: 1 of 4 items');
 	await expect(page).toHaveURL(new RegExp(`[?&]type=${tool.slug}`));
 
 	// The address carries the narrowing: a reload keeps it.
 	await page.reload();
-	await expect(narrowedBar(page)).toContainText('Narrowed by 3 filters: 1 of 3 items');
+	await expect(narrowedBar(page)).toContainText('Narrowed by 3 filters: 1 of 4 items');
 	await expect(itemLink(page, names.b)).toBeVisible();
 	await expect(page.getByPlaceholder('Search this collection…')).toHaveValue(names.b);
 
@@ -469,7 +482,7 @@ test('narrows a smart collection with filters, the search box and a type, withou
 	await expect(narrowedBar(page)).toHaveCount(0);
 	await expect(itemLink(page, names.a)).toBeVisible();
 	await page.goForward();
-	await expect(narrowedBar(page)).toContainText('Narrowed by 3 filters: 1 of 3 items');
+	await expect(narrowedBar(page)).toContainText('Narrowed by 3 filters: 1 of 4 items');
 	await expect(itemLink(page, names.b)).toBeVisible();
 
 	// The saved definition has not moved.

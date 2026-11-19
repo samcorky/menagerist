@@ -408,18 +408,32 @@ async def count_nodes(
     "/count/types",
     response_model=list[NodeTypeCountResponse],
     operation_id="count_node_types",
+    responses=error_response(
+        CollectionNotFoundError,
+        detail="Collection 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10 not found",
+    ),
 )
 async def count_node_types(
     use_case: Annotated[CountNodeTypes, Depends(get_count_node_types_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    collection: Annotated[
+        uuid.UUID | None,
+        Query(
+            description=(
+                "Count only the items on this collection. For a smart "
+                + "collection, the items matching its definition."
+            )
+        ),
+    ] = None,
 ) -> list[NodeTypeCountResponse]:
     """Count your items per item type, biggest first.
 
     Only item types that have at least one of your items appear, so the shared
     list of item types never inflates the numbers. Items with no type are one
-    row whose `type` is null. Counts are exact.
+    row whose `type` is null. Counts are exact. With `collection`, only that
+    collection's items count, so the rows match what `GET /node` lists for it.
     """
-    rows = await use_case.handle(CountNodeTypesQuery(), actor)
+    rows = await use_case.handle(CountNodeTypesQuery(collection=collection), actor)
     return [NodeTypeCountResponse.from_domain(row) for row in rows]
 
 

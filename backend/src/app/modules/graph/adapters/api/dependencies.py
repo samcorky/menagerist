@@ -184,10 +184,11 @@ def get_search_node_counts_use_case(
 
 
 def get_count_node_types_use_case(
+    list_nodes: Annotated[ListNodes, Depends(get_list_nodes_use_case)],
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> CountNodeTypes:
-    return CountNodeTypes(repos, guard)
+    return CountNodeTypes(repos, guard, list_nodes)
 
 
 def get_list_item_fields_use_case(

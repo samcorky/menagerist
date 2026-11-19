@@ -165,7 +165,16 @@ test('filters a collection by item type', async ({ page, request }) => {
 		expect(b!.height).toBeGreaterThanOrEqual(44);
 	}
 
-	await select.selectOption({ label: books.label });
+	// Only the types the collection holds are offered, each with its count.
+	const other = await makeItemType(request, uniqueName('Games'));
+	await expect(select.locator('option')).toHaveText([
+		'All types',
+		`${books.label} (1)`,
+		`${films.label} (1)`
+	]);
+	await expect(select.getByRole('option', { name: new RegExp(other.label) })).toHaveCount(0);
+
+	await select.selectOption({ label: `${books.label} (1)` });
 	await expect(page.getByRole('link', { name: film.name })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: book.name }).first()).toBeVisible();
 
@@ -173,15 +182,27 @@ test('filters a collection by item type', async ({ page, request }) => {
 	await expect(page.getByRole('link', { name: book.name }).first()).toBeVisible();
 	await expect(page.getByRole('link', { name: film.name }).first()).toBeVisible();
 
-	// A type with no members shows the no-match message, not the empty-collection one.
-	const other = await makeItemType(request, uniqueName('Games'));
-	await page.reload();
-	await page.getByLabel('Item type').selectOption({ label: other.label });
+	// Removing the last item of the chosen type keeps that type selected, so it can be cleared.
+	await select.selectOption({ label: `${books.label} (1)` });
+	await page.getByRole('button', { name: `Remove ${book.name} from this collection` }).click();
 	await expect(page.getByText('Nothing matched this type')).toBeVisible();
+	await expect(select).toHaveValue(books.slug);
 	await expect(page.getByTestId('empty-line')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Show all types' }).click();
 	await expect(page.getByRole('link', { name: film.name }).first()).toBeVisible();
 	await expectNoShelfCopy(page);
+});
+
+test('hides the item type filter when the collection holds one type', async ({ page, request }) => {
+	const collection = await makeCollection(request, uniqueName('OneType'));
+	const books = await makeItemType(request, uniqueName('Books'));
+	await makeItemType(request, uniqueName('Films'));
+	const book = await makeItem(request, uniqueName('Dune'), books.slug);
+	await addToCollection(request, collection.id, [book.id]);
+
+	await page.goto(`/collections/${collection.id}`);
+	await expect(page.getByRole('link', { name: book.name }).first()).toBeVisible();
+	await expect(page.getByLabel('Item type')).toHaveCount(0);
 });
 
 test('removes an item from a collection, keeps the item, and undo puts it back', async ({

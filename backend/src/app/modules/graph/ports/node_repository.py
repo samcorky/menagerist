@@ -170,11 +170,19 @@ class NodeRepository(Protocol):
         """
         ...
 
-    async def count_by_type(self, *, scope: ContentFilter) -> builtins.list[TypeCount]:
+    async def count_by_type(
+        self,
+        *,
+        scope: ContentFilter,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+        resolved: ResolvedQuery | None = None,
+    ) -> builtins.list[TypeCount]:
         """Count the live nodes in `scope` per item type, one row per type in use.
 
         Untyped nodes are one row with `type` `None`. Rows are ordered by count
-        descending, then type ascending with the untyped row last.
+        descending, then type ascending with the untyped row last. `ids` keeps
+        only those nodes (an empty collection matches nothing) and `resolved`
+        only the nodes a query matches, as `list` and `search` do.
         """
         ...
 
