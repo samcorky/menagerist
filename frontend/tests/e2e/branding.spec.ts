@@ -69,9 +69,10 @@ test("a pasted link's preview uses the instance's name and description", async (
 		expect(saved.ok()).toBe(true);
 	}
 
-	const page = await (await request.get('/items/some-item')).text();
+	const preview = async () => (await request.get('/items/some-item')).text();
+	await expect.poll(preview, SETTLED).toContain('<meta property="og:title" content="The Hoard" />');
+	const page = await preview();
 
-	expect(page).toContain('<meta property="og:title" content="The Hoard" />');
 	expect(page).toContain('<meta property="og:site_name" content="The Hoard" />');
 	expect(page).toMatch(/property="og:description"\s+content="Our family &amp; friends\."/);
 	// The app's own name is not part of the preview, so it stays (#641).
