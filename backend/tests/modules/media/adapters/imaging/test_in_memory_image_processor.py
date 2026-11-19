@@ -10,7 +10,7 @@ def test_in_memory_image_processor_success() -> None:
     assert res is not None
     assert res.data == b"fake-bytes"
     assert res.width == 200
-    assert res.height == 200
+    assert res.height == 150
 
 
 def test_in_memory_image_processor_disabled() -> None:

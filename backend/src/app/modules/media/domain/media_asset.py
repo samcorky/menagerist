@@ -15,6 +15,20 @@ class MediaStatus(StrEnum):
     ORPHANED = "orphaned"
 
 
+@dataclass(frozen=True, kw_only=True)
+class StoredOriginal:
+    """Where an asset's original file is kept, and what it should hold.
+
+    Only fields every schema version has had, so a backup taken before a
+    migration can read them from a database that is not yet up to date.
+    """
+
+    asset_id: uuid.UUID
+    status: MediaStatus
+    size: int
+    sha256: str
+
+
 @dataclass(kw_only=True, eq=False)
 class MediaAsset(Identifiable, Owned, Timestamped):
     """Binary media asset attached to a target entity."""
@@ -26,6 +40,10 @@ class MediaAsset(Identifiable, Owned, Timestamped):
     status: MediaStatus
     has_thumbnail: bool = False
     thumbnail_sha256: str | None = None
+    # The thumbnail's size in pixels, already turned upright, so its shape is the
+    # picture's. None for an asset with no thumbnail, or one made before it was kept.
+    thumbnail_width: int | None = None
+    thumbnail_height: int | None = None
 
     def __post_init__(self) -> None:
         """Validate invariants after construction."""
@@ -73,6 +91,8 @@ class MediaAsset(Identifiable, Owned, Timestamped):
             status=MediaStatus.ATTACHED,
             has_thumbnail=self.has_thumbnail,
             thumbnail_sha256=self.thumbnail_sha256,
+            thumbnail_width=self.thumbnail_width,
+            thumbnail_height=self.thumbnail_height,
             created_at=now,
             updated_at=now,
         )
@@ -115,16 +135,20 @@ class MediaAsset(Identifiable, Owned, Timestamped):
         self.status = MediaStatus.ATTACHED
         self.touch()
 
-    def mark_thumbnail_generated(self, *, sha256: str) -> None:
+    def mark_thumbnail_generated(self, *, sha256: str, width: int, height: int) -> None:
         """Record that a thumbnail has been generated for this asset.
 
         `sha256` is the hash of the thumbnail's own bytes, not the
         original's - thumbnails are cached under it independently so
         that regenerating one (e.g. a thumbnailing bug fix) changes its
         cache key even though the original file's `sha256` never does.
+        `width` and `height` are the thumbnail's, so a page can reserve the
+        picture's shape before any of it has loaded.
         """
         self.has_thumbnail = True
         self.thumbnail_sha256 = sha256
+        self.thumbnail_width = width
+        self.thumbnail_height = height
 
     def orphan(self) -> None:
         """Transition from attached to orphaned."""

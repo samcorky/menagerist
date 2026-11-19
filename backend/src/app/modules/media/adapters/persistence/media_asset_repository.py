@@ -4,7 +4,7 @@ import structlog
 from sqlalchemy import delete, select
 
 from app.modules.media.adapters.persistence.models import MediaAssetModel
-from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
+from app.modules.media.domain.media_asset import MediaAsset, MediaStatus, StoredOriginal
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
@@ -32,6 +32,8 @@ def asset_to_domain(model: MediaAssetModel) -> MediaAsset:
         status=MediaStatus(model.status),
         has_thumbnail=model.has_thumbnail,
         thumbnail_sha256=model.thumbnail_sha256,
+        thumbnail_width=model.thumbnail_width,
+        thumbnail_height=model.thumbnail_height,
         created_at=model.created_at,
         updated_at=model.updated_at,
     )
@@ -49,6 +51,8 @@ def _to_model(asset: MediaAsset) -> MediaAssetModel:
         status=asset.status.value,
         has_thumbnail=asset.has_thumbnail,
         thumbnail_sha256=asset.thumbnail_sha256,
+        thumbnail_width=asset.thumbnail_width,
+        thumbnail_height=asset.thumbnail_height,
         created_at=asset.created_at,
         updated_at=asset.updated_at,
     )
@@ -135,6 +139,32 @@ class SqlAlchemyMediaAssetRepository:
         )
         result = await self._session.execute(stmt)
         return [asset_to_domain(m) for m in result.scalars()]
+
+    async def list_originals(self, *, scope: ContentFilter) -> list[StoredOriginal]:
+        """Return the stored original of every asset in `scope`, in any status."""
+        logger.debug("listing stored media originals")
+        # Named columns, not the whole row: a pre-migration backup runs this against
+        # a database that may not have the newest columns yet.
+        stmt = (
+            select(
+                MediaAssetModel.id,
+                MediaAssetModel.status,
+                MediaAssetModel.size,
+                MediaAssetModel.sha256,
+            )
+            .where(owned_by(MediaAssetModel, scope.user_id))
+            .order_by(MediaAssetModel.id)
+        )
+        result = await self._session.execute(stmt)
+        return [
+            StoredOriginal(
+                asset_id=row.id,
+                status=MediaStatus(row.status),
+                size=row.size,
+                sha256=row.sha256,
+            )
+            for row in result
+        ]
 
     async def delete(self, asset_id: uuid.UUID) -> None:
         """Hard-delete the asset record."""

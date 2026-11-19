@@ -119,4 +119,6 @@ def prepare_row(name: str, row: dict[str, object], owner_id: UUID) -> dict[str, 
     if name == "media_assets":
         row["has_thumbnail"] = False
         row["thumbnail_sha256"] = None
+        row["thumbnail_width"] = None
+        row["thumbnail_height"] = None
     return row

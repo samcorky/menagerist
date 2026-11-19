@@ -88,7 +88,9 @@ class RegenerateThumbnails(
 
             await self._storage.store_thumbnail(asset.id, asset.status, result.data)
             asset.mark_thumbnail_generated(
-                sha256=hashlib.sha256(result.data).hexdigest()
+                sha256=hashlib.sha256(result.data).hexdigest(),
+                width=result.width,
+                height=result.height,
             )
             async with self._uow as repos:
                 await repos.assets.save(asset)

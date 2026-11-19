@@ -80,6 +80,7 @@ def test_stage_and_get_round_trip() -> None:
     assert body["content_type"] == "image/jpeg"
     assert body["size"] == len(TINY_JPEG)
     assert body["thumbnail_url"] == f"/api/v1/media/{body['id']}/thumbnail"
+    assert (body["thumbnail_width"], body["thumbnail_height"]) == (320, 240)
 
     get_response = client.get(f"/api/v1/media/{body['id']}")
     assert get_response.status_code == 200

@@ -29,7 +29,10 @@
 					if (!cover) return null;
 					return {
 						thumb: cover.thumbnail_url ?? cover.content_url ?? null,
-						full: cover.content_url ?? cover.thumbnail_url ?? null
+						full: cover.content_url ?? cover.thumbnail_url ?? null,
+						// The thumbnail's size gives the picture's shape before any of it loads.
+						width: cover.thumbnail_width ?? undefined,
+						height: cover.thumbnail_height ?? undefined
 					};
 				})
 	);
@@ -51,13 +54,15 @@
 	}
 
 	// The loading state fills the space the picture will take, so nothing jumps when it arrives.
+	// Until the cover's shape is known, it guesses one.
 	const waitingClass = $derived(hiRes ? 'aspect-[4/3] w-full rounded-xl lg:aspect-[3/4]' : '');
 </script>
 
-{#snippet waiting(overlay: boolean)}
+<!-- `sized`: the pictures carry their width and height, so they hold the space themselves. -->
+{#snippet waiting(overlay: boolean, sized = false)}
 	<Skeleton
 		data-testid="cover-loading"
-		class="{overlay ? 'col-start-1 row-start-1 size-full' : cls} {waitingClass}"
+		class="{overlay ? 'col-start-1 row-start-1 size-full' : cls} {sized ? '' : waitingClass}"
 	/>
 {/snippet}
 
@@ -94,12 +99,15 @@
 	{:then cover}
 		{#if cover?.thumb}
 			{#if hiRes && cover.full !== cover.thumb}
+				{@const sized = cover.width !== undefined && cover.height !== undefined}
 				<div class="grid {cls}">
 					{#if !thumbLoaded}
-						{@render waiting(true)}
+						{@render waiting(true, sized)}
 					{/if}
 					<img
 						src={cover.thumb}
+						width={cover.width}
+						height={cover.height}
 						alt=""
 						class="col-start-1 row-start-1 w-full object-contain transition-[filter,opacity] duration-500 {thumbLoaded
 							? fullLoaded
@@ -112,6 +120,8 @@
 					/>
 					<img
 						src={cover.full}
+						width={cover.width}
+						height={cover.height}
 						alt=""
 						class="col-start-1 row-start-1 w-full object-contain transition-opacity duration-500 {fullLoaded
 							? 'opacity-100'

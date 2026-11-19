@@ -74,6 +74,7 @@ async def test_regenerates_thumbnail_for_attached_image() -> None:
     updated = await repo.get(asset.id, scope=ContentFilter.everyone())
     assert updated is not None
     assert updated.has_thumbnail is True
+    assert (updated.thumbnail_width, updated.thumbnail_height) == (320, 240)
 
 
 async def test_skips_non_thumbnailable_content_types() -> None:

@@ -20,7 +20,7 @@ from app.modules.media.adapters.persistence.media_asset_repository import (
 from app.modules.media.adapters.persistence.media_attachment_repository import (
     SqlAlchemyMediaAttachmentRepository,
 )
-from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
+from app.modules.media.domain.media_asset import MediaAsset, MediaStatus, StoredOriginal
 from app.modules.media.domain.media_attachment import AttachmentTarget, MediaAttachment
 from app.modules.media.ports.media_asset_repository import MediaAssetRepository
 from app.modules.media.ports.media_attachment_repository import (
@@ -112,6 +112,26 @@ async def test_list_by_status_filters_status(repos: Repos) -> None:
 
     attached = await repos.assets.list_by_status(status=MediaStatus.ATTACHED, scope=A)
     assert attached == []
+
+
+async def test_list_originals_is_scoped_and_spans_every_status(repos: Repos) -> None:
+    """Each scope lists its own originals, in any status, with what a backup copies."""
+    mine, attached, theirs = _asset(ALICE), _asset(ALICE), _asset(BOB)
+    attached.promote()
+    for asset in (mine, attached, theirs):
+        await repos.assets.add(asset)
+
+    listed_a = await repos.assets.list_originals(scope=A)
+    listed_all = await repos.assets.list_originals(scope=ALL)
+
+    assert sorted(listed_a, key=lambda o: o.asset_id) == sorted(
+        (
+            StoredOriginal(asset_id=a.id, status=a.status, size=a.size, sha256=a.sha256)
+            for a in (mine, attached)
+        ),
+        key=lambda o: o.asset_id,
+    )
+    assert {o.asset_id for o in listed_all} == {mine.id, attached.id, theirs.id}
 
 
 async def test_list_expired_is_scoped(repos: Repos) -> None:
