@@ -7,7 +7,9 @@
 			content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
 		/>
 		<meta name="text-scale" content="scale" />
-		<!-- The same preview for every link; see tests/pwa-manifest.test.ts. -->
+		<!-- The same preview for every link. The server rewrites the name, description and image
+		     from the instance's branding (backend spa.py, brand_shell), so keep the tags in this
+		     form; see tests/pwa-manifest.test.ts. -->
 		<meta
 			name="description"
 			content="A self-hostable platform for organising the things you care about."

@@ -19,14 +19,20 @@ Behaviour mirrors ``frontend/nginx.conf``:
                                                   accepts it (adapter-static's
                                                   ``precompress``), so the build,
                                                   not each request, pays for it
+* given a branding source, the shell's link-preview tags are rewritten per
+  request from the instance's name and description (and made absolute on the
+  public origin), and sent for the compression middleware to encode, as the
+  build's own compressed copies of the shell hold the unbranded tags
 
 Security headers on the shell are set explicitly. ``SecurityHeadersMiddleware``
 uses ``setdefault``, so it fills in the API-oriented defaults (CSP ``default-src
 'none'``) only where a response hasn't already chosen its own.
 """
 
+import html
 import mimetypes
-from pathlib import PurePosixPath
+import re
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from starlette.datastructures import Headers
@@ -35,7 +41,14 @@ from starlette.responses import RedirectResponse, Response
 from starlette.staticfiles import StaticFiles
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+    from os import PathLike
+
     from starlette.types import Scope
+
+    from app.modules.system.domain.branding import Branding
+
+    type BrandingSource = Callable[[], Awaitable[Branding]]
 
 # StaticFiles types a file from the system's MIME tables, which not every host maps
 # for the web app manifest; browsers will not treat it as one without this type.
@@ -80,6 +93,45 @@ _SHELL_HEADERS: dict[str, str] = {
 }
 
 
+def _set_meta(shell: str, attribute: str, key: str, value: str) -> str:
+    """Replace the content of the first `<meta {attribute}="{key}">` in `shell`."""
+    pattern = rf'(<meta\s+{attribute}="{re.escape(key)}"\s+content=")[^"]*(")'
+    return re.sub(pattern, lambda m: m[1] + value + m[2], shell, count=1)
+
+
+def brand_shell(
+    shell: str, branding: Branding, *, origin: str | None, path: str
+) -> str:
+    """Return `shell` with its link-preview tags naming and describing the instance.
+
+    Only the preview tags change; the app's own uses of the name are left alone.
+    With a public origin, the image and the page's own address become absolute,
+    which WhatsApp, Facebook and X need; without one they stay as they are.
+    """
+    name = html.escape(branding.name)
+    description = html.escape(branding.description)
+    for attribute, key, value in (
+        ("name", "description", description),
+        ("property", "og:site_name", name),
+        ("property", "og:title", name),
+        ("property", "og:description", description),
+    ):
+        shell = _set_meta(shell, attribute, key, value)
+    if origin:
+        base = html.escape(origin.rstrip("/"))
+        shell = re.sub(
+            r'(<meta\s+property="og:image"\s+content=")(/[^"]*")',
+            lambda m: m[1] + base + m[2],
+            shell,
+            count=1,
+        )
+        url = f'<meta property="og:url" content="{base}{html.escape(path)}" />'
+        shell = shell.replace(
+            '<meta property="og:type"', f'{url}\n\t\t<meta property="og:type"', 1
+        )
+    return shell
+
+
 def _is_hidden(path: str) -> bool:
     return any(
         part.startswith(".") and part != ".well-known"
@@ -111,7 +163,23 @@ def _asset_headers(path: str) -> dict[str, str]:
 
 
 class SpaStaticFiles(StaticFiles):
-    """StaticFiles with SPA-shell fallback and per-path caching."""
+    """StaticFiles with SPA-shell fallback and per-path caching.
+
+    With `branding`, the shell's link-preview tags follow the instance's branding.
+    """
+
+    def __init__(
+        self,
+        *,
+        directory: str | PathLike[str],
+        branding: BrandingSource | None = None,
+        public_origin: str | None = None,
+    ) -> None:
+        super().__init__(directory=directory)
+        self._shell_path = Path(directory) / _SHELL
+        self._branding = branding
+        self._public_origin = public_origin
+        self._template: tuple[int, str] | None = None
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         """Serve `path`, falling back to the SPA shell for client-side routes."""
@@ -129,9 +197,13 @@ class SpaStaticFiles(StaticFiles):
         except HTTPException as exc:
             if exc.status_code != 404 or _looks_like_asset(path):
                 raise
+            if self._branding is not None:
+                return await self._branded_shell(self._branding, scope)
             return self._shell(await self._negotiated(_SHELL, scope))
 
         if path == _SHELL:
+            if self._branding is not None:
+                return await self._branded_shell(self._branding, scope)
             return self._shell(response)
 
         response.headers.update(_asset_headers(path))
@@ -164,6 +236,27 @@ class SpaStaticFiles(StaticFiles):
                 compressed.headers["Content-Encoding"] = encoding
                 return compressed
         return response
+
+    def _shell_template(self) -> str:
+        """The built shell, read again only when the file changes."""
+        modified = self._shell_path.stat().st_mtime_ns
+        if self._template is None or self._template[0] != modified:
+            self._template = (modified, self._shell_path.read_text(encoding="utf-8"))
+        return self._template[1]
+
+    async def _branded_shell(self, source: BrandingSource, scope: Scope) -> Response:
+        """The shell with this instance's preview tags.
+
+        Sent uncompressed: the app's compression middleware encodes it like any other
+        page, as the build's precompressed copies hold the unbranded tags.
+        """
+        body = brand_shell(
+            self._shell_template(),
+            await source(),
+            origin=self._public_origin,
+            path=scope["path"],
+        )
+        return self._shell(Response(body, media_type="text/html"))
 
     @staticmethod
     def _shell(response: Response) -> Response:
