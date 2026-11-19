@@ -1,7 +1,7 @@
 import Bowser from 'bowser';
 import type { DisplayMode, OwnDeviceResponse } from '$lib/api/client';
 
-export type DeviceKind = 'tool' | 'phone' | 'tablet' | 'desktop' | 'unknown';
+export type DeviceKind = 'tool' | 'automation' | 'phone' | 'tablet' | 'desktop' | 'unknown';
 
 export interface DeviceInfo {
 	userAgent?: string | null;
@@ -27,6 +27,9 @@ function detectTool(ua: string): string | null {
 	return null;
 }
 
+/** A browser driven by a script (Playwright, Puppeteer, Selenium, headless Chrome), not by a person. */
+const AUTOMATED_BROWSER = /HeadlessChrome|Playwright|Puppeteer|Selenium|webdriver/i;
+
 /**
  * Derives a human-readable device label and icon category from the user agent and Client Hints.
  */
@@ -49,13 +52,19 @@ export function describeDevice(info: DeviceInfo): DescribedDevice {
 		}
 	}
 
+	const system = platformHint || parsed?.os?.name?.trim() || null;
+
+	if (AUTOMATED_BROWSER.test(ua)) {
+		return {
+			label: system ? `Automated browser on ${system}` : 'Automated browser',
+			kind: 'automation'
+		};
+	}
+
 	let browser = parsed?.browser?.name?.trim() || null;
 	if (browser === 'Samsung Internet for Android') {
 		browser = 'Samsung Internet';
 	}
-
-	const os = parsed?.os?.name?.trim() || null;
-	const system = platformHint || os || null;
 
 	let kind: DeviceKind = 'unknown';
 	if (
