@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Camera, ScanBarcode, X } from '@lucide/svelte';
+	import { ScanBarcode, X } from '@lucide/svelte';
+	import FileDrop from '$lib/components/file-drop.svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
@@ -52,8 +53,8 @@
 		return code === null ? null : scannedAttributes(code, codeField, typeSchema);
 	}
 
-	async function handlePhotoChange(e: Event) {
-		const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+	async function handlePhotoChange(files: FileList | File[]) {
+		const file = Array.from(files)[0] ?? null;
 		if (!file) return;
 		staging = true;
 		const previewUrl = URL.createObjectURL(file);
@@ -155,23 +156,14 @@
 					</button>
 				</div>
 			{:else}
-				<label
-					class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-4 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground {staging
-						? 'pointer-events-none opacity-60'
-						: ''}"
-				>
-					<Camera class="size-4" />
-					{staging ? 'Adding…' : 'Add photo'}
-					<!-- @ts-expect-error capture is a valid mobile HTML attribute -->
-					<input
-						type="file"
-						accept="image/*"
-						capture="environment"
-						class="sr-only"
-						disabled={staging}
-						onchange={handlePhotoChange}
-					/>
-				</label>
+				<FileDrop
+					onFiles={handlePhotoChange}
+					multiple={false}
+					accept="image/*"
+					label={staging ? 'Adding…' : 'Add photo'}
+					camera
+					disabled={staging}
+				/>
 			{/if}
 
 			<!-- Name -->

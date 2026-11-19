@@ -43,5 +43,12 @@
 	>
 		<TypeIcon {icon} {colour} boxed class="size-24 rounded-3xl text-6xl" />
 	</div>
-	<FileDrop onFiles={add} multiple={false} accept="image/*" label="Add a photo" disabled={busy} />
+	<FileDrop
+		onFiles={add}
+		multiple={false}
+		accept="image/*"
+		label="Add a photo"
+		camera
+		disabled={busy}
+	/>
 </div>

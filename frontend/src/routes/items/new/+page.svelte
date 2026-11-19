@@ -3,7 +3,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ImagePlus, X } from '@lucide/svelte';
+	import { X } from '@lucide/svelte';
+	import FileDrop from '$lib/components/file-drop.svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		attachMedia,
@@ -127,8 +128,8 @@
 		}
 	});
 
-	function handlePhotoChange(e: Event) {
-		const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+	function handlePhotoChange(files: FileList | File[]) {
+		const file = Array.from(files)[0] ?? null;
 		if (photoPreview) URL.revokeObjectURL(photoPreview);
 		stagedAsset = null;
 		photo = file;
@@ -234,13 +235,13 @@
 						</button>
 					</div>
 				{:else}
-					<label
-						class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-					>
-						<ImagePlus class="size-4" />
-						Add cover photo
-						<input type="file" accept="image/*" class="sr-only" onchange={handlePhotoChange} />
-					</label>
+					<FileDrop
+						onFiles={handlePhotoChange}
+						multiple={false}
+						accept="image/*"
+						label="Add cover photo"
+						camera
+					/>
 				{/if}
 
 				<!-- Name -->
