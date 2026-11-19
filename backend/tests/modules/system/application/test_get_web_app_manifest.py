@@ -2,16 +2,19 @@ from app.modules.system.application.get_web_app_manifest import (
     GetWebAppManifest,
     GetWebAppManifestQuery,
 )
+from app.modules.system.domain.branding import Branding
 from app.shared_kernel.access import Public
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+
+APP = Branding(description="An app.")
 
 
 async def test_manifest_carries_the_configured_public_origin() -> None:
     """The origin comes from configuration, never from the request."""
     use_case = GetWebAppManifest(
         InMemoryAccessGuard(),
-        description="An app.",
+        branding=APP,
         public_origin="https://menagerist.example.com",
     )
 
@@ -23,7 +26,7 @@ async def test_manifest_carries_the_configured_public_origin() -> None:
 async def test_manifest_without_a_public_origin_has_none() -> None:
     """With no origin configured the manifest's URLs stay relative."""
     use_case = GetWebAppManifest(
-        InMemoryAccessGuard(), description="An app.", public_origin=None
+        InMemoryAccessGuard(), branding=APP, public_origin=None
     )
 
     manifest = await use_case.handle(GetWebAppManifestQuery(), SYSTEM_ACTOR)
@@ -31,15 +34,21 @@ async def test_manifest_without_a_public_origin_has_none() -> None:
     assert manifest.origin is None
 
 
-async def test_manifest_carries_the_description_it_is_given() -> None:
-    """The manifest holds no fixed description: the use case's builder supplies it."""
+async def test_manifest_carries_the_branding_it_is_given() -> None:
+    """Name and description come from the branding the builder supplies."""
+    branding = Branding(
+        name="The Hoard",
+        short_name="Hoard",
+        description="Our family's things.",
+    )
     use_case = GetWebAppManifest(
-        InMemoryAccessGuard(), description="Something else.", public_origin=None
+        InMemoryAccessGuard(), branding=branding, public_origin=None
     )
 
     manifest = await use_case.handle(GetWebAppManifestQuery(), SYSTEM_ACTOR)
 
-    assert manifest.description == "Something else."
+    assert (manifest.name, manifest.short_name) == ("The Hoard", "Hoard")
+    assert manifest.description == "Our family's things."
 
 
 def test_manifest_is_public() -> None:

@@ -52,7 +52,13 @@ from app.modules.system.application.get_version_detail import (
 )
 from app.modules.system.application.get_web_app_manifest import GetWebAppManifest
 from app.modules.system.application.run_browser_check import RunBrowserCheck
-from app.modules.system.application.setting_keys import RELEASE_CHANNEL
+from app.modules.system.application.setting_keys import (
+    BRANDING_DESCRIPTION,
+    BRANDING_NAME,
+    BRANDING_SHORT_NAME,
+    RELEASE_CHANNEL,
+)
+from app.modules.system.domain.branding import Branding
 from app.modules.system.domain.release import ReleaseChannel
 from app.platform.app_info import load_app_info
 from app.platform.config.api import get_api_settings
@@ -131,13 +137,28 @@ def get_get_version_use_case(
     return GetVersion(PackageAppInfoAdapter(), guard)
 
 
+async def get_branding() -> Branding:
+    """The instance's branding as the deployment or an administrator set it.
+
+    An empty description falls back to the package description, which the API's
+    OpenAPI summary also shows.
+    """
+    reader = get_settings_reader()
+    description = await reader.get(BRANDING_DESCRIPTION)
+    return Branding(
+        name=await reader.get(BRANDING_NAME),
+        short_name=await reader.get(BRANDING_SHORT_NAME),
+        description=description or load_app_info().project.description or "",
+    )
+
+
 def get_get_web_app_manifest_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    branding: Annotated[Branding, Depends(get_branding)],
 ) -> GetWebAppManifest:
-    # The same package description the API's OpenAPI summary shows.
     return GetWebAppManifest(
         guard,
-        description=load_app_info().project.description or "",
+        branding=branding,
         public_origin=get_api_settings().public_origin,
     )
 

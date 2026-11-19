@@ -6,6 +6,7 @@ export type SettingValue = boolean | number | string | string[];
 
 const GROUP_LABELS: Record<string, string> = {
 	backup: 'Backups',
+	branding: 'Branding',
 	identity: 'Sign-in',
 	media: 'Media',
 	release: 'Updates',

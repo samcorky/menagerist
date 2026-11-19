@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+from app.modules.system.domain.branding import Branding  # noqa: TC001
 from app.modules.system.domain.web_app_manifest import WebAppManifest
 from app.shared_kernel.access import Access, Public
 from app.shared_kernel.access_guard import AccessGuard  # noqa: TC001
@@ -21,14 +22,20 @@ class GetWebAppManifest(UseCase[GetWebAppManifestQuery, WebAppManifest]):
     access: ClassVar[Access] = Public()
 
     def __init__(
-        self, guard: AccessGuard, *, description: str, public_origin: str | None
+        self, guard: AccessGuard, *, branding: Branding, public_origin: str | None
     ) -> None:
         self._guard = guard
-        self._description = description
+        self._branding = branding
         self._public_origin = public_origin
 
     async def _handle(
         self, query: GetWebAppManifestQuery, actor: Actor
     ) -> WebAppManifest:
-        """Return the manifest, with URLs on the public origin when one is set."""
-        return WebAppManifest(description=self._description, origin=self._public_origin)
+        """Return the branded manifest, on the public origin when one is set."""
+        branding = self._branding
+        return WebAppManifest(
+            name=branding.name,
+            short_name=branding.short_name,
+            description=branding.description,
+            origin=self._public_origin,
+        )
