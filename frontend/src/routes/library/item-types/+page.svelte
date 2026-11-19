@@ -8,6 +8,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import {
+		countNodeTypes,
 		listNodes,
 		listNodeTypes,
 		createNodeType,
@@ -42,6 +43,8 @@
 	let categories = $state<NodeTypeResponse[]>([]);
 	let loading = $state(false);
 	let exampleTypeIds = $state<ReadonlySet<string>>(new Set());
+	// Items per type slug; null until counted, so a failed count shows no number rather than a wrong one.
+	let itemCounts = $state<ReadonlyMap<string, number> | null>(null);
 	let hasMore = $state(true);
 	let loadFailed = $state(false);
 	// A later page that would not load: the list says so and offers Try again (#588).
@@ -181,6 +184,16 @@
 		saving = false;
 	}
 
+	async function loadItemCounts() {
+		const result = await countNodeTypes();
+		if (result.error || !result.data) return;
+		itemCounts = new Map(
+			result.data.filter((row) => row.type !== null).map((row) => [row.type!, row.count])
+		);
+	}
+
+	const itemCount = (cat: NodeTypeResponse) => itemCounts?.get(cat.slug) ?? 0;
+
 	const fieldCount = (cat: NodeTypeResponse) =>
 		Object.keys((cat.attributes_schema as AttributesSchema | null)?.properties ?? {}).length;
 
@@ -248,6 +261,7 @@
 	$effect(() => {
 		void fetchPage();
 		void loadExampleIds().then((ids) => (exampleTypeIds = ids.itemTypes));
+		void loadItemCounts();
 	});
 
 	// Coming back online, or Retry in the banner, reloads a list that had failed.
@@ -342,6 +356,21 @@
 							</div>
 							{#if cat.description}
 								<p class="truncate text-sm text-muted-foreground">{cat.description}</p>
+							{/if}
+							{#if itemCounts}
+								{#if itemCount(cat) > 0}
+									<a
+										href="{resolve('/items')}?type={encodeURIComponent(cat.slug)}"
+										data-testid="type-item-count"
+										class="block truncate text-xs text-muted-foreground underline-offset-2 hover:underline"
+									>
+										{itemCount(cat) === 1 ? '1 item' : `${itemCount(cat).toLocaleString()} items`}
+									</a>
+								{:else}
+									<p data-testid="type-item-count" class="truncate text-xs text-muted-foreground">
+										No items yet
+									</p>
+								{/if}
 							{/if}
 						</div>
 						<span class="hidden shrink-0 text-xs text-muted-foreground sm:inline">
