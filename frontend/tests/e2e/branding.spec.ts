@@ -6,6 +6,10 @@ import { expect, test, type Page } from './fixtures';
  */
 test.describe.configure({ mode: 'serial' });
 
+// Each server process caches settings for up to five seconds; a save clears only the
+// cache of the process that took it, so another may answer with the old value meanwhile.
+const SETTLED = { timeout: 10_000 };
+
 const card = (page: Page, title: string) =>
 	page
 		.getByRole('listitem')
@@ -27,7 +31,7 @@ test.afterEach(async ({ request }) => {
 test('naming the instance renames the installed app', async ({ page }) => {
 	await page.goto('/settings/server?section=branding');
 	await expect(page.getByRole('heading', { name: 'Branding', exact: true })).toBeVisible();
-	expect((await manifest(page)).name).toBe('Menagerist');
+	await expect.poll(async () => (await manifest(page)).name, SETTLED).toBe('Menagerist');
 
 	for (const [title, value] of [
 		['App name', 'The Hoard'],
@@ -39,11 +43,9 @@ test('naming the instance renames the installed app', async ({ page }) => {
 		await expect(card(page, title).getByText('Changed here', { exact: true })).toBeVisible();
 	}
 
-	expect(await manifest(page)).toMatchObject({
-		name: 'The Hoard',
-		short_name: 'Hoard',
-		description: "Our family's things."
-	});
+	await expect
+		.poll(() => manifest(page), SETTLED)
+		.toMatchObject({ name: 'The Hoard', short_name: 'Hoard', description: "Our family's things." });
 });
 
 test('a short name too long for a launcher is refused and nothing is saved', async ({ page }) => {
@@ -52,5 +54,5 @@ test('a short name too long for a launcher is refused and nothing is saved', asy
 	await card(page, 'Short app name').getByRole('button', { name: 'Save', exact: true }).click();
 
 	await expect(card(page, 'Short app name').getByRole('alert')).toBeVisible();
-	expect((await manifest(page)).short_name).toBe('Menagerist');
+	await expect.poll(async () => (await manifest(page)).short_name, SETTLED).toBe('Menagerist');
 });
