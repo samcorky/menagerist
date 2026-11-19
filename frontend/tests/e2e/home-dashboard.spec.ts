@@ -81,3 +81,13 @@ test('opening Home after capturing an item loads each figure once, not twice', a
 	// Stats and Tidy up are one counts request each; a second load would double both.
 	expect(counts).toBeLessThanOrEqual(2);
 });
+
+test('the Favourites tile opens the items list filtered to favourites', async ({
+	page,
+	request
+}) => {
+	await makeItem(request, uniqueName('Dash fav'));
+	await page.goto('/');
+	await page.getByTestId('stat-favourites').click();
+	await expect(page).toHaveURL(/\/items\?.*f=/);
+});
