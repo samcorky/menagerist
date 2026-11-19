@@ -20,7 +20,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { NativeSelect } from '$lib/components/ui/native-select/index.js';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 
 	let name = $state('');
 	let selectedType = $state<string | null>(null);
@@ -239,9 +239,11 @@
 							</Label>
 							<NativeSelect id="capture-barcode-field" bind:value={codeField}>
 								{#each codeFields as field (field.key)}
-									<option value={field.key}>{field.label}</option>
+									<NativeSelectOption value={field.key}>{field.label}</NativeSelectOption>
 								{/each}
-								<option value={NEW_BARCODE_DETAIL}>A new Barcode detail</option>
+								<NativeSelectOption value={NEW_BARCODE_DETAIL}
+									>A new Barcode detail</NativeSelectOption
+								>
 							</NativeSelect>
 						</div>
 					{:else}

@@ -18,7 +18,7 @@
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import { NativeSelect } from '$lib/components/ui/native-select/index.js';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import {
 		assignTarget,
 		choicesFrom,
@@ -220,7 +220,7 @@
 							onchange={(e) => (separator = e.currentTarget.value)}
 						>
 							{#each SEPARATORS as option (option.value)}
-								<option value={option.value}>{option.label}</option>
+								<NativeSelectOption value={option.value}>{option.label}</NativeSelectOption>
 							{/each}
 						</NativeSelect>
 						<p class="text-xs text-muted-foreground">
@@ -274,11 +274,15 @@
 										choices = assignTarget(choices, choice.column, e.currentTarget.value || null);
 									}}
 								>
-									<option value="">Don't import</option>
+									<NativeSelectOption value="">Don't import</NativeSelectOption>
 									{#each options as option (option.value)}
-										<option value={option.value} disabled={option.disabled} title={option.hint}>
+										<NativeSelectOption
+											value={option.value}
+											disabled={option.disabled}
+											title={option.hint}
+										>
 											{option.label}{option.disabled ? ' (not supported yet)' : ''}
-										</option>
+										</NativeSelectOption>
 									{/each}
 								</NativeSelect>
 							</li>
@@ -296,7 +300,7 @@
 							onchange={(e) => (dateOrder = e.currentTarget.value as DayMonthOrder)}
 						>
 							{#each DATE_ORDERS as option (option.value)}
-								<option value={option.value}>{option.label}</option>
+								<NativeSelectOption value={option.value}>{option.label}</NativeSelectOption>
 							{/each}
 						</NativeSelect>
 						<p class="text-xs text-muted-foreground">

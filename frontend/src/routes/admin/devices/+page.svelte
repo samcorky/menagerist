@@ -28,7 +28,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { NativeSelect } from '$lib/components/ui/native-select/index.js';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
@@ -173,9 +173,9 @@
 						value={selectedUserId}
 						onchange={handleFilterChange}
 					>
-						<option value="">All users</option>
+						<NativeSelectOption value="">All users</NativeSelectOption>
 						{#each users as u (u.id)}
-							<option value={u.id}>{u.display_name} ({u.username})</option>
+							<NativeSelectOption value={u.id}>{u.display_name} ({u.username})</NativeSelectOption>
 						{/each}
 					</NativeSelect>
 				</div>
