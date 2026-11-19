@@ -19,15 +19,14 @@ class InMemoryImageProcessor:
     def generate_thumbnail(
         self, data: bytes, *, max_dimension: int = 320
     ) -> ThumbnailResult | None:
-        """Return a synthetic thumbnail, None for failure, or raise if too large."""
+        """Return a synthetic 4:3 thumbnail, None for failure, or raise if too large."""
         if self._too_large:
             raise ImageTooLargeError("That image has too many pixels.")
         if not self._generate_result or not data:
             return None
+        width = min(max_dimension, 320)
         return ThumbnailResult(
-            data=self._fake_thumbnail_bytes,
-            width=min(max_dimension, 320),
-            height=min(max_dimension, 320),
+            data=self._fake_thumbnail_bytes, width=width, height=width * 3 // 4
         )
 
 

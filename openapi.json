@@ -11189,7 +11189,9 @@
                   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                   "size": 204800,
                   "status": "attached",
+                  "thumbnail_height": 240,
                   "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "thumbnail_width": 320,
                   "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
@@ -11818,7 +11820,9 @@
                   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                   "size": 204800,
                   "status": "attached",
+                  "thumbnail_height": 240,
                   "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "thumbnail_width": 320,
                   "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
@@ -12135,7 +12139,9 @@
                   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                   "size": 204800,
                   "status": "attached",
+                  "thumbnail_height": 240,
                   "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "thumbnail_width": 320,
                   "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
@@ -13952,7 +13958,9 @@
                   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                   "size": 204800,
                   "status": "attached",
+                  "thumbnail_height": 240,
                   "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "thumbnail_width": 320,
                   "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
@@ -14176,7 +14184,9 @@
                   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                   "size": 204800,
                   "status": "attached",
+                  "thumbnail_height": 240,
                   "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                  "thumbnail_width": 320,
                   "updated_at": "2026-09-07T10:00:00Z"
                 }
               }
@@ -14407,7 +14417,9 @@
                     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                     "size": 204800,
                     "status": "attached",
+                    "thumbnail_height": 240,
                     "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+                    "thumbnail_width": 320,
                     "updated_at": "2026-09-07T10:00:00Z"
                   }
                 ]
@@ -34196,6 +34208,30 @@
             "title": "Thumbnail Url",
             "description": "Where to fetch a WebP thumbnail; null if there is none."
           },
+          "thumbnail_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Width",
+            "description": "The thumbnail's width in pixels, upright; null if not known."
+          },
+          "thumbnail_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Height",
+            "description": "The thumbnail's height in pixels, upright; null if not known."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -34219,6 +34255,8 @@
           "status",
           "content_url",
           "thumbnail_url",
+          "thumbnail_width",
+          "thumbnail_height",
           "created_at",
           "updated_at"
         ],
@@ -34234,7 +34272,9 @@
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "size": 204800,
             "status": "attached",
+            "thumbnail_height": 240,
             "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+            "thumbnail_width": 320,
             "updated_at": "2026-09-07T10:00:00Z"
           }
         ]
@@ -34443,6 +34483,30 @@
             "title": "Thumbnail Url",
             "description": "Where to fetch a WebP thumbnail; null if there is none."
           },
+          "thumbnail_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Width",
+            "description": "The thumbnail's width in pixels, upright; null if not known."
+          },
+          "thumbnail_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Height",
+            "description": "The thumbnail's height in pixels, upright; null if not known."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -34477,6 +34541,8 @@
           "status",
           "content_url",
           "thumbnail_url",
+          "thumbnail_width",
+          "thumbnail_height",
           "created_at",
           "updated_at",
           "attribute_key"
@@ -34494,7 +34560,9 @@
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "size": 204800,
             "status": "attached",
+            "thumbnail_height": 240,
             "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+            "thumbnail_width": 320,
             "updated_at": "2026-09-07T10:00:00Z"
           }
         ]

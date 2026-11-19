@@ -157,11 +157,20 @@ def test_import_stamps_ownership_and_regenerates_derived_fields() -> None:
     preset = prepare_row("presets", {"owner_id": "someone-else"}, actor)
     assert preset == {"owner_id": actor}
     media = prepare_row(
-        "media_assets", {"has_thumbnail": True, "thumbnail_sha256": "old"}, actor
+        "media_assets",
+        {
+            "has_thumbnail": True,
+            "thumbnail_sha256": "old",
+            "thumbnail_width": 320,
+            "thumbnail_height": 240,
+        },
+        actor,
     )
     assert media == {
         "has_thumbnail": False,
         "thumbnail_sha256": None,
+        "thumbnail_width": None,
+        "thumbnail_height": None,
         "owner_id": actor,
     }
 

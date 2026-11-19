@@ -58,7 +58,7 @@ class _Setup:
             sha256="x",
         )
         asset.promote()
-        asset.mark_thumbnail_generated(sha256="t")
+        asset.mark_thumbnail_generated(sha256="t", width=320, height=240)
         await self.assets.add(asset)
         self.storage._files[(asset.id, MediaStatus.ATTACHED.value)] = data
         self.storage._thumbnails[(asset.id, MediaStatus.ATTACHED.value)] = b"thumb"
@@ -141,6 +141,7 @@ async def test_every_copy_is_a_separate_asset_with_its_own_file() -> None:
     )
     assert copy.has_thumbnail
     assert copy.thumbnail_sha256 == "t"
+    assert (copy.thumbnail_width, copy.thumbnail_height) == (320, 240)
     key = MediaStatus.ATTACHED.value
     assert setup.storage._files[(copy.id, key)] == b"original bytes"
     assert setup.storage._thumbnails[(copy.id, key)] == b"thumb"

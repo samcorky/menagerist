@@ -32,21 +32,15 @@ class BackupMediaFiles:
 
     async def list_files(self) -> list[MediaFileRef]:
         """List original assets in all lifecycle buckets, across the instance."""
-        refs: list[MediaFileRef] = []
-        for status in MediaStatus:
-            assets = await self._repository.list_by_status(
-                status=status, scope=self._scope
+        return [
+            MediaFileRef(
+                asset_id=original.asset_id,
+                status=original.status.value,
+                size=original.size,
+                sha256=original.sha256,
             )
-            refs.extend(
-                MediaFileRef(
-                    asset_id=asset.id,
-                    status=asset.status.value,
-                    size=asset.size,
-                    sha256=asset.sha256,
-                )
-                for asset in assets
-            )
-        return refs
+            for original in await self._repository.list_originals(scope=self._scope)
+        ]
 
     async def exists(self, ref: MediaFileRef) -> bool:
         """Probe for the original by opening it and reading no more than a chunk."""

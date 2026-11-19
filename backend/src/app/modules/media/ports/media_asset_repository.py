@@ -5,7 +5,11 @@ if TYPE_CHECKING:
     from collections.abc import Collection
     from datetime import datetime
 
-    from app.modules.media.domain.media_asset import MediaAsset, MediaStatus
+    from app.modules.media.domain.media_asset import (
+        MediaAsset,
+        MediaStatus,
+        StoredOriginal,
+    )
     from app.shared_kernel.content_filter import ContentFilter
 
 
@@ -45,6 +49,14 @@ class MediaAssetRepository(Protocol):
         self, *, status: MediaStatus, scope: ContentFilter
     ) -> list[MediaAsset]:
         """Return all assets in `scope` that are in `status`."""
+        ...
+
+    async def list_originals(self, *, scope: ContentFilter) -> list[StoredOriginal]:
+        """Return the stored original of every asset in `scope`, in any status.
+
+        Reads only the columns `StoredOriginal` names, so it works on a database
+        a pending migration has not yet brought up to date.
+        """
         ...
 
     async def delete(self, asset_id: uuid.UUID) -> None:

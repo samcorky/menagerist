@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from app.modules.media.domain.media_asset import StoredOriginal
+
 if TYPE_CHECKING:
     import uuid
     from collections.abc import Collection
@@ -72,6 +74,14 @@ class InMemoryMediaAssetRepository:
             a
             for a in self._assets.values()
             if a.status is status and scope.covers(a.owner_id)
+        ]
+
+    async def list_originals(self, *, scope: ContentFilter) -> list[StoredOriginal]:
+        """Return the stored original of every asset in `scope`, in any status."""
+        return [
+            StoredOriginal(asset_id=a.id, status=a.status, size=a.size, sha256=a.sha256)
+            for a in sorted(self._assets.values(), key=lambda a: a.id)
+            if scope.covers(a.owner_id)
         ]
 
     async def delete(self, asset_id: uuid.UUID) -> None:

@@ -217,11 +217,25 @@ def test_mark_thumbnail_generated_sets_flag_and_hash() -> None:
         sha256="original-hash",
     )
 
-    asset.mark_thumbnail_generated(sha256="thumbnail-hash")
+    asset.mark_thumbnail_generated(sha256="thumbnail-hash", width=320, height=180)
 
     assert asset.has_thumbnail is True
     assert asset.thumbnail_sha256 == "thumbnail-hash"
     assert asset.thumbnail_sha256 != asset.sha256
+    assert (asset.thumbnail_width, asset.thumbnail_height) == (320, 180)
+
+
+def test_a_new_asset_has_no_thumbnail_size() -> None:
+    """Until a thumbnail is made, its size is unknown."""
+    asset = MediaAsset.create(
+        owner_id=SYSTEM_ACTOR.id,
+        filename="f.jpg",
+        content_type="image/jpeg",
+        size=1,
+        sha256="x",
+    )
+
+    assert (asset.thumbnail_width, asset.thumbnail_height) == (None, None)
 
 
 def test_orphan_raises_if_already_orphaned() -> None:

@@ -95,6 +95,7 @@ async def test_stage_generates_thumbnail_for_image() -> None:
     )
 
     assert asset.has_thumbnail is True
+    assert (asset.thumbnail_width, asset.thumbnail_height) == (320, 240)
     assert (asset.id, "staged") in storage._thumbnails
 
 

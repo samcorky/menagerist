@@ -127,7 +127,9 @@ class StageMedia(CommandHandler[MediaUnitOfWork, StageMediaCommand, MediaAsset])
                     asset_id, MediaStatus.STAGED, result.data
                 )
                 asset.mark_thumbnail_generated(
-                    sha256=hashlib.sha256(result.data).hexdigest()
+                    sha256=hashlib.sha256(result.data).hexdigest(),
+                    width=result.width,
+                    height=result.height,
                 )
 
         async with self._uow as repos:

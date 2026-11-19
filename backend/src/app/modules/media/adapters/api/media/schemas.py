@@ -126,6 +126,8 @@ _EXAMPLE: dict[str, Any] = {
     "status": "attached",
     "content_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/content",
     "thumbnail_url": "/api/v1/media/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20/thumbnail",
+    "thumbnail_width": 320,
+    "thumbnail_height": 240,
     "created_at": "2026-09-07T10:00:00Z",
     "updated_at": "2026-09-07T10:00:00Z",
 }
@@ -146,6 +148,12 @@ class MediaAssetResponse(BaseModel):
     thumbnail_url: str | None = Field(
         description="Where to fetch a WebP thumbnail; null if there is none."
     )
+    thumbnail_width: int | None = Field(
+        description="The thumbnail's width in pixels, upright; null if not known."
+    )
+    thumbnail_height: int | None = Field(
+        description="The thumbnail's height in pixels, upright; null if not known."
+    )
     created_at: datetime = Field(description="When it was uploaded.")
     updated_at: datetime = Field(description="When it last changed.")
 
@@ -163,6 +171,8 @@ class MediaAssetResponse(BaseModel):
             thumbnail_url=(
                 f"/api/v1/media/{asset.id}/thumbnail" if asset.has_thumbnail else None
             ),
+            thumbnail_width=asset.thumbnail_width,
+            thumbnail_height=asset.thumbnail_height,
             created_at=asset.created_at,
             updated_at=asset.updated_at,
         )
@@ -186,6 +196,12 @@ class NodeMediaItemResponse(BaseModel):
     content_url: str = Field(description="Where to download the file.")
     thumbnail_url: str | None = Field(
         description="Where to fetch a WebP thumbnail; null if there is none."
+    )
+    thumbnail_width: int | None = Field(
+        description="The thumbnail's width in pixels, upright; null if not known."
+    )
+    thumbnail_height: int | None = Field(
+        description="The thumbnail's height in pixels, upright; null if not known."
     )
     created_at: datetime = Field(description="When it was uploaded.")
     updated_at: datetime = Field(description="When it last changed.")
