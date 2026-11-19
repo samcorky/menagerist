@@ -55,7 +55,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { NativeSelect } from '$lib/components/ui/native-select/index.js';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
@@ -675,8 +675,8 @@
 								value={newRole}
 								onchange={(e) => (newRole = e.currentTarget.value as Role)}
 							>
-								<option value="member">Member</option>
-								<option value="admin">Administrator</option>
+								<NativeSelectOption value="member">Member</NativeSelectOption>
+								<NativeSelectOption value="admin">Administrator</NativeSelectOption>
 							</NativeSelect>
 						</div>
 						<div class="flex gap-2 pt-2">
@@ -747,8 +747,8 @@
 											value={user.role}
 											onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
 										>
-											<option value="member">Member</option>
-											<option value="admin">Administrator</option>
+											<NativeSelectOption value="member">Member</NativeSelectOption>
+											<NativeSelectOption value="admin">Administrator</NativeSelectOption>
 										</NativeSelect>
 									</div>
 									{#if isMe}
@@ -813,8 +813,8 @@
 														value={user.role}
 														onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
 													>
-														<option value="member">Member</option>
-														<option value="admin">Administrator</option>
+														<NativeSelectOption value="member">Member</NativeSelectOption>
+														<NativeSelectOption value="admin">Administrator</NativeSelectOption>
 													</NativeSelect>
 												</div>
 											{/if}
