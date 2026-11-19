@@ -118,6 +118,14 @@ describe('describeDevice', () => {
 		});
 	});
 
+	it('recognises a headless browser as automation', () => {
+		const result = describeDevice({
+			userAgent:
+				'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/131.0.0.0 Safari/537.36'
+		});
+		expect(result).toEqual({ label: 'Automated browser on Linux', kind: 'automation' });
+	});
+
 	it('handles null, empty, and junk user agents', () => {
 		expect(describeDevice({ userAgent: null })).toEqual({
 			label: 'Unknown device',

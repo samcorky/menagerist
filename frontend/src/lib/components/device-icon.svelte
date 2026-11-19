@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Terminal, Smartphone, Tablet, Monitor, CircleQuestionMark } from '@lucide/svelte';
+	import { Bot, Terminal, Smartphone, Tablet, Monitor, CircleQuestionMark } from '@lucide/svelte';
 	import type { DeviceKind } from '$lib/devices';
 
 	let {
@@ -13,6 +13,8 @@
 
 {#if kind === 'tool'}
 	<Terminal class={className} aria-hidden="true" />
+{:else if kind === 'automation'}
+	<Bot class={className} aria-hidden="true" />
 {:else if kind === 'phone'}
 	<Smartphone class={className} aria-hidden="true" />
 {:else if kind === 'tablet'}
