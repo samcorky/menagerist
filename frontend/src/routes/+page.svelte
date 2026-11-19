@@ -305,7 +305,7 @@
 					'Item types',
 					breakdown?.status === 'ok' ? String(usedTypes.length) : '–',
 					breakdown?.status === 'error' ? failedNote(breakdown) : 'with items in them',
-					undefined,
+					resolve('/library/item-types'),
 					true
 				)}
 				{@render tile(
