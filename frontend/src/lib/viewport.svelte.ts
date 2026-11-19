@@ -11,3 +11,6 @@ export const desktop = new MediaQuery('min-width: 1024px');
 
 /** A mouse on a wide enough screen: global search lives in the top bar instead of a full-screen sheet. */
 export const inlineSearch = new MediaQuery('(min-width: 768px) and (pointer: fine)');
+
+/** A finger as the primary pointer: focusing a field would raise the on-screen keyboard. */
+export const coarsePointer = new MediaQuery('(pointer: coarse)');

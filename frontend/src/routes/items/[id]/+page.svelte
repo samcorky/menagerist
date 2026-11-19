@@ -33,6 +33,7 @@
 	import { formatDateTime, formatRelativeTime } from '$lib/format-date';
 	import { slugify } from '$lib/utils.js';
 	import { loadExampleIds } from '$lib/examples';
+	import { coarsePointer } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import DuplicateItemDialog from '$lib/components/duplicate-item-dialog.svelte';
@@ -428,6 +429,12 @@
 
 	$effect(() => {
 		if (mode !== 'edit') return;
+		// On a touch screen a focused field raises the keyboard before the person has chosen
+		// what to change, so focus the form instead and let them tap the field they want.
+		if (coarsePointer.current) {
+			editFormEl?.focus();
+			return;
+		}
 		nameInputEl?.focus();
 		nameInputEl?.select();
 	});
@@ -818,7 +825,8 @@
 						{#if mode === 'edit'}
 							<form
 								id="item-edit-form"
-								class="space-y-4"
+								class="space-y-4 outline-none"
+								tabindex="-1"
 								bind:this={editFormEl}
 								onsubmit={handleSave}
 							>
