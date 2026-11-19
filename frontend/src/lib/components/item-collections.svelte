@@ -189,7 +189,7 @@
 				</Button>
 			</div>
 		{:else if !loading && memberOf.length === 0}
-			<p class="text-sm text-muted-foreground">Not in any collection yet.</p>
+			<p class="text-sm text-muted-foreground">Not added to any collection yet.</p>
 		{:else if memberOf.length > 0}
 			<ul class="flex flex-wrap gap-2">
 				{#each memberOf as collection (collection.id)}
