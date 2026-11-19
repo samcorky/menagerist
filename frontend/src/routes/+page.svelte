@@ -12,7 +12,14 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import { captureController } from '$lib/capture.svelte.js';
 	import { collectionRouteParams } from '$lib/collections';
-	import { greeting, itemsHref, noPhotoQuery, percent, tidyRows } from '$lib/dashboard';
+	import {
+		favouriteQuery,
+		greeting,
+		itemsHref,
+		noPhotoQuery,
+		percent,
+		tidyRows
+	} from '$lib/dashboard';
 	import { pickEmptyLine } from '$lib/empty-lines';
 	import { formatRelativeTime } from '$lib/format-date';
 	import {
@@ -305,7 +312,8 @@
 					'stat-favourites',
 					'Favourites',
 					formatCount(s.favourites, false),
-					`${percent(s.favourites, s.items)}% of items`
+					`${percent(s.favourites, s.items)}% of items`,
+					resolve(itemsHref(favouriteQuery()) as '/items')
 				)}
 				{@render tile(
 					'stat-photo',
