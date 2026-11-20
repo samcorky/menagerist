@@ -99,6 +99,10 @@ test('naming a new detail after one other items have joins it', async ({ page, r
 	await expect(label).toHaveAttribute('list', /.+/);
 	const list = await label.getAttribute('list');
 	await expect(page.locator(`datalist[id="${list}"] option[value="Signed"]`)).toHaveCount(1);
+	// A name of one's own still makes a new field, of the kind chosen.
+	await label.fill('Signed by hand');
+	await expect(page.getByText(/^Joins the/)).toHaveCount(0);
+	await expect(page.getByLabel('Field type')).toHaveValue('text');
 	await label.fill('signed');
 	await expect(page.getByText('Joins the Signed detail on 2 other items')).toBeVisible();
 	await expect(page.getByLabel('Field type')).toHaveValue('boolean');
