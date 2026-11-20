@@ -335,3 +335,17 @@ async def test_editing_the_items_needs_item_write_too() -> None:
     )
 
     assert Content(GraphPermission.ITEM_WRITE) in checked
+
+
+async def test_a_choice_from_a_list_has_no_options_to_combine() -> None:
+    """A choice drawing on a choice list stores no options; the others still combine."""
+    world = await _world()
+    from_list = {"type": "string", "x-menagerist": {"kind": "choice", "list": "grades"}}
+    listed = {"type": "string", "enum": ["Mint"], "x-menagerist": {"kind": "choice"}}
+    await world.item("Alien", extra=_overlay(grade=listed))
+    await world.item("Heat", extra=_overlay(grade=from_list))
+    mine = await world.item("Ran", extra=_overlay(grade=listed))
+
+    await world.promote("grade", node_id=mine.id)
+
+    assert (await world.type_properties())["grade"]["enum"] == ["Mint"]
