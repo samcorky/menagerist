@@ -228,3 +228,11 @@ def test_the_reference_says_who_changes_each_setting() -> None:
     assert "| any | Personal | Each person changes it. |" in doc
     assert "Setting it here locks it there." in doc
     assert "Setting it here changes only the default" in doc
+
+    env = render_env_example(build_sections([Mixed]))
+    assert "# In the app: Deployment only.\n# MENAGERIST_MIXED_FIXED=1" in env
+    assert "# In the app: Admin setting.\n# MENAGERIST_MIXED_SHARED=2" in env
+    assert "# In the app: Personal.\n# MENAGERIST_MIXED_MINE=a" in env
+    assert "Personal (each person; set here, it is only the default)" in " ".join(
+        line.removeprefix("# ") for line in env.splitlines()
+    )
