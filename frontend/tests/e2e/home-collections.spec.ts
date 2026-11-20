@@ -1,10 +1,17 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect, sessionOptions, type Page } from './fixtures';
 import { ownedData, uniqueName } from './helpers';
 
-/** Any collection, manual or smart, can be shown on Home with its count and newest items. */
+/**
+ * Any collection, manual or smart, can be shown on Home with its count and newest items. The
+ * choice is the person's own setting, so it follows them to every device.
+ */
 const { makeCollection, makeItem, addToCollection, trackCollection, cleanUp } = ownedData();
 
-test.afterEach(({ request }) => cleanUp(request));
+test.afterEach(async ({ request }) => {
+	await cleanUp(request);
+	// The e2e account is shared: leave Home as it was found.
+	await request.delete('/api/v1/me/settings/home.collections');
+});
 
 const homeSection = (page: Page, name: string) =>
 	page
@@ -15,7 +22,7 @@ test('shows a manual collection on Home from its page, then takes it off from Ho
 	page,
 	request
 }) => {
-	const collection = await makeCollection(request, uniqueName('Wishlist'));
+	const collection = await makeCollection(request, uniqueName('Shelf'));
 	const item = await makeItem(request, uniqueName('Tardis'));
 	await addToCollection(request, collection.id, [item.id]);
 
@@ -72,4 +79,44 @@ test('shows a smart collection on Home with the items its conditions match', asy
 	const section = homeSection(page, smart.name);
 	await expect(section.getByRole('link', { name: /View all 1/ })).toBeVisible();
 	await expect(section.getByRole('link', { name: new RegExp(item.name) })).toBeVisible();
+});
+
+test('the choice follows the person to another device', async ({
+	page,
+	browser,
+	request,
+	workerBaseURL,
+	workerSession
+}) => {
+	const collection = await makeCollection(request, uniqueName('Shelf'));
+	// Home shows sections only once there are items at all.
+	const item = await makeItem(request, uniqueName('Tardis'));
+	await addToCollection(request, collection.id, [item.id]);
+
+	await page.goto(`/collections/${collection.id}`);
+	await page.getByRole('button', { name: 'Show on Home' }).click();
+	await expect(page.getByText('Shown on Home')).toBeVisible();
+
+	// A separate browser context has none of this one's storage: a second device.
+	const other = await browser.newContext(sessionOptions(workerBaseURL, workerSession));
+	try {
+		const elsewhere = await other.newPage();
+		await elsewhere.goto('/');
+		await expect(homeSection(elsewhere, collection.name)).toBeVisible();
+	} finally {
+		await other.close();
+	}
+});
+
+test('offline, Show on Home cannot be used and the page says why', async ({ page, request }) => {
+	const collection = await makeCollection(request, uniqueName('Shelf'));
+	await page.goto(`/collections/${collection.id}`);
+	const toggle = page.getByRole('button', { name: 'Show on Home' });
+	await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+	await page.context().setOffline(true);
+	await expect(page.getByText("You're offline", { exact: false }).first()).toBeVisible();
+	await expect(toggle).toBeDisabled();
+	await page.context().setOffline(false);
+	await expect(toggle).toBeEnabled();
 });

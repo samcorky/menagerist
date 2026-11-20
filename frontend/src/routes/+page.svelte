@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import Page from '$lib/components/page.svelte';
 	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
 	import IconButton from '$lib/components/icon-button.svelte';
@@ -70,8 +71,8 @@
 	let collections = $state<Block<CollectionResponse[]> | null>(null);
 	let breakdown = $state<Block<TypeBreakdown> | null>(null);
 	let tidy = $state<TidyResult[] | null>(null);
-	// The collections chosen for Home (per device), and each one's newest items by id.
-	let chosenIds = $state(homeCollectionIds());
+	// The collections chosen for Home (the person's own setting), and each one's newest items.
+	const chosenIds = $derived(homeCollectionIds());
 	let chosenItems = $state<Record<string, Block<NodeResponse[]>>>({});
 	let types = $state<NodeTypeResponse[]>([]);
 	// null until the pack list has loaded, so the line never shifts the layout
@@ -132,15 +133,11 @@
 		void loadEdited().then((result) => !stale() && (edited = result));
 		const collectionsResult = await loadCollections();
 		if (stale()) return;
-		collections = collectionsResult;
-		chosenIds = homeCollectionIds();
-		if (collectionsResult.status === 'ok') {
-			for (const chosen of chosenCollections(chosenIds, collectionsResult.data)) {
-				void loadCollectionItems(chosen.id).then(
-					(result) => !stale() && (chosenItems[chosen.id] = result)
-				);
-			}
+		// A reload tries the collections whose items failed again (see the effect below).
+		for (const [id, block] of Object.entries(chosenItems)) {
+			if (block.status === 'error') delete chosenItems[id];
 		}
+		collections = collectionsResult;
 		const loadedTypes = await typesPromise;
 		if (stale()) return;
 		types = loadedTypes;
@@ -166,9 +163,25 @@
 		)
 	);
 
-	function removeFromHome(collection: CollectionResponse) {
-		toggleHomeCollection(collection.id);
-		chosenIds = homeCollectionIds();
+	// Each shown collection's newest items, loaded once: when Home loads, when the person's
+	// settings arrive, and when a collection is put on Home elsewhere.
+	// Not reactive on purpose: it only stops a second request while the first is in flight.
+	const requested: string[] = [];
+	$effect(() => {
+		for (const collection of shownCollections) {
+			const id = collection.id;
+			if (untrack(() => id in chosenItems) || requested.includes(id)) continue;
+			requested.push(id);
+			void loadCollectionItems(id).then((result) => {
+				requested.splice(requested.indexOf(id), 1);
+				chosenItems[id] = result;
+			});
+		}
+	});
+
+	async function removeFromHome(collection: CollectionResponse) {
+		const outcome = await toggleHomeCollection(collection.id);
+		if (!outcome.ok) toast.error(outcome.message);
 	}
 
 	// Coming back online, or Retry in the banner, reloads when any block had failed.
@@ -442,6 +455,8 @@
 						<IconButton
 							label="Remove {collection.name} from Home"
 							labelOnTouch={false}
+							aria-disabled={offlineController.offline}
+							class={offlineController.offline ? 'opacity-50' : undefined}
 							onclick={() => removeFromHome(collection)}
 						>
 							<X />

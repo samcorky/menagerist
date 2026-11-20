@@ -112,6 +112,21 @@ describe('PreferencesController', () => {
 		expect(localStorage.getItem(`${KEY}ann`)).toContain('saturday');
 	});
 
+	it('shows a change at once and puts it back when the server refuses it', async () => {
+		listMySettings.mockResolvedValue({ data: [setting({ value: 'monday', source: 'user' })] });
+		let answer: (value: unknown) => void = () => {};
+		updateMySettings.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+		const prefs = new PreferencesController();
+		await prefs.load('ann');
+
+		const saving = prefs.save('calendar.first_day', 'sunday');
+		expect(prefs.value('calendar.first_day')).toBe('sunday');
+
+		answer({ error: {}, response: new Response(null, { status: 500 }) });
+		expect((await saving).ok).toBe(false);
+		expect(prefs.value('calendar.first_day')).toBe('monday');
+	});
+
 	it('resets to the default', async () => {
 		listMySettings.mockResolvedValue({ data: [setting({ value: 'monday', source: 'user' })] });
 		resetMySetting.mockResolvedValue({ data: setting({}) });
