@@ -25,8 +25,11 @@
 	import { listAttributeValues, promoteExtraSchemaField } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import FieldKindRow from '$lib/components/field-kind-row.svelte';
+	import SuggestInput from '$lib/components/suggest-input.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
-	import { fetchItemFields } from '$lib/item-fields';
+	import { fetchItemFields, type ItemField } from '$lib/item-fields';
+	import { fieldNameSuggestions, matchItemField } from '$lib/field-suggestions';
+	import { changeKind } from '$lib/field-types/kind-changes';
 	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
 	import { definitionToFieldSet, type FieldSetDefinition, type Preset } from '$lib/presets';
 
@@ -128,29 +131,54 @@
 		}
 	}
 
-	// -- Value type-ahead for text fields on a node's own attributes -------------
+	// -- Values used before, offered by the browser on text fields (#680) ----------
 
-	let typeaheadOpenKey = $state<string | null>(null);
-	let previousValuesByKey = $state<Record<string, { value: string; count: number }[]>>({});
+	// Kept per field, so a field never shows another field's values.
+	let valueSuggestions = $state<Record<string, string[]>>({});
+	let suggestTimer: ReturnType<typeof setTimeout> | undefined;
 
-	async function fetchPreviousValues(key: string, q: string) {
-		if (!nodeType || !q) {
-			previousValuesByKey = { ...previousValuesByKey, [key]: [] };
-			return;
-		}
+	async function fetchValues(key: string, q: string) {
+		if (!nodeType) return;
 		const result = await listAttributeValues({
 			path: { node_type_id: nodeType.id, key },
-			query: { q, limit: 8 }
+			query: q ? { q, limit: 20 } : { limit: 20 }
 		});
 		if (result.data) {
-			previousValuesByKey = { ...previousValuesByKey, [key]: result.data };
+			valueSuggestions = { ...valueSuggestions, [key]: result.data.map((v) => v.value) };
 		}
+	}
+
+	/** The most used values on focus; matches for what is typed once typing pauses. */
+	function suggestValues(key: string, q: string, wait = 250) {
+		clearTimeout(suggestTimer);
+		suggestTimer = setTimeout(() => void fetchValues(key, q.trim()), wait);
 	}
 
 	// -- Overlay field creation ("Add field") -----------------------------------
 
 	let addingField = $state(false);
 	let draftField = $state<EditorField | null>(null);
+	// Extra details other items of the type have, offered as names; one chosen is joined.
+	let otherFields = $state<ItemField[]>([]);
+	let joining = $state<ItemField | null>(null);
+
+	const takenKeys = () => [
+		...Object.keys(schema?.properties ?? {}),
+		...Object.keys(extraSchema?.properties ?? {})
+	];
+
+	function nameDraft(label: string) {
+		if (!draftField) return;
+		joining = matchItemField(label, otherFields) ?? null;
+		const named = { ...draftField, label };
+		draftField = joining && joining.kind !== named.kind ? changeKind(named, joining.kind) : named;
+	}
+
+	function changeDraft(field: EditorField) {
+		// Another kind is another field, so it no longer joins one.
+		if (joining && field.kind !== joining.kind) joining = null;
+		draftField = field;
+	}
 
 	function newDraftField(): EditorField {
 		return {
@@ -166,7 +194,16 @@
 
 	function startAddField() {
 		draftField = newDraftField();
+		joining = null;
 		addingField = true;
+		if (nodeType) {
+			const taken = new Set(takenKeys());
+			void fetchItemFields(nodeType.slug).then((found) => {
+				otherFields = (found ?? []).filter((f) => !taken.has(f.key));
+				// A name typed before they arrived still joins its detail.
+				if (draftField?.label) nameDraft(draftField.label);
+			});
+		}
 	}
 
 	function cancelAddField() {
@@ -176,17 +213,18 @@
 
 	function confirmAddField() {
 		if (!draftField || !draftField.label.trim()) return;
-		const taken = [
-			...Object.keys(schema?.properties ?? {}),
-			...Object.keys(extraSchema?.properties ?? {})
-		];
-		const key = generateFieldKey(draftField.label, taken);
+		const taken = takenKeys();
+		const key =
+			joining && !taken.includes(joining.key)
+				? joining.key
+				: generateFieldKey(draftField.label, taken);
 		const items = schemaToItems(extraSchema).filter((i): i is EditorField => !isSection(i));
 		const nextItems = [...items, { ...draftField, key, keyPending: false }];
 		extraSchema = itemsToSchema(nextItems, readSchemaMeta(extraSchema), []);
 		rows = [...rows, { key, value: draftField.kind === 'boolean' ? 'false' : '' }];
 		addingField = false;
 		draftField = null;
+		joining = null;
 	}
 
 	function removeExtraField(key: string) {
@@ -316,45 +354,18 @@
 				>
 					{#if desc?.kind === 'text' && nodeType}
 						{@const currentValue = typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
-						{@const previousValues = previousValuesByKey[key] ?? []}
-						<div class="relative">
-							<Input
-								value={currentValue}
-								autocomplete="off"
-								oninput={(e) => {
-									const v = (e.target as HTMLInputElement).value;
-									setValue(key, v);
-									void fetchPreviousValues(key, v);
-								}}
-								onfocus={() => {
-									typeaheadOpenKey = key;
-									if (currentValue) void fetchPreviousValues(key, currentValue);
-								}}
-								onblur={() => setTimeout(() => (typeaheadOpenKey = null), 150)}
-								class="flex-1"
-								aria-label={prop.title || key}
-								aria-invalid={!!error}
-							/>
-							{#if typeaheadOpenKey === key && previousValues.length > 0}
-								<ul class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
-									{#each previousValues as pv (pv.value)}
-										<li>
-											<button
-												type="button"
-												class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
-												onmousedown={() => {
-													setValue(key, pv.value);
-													typeaheadOpenKey = null;
-												}}
-											>
-												<span class="truncate">{pv.value}</span>
-												<span class="ml-2 shrink-0 text-xs text-muted-foreground">{pv.count}</span>
-											</button>
-										</li>
-									{/each}
-								</ul>
-							{/if}
-						</div>
+						<SuggestInput
+							value={currentValue}
+							suggestions={valueSuggestions[key] ?? []}
+							oninput={(v) => {
+								setValue(key, v);
+								suggestValues(key, v);
+							}}
+							onfocus={() => suggestValues(key, currentValue, 0)}
+							class="flex-1"
+							aria-label={prop.title || key}
+							aria-invalid={!!error}
+						/>
 					{:else if Widget}
 						<Widget
 							value={getValue(key)}
@@ -477,9 +488,17 @@
 			<div class="space-y-2 rounded-md border border-input bg-muted/30 p-3">
 				<FieldKindRow
 					field={draftField}
-					onLabelChange={(v) => (draftField = { ...draftField!, label: v })}
-					onFieldChange={(f) => (draftField = f)}
+					labelSuggestions={fieldNameSuggestions(otherFields)}
+					onLabelChange={nameDraft}
+					onFieldChange={changeDraft}
 				/>
+				{#if joining}
+					<p class="text-xs text-muted-foreground">
+						Joins the {joining.label} detail on {joining.count === 1
+							? '1 other item'
+							: `${joining.count.toLocaleString('en-GB')} other items`}.
+					</p>
+				{/if}
 				<div class="flex gap-2">
 					<Button
 						type="button"

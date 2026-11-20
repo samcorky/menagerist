@@ -87,3 +87,34 @@ test("the item type's editor lists its items' extra details and adds one to the 
 	await expect(page.getByText('Item type updated')).toBeVisible();
 	await expectPromoted(request, type, items);
 });
+
+test('naming a new detail after one other items have joins it', async ({ page, request }) => {
+	const { type, items } = await signedItems(request, 2);
+	const plain = await makeItem(request, uniqueName('Poster plain'), type.slug);
+
+	await page.goto(`/items/${plain.id}`);
+	await page.getByRole('button', { name: 'Edit', exact: true }).filter({ visible: true }).click();
+	await page.getByRole('button', { name: 'Add field', exact: true }).click();
+	const label = page.getByLabel('Field label');
+	await expect(label).toHaveAttribute('list', /.+/);
+	const list = await label.getAttribute('list');
+	await expect(page.locator(`datalist[id="${list}"] option[value="Signed"]`)).toHaveCount(1);
+	// A name of one's own still makes a new field, of the kind chosen.
+	await label.fill('Signed by hand');
+	await expect(page.getByText(/^Joins the/)).toHaveCount(0);
+	await expect(page.getByLabel('Field type')).toHaveValue('text');
+	await label.fill('signed');
+	await expect(page.getByText('Joins the Signed detail on 2 other items')).toBeVisible();
+	await expect(page.getByLabel('Field type')).toHaveValue('boolean');
+	await page.getByRole('button', { name: 'Add', exact: true }).click();
+	await page
+		.getByRole('button', { name: 'Save changes', exact: true })
+		.filter({ visible: true })
+		.click();
+	await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+
+	// The same key, so all three are one field: promoting it takes every item along.
+	const fields = await (await request.get(`/api/v1/nodes/fields?type=${type.slug}`)).json();
+	expect(fields).toEqual([expect.objectContaining({ key: 'signed', count: 3 })]);
+	expect(items).toHaveLength(2);
+});

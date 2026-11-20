@@ -170,6 +170,12 @@
 }
 
 @layer base {
+	/* Chrome marks an input with suggestions (a datalist) by an arrow that looks like a broken
+	   select. The suggestions still show as you type, and the down-arrow key opens them. */
+	input[list]::-webkit-calendar-picker-indicator {
+		display: none !important;
+	}
+
 	* {
 		@apply border-border outline-ring/50;
 		/* A thin bar with no arrow buttons, so a narrow scroll area such as the sidebar

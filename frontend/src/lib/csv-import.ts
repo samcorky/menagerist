@@ -16,6 +16,8 @@ export type Target = string | null;
 export interface KeptDetail {
 	title: string;
 	kind: ExtraFieldKind;
+	/** The key of a detail the type's items already have, which this one joins. */
+	key?: string;
 }
 
 export interface ColumnChoice {
@@ -96,22 +98,31 @@ function updateKept(
 	column: string,
 	change: Partial<KeptDetail>
 ): ColumnChoice[] {
-	return choices.map((choice) =>
-		choice.column === column && choice.extra
-			? { ...choice, extra: { ...choice.extra, ...change } }
-			: choice
-	);
+	return choices.map((choice) => {
+		if (choice.column !== column || !choice.extra) return choice;
+		const extra: KeptDetail = { ...choice.extra, ...change };
+		if (extra.key === undefined) delete extra.key;
+		return { ...choice, extra };
+	});
 }
 
-export const renameKept = (choices: ColumnChoice[], column: string, title: string) =>
-	updateKept(choices, column, { title });
+/** Rename a kept detail; with `joins`, it becomes that existing detail, key and kind. */
+export const renameKept = (
+	choices: ColumnChoice[],
+	column: string,
+	title: string,
+	joins?: { key: string; kind: ExtraFieldKind }
+) => updateKept(choices, column, joins ? { title, ...joins } : { title, key: undefined });
 
+/** A different kind is a different field, so it no longer joins one. */
 export const setKeptKind = (choices: ColumnChoice[], column: string, kind: ExtraFieldKind) =>
-	updateKept(choices, column, { kind });
+	updateKept(choices, column, { kind, key: undefined });
 
 /** The extra details the items will get, in column order. */
 export function keptDetails(choices: ColumnChoice[]): KeptDetail[] {
-	return choices.flatMap((choice) => (choice.extra ? [choice.extra] : []));
+	return choices.flatMap((choice) =>
+		choice.extra ? [{ title: choice.extra.title, kind: choice.extra.kind }] : []
+	);
 }
 
 /** An item cannot be made without a name. */
@@ -131,7 +142,7 @@ export function mappingJson(choices: ColumnChoice[], fieldKeys: string[]): strin
 	const taken = new Set([...fieldKeys, ...BUILT_IN_TARGETS.map((t) => t.value)]);
 	const entries: ColumnMappingEntry[] = choices.map(({ column, target, extra }) => {
 		if (!extra) return { column, target };
-		const key = generateFieldKey(extra.title, taken);
+		const key = extra.key ?? generateFieldKey(extra.title, taken);
 		taken.add(key);
 		return { column, target: null, extra: { key, title: extra.title.trim(), kind: extra.kind } };
 	});

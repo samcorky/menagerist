@@ -174,6 +174,24 @@ describe('keeping a column as an extra detail', () => {
 		expect(keptDetails(next)).toEqual([{ title: 'Signed', kind: 'boolean' }]);
 	});
 
+	it('joins a detail the items of the type already have, taking its key and kind', () => {
+		let next = keepColumn(choices, 'misc', 'text');
+		next = renameKept(next, 'misc', 'signed', { key: 'signed', kind: 'boolean' });
+		expect(next[2].extra).toEqual({ title: 'signed', kind: 'boolean', key: 'signed' });
+		expect(JSON.parse(mappingJson(next, []))[2].extra).toEqual({
+			key: 'signed',
+			title: 'signed',
+			kind: 'boolean'
+		});
+	});
+
+	it('stops joining when the name or the kind changes', () => {
+		let joined = keepColumn(choices, 'misc', 'text');
+		joined = renameKept(joined, 'misc', 'Signed', { key: 'signed', kind: 'boolean' });
+		expect(renameKept(joined, 'misc', 'Signed by')[2].extra?.key).toBeUndefined();
+		expect(setKeptKind(joined, 'misc', 'text')[2].extra?.key).toBeUndefined();
+	});
+
 	it('allows as many as an item can have', () => {
 		expect(MAX_KEPT).toBe(50);
 	});
