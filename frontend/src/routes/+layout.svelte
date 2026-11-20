@@ -56,6 +56,7 @@
 	import { themeController } from '$lib/theme.svelte.js';
 	import { offlineController, unreachableWording } from '$lib/offline.svelte.js';
 	import { displayMode } from '$lib/display-mode.svelte.js';
+	import { installPrompt } from '$lib/install-prompt.svelte.js';
 	import BackToTop from '$lib/components/back-to-top.svelte';
 	import OfflineBanner from '$lib/components/offline-banner.svelte';
 	import { captureController } from '$lib/capture.svelte.js';
@@ -94,6 +95,8 @@
 	$effect(() => offlineController.init());
 
 	$effect(() => displayMode.init());
+
+	$effect(() => installPrompt.init());
 
 	// Launched with no connection, the sign-in check fails: try again once the connection returns.
 	$effect(() => {

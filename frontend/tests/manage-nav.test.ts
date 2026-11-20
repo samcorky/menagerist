@@ -8,6 +8,7 @@ import {
 	manageGroups,
 	type ManagePermissionCheck
 } from '$lib/manage-nav';
+import { displayMode } from '$lib/display-mode.svelte';
 
 const none: ManagePermissionCheck = () => false;
 const all: ManagePermissionCheck = () => true;
@@ -57,6 +58,7 @@ describe('hubTiles', () => {
 			'Recently deleted',
 			'Account',
 			'Preferences',
+			'Install the app',
 			'Status',
 			'Administration'
 		]);
@@ -103,6 +105,18 @@ describe('canSeeAdmin', () => {
 	});
 });
 
+describe('Install the app', () => {
+	it('is left out once the app is installed', () => {
+		displayMode.standalone = true;
+		try {
+			expect(hrefs(none)).not.toContain('/settings/install');
+		} finally {
+			displayMode.standalone = false;
+		}
+		expect(hrefs(none)).toContain('/settings/install');
+	});
+});
+
 describe('manageGroups', () => {
 	it('groups the always-available sections as Library, Account and System', () => {
 		const groups = manageGroups(none);
@@ -115,6 +129,7 @@ describe('manageGroups', () => {
 			'/library/recently-deleted',
 			'/settings/account',
 			'/settings/preferences',
+			'/settings/install',
 			'/status'
 		]);
 	});
