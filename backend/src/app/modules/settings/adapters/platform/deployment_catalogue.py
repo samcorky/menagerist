@@ -34,7 +34,7 @@ def build_catalogue(
         scope = SettingScope(spec.scope.value)
         default = spec.default
         instance = instances[spec.group_type]
-        supplied = instance.is_pinned(spec.field_name)
+        supplied = spec.env_default and instance.is_pinned(spec.field_name)
         if supplied:
             value = spec.adapter.dump_python(
                 getattr(instance, spec.field_name), mode="json"
@@ -55,7 +55,7 @@ def build_catalogue(
                 restart_required=spec.restart_required,
                 default=default,  # type: ignore[arg-type]
                 schema={**spec.schema, "default": default},
-                env_name=spec.env_name,
+                env_name=spec.env_name if spec.env_default else None,
                 hidden=spec.hidden,
                 default_from_env=supplied and scope is SettingScope.USER,
             )

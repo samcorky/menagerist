@@ -5,6 +5,7 @@ from app.platform.config.backup import BackupSettings, get_backup_settings
 from app.platform.config.branding import BrandingSettings, get_branding_settings
 from app.platform.config.calendar import CalendarSettings, get_calendar_settings
 from app.platform.config.database import DatabaseSettings, get_database_settings
+from app.platform.config.date_time import DateTimeSettings, get_date_time_settings
 from app.platform.config.identity import IdentitySettings, get_identity_settings
 from app.platform.config.identity_cli import (
     IdentityCliSettings,
@@ -34,6 +35,7 @@ INSTANCE_SETTINGS = (
     get_branding_settings,
     get_calendar_settings,
     get_database_settings,
+    get_date_time_settings,
     get_identity_settings,
     get_logging_settings,
     get_media_settings,
@@ -54,6 +56,7 @@ ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
     BrandingSettings,
     CalendarSettings,
     DatabaseSettings,
+    DateTimeSettings,
     IdentitySettings,
     IdentityCliSettings,
     LoggingSettings,
@@ -77,6 +80,7 @@ __all__ = [
     "BrandingSettings",
     "CalendarSettings",
     "DatabaseSettings",
+    "DateTimeSettings",
     "IdentityCliSettings",
     "IdentitySettings",
     "LogLevel",
@@ -97,6 +101,7 @@ __all__ = [
     "get_branding_settings",
     "get_calendar_settings",
     "get_database_settings",
+    "get_date_time_settings",
     "get_identity_cli_settings",
     "get_identity_settings",
     "get_logging_settings",

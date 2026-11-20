@@ -1,5 +1,6 @@
 {
   "kinds": [
-    "cron"
+    "cron",
+    "timezone"
   ]
 }

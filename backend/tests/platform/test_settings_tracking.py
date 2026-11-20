@@ -23,7 +23,7 @@ class Settings(MenageristBaseSettings):
 
     count: int = 1
     timezone: str = Field(
-        default="UTC", validation_alias=AliasChoices("MENAGERIST_TIMEZONE", "TZ")
+        default="UTC", validation_alias=AliasChoices("MENAGERIST_TIME_ZONE", "TZ")
     )
 
 
@@ -155,10 +155,10 @@ def test_log_sources(monkeypatch: pytest.MonkeyPatch) -> None:
     assert logs[0]["values"]["count"] == 3
 
 
-@pytest.mark.parametrize("env_name", ["MENAGERIST_TIMEZONE", "TZ"])
+@pytest.mark.parametrize("env_name", ["MENAGERIST_TIME_ZONE", "TZ"])
 def test_alias_choices(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
     """Both environment aliases report the Python field name."""
-    monkeypatch.delenv("MENAGERIST_TIMEZONE", raising=False)
+    monkeypatch.delenv("MENAGERIST_TIME_ZONE", raising=False)
     monkeypatch.delenv("TZ", raising=False)
     monkeypatch.setenv(env_name, "Europe/London")
     settings = Settings()
@@ -199,7 +199,7 @@ def test_custom_fallback_label_and_source_state() -> None:
         def __call__(self) -> dict[str, object]:
             assert self.current_state["count"] == 4
             assert self.settings_sources_data["InitSettingsSource"]["count"] == 4
-            return {"MENAGERIST_TIMEZONE": "Europe/London"}
+            return {"MENAGERIST_TIME_ZONE": "Europe/London"}
 
     class StateSettings(Settings):
         @classmethod
@@ -277,7 +277,7 @@ def test_preferred_alias_from_later_source_is_the_effective_source(
         ) -> tuple[PydanticBaseSettingsSource, ...]:
             return AliasSource(settings_cls), env_settings
 
-    monkeypatch.setenv("MENAGERIST_TIMEZONE", "UTC")
+    monkeypatch.setenv("MENAGERIST_TIME_ZONE", "UTC")
     settings = AliasSettings()
     assert settings.timezone == "UTC"
     assert settings.source_of("timezone") == "env"

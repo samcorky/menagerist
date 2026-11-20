@@ -10,17 +10,19 @@ export type ComboboxItem = {
 	selectedLabel?: string;
 	/** Muted text on the right of the row, such as a count. */
 	description?: string;
+	/** Other words a search should find it by, such as a full name the label shortens. */
+	keywords?: string;
 	disabled?: boolean;
 };
 
 export type ComboboxGroup = { heading: string | null; items: ComboboxItem[] };
 
-/** Items whose label and group together contain every word of the query. */
+/** Items whose label, group and keywords together contain every word of the query. */
 export function filterComboboxItems(items: ComboboxItem[], query: string): ComboboxItem[] {
 	const words = foldText(query).split(/\s+/).filter(Boolean);
 	if (words.length === 0) return items;
 	return items.filter((item) => {
-		const haystack = foldText(`${item.group ?? ''} ${item.label}`);
+		const haystack = foldText(`${item.group ?? ''} ${item.label} ${item.keywords ?? ''}`);
 		return words.every((word) => haystack.includes(word));
 	});
 }

@@ -8,7 +8,12 @@ from fastapi import Depends
 from app.entrypoints.api.shared.bridges.collection_conditions import (
     build_search_graph_repos,
 )
-from app.modules.graph.application.prepare_query import count_matching, item_matches
+from app.entrypoints.api.shared.clock import Today, get_today
+from app.modules.graph.application.prepare_query import (
+    count_matching,
+    item_matches,
+    utc_today,
+)
 from app.modules.graph.domain.query import InvalidQueryError
 from app.platform.database import get_session_factory
 
@@ -29,8 +34,9 @@ logger = structlog.get_logger()
 class GraphItemLookup:
     """Reports which item ids are live (non-deleted) and visible in the graph module."""
 
-    def __init__(self, repos: GraphRepos) -> None:
+    def __init__(self, repos: GraphRepos, *, today: Today = utc_today) -> None:
         self._repos = repos
+        self._today = today
 
     async def live_ids(
         self, ids: Sequence[uuid.UUID], scope: ContentFilter
@@ -58,7 +64,9 @@ class GraphItemLookup:
         can no longer be read counts as `(0, False)` and is logged.
         """
         try:
-            return await count_matching(self._repos, definition, scope, cap=cap)
+            return await count_matching(
+                self._repos, definition, scope, cap=cap, today=self._today
+            )
         except InvalidQueryError as exc:
             logger.warning("stored collection definition unreadable", error=str(exc))
             return 0, False
@@ -71,7 +79,9 @@ class GraphItemLookup:
         A definition that can no longer be read matches nothing and is logged.
         """
         try:
-            return await item_matches(self._repos, definition, scope, item_id)
+            return await item_matches(
+                self._repos, definition, scope, item_id, today=self._today
+            )
         except InvalidQueryError as exc:
             logger.warning("stored collection definition unreadable", error=str(exc))
             return False
@@ -81,7 +91,11 @@ async def get_item_lookup(
     session_factory: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_session_factory)
     ],
+    today: Annotated[Today, Depends(get_today)],
 ) -> AsyncIterator[GraphItemLookup]:
-    """Yield the item lookup, backed by a read session on the graph tables."""
+    """Yield the item lookup, backed by a read session on the graph tables.
+
+    Smart collections' relative dates resolve in the request's time zone.
+    """
     async with session_factory() as session:
-        yield GraphItemLookup(build_search_graph_repos(session))
+        yield GraphItemLookup(build_search_graph_repos(session), today=today)

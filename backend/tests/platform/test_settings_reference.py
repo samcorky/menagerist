@@ -147,7 +147,16 @@ def test_every_field_of_every_class_is_listed_once() -> None:
         for marker in unwrap(field)[1]
     )
     assert internal  # `MENAGERIST_SHARED_DIR` at least
-    assert len(listed) + internal == sum(len(cls.model_fields) for cls in ALL_SETTINGS)
+    no_variable = sum(
+        isinstance(marker, Tunable) and not marker.env_default
+        for cls in ALL_SETTINGS
+        for field in cls.model_fields.values()
+        for marker in unwrap(field)[1]
+    )
+    assert "MENAGERIST_DATETIME_TIME_ZONE" not in listed
+    assert len(listed) + internal + no_variable == sum(
+        len(cls.model_fields) for cls in ALL_SETTINGS
+    )
 
 
 def test_an_internal_field_is_left_out_of_the_reference() -> None:
@@ -171,7 +180,7 @@ def test_classes_sharing_a_group_share_a_section() -> None:
 def test_an_alias_is_shown_as_another_way_to_set_the_variable() -> None:
     """The instance timezone is also read from `TZ`."""
     entries = {e.env_name: e for s in build_sections(ALL_SETTINGS) for e in s.entries}
-    assert entries["MENAGERIST_TIMEZONE"].aliases == ("TZ",)
+    assert entries["MENAGERIST_TIME_ZONE"].aliases == ("TZ",)
     assert "Also read from `TZ`" in render_settings_doc(build_sections(ALL_SETTINGS))
 
 

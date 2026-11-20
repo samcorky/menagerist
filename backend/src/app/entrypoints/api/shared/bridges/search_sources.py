@@ -51,7 +51,7 @@ from app.modules.settings.application.list_settings import (
     ListSettings,
     ListSettingsQuery,
 )
-from app.platform.config import get_scheduler_settings
+from app.platform.config import get_server_settings
 from app.shared_kernel.text import fold
 
 if TYPE_CHECKING:
@@ -327,7 +327,7 @@ class ScheduledTaskSource:
         """Return scheduled tasks matching `query`."""
         statuses = await self._use_case.handle(
             ListJobsQuery(
-                now=datetime.now(UTC), timezone=get_scheduler_settings().timezone.key
+                now=datetime.now(UTC), timezone=get_server_settings().time_zone.key
             ),
             actor,
         )

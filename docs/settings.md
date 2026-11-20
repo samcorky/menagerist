@@ -81,6 +81,15 @@ Database connection settings.
 | `MENAGERIST_DATABASE_POOL_SIZE` | whole number | `5` | 1 or more | Deployment only | Database connections each process (every web worker, and the background worker) keeps open in its pool. |
 | `MENAGERIST_DATABASE_MAX_OVERFLOW` | whole number | `10` | 0 or more | Deployment only | Extra database connections each process may open beyond the pool under load, closed again when idle. 0 caps a process at the pool size. |
 
+## Datetime
+
+How dates and times read. People choose; the deployment sets defaults.
+
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_DATETIME_DATE_ORDER` | text | `automatic` | `automatic`, `dmy`, `mdy`, `ymd` | Personal | The order dates are written in. Automatic uses your browser's language. |
+| `MENAGERIST_DATETIME_CLOCK` | text | `automatic` | `automatic`, `12h`, `24h` | Personal | How times of day are written. Automatic uses your browser's language. |
+
 ## Identity
 
 Configuration for the identity module.
@@ -182,21 +191,21 @@ How long deleted content stays recoverable before it is purged.
 
 ## Scheduler
 
-Instance timezone, worker liveness and job history retention.
+Worker liveness and job history retention.
 
 | Variable | Type | Default | Allowed values | In the app | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `MENAGERIST_TIMEZONE` | time zone (IANA name) | `UTC` | any | Deployment only | Timezone used to interpret recurring job schedules. Also read from `TZ`. |
 | `MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB` | whole number | `100` | 1 or more | Admin setting | Number of completed runs to retain for each job. |
 | `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS` | whole number | `300` | more than 0 | Deployment only | Seconds without a worker heartbeat before liveness checks warn. |
 | `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_INTERVAL_SECONDS` | whole number | `60` | more than 0 | Deployment only | Seconds between the worker's liveness heartbeats. |
 
 ## Server
 
-How many web worker processes run, and whether this is a container.
+The server's time zone, its web workers, and whether it is a container.
 
 | Variable | Type | Default | Allowed values | In the app | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_TIME_ZONE` | time zone (IANA name) | `UTC` | any | Deployment only | The server's time zone: when scheduled tasks run, and what 'today' is for requests that don't name a zone, such as scripts using an API token. Each person's own time zone is set in their preferences. Also read from `TZ`. |
 | `MENAGERIST_SERVER_WORKERS` | whole number | `auto` | 1 to 16, `auto` | Deployment only | Web worker processes, 1 to 16, or auto: one per CPU core on a host and one in a container or when reloading, as Granian advises. |
 | `MENAGERIST_SERVER_IN_CONTAINER` | true or false | unset | any | Deployment only | Whether the server runs in a container. Unset detects it; the image sets it, and 0 or 1 overrides detection. |
 

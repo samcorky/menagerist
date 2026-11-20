@@ -1,4 +1,4 @@
-import { formatDateTime, formatRelativeTime } from '$lib/format-date';
+import { formatDateTime, formatRelativeTime, formatTime } from '$lib/format-date';
 import { displayNameProblem } from '$lib/auth';
 
 /** Whether a sign-in lockout is still running at `now`. */
@@ -8,11 +8,11 @@ export function isLocked(lockedUntil: string | null | undefined, now: Date = new
 	return !isNaN(until) && until > now.getTime();
 }
 
-/** "Locked until 14:05", in the viewer's own time zone. */
+/** "Locked until 14:05", in the person's chosen time zone and clock. */
 export function lockedLabel(lockedUntil: string): string {
 	const date = new Date(lockedUntil);
 	if (isNaN(date.getTime())) return 'Locked';
-	return `Locked until ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+	return `Locked until ${formatTime(date)}`;
 }
 
 /** "Never" or a relative time such as "3 hours ago"; `title` is the full local date. */

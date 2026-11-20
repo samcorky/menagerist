@@ -2363,6 +2363,24 @@
               "title": "Collection"
             },
             "description": "Restrict the list to items on this collection. For a smart collection, the items matching its definition, still in id order."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {
@@ -2625,15 +2643,43 @@
         "summary": "Search Nodes",
         "description": "Search items with a condition tree, paged by cursor.\n\n`query` is `{\"v\": 1, \"where\": <group>, \"sort\": [...]}`. A group is\n`{\"op\": \"and\" | \"or\" | \"not\", \"children\": [...]}` of conditions and groups.\nA field condition's `!=` and `not_in` (a list, like `in`) match only items\nof its `type`, including those where the field is missing. A condition\nthat refers to a removed field matches nothing (so under\n`not` it matches everything) and is reported in `warnings`. A malformed\nquery is a 400 whose `detail` names the JSON path.\n\n**Requires permission:** `graph:item:read`",
         "operationId": "search_nodes",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/NodeSearchRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -2798,14 +2844,6 @@
           },
           "429": {
             "description": "Too many requests recently; wait for `Retry-After` seconds.",
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds to wait before trying again.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            },
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2817,6 +2855,14 @@
                   "status": 429,
                   "detail": "Too many requests. Try again later.",
                   "instance": "https://menagerist.example/api/v1/nodes/search"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             }
@@ -2844,14 +2890,6 @@
             }
           }
         },
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
         "x-required-permission": "graph:item:read"
       }
     },
@@ -2864,15 +2902,43 @@
         "summary": "Count Node Searches",
         "description": "Count the items several condition trees match, in one call.\n\nEach entry in `queries` is a condition tree like the `query` of\n`POST /node/search`, and is parsed and resolved the same way, so a count\nalways agrees with the list a search for that query returns. Sort keys are\nchecked but do not change a count. `total` is exact up to 100,000, then\n`total_capped` is true. A malformed query is a 400 whose `detail` starts\n`queries.<name>`.\n\n**Requires permission:** `graph:item:read`",
         "operationId": "count_node_searches",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/NodeSearchCountsRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -3028,14 +3094,6 @@
           },
           "429": {
             "description": "Too many requests recently; wait for `Retry-After` seconds.",
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds to wait before trying again.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            },
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3047,6 +3105,14 @@
                   "status": 429,
                   "detail": "Too many requests. Try again later.",
                   "instance": "https://menagerist.example/api/v1/nodes/search/counts"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             }
@@ -3074,14 +3140,6 @@
             }
           }
         },
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
         "x-required-permission": "graph:item:read"
       }
     },
@@ -3548,6 +3606,24 @@
               "title": "Collection"
             },
             "description": "Restrict the list to items on this collection. For a smart collection, the items matching its definition, still in id order."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {
@@ -3810,6 +3886,24 @@
               "title": "Collection"
             },
             "description": "Restrict the list to items on this collection. For a smart collection, the items matching its definition, still in id order."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {
@@ -4005,6 +4099,24 @@
               "title": "Collection"
             },
             "description": "Count only the items on this collection. For a smart collection, the items matching its definition."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {
@@ -18015,6 +18127,24 @@
               "title": "Collection"
             },
             "description": "A collection's id or slug. Items in it are marked `in_collection` and rank above the same match outside it."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {
@@ -21317,6 +21447,26 @@
             "HTTPBearer": []
           }
         ],
+        "parameters": [
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -21662,6 +21812,24 @@
               "title": "Kind"
             },
             "description": "Keep one kind only. `manual` never loads or counts smart collections, so use it where they cannot be used."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {
@@ -22132,6 +22300,24 @@
             "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections."
           },
           {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
+          },
+          {
             "name": "If-None-Match",
             "in": "header",
             "required": false,
@@ -22399,6 +22585,24 @@
               "title": "Collection Id"
             },
             "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           },
           {
             "name": "If-Match",
@@ -22916,6 +23120,24 @@
               "title": "Collection Id"
             },
             "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {
@@ -23107,6 +23329,24 @@
               "title": "Collection Id"
             },
             "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "requestBody": {
@@ -23569,6 +23809,24 @@
               "title": "Collection Id"
             },
             "description": "The deleted collection's id."
+          },
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
           }
         ],
         "responses": {

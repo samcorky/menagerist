@@ -8,6 +8,8 @@
 	import { networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
+	import { formatDateTime } from '$lib/format-date';
+	import { withAutomaticExample } from '$lib/automatic-labels';
 	import { coreForProp } from '$lib/field-types';
 	import { offlineController } from '$lib/offline.svelte';
 	import { OFFLINE_PREFERENCES, preferences } from '$lib/preferences.svelte';
@@ -28,6 +30,11 @@
 	// Hidden settings are changed elsewhere in the app; only what the schema offers shows here.
 	const shown = $derived(preferences.items.filter((item) => !item.hidden && item.key in props));
 	const offline = $derived(offlineController.offline);
+	// Re-read when a preference changes, so the line shows the choices just made.
+	const preview = $derived.by(() => {
+		void preferences.items;
+		return formatDateTime(new Date().toISOString()).local;
+	});
 	const loadingDisplay = delayedLoading();
 	$effect(() => loadingDisplay.set(loading));
 	$effect(() => {
@@ -51,7 +58,7 @@
 	}
 
 	function widgetFor(item: SettingResponse) {
-		const prop = formProp(props[item.key]);
+		const prop = withAutomaticExample(item.key, formProp(props[item.key]));
 		const core = coreForProp(prop);
 		return core ? { prop, core } : null;
 	}
@@ -167,6 +174,9 @@
 				</li>
 			{/each}
 		</ul>
+		<p class="text-sm text-muted-foreground" aria-live="polite">
+			Dates and times read like this: <span class="text-foreground">{preview}</span>
+		</p>
 	{:else if !loading && !error}
 		<p class="rounded-xl border p-6 text-muted-foreground">There is nothing to choose yet.</p>
 	{/if}

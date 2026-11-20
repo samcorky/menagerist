@@ -67,6 +67,7 @@ from app.modules.scheduling.domain.job_run import RunStatus
 from app.platform.alembic_runner import code_head_revisions, db_current_revisions
 from app.platform.app_info import load_app_info
 from app.platform.config.scheduler import get_scheduler_settings
+from app.platform.config.server import get_server_settings
 from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.actor import SYSTEM_ACTOR
 
@@ -178,7 +179,7 @@ def build_job_executor(
         next_run=lambda: GetJobNextRun(
             catalogue.registry, source, CronScheduleEvaluator(), guard
         ),
-        timezone=get_scheduler_settings().timezone.key,
+        timezone=get_server_settings().time_zone.key,
         record_progress=lambda: RecordJobRunProgress(
             create_scheduling_uow(factory), guard
         ),
@@ -208,7 +209,7 @@ def build_worker(
         lambda: FinishJobRun(create_scheduling_uow(factory), guard),
         build_job_executor(factory, guard, catalogue, source),
         worker_id=worker_id if worker_id is not None else str(uuid7()),
-        timezone=get_scheduler_settings().timezone.key,
+        timezone=get_server_settings().time_zone.key,
         heartbeat_interval=get_scheduler_settings().worker_heartbeat_interval_seconds,
         transient_errors=(SQLAlchemyError, OSError),
     )
@@ -317,7 +318,7 @@ async def list_registered_jobs(
         )
         return await query.handle(
             ListJobsQuery(
-                now=datetime.now(UTC), timezone=get_scheduler_settings().timezone.key
+                now=datetime.now(UTC), timezone=get_server_settings().time_zone.key
             ),
             SYSTEM_ACTOR,
         )

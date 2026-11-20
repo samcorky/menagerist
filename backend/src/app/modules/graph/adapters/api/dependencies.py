@@ -26,6 +26,7 @@ from app.entrypoints.api.shared.bridges.item_dependents import (
     ItemDependentsPurger,
     get_item_dependents,
 )
+from app.entrypoints.api.shared.clock import Today, get_today
 from app.modules.graph.adapters.persistence.unit_of_work import create_graph_uow
 from app.modules.graph.application.count_edge_type_attribute_usage import (
     CountEdgeTypeAttributeUsage,
@@ -147,8 +148,11 @@ def get_list_nodes_use_case(
     collection_members: Annotated[CollectionsMembers, Depends(get_collection_members)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
     item_covers: Annotated[MediaItemCovers, Depends(get_item_covers)],
+    today: Annotated[Today, Depends(get_today)],
 ) -> ListNodes:
-    return ListNodes(repos, guard, collection_members, item_covers=item_covers)
+    return ListNodes(
+        repos, guard, collection_members, item_covers=item_covers, today=today
+    )
 
 
 def get_random_node_use_case(
@@ -172,15 +176,17 @@ def get_search_nodes_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
     item_covers: Annotated[MediaItemCovers, Depends(get_item_covers)],
+    today: Annotated[Today, Depends(get_today)],
 ) -> SearchNodes:
-    return SearchNodes(repos, guard, item_covers=item_covers)
+    return SearchNodes(repos, guard, item_covers=item_covers, today=today)
 
 
 def get_search_node_counts_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    today: Annotated[Today, Depends(get_today)],
 ) -> SearchNodeCounts:
-    return SearchNodeCounts(repos, guard)
+    return SearchNodeCounts(repos, guard, today=today)
 
 
 def get_count_node_types_use_case(

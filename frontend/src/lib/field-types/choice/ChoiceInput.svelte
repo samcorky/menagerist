@@ -78,21 +78,23 @@
 {:else}
 	<Select.Root type="single" value={selected} onValueChange={(v) => onChange(v ?? '')}>
 		<Select.Trigger
-			class="flex h-9 flex-1 cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors hover:bg-accent/10 focus:ring-1 focus:ring-ring focus:outline-none"
+			class="flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-between gap-2 rounded-2xl border border-transparent bg-input/50 py-1 pr-2.5 pl-2.5 text-left text-sm transition-[color,box-shadow] duration-200 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
 			aria-label={ariaLabel}
 		>
-			<span class={selected && stale === null ? '' : 'text-muted-foreground'}
+			<span class="min-w-0 truncate {selected && stale === null ? '' : 'text-muted-foreground'}"
 				>{staleLabel ?? (selected ? optionLabel(labels, selected) : '- select -')}</span
 			>
 			<ChevronDown class="size-4 shrink-0 text-muted-foreground" />
 		</Select.Trigger>
 		<Select.Content
-			class="z-50 max-h-60 min-w-[8rem] overflow-auto rounded-md border bg-popover p-1 shadow-md"
+			align="start"
+			sideOffset={4}
+			class="z-50 max-h-60 min-w-(--bits-select-anchor-width) overflow-auto rounded-2xl bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
 		>
 			<Select.Item
 				value=""
 				label="- select -"
-				class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm text-muted-foreground outline-none data-[highlighted]:bg-accent"
+				class="flex min-h-7 cursor-pointer items-center rounded-xl px-2 py-1.5 text-sm text-muted-foreground outline-none data-[highlighted]:bg-muted"
 			>
 				- select -
 			</Select.Item>
@@ -100,7 +102,7 @@
 				<Select.Item
 					value={stale}
 					label={staleLabel}
-					class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm text-muted-foreground outline-none data-[highlighted]:bg-accent data-[selected]:font-medium"
+					class="flex min-h-7 cursor-pointer items-center rounded-xl px-2 py-1.5 text-sm text-muted-foreground outline-none data-[highlighted]:bg-muted data-[selected]:font-medium"
 				>
 					{staleLabel}
 				</Select.Item>
@@ -109,7 +111,7 @@
 				<Select.Item
 					value={option}
 					label={optionLabel(labels, option)}
-					class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[selected]:font-medium"
+					class="flex min-h-7 cursor-pointer items-center rounded-xl px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-muted data-[selected]:font-medium"
 				>
 					{optionLabel(labels, option)}
 				</Select.Item>

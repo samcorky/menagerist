@@ -9,6 +9,8 @@ import './auth-interceptor';
 import './offline-interceptor';
 // Says whether the app runs installed or in a browser tab.
 import './display-mode-interceptor';
+// Names the time zone "today" is read in.
+import './time-zone-interceptor';
 
 // Use relative URL in browser, fallback to localhost for Node tests.
 const defaultBase = typeof window !== 'undefined' ? '' : 'http://localhost';

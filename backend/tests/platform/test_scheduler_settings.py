@@ -51,44 +51,6 @@ def test_heartbeat_interval_must_be_positive_and_shorter_than_timeout(
         )
 
 
-@pytest.mark.parametrize(
-    ("tz", "fallback", "expected"),
-    [
-        (None, None, "UTC"),
-        ("Europe/London", "America/New_York", "America/New_York"),
-        (None, "America/New_York", "America/New_York"),
-        ("Europe/London", None, "Europe/London"),
-        ("Europe/London", "", "Europe/London"),
-        ("", "Europe/London", "Europe/London"),
-        ("", "", "UTC"),
-    ],
-)
-def test_timezone_precedence(
-    monkeypatch: pytest.MonkeyPatch, tz: str | None, fallback: str | None, expected: str
-) -> None:
-    """The application timezone overrides Docker TZ; empty aliases fall through."""
-    for name, value in [("TZ", tz), ("MENAGERIST_TIMEZONE", fallback)]:
-        monkeypatch.delenv(name, raising=False)
-        if value is not None:
-            monkeypatch.setenv(name, value)
-    settings = SchedulerSettings()
-    assert str(settings.timezone) == expected
-    assert settings.model_dump(mode="json")["timezone"] == expected
-    assert settings.source_of("timezone") == (
-        "default" if not tz and not fallback else "env"
-    )
-
-
-@pytest.mark.parametrize("zone", ["Not/AZone", "GMT+25"])
-def test_invalid_timezone_is_a_validation_error(
-    monkeypatch: pytest.MonkeyPatch, zone: str
-) -> None:
-    """Unknown zones fail at settings construction instead of worker execution."""
-    monkeypatch.setenv("TZ", zone)
-    with pytest.raises(ValidationError):
-        SchedulerSettings()
-
-
 def test_history_limit_and_cached_getter(monkeypatch: pytest.MonkeyPatch) -> None:
     """History is configurable, positive and cached consistently with other groups."""
     monkeypatch.setenv("MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB", "12")

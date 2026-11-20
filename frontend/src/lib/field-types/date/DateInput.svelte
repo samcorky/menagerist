@@ -1,15 +1,11 @@
 <script lang="ts">
 	import { ChevronDown } from '@lucide/svelte';
-	import {
-		CalendarDate,
-		parseDate,
-		getLocalTimeZone,
-		type DateValue
-	} from '@internationalized/date';
+	import { CalendarDate, parseDate, type DateValue } from '@internationalized/date';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import Calendar from '$lib/components/ui/calendar/calendar.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
+	import { formatIsoDate } from '$lib/format-date';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 
 	let {
@@ -51,7 +47,7 @@
 				aria-label={ariaLabel}
 			>
 				{#if calValue}
-					{calValue.toDate(getLocalTimeZone()).toLocaleDateString()}
+					{formatIsoDate(calValue.toString(), 'short')}
 				{:else}
 					Select a date
 				{/if}

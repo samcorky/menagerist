@@ -22,6 +22,7 @@ import './checklist/checklist';
 import './opaque/opaque';
 // Core-only kinds have no schema-editor half.
 import './cron/cron';
+import './timezone/timezone';
 
 export {
 	register,
