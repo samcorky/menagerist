@@ -30,6 +30,9 @@ class Tunable:
     restart_required: bool = False
     # A per-person value changed elsewhere in the app, not on the settings form.
     hidden: bool = False
+    # A per-person setting whose default the environment may set. False leaves it to the
+    # declared default alone, and out of the deployment reference.
+    env_default: bool = True
 
 
 @dataclass(frozen=True)

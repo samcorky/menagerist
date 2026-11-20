@@ -2,9 +2,8 @@
 
 from functools import lru_cache
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from app.platform.config._base import MenageristBaseSettings
@@ -12,15 +11,10 @@ from app.platform.config._markers import Tunable
 
 
 class SchedulerSettings(MenageristBaseSettings, group="scheduler"):
-    """Instance timezone, worker liveness and job history retention."""
+    """Worker liveness and job history retention."""
 
     model_config = SettingsConfigDict(extra="ignore", env_ignore_empty=True)
 
-    timezone: ZoneInfo = Field(
-        default_factory=lambda: ZoneInfo("UTC"),
-        validation_alias=AliasChoices("MENAGERIST_TIMEZONE", "TZ"),
-        description="Timezone used to interpret recurring job schedules.",
-    )
     run_history_per_job: Annotated[
         int,
         Field(

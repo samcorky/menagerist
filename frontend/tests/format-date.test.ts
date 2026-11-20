@@ -2,7 +2,17 @@ import { describe, it, expect } from 'vitest';
 
 process.env.TZ = 'America/Los_Angeles';
 
-import { formatIsoDate, formatRelativeTime } from '../src/lib/format-date';
+import {
+	formatDateTime,
+	formatIsoDate,
+	formatPartialDate,
+	formatRelativeTime,
+	formatTime,
+	knownZones,
+	resolvedZone,
+	zoneOffset,
+	type DateTimePrefs
+} from '../src/lib/format-date';
 
 describe('formatIsoDate', () => {
 	it('does not shift the day in a negative UTC offset', () => {
@@ -35,5 +45,65 @@ describe('formatRelativeTime', () => {
 
 	it('returns the input when it is not a date', () => {
 		expect(formatRelativeTime('not a date', now)).toBe('not a date');
+	});
+});
+
+describe('date and time preferences', () => {
+	const at = '2026-12-31T22:30:00Z';
+	const base: DateTimePrefs = {
+		zone: 'browser',
+		order: 'automatic',
+		clock: 'automatic',
+		locale: 'en-GB'
+	};
+
+	it('writes calendar dates in the chosen order, never shifted by the zone', () => {
+		const tokyo = { ...base, zone: 'Asia/Tokyo' };
+		expect(formatIsoDate('2026-03-05', 'short', { ...tokyo, order: 'dmy' })).toBe('5 Mar 2026');
+		expect(formatIsoDate('2026-03-05', 'short', { ...tokyo, order: 'mdy' })).toBe('Mar 5, 2026');
+		expect(formatIsoDate('2026-03-05', 'long', { ...tokyo, order: 'ymd' })).toBe('2026-03-05');
+		expect(formatIsoDate('2026-03-05', 'long', { ...tokyo, order: 'dmy' })).toBe('5 March 2026');
+	});
+
+	it('keeps partial dates at their precision in each order', () => {
+		expect(formatPartialDate('1973-03', 'short', { ...base, order: 'ymd' })).toBe('1973-03');
+		expect(formatPartialDate('1973-03', 'short', { ...base, order: 'dmy' })).toBe('Mar 1973');
+		expect(formatPartialDate('1973', 'short', { ...base, order: 'mdy' })).toBe('1973');
+	});
+
+	it('shows timestamps in the chosen zone, naming it when it is not the device one', () => {
+		const tokyo = formatDateTime(
+			at,
+			{},
+			{ ...base, zone: 'Asia/Tokyo', order: 'dmy', clock: '24h' }
+		);
+		expect(tokyo.local).toBe('1 Jan 2027, 07:30 GMT+9');
+		expect(tokyo.utc).toBe('31 Dec 2026, 22:30 UTC');
+
+		const here = formatDateTime(at, {}, { ...base, order: 'dmy', clock: '24h' });
+		expect(here.local).toBe('31 Dec 2026, 14:30');
+		const named = formatDateTime(
+			at,
+			{},
+			{ ...base, zone: 'America/Los_Angeles', order: 'dmy', clock: '24h' }
+		);
+		expect(named.local).toBe('31 Dec 2026, 14:30');
+	});
+
+	it('follows the chosen clock', () => {
+		const prefs = { ...base, zone: 'UTC', order: 'dmy' as const };
+		expect(formatTime(at, { ...prefs, clock: '24h' })).toMatch(/^22:30/);
+		expect(formatTime(at, { ...prefs, clock: '12h' })).toMatch(/^10:30\s?pm/i);
+		expect(formatDateTime(at, { seconds: true }, { ...prefs, clock: '24h' }).local).toContain(
+			'22:30:00'
+		);
+	});
+
+	it('resolves the browser zone and names offsets', () => {
+		expect(resolvedZone(base)).toBe('America/Los_Angeles');
+		expect(resolvedZone({ ...base, zone: 'Asia/Tokyo' })).toBe('Asia/Tokyo');
+		expect(zoneOffset('Asia/Tokyo')).toBe('GMT+9');
+		expect(zoneOffset('Not/AZone')).toBe('');
+		expect(knownZones()).toContain('Europe/London');
 	});
 });

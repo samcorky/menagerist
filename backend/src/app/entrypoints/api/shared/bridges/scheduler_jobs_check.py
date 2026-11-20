@@ -23,7 +23,7 @@ from app.modules.scheduling.application.assess_job_health import (
     LaneBacklog,
 )
 from app.modules.system.domain.readiness import CheckObservation, CheckStatus
-from app.platform.config.scheduler import get_scheduler_settings
+from app.platform.config.server import get_server_settings
 from app.platform.database import DATABASE_OUTAGE_ERRORS
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.jobs import Lane
@@ -108,7 +108,7 @@ class SchedulerJobsCheck:
                     self._evaluator or CronScheduleEvaluator(),
                 ).handle(
                     AssessJobHealthQuery(
-                        now=now, timezone=get_scheduler_settings().timezone.key
+                        now=now, timezone=get_server_settings().time_zone.key
                     ),
                     SYSTEM_ACTOR,
                 )

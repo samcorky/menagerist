@@ -158,6 +158,7 @@ def test_count_route_is_in_the_spec() -> None:
     listed = spec["paths"]["/api/v1/nodes"]["get"]
 
     names = {p["name"] for p in get["parameters"]}
-    assert names == {"type", "q", "favourite", "collection"}
+    # `Time-Zone` sets "today" for relative dates in the filter.
+    assert names == {"type", "q", "favourite", "collection", "Time-Zone"}
     assert names <= {p["name"] for p in listed["parameters"]}
     assert get["operationId"] == "count_nodes"

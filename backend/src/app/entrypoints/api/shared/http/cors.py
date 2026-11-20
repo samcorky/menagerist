@@ -15,6 +15,7 @@ CORS_REQUEST_HEADERS = [
     "If-None-Match",
     "If-Modified-Since",
     "Request-Id",
+    "Time-Zone",
     "X-Client-Display-Mode",
 ]
 

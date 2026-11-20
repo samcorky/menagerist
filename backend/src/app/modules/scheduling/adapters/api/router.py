@@ -29,7 +29,7 @@ from app.modules.scheduling.application.preview_schedule import (
 )
 from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
 from app.modules.scheduling.domain.errors import RunNowNotAllowedError, UnknownJobError
-from app.platform.config import get_scheduler_settings
+from app.platform.config import get_server_settings
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError, ValidationError
 
@@ -82,7 +82,7 @@ async def preview_schedule(
     preview = await use_case.handle(
         PreviewScheduleQuery(
             expression=expression,
-            timezone=get_scheduler_settings().timezone.key,
+            timezone=get_server_settings().time_zone.key,
             now=datetime.now(UTC),
             count=count,
         ),
@@ -106,7 +106,7 @@ async def list_jobs(
     response.headers["Cache-Control"] = "private, no-store"
     statuses = await use_case.handle(
         ListJobsQuery(
-            now=datetime.now(UTC), timezone=get_scheduler_settings().timezone.key
+            now=datetime.now(UTC), timezone=get_server_settings().time_zone.key
         ),
         actor,
     )

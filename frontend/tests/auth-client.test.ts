@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Loading preferences is a request of its own, started without waiting; stubbed here so it
+// cannot answer to another test's fetch. The preferences tests cover it.
+vi.mock('$lib/preferences.svelte', () => ({
+	preferences: { load: vi.fn(), clear: vi.fn(), value: () => undefined, items: [] }
+}));
 import { auth } from '../src/lib/auth.svelte';
 import { clearAllEtags, getEtag, setEtag } from '../src/lib/api/etagStore';
 import { resetAuthEvents } from '../src/lib/api/auth-events';
@@ -129,8 +135,7 @@ describe('can()', () => {
 		await auth.refresh();
 		expect(auth.passwordExpired).toBe(true);
 		expect(auth.can('graph:node_type:delete')).toBe(false);
-		expect(paths).toContain('/api/v1/me');
-		expect(paths).not.toContain('/api/v1/me/permissions');
+		expect(paths).toEqual(['/api/v1/me']);
 		auth.user = null;
 	});
 });

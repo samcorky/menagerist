@@ -32,6 +32,7 @@
 		type Readiness
 	} from '$lib/status';
 	import { formatGroup, formatLabel, groupIcon, metricIcon } from '$lib/status-display';
+	import { formatDateTime } from '$lib/format-date';
 	import ReleaseCard from '$lib/components/release-card.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -268,7 +269,7 @@
 			rows.push({ label: 'Commit', value: `${info.short_sha}${dirty}` });
 		}
 		if (info.build_timestamp != null) {
-			rows.push({ label: 'Built', value: new Date(info.build_timestamp).toLocaleString() });
+			rows.push({ label: 'Built', value: formatDateTime(info.build_timestamp).local });
 		}
 		rows.push({ label: 'Migration', value: info.migration_head.join(', ') || 'none' });
 
@@ -380,14 +381,7 @@
 		'relative -mb-(--card-spacing) flex min-h-9 pointer-coarse:min-h-11 w-full items-center justify-center gap-2 border-t border-border/70 px-5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none';
 
 	function formatTime(date: Date): string {
-		return date.toLocaleString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-			second: '2-digit'
-		});
+		return formatDateTime(date.toISOString(), { seconds: true }).local;
 	}
 </script>
 

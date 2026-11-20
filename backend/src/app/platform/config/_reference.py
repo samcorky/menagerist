@@ -276,6 +276,17 @@ def _entry(group_type: type[MenageristBaseSettings], name: str) -> SettingEntry:
     )
 
 
+def _documented(field: FieldInfo) -> bool:
+    """Whether a field has a variable to document.
+
+    Internal fields have none, nor does a per-person setting with no env default.
+    """
+    markers = unwrap(field)[1]
+    if any(isinstance(m, Internal) for m in markers):
+        return False
+    return all(m.env_default for m in markers if isinstance(m, Tunable))
+
+
 def build_sections(
     groups: Iterable[type[MenageristBaseSettings]],
     compose_texts: Mapping[str, str] | None = None,
@@ -294,7 +305,7 @@ def build_sections(
         entries.setdefault(group, []).extend(
             _entry(group_type, name)
             for name, field in group_type.model_fields.items()
-            if not any(isinstance(m, Internal) for m in unwrap(field)[1])
+            if _documented(field)
         )
     sections = [
         SettingsSection(group=group, summary=summaries[group], entries=tuple(items))

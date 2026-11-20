@@ -114,7 +114,7 @@ def test_environment_guard_allows_shared_timezone_fallback(
     test_settings_environment_names_do_not_overlap()
 
 
-@pytest.mark.parametrize("alias", ["MENAGERIST_TIMEZONE", "menagerist_backup_path"])
+@pytest.mark.parametrize("alias", ["MENAGERIST_TIME_ZONE", "menagerist_backup_path"])
 def test_environment_guard_rejects_other_shared_names(
     monkeypatch: pytest.MonkeyPatch, alias: str
 ) -> None:

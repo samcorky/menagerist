@@ -1,7 +1,9 @@
 """Validated setting value types; each is kept as the string the consumer needs."""
 
 from datetime import UTC, datetime
+from functools import cache
 from typing import Annotated, Literal
+from zoneinfo import available_timezones
 
 from cronsim import CronSim, CronSimError
 from pydantic import (
@@ -74,4 +76,25 @@ def _cron(value: str) -> str:
 
 
 type Cron = Annotated[str, ValidateAs(str, _cron), UIMeta(kind="cron")]
+
+# The value that leaves the zone to the browser.
+BROWSER_ZONE = "browser"
+
+
+@cache
+def _zones() -> frozenset[str]:
+    return frozenset(available_timezones())
+
+
+def _time_zone(value: str) -> str:
+    """Accept `browser` or an IANA zone name such as `Europe/London`."""
+    if value != BROWSER_ZONE and value not in _zones():
+        msg = f"unknown time zone: {value} (use an IANA name such as Europe/London)"
+        raise ValueError(msg)
+    return value
+
+
+type TimeZoneChoice = Annotated[
+    str, ValidateAs(str, _time_zone), UIMeta(kind="timezone")
+]
 type Hours = Annotated[int, Field(gt=0), UIMeta(unit="hours")]

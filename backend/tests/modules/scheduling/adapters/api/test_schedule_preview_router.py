@@ -6,7 +6,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
-from app.platform.config import get_scheduler_settings
+from app.platform.config import get_server_settings
 
 URL = "/api/v1/scheduling/preview"
 
@@ -25,7 +25,7 @@ def test_it_returns_the_next_runs_in_the_instance_zone(as_user: AsUser) -> None:
     response = client(as_user).get(URL, params={"expression": "0 3 * * *"})
     assert response.status_code == 200
     body = response.json()
-    assert body["timezone"] == get_scheduler_settings().timezone.key
+    assert body["timezone"] == get_server_settings().time_zone.key
     runs = [datetime.fromisoformat(run) for run in body["runs"]]
     assert len(runs) == 3
     assert runs == sorted(runs)
