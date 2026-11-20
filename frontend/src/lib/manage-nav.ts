@@ -10,6 +10,7 @@ import {
 	Laptop,
 	LayoutGrid,
 	Library,
+	MonitorSmartphone,
 	Settings2,
 	Shield,
 	SlidersHorizontal,
@@ -20,6 +21,7 @@ import {
 	Users
 } from '@lucide/svelte';
 import type { Permission } from '$lib/auth';
+import { displayMode } from '$lib/display-mode.svelte';
 
 /** Whether the signed-in account holds a permission (`auth.can`). */
 export type ManagePermissionCheck = (permission: Permission) => boolean;
@@ -34,6 +36,8 @@ export type ManageItem = {
 	description?: string;
 	/** Which hub page lists this entry as a tile. Sidebar-only entries leave it unset. */
 	hub?: ManageHub;
+	/** Left out while this is true, for an entry that stops making sense in some state. */
+	hideWhen?: () => boolean;
 };
 
 /** The two hub pages that list entries as tiles: /settings and /admin. */
@@ -101,6 +105,15 @@ const ACCOUNT: ManageItem[] = [
 		icon: Settings2,
 		hub: 'settings',
 		description: 'Choose how Menagerist works for you.'
+	},
+	{
+		href: '/settings/install',
+		label: 'Install the app',
+		icon: MonitorSmartphone,
+		hub: 'settings',
+		description: 'Open Menagerist from your home screen or dock.',
+		// Nothing to install once this is the installed app.
+		hideWhen: () => displayMode.standalone
 	}
 ];
 
@@ -157,10 +170,10 @@ const SYSTEM: ManageItem[] = [
 /** The sidebar's sections, with admin entries left out for accounts without their permission. */
 export function manageGroups(can: ManagePermissionCheck): ManageGroup[] {
 	const visible = (items: ManageItem[]) =>
-		items.filter((item) => !item.permission || can(item.permission));
+		items.filter((item) => (!item.permission || can(item.permission)) && !item.hideWhen?.());
 	return [
 		{ label: 'Library', items: LIBRARY },
-		{ label: 'Account', items: ACCOUNT },
+		{ label: 'Account', items: visible(ACCOUNT) },
 		{ label: 'System', items: visible(SYSTEM) }
 	];
 }

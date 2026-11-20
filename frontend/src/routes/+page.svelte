@@ -43,6 +43,7 @@
 		type TypeBreakdown
 	} from '$lib/dashboard-sources';
 	import { dismissExamplesBanner, isExamplesBannerDismissed } from '$lib/examples';
+	import InstallCard from '$lib/components/install-card.svelte';
 	import {
 		listExamplePacks,
 		type CollectionResponse,
@@ -287,6 +288,7 @@
 			</a>
 		</div>
 	{:else}
+		<InstallCard />
 		{#if hasExamples && !examplesDismissed}
 			<div
 				class="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3 text-sm"
