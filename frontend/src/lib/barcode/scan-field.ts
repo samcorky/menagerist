@@ -14,12 +14,35 @@ export const NEW_BARCODE_DETAIL = '';
 
 const NEW_DETAIL_LABEL = 'Barcode';
 
-/** The type's single-line text fields, in the order the type shows them. */
-export function scanFields(schema: AttributesSchema | null): ScanField[] {
+function textFields(schema: AttributesSchema | null): EditorField[] {
 	return schemaToItems(schema)
 		.flatMap((item) => (isSection(item) ? item.fields : [item]))
-		.filter((field) => field.kind === 'text' && !field.meta?.archived)
-		.map(({ key, label }) => ({ key, label }));
+		.filter((field) => field.kind === 'text' && !field.meta?.archived);
+}
+
+const asScanField = ({ key, label }: EditorField): ScanField => ({ key, label });
+
+/** The type's single-line text fields, in the order the type shows them. */
+export function scanFields(schema: AttributesSchema | null): ScanField[] {
+	return textFields(schema).map(asScanField);
+}
+
+/** The text fields the type marks as taking barcodes, in the order the type shows them. */
+export function barcodeFields(schema: AttributesSchema | null): ScanField[] {
+	return textFields(schema)
+		.filter((field) => field.meta?.barcode === true)
+		.map(asScanField);
+}
+
+/** Where a scanned code can go: the marked fields when there are some, otherwise any text field. */
+export function scanTargets(schema: AttributesSchema | null): ScanField[] {
+	const marked = barcodeFields(schema);
+	return marked.length > 0 ? marked : scanFields(schema);
+}
+
+/** The field chosen before the person picks one: the first marked field, else a label guess. */
+export function defaultScanField(schema: AttributesSchema | null): string | null {
+	return barcodeFields(schema)[0]?.key ?? suggestScanField(scanFields(schema));
 }
 
 /**

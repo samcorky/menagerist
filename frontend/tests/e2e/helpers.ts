@@ -35,6 +35,8 @@ export type FieldSpec = {
 	kind?: string;
 	/** Switch on "Show in quick capture" for the field. */
 	capture?: boolean;
+	/** Switch on "Takes barcodes" for the field (text only). */
+	barcode?: boolean;
 };
 
 /** Create an item type and return its label. */
@@ -59,9 +61,13 @@ export async function createItemType(
 		if (field.kind && field.kind !== 'text') {
 			await form.getByLabel('Field type').last().selectOption(field.kind);
 		}
-		if (field.capture) {
+		const switches = [
+			...(field.capture ? ['Show in quick capture'] : []),
+			...(field.barcode ? ['Takes barcodes'] : [])
+		];
+		if (switches.length > 0) {
 			await form.getByRole('button', { name: 'More field actions' }).last().click();
-			await page.getByRole('menuitemcheckbox', { name: 'Show in quick capture' }).click();
+			for (const name of switches) await page.getByRole('menuitemcheckbox', { name }).click();
 			await page.keyboard.press('Escape');
 			await expect(page.getByRole('menu')).toBeHidden();
 		}
