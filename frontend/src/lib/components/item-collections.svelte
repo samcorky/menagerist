@@ -50,15 +50,15 @@
 	const newNameHint = $derived(validateCollectionName(newName));
 	const showNewNameHint = $derived(newTouched && newNameHint !== null);
 
-	async function fetchAll(
-		query: { item_id?: string; matches_item?: string },
-		kind: 'manual' | 'dynamic' = 'manual'
-	): Promise<CollectionResponse[] | null> {
+	async function fetchAll(query: {
+		item_id?: string;
+		kind?: 'manual';
+	}): Promise<CollectionResponse[] | null> {
 		const found: CollectionResponse[] = [];
 		let after: string | undefined;
 		for (let i = 0; i < MAX_PAGES; i++) {
 			const result = await listCollections({
-				query: { ...query, kind, after, limit: PAGE_SIZE }
+				query: { ...query, after, limit: PAGE_SIZE }
 			});
 			if (result.error || !result.data) return null;
 			found.push(...result.data);
@@ -69,14 +69,11 @@
 	}
 
 	async function loadMemberOf(id: string) {
-		const [found, matched] = await Promise.all([
-			fetchAll({ item_id: id }),
-			fetchAll({ matches_item: id }, 'dynamic')
-		]);
+		const found = await fetchAll({ item_id: id });
 		if (id !== itemId) return;
-		if (found && matched) {
+		if (found) {
 			memberOf = manualCollections(found);
-			matchedBy = matched.filter(isSmart);
+			matchedBy = found.filter(isSmart);
 			loadFailed = false;
 		} else {
 			loadFailed = true;
@@ -93,7 +90,7 @@
 	async function loadPicker() {
 		pickerLoading = true;
 		pickerFailed = false;
-		const found = await fetchAll({});
+		const found = await fetchAll({ kind: 'manual' });
 		if (found) allCollections = manualCollections(found);
 		else pickerFailed = true;
 		pickerLoading = false;

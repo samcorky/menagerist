@@ -359,17 +359,17 @@ def test_smart_collection_resolves_by_slug_and_edits_its_slug(api: Api) -> None:
     assert api.client.get(f"{BASE}/smart").status_code == 404
 
 
-def test_list_matches_item_returns_the_smart_collections_it_matches(
+def test_list_item_id_includes_the_smart_collections_it_matches(
     api: Api,
 ) -> None:
-    """`matches_item` lists the smart collections whose rule takes the item."""
+    """`item_id` lists the smart collections whose rule takes the item."""
     item = uuid.uuid7()
     api.items.live.add(item)
     aliens = api.smart()
     api.client.post(BASE, json={"name": "Shelf"})
 
-    listed = api.client.get(BASE, params={"matches_item": str(item)}).json()
-    missing = api.client.get(BASE, params={"matches_item": str(uuid.uuid7())}).json()
+    listed = api.client.get(BASE, params={"item_id": str(item)}).json()
+    missing = api.client.get(BASE, params={"item_id": str(uuid.uuid7())}).json()
 
     assert [c["id"] for c in listed] == [aliens["id"]]
     assert missing == []

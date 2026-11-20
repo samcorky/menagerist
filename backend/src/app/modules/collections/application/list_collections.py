@@ -31,14 +31,13 @@ class ListCollectionsQuery:
     """Request for a page of collections ordered by id, optionally holding an item.
 
     A `kind` keeps one kind only; the other kind is not loaded or counted.
-    `item_id` keeps manual collections holding that item; `matches_item` keeps
-    smart collections whose definition matches it, so implies the smart kind.
+    `item_id` keeps the collections that item is in: manual ones holding it and
+    smart ones whose definition matches it.
     """
 
     after: uuid.UUID | None = None
     limit: int = 50
     item_id: uuid.UUID | None = None
-    matches_item: uuid.UUID | None = None
     q: str | None = None
     kind: CollectionKind | None = None
 
@@ -83,25 +82,19 @@ class ListCollections(
         Filtering happens while paging so a page is never short just because
         non-matching collections sat between matches.
         """
-        kind = query.kind
-        if query.matches_item is not None:
-            if kind is CollectionKind.MANUAL:
-                return []
-            kind = CollectionKind.DYNAMIC
-        if query.item_id is None and query.matches_item is None:
+        if query.item_id is None:
             return await self._repos.collections.list(
                 scope=scope,
                 after=query.after,
                 limit=query.limit,
                 q=query.q,
-                kind=kind,
+                kind=query.kind,
             )
+        item_id = query.item_id
         holding = (
-            None
-            if query.item_id is None
-            else await self._repos.memberships.collection_ids_for(
-                query.item_id, scope=scope
-            )
+            set()
+            if query.kind is CollectionKind.DYNAMIC
+            else await self._repos.memberships.collection_ids_for(item_id, scope=scope)
         )
         found: list[Collection] = []
         after = query.after
@@ -111,30 +104,26 @@ class ListCollections(
                 after=after,
                 limit=query.limit,
                 q=query.q,
-                kind=kind,
+                kind=query.kind,
             )
             found.extend(
-                [c for c in batch if await self._keeps(c, query, holding, scope)]
+                [c for c in batch if await self._holds(c, item_id, holding, scope)]
             )
             if len(batch) < query.limit:
                 break
             after = batch[-1].id
         return found[: query.limit]
 
-    async def _keeps(
+    async def _holds(
         self,
         collection: Collection,
-        query: ListCollectionsQuery,
-        holding: set[uuid.UUID] | None,
+        item_id: uuid.UUID,
+        holding: set[uuid.UUID],
         scope: ContentFilter,
     ) -> bool:
-        """Whether the collection passes the `item_id` and `matches_item` filters."""
-        if holding is not None and collection.id not in holding:
-            return False
-        if query.matches_item is None:
-            return True
+        """Whether the item is in the collection: held if manual, matched if smart."""
+        if collection.kind is CollectionKind.MANUAL:
+            return collection.id in holding
         if collection.definition is None:
             return False
-        return await self._items.matches(
-            collection.definition, scope, query.matches_item
-        )
+        return await self._items.matches(collection.definition, scope, item_id)
