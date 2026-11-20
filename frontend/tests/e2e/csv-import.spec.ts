@@ -162,3 +162,38 @@ test('Excel date shapes are read, and the day order can be chosen', async ({ pag
 	await page.getByRole('button', { name: 'Add 3 items' }).click();
 	await expect(page).toHaveURL(/\/items$/);
 });
+
+test('a column the type has no field for is kept as each item’s own detail', async ({
+	page,
+	request
+}) => {
+	const type = await makeType(request);
+	prefix = uniqueName('Sig').replace(/\W+/g, '');
+	const file = {
+		name: 'signatures.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from(`Title,Copies\n${prefix}A,3\n${prefix}B,\n`)
+	};
+
+	await chooseFileAndType(page, file, type.label);
+	await page.getByLabel('Copies').selectOption({ label: 'Keep as an extra detail' });
+	// The kind is guessed from the column's values.
+	await expect(page.getByLabel('Kind')).toHaveValue('number');
+	await page.getByLabel('Detail name').fill('Copies signed');
+
+	await page.getByRole('button', { name: 'Preview' }).click();
+	await expect(page.getByText('Copies signed (Number)')).toBeVisible();
+	await page.getByRole('button', { name: 'Add 2 items' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+
+	const nodes = (await (await request.get(`/api/v1/nodes?q=${prefix}`)).json()) as {
+		name: string;
+		attributes: Record<string, unknown>;
+		extra_schema: { properties: Record<string, { title: string }> } | null;
+	}[];
+	const byName = Object.fromEntries(nodes.map((n) => [n.name, n]));
+	expect(byName[`${prefix}A`].attributes.copies_signed).toBe(3);
+	expect(byName[`${prefix}A`].extra_schema?.properties.copies_signed.title).toBe('Copies signed');
+	// An empty cell leaves the detail off that item.
+	expect(byName[`${prefix}B`].extra_schema).toBeNull();
+});

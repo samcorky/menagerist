@@ -21060,7 +21060,12 @@
                     }
                   ],
                   "encoding": "utf_8",
-                  "day_month_order_certain": false
+                  "day_month_order_certain": false,
+                  "column_kinds": {
+                    "title": "text",
+                    "signed_on": "partialdate",
+                    "authenticated": "boolean"
+                  }
                 }
               }
             }
@@ -32622,6 +32627,17 @@
             ],
             "title": "Target",
             "description": "`name`, `description`, `tags`, a field's key, or null to ignore the column."
+          },
+          "extra": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExtraFieldEntry"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Keep the column as each item's own field instead; `target` must then be null. An item gets the field only when its cell has a value."
           }
         },
         "additionalProperties": false,
@@ -34136,6 +34152,55 @@
         "title": "ExamplePermission",
         "description": "Permissions for example packs."
       },
+      "ExtraFieldEntry": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Key",
+            "description": "The field's key: lowercase letters, digits and `_`, not one the item type has."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Title",
+            "description": "The field's name, as people see it."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ExtraFieldKind",
+            "description": "What sort of value it holds. A `choice` offers each different value in the column, up to 50."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "kind"
+        ],
+        "title": "ExtraFieldEntry",
+        "description": "A field each imported item gets for itself, filled from the column.",
+        "examples": [
+          {
+            "key": "paper",
+            "kind": "choice",
+            "title": "Paper"
+          }
+        ]
+      },
+      "ExtraFieldKind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "number",
+          "boolean",
+          "date",
+          "partialdate",
+          "choice"
+        ],
+        "title": "ExtraFieldKind",
+        "description": "The kinds a column kept as the items' own field can be."
+      },
       "FindingKind": {
         "type": "string",
         "enum": [
@@ -34340,9 +34405,9 @@
               "type": "array"
             },
             "title": "Mapping",
-            "description": "Where each column goes, as JSON: a list of `column` and `target`.",
+            "description": "Where each column goes, as JSON: a list of `column` and `target`, or `extra` to keep the column as each item's own field.",
             "examples": [
-              "[{\"column\": \"title\", \"target\": \"name\"}]"
+              "[{\"column\": \"title\", \"target\": \"name\"}, {\"column\": \"paper\", \"extra\": {\"key\": \"paper\", \"title\": \"Paper\", \"kind\": \"text\"}}]"
             ]
           },
           "list_separator": {
@@ -34890,6 +34955,14 @@
             "type": "boolean",
             "title": "Day Month Order Certain",
             "description": "Whether the values prove the suggested order, or it is a guess."
+          },
+          "column_kinds": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExtraFieldKind"
+            },
+            "type": "object",
+            "title": "Column Kinds",
+            "description": "For each column, the kind its values suggest should it be kept as an extra field: the first of number, yes/no, date and partial date that takes every value, else text."
           }
         },
         "type": "object",
@@ -34906,6 +34979,11 @@
         "description": "What is in a CSV file, the item type's fields, and a mapping to start from.",
         "examples": [
           {
+            "column_kinds": {
+              "authenticated": "boolean",
+              "signed_on": "partialdate",
+              "title": "text"
+            },
             "day_month_order_certain": false,
             "encoding": "utf_8",
             "fields": [
@@ -36800,9 +36878,9 @@
               "type": "array"
             },
             "title": "Mapping",
-            "description": "Where each column goes, as JSON: a list of `column` and `target`.",
+            "description": "Where each column goes, as JSON: a list of `column` and `target`, or `extra` to keep the column as each item's own field.",
             "examples": [
-              "[{\"column\": \"title\", \"target\": \"name\"}]"
+              "[{\"column\": \"title\", \"target\": \"name\"}, {\"column\": \"paper\", \"extra\": {\"key\": \"paper\", \"title\": \"Paper\", \"kind\": \"text\"}}]"
             ]
           },
           "list_separator": {

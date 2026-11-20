@@ -65,8 +65,12 @@ _ITEM_TYPE = Annotated[
 _MAPPING = Annotated[
     Json[list[ColumnMappingEntry]],
     Form(
-        description="Where each column goes, as JSON: a list of `column` and `target`.",
-        examples=['[{"column": "title", "target": "name"}]'],
+        description="Where each column goes, as JSON: a list of `column` and "
+        + "`target`, or `extra` to keep the column as each item's own field.",
+        examples=[
+            '[{"column": "title", "target": "name"}, {"column": "paper", '
+            + '"extra": {"key": "paper", "title": "Paper", "kind": "text"}}]'
+        ],
     ),
 ]
 _SEPARATOR = Annotated[
@@ -88,7 +92,7 @@ async def _read(file: UploadFile) -> bytes:
 
 
 def _mapping(entries: list[ColumnMappingEntry]) -> tuple[ColumnMapping, ...]:
-    return tuple(ColumnMapping(column=e.column, target=e.target) for e in entries)
+    return tuple(e.to_domain() for e in entries)
 
 
 def _example(example: dict[str, Any]) -> dict[str, Any]:

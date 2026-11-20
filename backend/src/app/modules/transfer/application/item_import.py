@@ -6,7 +6,7 @@ every problem (up to a cap) by spreadsheet row and field.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
@@ -18,6 +18,13 @@ from app.modules.transfer.application.csv_rows import (
     CsvTable,
     read_csv,
     suggest_mapping,
+)
+from app.modules.transfer.application.extra_columns import (
+    check_key,
+    choice_options,
+    extra_property,
+    extra_spec,
+    suggest_kind,
 )
 from app.modules.transfer.application.extras import BundleExtras
 from app.modules.transfer.application.permissions import TransferPermission
@@ -31,13 +38,17 @@ from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.errors import CellValueError, InvalidImportFileError
 from app.modules.transfer.domain.plan import ClashPolicy, Plan, PlanBlocker
 from app.modules.transfer.domain.tabular import (
+    MAX_EXTRA_FIELDS,
     MAX_IMPORT_ROWS,
     MAX_LISTED_PROBLEMS,
     CellProblem,
+    ColumnKind,
     ColumnMapping,
     CsvEncoding,
     DayMonthOrder,
     DayMonthOrderGuess,
+    ExtraField,
+    ExtraFieldKind,
     FieldSpec,
 )
 from app.shared_kernel.access import Access, Requires
@@ -79,6 +90,8 @@ class ItemImportInspection:
     encoding: CsvEncoding
     # None when no cell is written as three numbers, so there is nothing to choose.
     day_month_order: DayMonthOrderGuess | None
+    # Each column's kind, should it be kept as the items' own field.
+    column_kinds: tuple[ColumnKind, ...] = ()
 
 
 def build_item_bundle(
@@ -96,8 +109,16 @@ def build_item_bundle(
     Raises:
         InvalidImportFileError: the mapping cannot be used for this file and type.
     """
-    columns = _columns(table.headers, mapping, fields)
+    columns, kept = _columns(table.headers, mapping, fields)
     by_key = {field.key: field for field in fields}
+    # Each filled column: its index, how to read it, and the item's own definition
+    # when the column is kept as an extra field rather than one of the type's.
+    filled: list[tuple[int, FieldSpec, dict[str, Any] | None]] = [
+        (index, by_key[key], None)
+        for key, index in columns.items()
+        if key not in _BUILT_IN
+    ]
+    filled.extend(_extras(table, kept))
     items: list[BundleItem] = []
     problems: list[CellProblem] = []
     for number, cells in zip(table.numbers, table.rows, strict=True):
@@ -106,24 +127,25 @@ def build_item_bundle(
         if not name:
             found.append(CellProblem(row=number, field="Name", message="name is empty"))
         attributes: dict[str, object] = {}
-        for key, index in columns.items():
-            if key in _BUILT_IN:
-                continue
-            field = by_key[key]
+        own: dict[str, Any] = {}
+        for index, spec, prop in filled:
             try:
                 value = convert_cell(
                     cells[index],
-                    field,
+                    spec,
                     list_separator=list_separator,
                     day_month_order=day_month_order,
                 )
             except CellValueError as error:
                 found.append(
-                    CellProblem(row=number, field=field.title, message=str(error))
+                    CellProblem(row=number, field=spec.title, message=str(error))
                 )
                 continue
-            if value is not None:
-                attributes[key] = value
+            if value is None:
+                continue
+            attributes[spec.key] = value
+            if prop is not None:
+                own[spec.key] = prop
         if found:
             problems.extend(found)
             continue
@@ -135,6 +157,7 @@ def build_item_bundle(
                 description=_cell(cells, columns, "description"),
                 attributes=attributes,
                 tags=_tags(cells, columns, list_separator),
+                extra_schema={"type": "object", "properties": own} if own else None,
             )
         )
     bundle = Bundle(
@@ -150,13 +173,14 @@ def _columns(
     headers: Sequence[str],
     mapping: Sequence[ColumnMapping],
     fields: Sequence[FieldSpec],
-) -> dict[str, int]:
-    """Return each mapped target's column index, after checking the mapping."""
+) -> tuple[dict[str, int], list[tuple[int, ExtraField]]]:
+    """Return each mapped target's column index and the kept columns, once checked."""
     index = {header: i for i, header in enumerate(headers)}
     by_key = {field.key: field for field in fields}
     columns: dict[str, int] = {}
+    kept = _kept(mapping, index)
     for entry in mapping:
-        if entry.target is None:
+        if entry.target is None or entry.extra is not None:
             continue
         if entry.column not in index:
             raise InvalidImportFileError(f"The file has no column '{entry.column}'.")
@@ -166,7 +190,70 @@ def _columns(
         columns[entry.target] = index[entry.column]
     if "name" not in columns:
         raise InvalidImportFileError("Map a column to name: every item needs one.")
-    return columns
+    _check_kept(kept, by_key)
+    return columns, kept
+
+
+def _kept(
+    mapping: Sequence[ColumnMapping], index: dict[str, int]
+) -> list[tuple[int, ExtraField]]:
+    """The columns kept as the items' own fields, with their index."""
+    kept: list[tuple[int, ExtraField]] = []
+    for entry in mapping:
+        if entry.extra is None:
+            continue
+        if entry.column not in index:
+            raise InvalidImportFileError(f"The file has no column '{entry.column}'.")
+        if entry.target is not None:
+            raise InvalidImportFileError(
+                f"'{entry.column}' goes to either a field or kept as an extra "
+                + "detail, not both."
+            )
+        kept.append((index[entry.column], entry.extra))
+    return kept
+
+
+def _check_kept(
+    kept: Sequence[tuple[int, ExtraField]], by_key: dict[str, FieldSpec]
+) -> None:
+    """Refuse kept columns that would clash, or more than an item may have."""
+    if len(kept) > MAX_EXTRA_FIELDS:
+        raise InvalidImportFileError(
+            f"An item can have at most {MAX_EXTRA_FIELDS} extra fields."
+        )
+    keys: set[str] = set()
+    for _, extra in kept:
+        if not extra.title.strip():
+            raise InvalidImportFileError(
+                f"The field kept as '{extra.key}' needs a name."
+            )
+        if extra.key in by_key or extra.key in _BUILT_IN:
+            raise InvalidImportFileError(
+                f"'{extra.key}' is already a field of this item type."
+            )
+        check_key(extra.key)
+        if extra.key in keys:
+            raise InvalidImportFileError(
+                f"'{extra.key}' is used for more than one column."
+            )
+        keys.add(extra.key)
+
+
+def _extras(
+    table: CsvTable, kept: Sequence[tuple[int, ExtraField]]
+) -> list[tuple[int, FieldSpec, dict[str, Any] | None]]:
+    """Each kept column's index, its conversion and the definition items get."""
+    found: list[tuple[int, FieldSpec, dict[str, Any] | None]] = []
+    for index, extra in kept:
+        options = (
+            choice_options((row[index] for row in table.rows), extra.title)
+            if extra.kind is ExtraFieldKind.CHOICE
+            else ()
+        )
+        found.append(
+            (index, extra_spec(extra, options), extra_property(extra, options))
+        )
+    return found
 
 
 def _check_target(target: str, by_key: dict[str, FieldSpec]) -> None:
@@ -226,8 +313,10 @@ class _ItemImport:
         listed = [(p.row, f"Row {p.row}, {p.field}: {p.message}.") for p in problems]
         for item in bundle.items:
             number = int(item.ref.removeprefix("row-"))
+            own = (item.extra_schema or {}).get("properties", {})
             found = await self._graph.check_item_attributes(
-                request.item_type, item.attributes
+                request.item_type,
+                {k: v for k, v in item.attributes.items() if k not in own},
             )
             listed.extend((number, f"Row {number}, {text}.") for text in found)
         plan = await plan_bundle(
@@ -274,6 +363,8 @@ class InspectItemImport(_ItemImport, UseCase[ItemImportRequest, ItemImportInspec
         """Return the headers, a few rows and a first guess at the mapping."""
         fields = await self._fields(request.item_type)
         table = read_csv(request.data)
+        order = suggest_day_month_order(cell for row in table.rows for cell in row)
+        reading = DayMonthOrder.DAY_FIRST if order is None else order.order
         return ItemImportInspection(
             headers=table.headers,
             sample_rows=table.rows[:_SAMPLE_ROWS],
@@ -281,8 +372,13 @@ class InspectItemImport(_ItemImport, UseCase[ItemImportRequest, ItemImportInspec
             fields=tuple(fields),
             suggested_mapping=tuple(suggest_mapping(table.headers, fields)),
             encoding=table.encoding,
-            day_month_order=suggest_day_month_order(
-                cell for row in table.rows for cell in row
+            day_month_order=order,
+            column_kinds=tuple(
+                ColumnKind(
+                    column=header,
+                    kind=suggest_kind((row[i] for row in table.rows), reading),
+                )
+                for i, header in enumerate(table.headers)
             ),
         )
 

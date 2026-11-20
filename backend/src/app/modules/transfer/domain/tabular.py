@@ -65,15 +65,52 @@ class FieldSpec:
     reason: str | None = None
 
 
+class ExtraFieldKind(StrEnum):
+    """The kinds a column kept as the items' own field can be."""
+
+    TEXT = "text"
+    NUMBER = "number"
+    BOOLEAN = "boolean"
+    DATE = "date"
+    PARTIAL_DATE = "partialdate"
+    CHOICE = "choice"
+
+
+# An item's own fields, as the graph module allows.
+MAX_EXTRA_FIELDS = 50
+# A column kept as a choice offers each different value; past this, keep it as text.
+MAX_CHOICE_OPTIONS = 50
+
+
+@dataclass(kw_only=True, frozen=True)
+class ExtraField:
+    """A field each imported item gets for itself, filled from one column."""
+
+    key: str
+    title: str
+    kind: ExtraFieldKind
+
+
+@dataclass(kw_only=True, frozen=True)
+class ColumnKind:
+    """The kind a column's values suggest, should it be kept as an extra field."""
+
+    column: str
+    kind: ExtraFieldKind
+
+
 @dataclass(kw_only=True, frozen=True)
 class ColumnMapping:
     """Where one column of the file goes.
 
     `target` is `name`, `description`, `tags`, a field key, or `None` to ignore it.
+    With `extra`, the column becomes each item's own field instead, and `target` is
+    `None`.
     """
 
     column: str
     target: str | None
+    extra: ExtraField | None = None
 
 
 @dataclass(kw_only=True, frozen=True)
