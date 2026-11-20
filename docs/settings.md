@@ -42,6 +42,16 @@ Instance backup storage, retention and upload limits.
 | `MENAGERIST_BACKUP_PRUNE_EXPORTS_SCHEDULE` | cron schedule | `0 * * * *` | five fields; empty turns the job off | Cron expression for expiring downloadable data exports. Empty disables the job. Editable in the app's settings unless set here. |
 | `MENAGERIST_BACKUP_MAX_UPLOAD_SIZE` | whole number | `8589934592` | more than 0 | Maximum accepted backup archive upload size in bytes. |
 
+## Branding
+
+How the instance names and describes itself when installed as an app.
+
+| Variable | Type | Default | Allowed values | Notes |
+| --- | --- | --- | --- | --- |
+| `MENAGERIST_BRANDING_NAME` | text | `Menagerist` | any | The name an installed app shows, such as in an app list. Installed apps may keep the old value until the browser next checks the app, which can take a day or more. Editable in the app's settings unless set here. |
+| `MENAGERIST_BRANDING_SHORT_NAME` | text | `Menagerist` | any | The name under an installed app's icon, where there is little room: at most 12 characters. Installed apps may keep the old value until the browser next checks the app, which can take a day or more. Editable in the app's settings unless set here. |
+| `MENAGERIST_BRANDING_DESCRIPTION` | text | empty | any | What the instance is for, shown where a browser offers to install it. Empty uses Menagerist's own description. Editable in the app's settings unless set here. |
+
 ## Database
 
 Database connection settings.

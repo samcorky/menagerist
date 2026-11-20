@@ -2,6 +2,7 @@ from app.platform.config._base import MenageristBaseSettings
 from app.platform.config.api import ApiSettings, get_api_settings
 from app.platform.config.avatars import AvatarSettings, get_avatar_settings
 from app.platform.config.backup import BackupSettings, get_backup_settings
+from app.platform.config.branding import BrandingSettings, get_branding_settings
 from app.platform.config.database import DatabaseSettings, get_database_settings
 from app.platform.config.identity import IdentitySettings, get_identity_settings
 from app.platform.config.identity_cli import (
@@ -29,6 +30,7 @@ INSTANCE_SETTINGS = (
     get_api_settings,
     get_avatar_settings,
     get_backup_settings,
+    get_branding_settings,
     get_database_settings,
     get_identity_settings,
     get_logging_settings,
@@ -47,6 +49,7 @@ ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
     ApiSettings,
     AvatarSettings,
     BackupSettings,
+    BrandingSettings,
     DatabaseSettings,
     IdentitySettings,
     IdentityCliSettings,
@@ -68,6 +71,7 @@ __all__ = [
     "ApiSettings",
     "AvatarSettings",
     "BackupSettings",
+    "BrandingSettings",
     "DatabaseSettings",
     "IdentityCliSettings",
     "IdentitySettings",
@@ -86,6 +90,7 @@ __all__ = [
     "get_api_settings",
     "get_avatar_settings",
     "get_backup_settings",
+    "get_branding_settings",
     "get_database_settings",
     "get_identity_cli_settings",
     "get_identity_settings",

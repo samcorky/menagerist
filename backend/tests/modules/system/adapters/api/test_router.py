@@ -10,10 +10,12 @@ from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
+from app.entrypoints.api.shared import settings_reader
 from app.entrypoints.api.shared.access_guard import RoleAccessGuard, get_access_guard
 from app.entrypoints.api.shared.access_policy import OwnerAccessPolicy
 from app.entrypoints.api.shared.authorisation import RoleAuthorisationAdapter
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.modules.settings.domain.setting import SettingScope, StoredSetting
 from app.modules.system.adapters.api import dependencies
 from app.modules.system.adapters.api.dependencies import (
     get_check_for_updates_use_case,
@@ -69,6 +71,9 @@ if TYPE_CHECKING:
 
     from fastapi import FastAPI
 
+    from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
+        InMemorySettingValueRepository,
+    )
     from app.platform.storage_probe import DirectoryState
 
 _PATCH_GET_ENGINE = f"{database_pool_utilization_check.__name__}.get_engine"
@@ -511,6 +516,43 @@ def test_manifest_revalidates_by_etag() -> None:
     assert fresh.content == b""
     assert fresh.headers["cache-control"] == "no-cache"
     assert stale.status_code == 200
+
+
+async def test_manifest_uses_the_branding_an_administrator_saves(
+    settings_store: InMemorySettingValueRepository,
+) -> None:
+    """A name saved on the settings page is the installed app's on the next fetch."""
+    client = TestClient(create_app())
+    before = client.get("/manifest.webmanifest")
+
+    for key, value in {
+        "branding.name": "The Hoard",
+        "branding.short_name": "Hoard",
+        "branding.description": "Our family's things.",
+    }.items():
+        await settings_store.save(
+            StoredSetting.create(
+                scope=SettingScope.INSTANCE,
+                owner_id=None,
+                key=key,
+                value=value,
+                updated_by=None,
+            )
+        )
+    settings_reader.get_settings_reader().invalidate()
+    after = client.get("/manifest.webmanifest")
+
+    manifest = after.json()
+    assert (manifest["name"], manifest["short_name"]) == ("The Hoard", "Hoard")
+    assert manifest["description"] == "Our family's things."
+    assert after.headers["etag"] != before.headers["etag"]
+
+
+def test_manifest_without_saved_branding_is_menagerist() -> None:
+    """An instance nobody has branded installs as Menagerist."""
+    manifest = TestClient(create_app()).get("/manifest.webmanifest").json()
+
+    assert (manifest["name"], manifest["short_name"]) == ("Menagerist", "Menagerist")
 
 
 def test_manifest_urls_ignore_the_host_header() -> None:
