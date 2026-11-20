@@ -38,8 +38,6 @@
 		supportsExtraFields = false,
 		nodeId,
 		nodeTypeId,
-		nodeCandidates = [],
-		onLinkItem,
 		onPromoted,
 		serverErrors = null,
 		only
@@ -50,8 +48,6 @@
 		supportsExtraFields?: boolean;
 		nodeId?: string;
 		nodeTypeId?: string;
-		nodeCandidates?: { id: string; name: string }[];
-		onLinkItem?: (key: string, item: { id: string; name: string }) => void;
 		onPromoted?: () => void;
 		serverErrors?: Record<string, string> | null;
 		/** Show just these fields of `schema`, flat and in this order, with nothing else (quick capture). */
@@ -304,12 +300,6 @@
 					{#if desc?.kind === 'text' && nodeTypeId}
 						{@const currentValue = typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
 						{@const previousValues = previousValuesByKey[key] ?? []}
-						{@const matchingCandidates =
-							nodeCandidates.length > 0 && onLinkItem
-								? nodeCandidates
-										.filter((c) => c.name.toLowerCase().includes(currentValue.toLowerCase()))
-										.slice(0, 8)
-								: []}
 						<div class="relative">
 							<Input
 								value={currentValue}
@@ -328,7 +318,7 @@
 								aria-label={prop.title || key}
 								aria-invalid={!!error}
 							/>
-							{#if typeaheadOpenKey === key && (previousValues.length > 0 || matchingCandidates.length > 0)}
+							{#if typeaheadOpenKey === key && previousValues.length > 0}
 								<ul class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
 									{#each previousValues as pv (pv.value)}
 										<li>
@@ -342,21 +332,6 @@
 											>
 												<span class="truncate">{pv.value}</span>
 												<span class="ml-2 shrink-0 text-xs text-muted-foreground">{pv.count}</span>
-											</button>
-										</li>
-									{/each}
-									{#each matchingCandidates as candidate (candidate.id)}
-										<li>
-											<button
-												type="button"
-												class="flex w-full items-center rounded px-2 py-1.5 text-sm hover:bg-accent"
-												onmousedown={() => {
-													onLinkItem?.(key, candidate);
-													setValue(key, '');
-													typeaheadOpenKey = null;
-												}}
-											>
-												<span class="truncate">{candidate.name}</span>
 											</button>
 										</li>
 									{/each}
