@@ -17,6 +17,7 @@
 		List,
 		Pencil,
 		Plus,
+		Share,
 		SlidersHorizontal,
 		TriangleAlert,
 		SearchX,
@@ -26,6 +27,7 @@
 	import { tick, untrack } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
+	import { absoluteUrl, shareLinkWithFeedback } from '$lib/share';
 	import {
 		addItemsToCollection,
 		countNodeTypes,
@@ -337,6 +339,12 @@
 		const outcome = await toggleHomeCollection(collection.id);
 		if (outcome.ok) toast.success(shown ? 'Shown on Home' : 'Removed from Home');
 		else toast.error(outcome.message);
+	}
+
+	function handleShare() {
+		if (!collection) return;
+		const url = absoluteUrl(resolve('/collections/[id]', collectionRouteParams(collection)));
+		void shareLinkWithFeedback({ title: collection.name, url });
 	}
 
 	/** Save the collection, with its items when it is a manual one, as a file to import again. */
@@ -1112,6 +1120,9 @@
 						onclick={toggleOnHome}
 					>
 						<HousePlus />
+					</IconButton>
+					<IconButton label="Share" variant="outline" onclick={handleShare}>
+						<Share />
 					</IconButton>
 					<IconButton label="Edit" variant="outline" onclick={openEdit}>
 						<Pencil />
