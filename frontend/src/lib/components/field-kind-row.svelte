@@ -5,7 +5,6 @@
 	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
 	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
 	import type { EditorField } from '$lib/schema-types';
-	import FieldOptionsMenu from '$lib/components/field-options-menu.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { fieldChips } from '$lib/field-flags';
 
@@ -19,8 +18,9 @@
 		field: EditorField;
 		allowGroup?: boolean;
 		/**
-		 * Put Required and the type-level switches (quick capture, barcodes) in a field menu, with
-		 * chips for what is on; not for a single item's fields, which keep the Required checkbox.
+		 * Required and the type-level switches (quick capture, barcodes) live in the field's actions
+		 * menu, so show chips for what is on instead of the Required checkbox. Not for a single
+		 * item's fields, which keep the checkbox.
 		 */
 		showFlags?: boolean;
 		onLabelChange: (value: string) => void;
@@ -83,9 +83,7 @@
 			</NativeSelect>
 		</span>
 	{/each}
-	{#if showFlags}
-		<FieldOptionsMenu {field} onChange={onFieldChange} />
-	{:else}
+	{#if !showFlags}
 		<label class="flex items-center gap-1.5 text-sm">
 			<input
 				type="checkbox"

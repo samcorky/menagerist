@@ -60,10 +60,7 @@ export async function createItemType(
 			await form.getByLabel('Field type').last().selectOption(field.kind);
 		}
 		if (field.capture) {
-			await form
-				.getByRole('button', { name: /^Field options for/ })
-				.last()
-				.click();
+			await form.getByRole('button', { name: 'More field actions' }).last().click();
 			await page.getByRole('menuitemcheckbox', { name: 'Show in quick capture' }).click();
 			await page.keyboard.press('Escape');
 			await expect(page.getByRole('menu')).toBeHidden();

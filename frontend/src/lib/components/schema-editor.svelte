@@ -54,6 +54,7 @@
 	import SavePresetDialog from '$lib/components/save-preset-dialog.svelte';
 	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
 	import FieldKindRow from '$lib/components/field-kind-row.svelte';
+	import FieldFlagItems from '$lib/components/field-flag-items.svelte';
 
 	let {
 		schema = $bindable<AttributesSchema | null>(null),
@@ -454,7 +455,7 @@
 					<Pin class="size-4 {pinned ? 'fill-current' : ''}" />
 				</Button>
 			{/if}
-			{#if field.kind !== 'opaque'}
+			{#if field.kind !== 'opaque' || fieldFlags}
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
@@ -470,16 +471,27 @@
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content align="end">
-						{#if !field.keyPending}
-							<DropdownMenu.Item onSelect={onReplace}>
-								<Replace class="size-4" />
-								Replace field
+						{#if fieldFlags}
+							<FieldFlagItems
+								{field}
+								onChange={(next) => onFieldChange(handleFieldRowChange(field, next))}
+							/>
+						{/if}
+						{#if field.kind !== 'opaque'}
+							{#if fieldFlags}
+								<DropdownMenu.Separator />
+							{/if}
+							{#if !field.keyPending}
+								<DropdownMenu.Item onSelect={onReplace}>
+									<Replace class="size-4" />
+									Replace field
+								</DropdownMenu.Item>
+							{/if}
+							<DropdownMenu.Item onSelect={() => (savingField = field)}>
+								<BookmarkPlus class="size-4" />
+								Save field for reuse
 							</DropdownMenu.Item>
 						{/if}
-						<DropdownMenu.Item onSelect={() => (savingField = field)}>
-							<BookmarkPlus class="size-4" />
-							Save field for reuse
-						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			{/if}

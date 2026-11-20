@@ -11,7 +11,7 @@
 		Pencil,
 		Trash2,
 		Upload,
-		Ellipsis,
+		MoreVertical,
 		Library
 	} from '@lucide/svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
@@ -513,7 +513,7 @@
 							class="pointer-coarse:size-11"
 							aria-label="More actions for {preset.label}"
 						>
-							<Ellipsis class="size-4" />
+							<MoreVertical class="size-4" />
 						</Button>
 					{/snippet}
 				</DropdownMenu.Trigger>
@@ -590,7 +590,7 @@
 							class="pointer-coarse:size-11"
 							aria-label="More actions"
 						>
-							<Ellipsis class="size-4" />
+							<MoreVertical class="size-4" />
 						</Button>
 					{/snippet}
 				</DropdownMenu.Trigger>
