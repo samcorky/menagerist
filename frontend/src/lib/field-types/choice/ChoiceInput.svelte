@@ -87,7 +87,9 @@
 			<ChevronDown class="size-4 shrink-0 text-muted-foreground" />
 		</Select.Trigger>
 		<Select.Content
-			class="z-50 max-h-60 min-w-[8rem] overflow-auto rounded-2xl bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
+			align="start"
+			sideOffset={4}
+			class="z-50 max-h-60 min-w-(--bits-select-anchor-width) overflow-auto rounded-2xl bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10"
 		>
 			<Select.Item
 				value=""
