@@ -35,10 +35,18 @@ export function manualInstall(env: InstallEnvironment): ManualInstall | null {
 	return null;
 }
 
+/** What happened to the browser's install prompt once it was shown. */
+export type InstallChoice = 'waiting' | 'accepted' | 'dismissed';
+
 class InstallPromptController {
 	/** The kept `beforeinstallprompt` event; `null` until one fires and again once it is used. */
 	event = $state<BeforeInstallPromptEvent | null>(null);
 	manual = $state<ManualInstall | null>(null);
+	/**
+	 * Where the shown prompt stands, so a page does not claim the browser cannot install the app
+	 * while the browser's own dialog is open, or after it was closed. `null` until one is shown.
+	 */
+	choice = $state<InstallChoice | null>(null);
 
 	canPrompt = $derived(this.event !== null);
 	/** Something can be offered: the native prompt or the manual steps, and not installed yet. */
@@ -55,8 +63,13 @@ class InstallPromptController {
 			// Hold the browser's own mini prompt back; the Install button shows it instead.
 			event.preventDefault();
 			this.event = event as BeforeInstallPromptEvent;
+			// The browser offers the app again, as it does in time after a closed prompt.
+			this.choice = null;
 		};
-		const onInstalled = () => (this.event = null);
+		const onInstalled = () => {
+			this.event = null;
+			this.choice = 'accepted';
+		};
 		env.addEventListener('beforeinstallprompt', onPrompt);
 		env.addEventListener('appinstalled', onInstalled);
 		return () => {
@@ -70,8 +83,11 @@ class InstallPromptController {
 		const event = this.event;
 		if (!event) return null;
 		this.event = null;
+		this.choice = 'waiting';
 		await event.prompt();
-		return (await event.userChoice).outcome;
+		const { outcome } = await event.userChoice;
+		this.choice = outcome;
+		return outcome;
 	}
 }
 

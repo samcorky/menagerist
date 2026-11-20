@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { installPrompt, manualInstall } from '../src/lib/install-prompt.svelte';
 import { displayMode } from '../src/lib/display-mode.svelte';
 
@@ -65,6 +65,12 @@ function installEvent(outcome: 'accepted' | 'dismissed') {
 }
 
 describe('installPrompt', () => {
+	// One controller serves the whole app, so each test starts it from scratch.
+	beforeEach(() => {
+		installPrompt.event = null;
+		installPrompt.choice = null;
+	});
+
 	it('keeps the browser event, shows it once on request and then lets go of it', async () => {
 		const { env, listeners } = fakeWindow(WINDOWS_EDGE);
 		const stop = installPrompt.init(env);
@@ -84,12 +90,33 @@ describe('installPrompt', () => {
 		expect(listeners.size).toBe(0);
 	});
 
+	it('says where the shown prompt stands, so a page never claims the browser cannot install', async () => {
+		const { env, listeners } = fakeWindow(WINDOWS_EDGE);
+		const stop = installPrompt.init(env);
+		expect(installPrompt.choice).toBeNull();
+
+		listeners.get('beforeinstallprompt')!(installEvent('dismissed').event);
+		const shown = installPrompt.prompt();
+		// While the browser's dialog is open the event is already spent.
+		expect(installPrompt.canPrompt).toBe(false);
+		expect(installPrompt.choice).toBe('waiting');
+		await shown;
+		expect(installPrompt.choice).toBe('dismissed');
+
+		// The browser offers the app again later, and the button comes back.
+		listeners.get('beforeinstallprompt')!(installEvent('accepted').event);
+		expect(installPrompt.choice).toBeNull();
+		expect(installPrompt.canPrompt).toBe(true);
+		stop();
+	});
+
 	it('forgets the event once the app is installed', () => {
 		const { env, listeners } = fakeWindow(WINDOWS_EDGE);
 		const stop = installPrompt.init(env);
 		listeners.get('beforeinstallprompt')!(installEvent('accepted').event);
 		listeners.get('appinstalled')!(new Event('appinstalled'));
 		expect(installPrompt.canPrompt).toBe(false);
+		expect(installPrompt.choice).toBe('accepted');
 		stop();
 	});
 
