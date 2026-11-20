@@ -97,6 +97,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         "description": "Read and change instance settings, and fetch their schema.",
     },
     {
+        "name": "Personal settings",
+        "description": "Read and change your own preferences, and fetch their schema.",
+    },
+    {
         "name": "System",
         "description": "System-level endpoints for health checks and diagnostics.",
     },

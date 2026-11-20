@@ -1,5 +1,3 @@
-import hashlib
-import json
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, Request, Response
@@ -8,6 +6,7 @@ from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.parameters import IfNoneMatch
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
+from app.modules.settings.adapters.api.caching import REVALIDATE, etag, not_modified
 from app.modules.settings.adapters.api.dependencies import (
     get_get_settings_schema_use_case,
     get_list_settings_use_case,
@@ -56,8 +55,6 @@ _INVALID = error_response(
     detail="Invalid value for backup.keep_last: greater than or equal to 1 expected",
 )
 
-# The schema changes only between releases; clients revalidate cheaply.
-_REVALIDATE = "private, no-cache"
 
 # Both bodies are open-ended maps, which Swagger renders as `additionalProp1`, so each
 # carries explicit examples at the media-type level.
@@ -119,18 +116,6 @@ _SCHEMA_200: dict[int | str, dict[str, Any]] = {
 }
 
 
-def _etag(schema: dict[str, object]) -> str:
-    body = json.dumps(schema, sort_keys=True, separators=(",", ":")).encode()
-    return f'"{hashlib.sha256(body).hexdigest()[:32]}"'
-
-
-def _not_modified(header: str | None, etag: str) -> bool:
-    if not header:
-        return False
-    candidates = [part.strip() for part in header.split(",")]
-    return "*" in candidates or any(c.removeprefix("W/") == etag for c in candidates)
-
-
 @router.get(
     "/schema",
     response_model=dict[str, object],
@@ -154,9 +139,9 @@ async def get_settings_schema(
     The document only changes between releases, so it carries an `ETag`.
     """
     schema = await use_case.handle(GetSettingsSchemaQuery(), actor)
-    etag = _etag(schema)
-    headers = {"ETag": etag, "Cache-Control": _REVALIDATE}
-    if _not_modified(if_none_match, etag):
+    tag = etag(schema)
+    headers = {"ETag": tag, "Cache-Control": REVALIDATE}
+    if not_modified(if_none_match, tag):
         return Response(status_code=304, headers=headers)
     response.headers.update(headers)
     return schema

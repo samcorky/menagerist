@@ -89,6 +89,8 @@ export function sourceLabel(item: Pick<SettingResponse, 'source'>): string {
 	switch (item.source) {
 		case 'env':
 			return 'Set by your deployment';
+		case 'env_default':
+			return "This server's default";
 		case 'instance':
 		case 'user':
 			return 'Changed here';

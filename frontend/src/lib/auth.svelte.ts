@@ -13,6 +13,7 @@ import { registerAuthHandlers, resetAuthEvents } from '$lib/api/auth-events';
 import { clearAllEtags } from '$lib/api/etagStore';
 import { clearDrafts, saveDrafts } from '$lib/drafts';
 import { OFFLINE_MESSAGE } from '$lib/offline';
+import { preferences } from '$lib/preferences.svelte';
 import {
 	authErrorMessage,
 	DISPLAY_NAME_MESSAGE,
@@ -224,6 +225,7 @@ class AuthController {
 	private clearSession(): void {
 		this.user = null;
 		this.permissions = new Set();
+		preferences.clear();
 		clearAllEtags();
 	}
 
@@ -238,6 +240,8 @@ class AuthController {
 			// An expired password makes content routes answer 403, so skip the call.
 			const permissions = me.data.password_expired ? null : await getMyPermissions();
 			this.user = me.data;
+			// Not awaited: the kept copy applies at once and the app needn't wait for the rest.
+			if (!me.data.password_expired) void preferences.load(me.data.id);
 			this.permissions =
 				!permissions || permissions.error || !permissions.data
 					? new Set()

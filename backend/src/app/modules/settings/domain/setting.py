@@ -24,6 +24,8 @@ class SettingSource(StrEnum):
     """Which layer supplied the effective value."""
 
     DEFAULT = "default"
+    # A per-person setting's default, supplied by the deployment's environment.
+    ENV_DEFAULT = "env_default"
     INSTANCE = "instance"
     USER = "user"
     ENV = "env"
@@ -43,6 +45,10 @@ class SettingDescriptor:
     # JSON Schema of the value, with `x-menagerist` hints; rendered by the form.
     schema: dict[str, object] = field(default_factory=dict)
     env_name: str | None = None
+    # Stored and synced like any other, but not offered on a settings form.
+    hidden: bool = False
+    # The deployment's environment supplies `default` (per-person settings only).
+    default_from_env: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -116,7 +122,10 @@ def resolve(
     stored: SettingValue | None,
     is_valid: Callable[[SettingValue], bool],
 ) -> ResolvedSetting:
-    """Combine the layers: deployment pin, then the stored value, then the default."""
+    """Combine the layers: deployment pin, then the stored value, then the default.
+
+    A per-person setting is never pinned: the environment supplies its default.
+    """
     if pin is not None:
         return ResolvedSetting(
             descriptor=descriptor,
@@ -141,7 +150,11 @@ def resolve(
     return ResolvedSetting(
         descriptor=descriptor,
         value=descriptor.default,
-        source=SettingSource.DEFAULT,
+        source=(
+            SettingSource.ENV_DEFAULT
+            if descriptor.default_from_env
+            else SettingSource.DEFAULT
+        ),
         locked=False,
         env_name=descriptor.env_name,
         stored_invalid=stored is not None,

@@ -5,7 +5,7 @@
 	import * as Calendar from './index.js';
 	import type { ButtonVariant } from '../button/button.svelte';
 	import type { Snippet } from 'svelte';
-	import { FIRST_DAY_OF_WEEK } from '$lib/calendar-settings';
+	import { firstDayOfWeek } from '$lib/calendar-settings';
 
 	let {
 		ref = $bindable(null),
@@ -13,7 +13,7 @@
 		placeholder = $bindable(),
 		class: className,
 		weekdayFormat = 'short',
-		weekStartsOn = FIRST_DAY_OF_WEEK,
+		weekStartsOn = firstDayOfWeek(),
 		buttonVariant = 'ghost',
 		captionLayout = 'label',
 		locale = 'en-US',

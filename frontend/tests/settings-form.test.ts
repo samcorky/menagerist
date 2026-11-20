@@ -32,6 +32,7 @@ function setting(over: Partial<SettingResponse>): SettingResponse {
 		env_name: 'MENAGERIST_BACKUP_SCHEDULE',
 		restart_required: false,
 		stored_invalid: false,
+		hidden: false,
 		...over
 	};
 }
@@ -82,6 +83,7 @@ describe('notes', () => {
 		expect(sourceLabel({ source: 'env' })).toBe('Set by your deployment');
 		expect(sourceLabel({ source: 'instance' })).toBe('Changed here');
 		expect(sourceLabel({ source: 'default' })).toBe('Default');
+		expect(sourceLabel({ source: 'env_default' })).toBe("This server's default");
 	});
 
 	it('names the variable when the deployment sets a value', () => {

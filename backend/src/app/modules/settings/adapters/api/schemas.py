@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.settings.application.update_my_settings import UpdateMySettingsCommand
 from app.modules.settings.application.update_settings import UpdateSettingsCommand
 from app.modules.settings.domain.setting import ResolvedSetting  # noqa: TC001
 from app.platform.request_model import RequestModel
@@ -31,6 +32,7 @@ class SettingResponse(BaseModel):
                     "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                     "restart_required": False,
                     "stored_invalid": False,
+                    "hidden": False,
                 }
             ]
         }
@@ -43,8 +45,11 @@ class SettingResponse(BaseModel):
         description="What it does; null if the title says enough."
     )
     value: SettingJson = Field(description="The effective value.")
-    source: Literal["default", "instance", "user", "env"] = Field(
-        description="Which layer supplied the value."
+    source: Literal["default", "env_default", "instance", "user", "env"] = Field(
+        description=(
+            "Which layer supplied the value. `env_default` is a per-person "
+            + "setting's default that the deployment sets through `env_name`."
+        )
     )
     locked: bool = Field(
         description="True when the deployment sets the value, so it cannot be changed."
@@ -57,6 +62,12 @@ class SettingResponse(BaseModel):
     )
     stored_invalid: bool = Field(
         description="True when a saved value no longer validates and is being ignored."
+    )
+    hidden: bool = Field(
+        description=(
+            "True for a per-person setting changed elsewhere in the app, so not "
+            + "offered on a settings form."
+        )
     )
 
     @classmethod
@@ -74,6 +85,7 @@ class SettingResponse(BaseModel):
             env_name=resolved.env_name,
             restart_required=descriptor.restart_required,
             stored_invalid=resolved.stored_invalid,
+            hidden=descriptor.hidden,
         )
 
 
@@ -95,3 +107,7 @@ class UpdateSettingsRequest(RequestModel):
     def to_command(self) -> UpdateSettingsCommand:
         """Convert to the use case's command."""
         return UpdateSettingsCommand(values=self.values)
+
+    def to_own_command(self) -> UpdateMySettingsCommand:
+        """Convert to the per-person use case's command."""
+        return UpdateMySettingsCommand(values=self.values)

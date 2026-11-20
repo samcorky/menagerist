@@ -8,13 +8,8 @@ import structlog
 
 from app.modules.settings.application.permissions import SettingsPermission
 from app.modules.settings.application.resolution import resolve_setting
-from app.modules.settings.domain.errors import SettingLockedError, UnknownSettingError
-from app.modules.settings.domain.setting import (
-    ResolvedSetting,
-    SettingScope,
-    SettingValue,
-    StoredSetting,
-)
+from app.modules.settings.application.saving import check_values, save_values
+from app.modules.settings.domain.setting import ResolvedSetting, SettingScope
 from app.modules.settings.ports.unit_of_work import SettingsUnitOfWork
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -58,33 +53,12 @@ class UpdateSettings(
     async def _handle(
         self, request: UpdateSettingsCommand, actor: Actor
     ) -> list[ResolvedSetting]:
-        checked: dict[str, SettingValue] = {}
-        for key, raw in request.values.items():
-            descriptor = self._catalogue.descriptor(key)
-            if descriptor.scope is not SettingScope.INSTANCE:
-                raise UnknownSettingError(key)
-            pin = self._catalogue.pin(key)
-            if pin is not None:
-                raise SettingLockedError(key, pin.env_name)
-            checked[key] = self._catalogue.normalise(key, raw)
-
+        checked = check_values(self._catalogue, SettingScope.INSTANCE, request.values)
         editor = None if actor.id == SYSTEM_ACTOR.id else actor.id
         async with self._uow as repos:
-            saved = await repos.values.list(SettingScope.INSTANCE, None)
-            for key, value in checked.items():
-                row = saved.get(key)
-                if row is None:
-                    row = StoredSetting.create(
-                        scope=SettingScope.INSTANCE,
-                        owner_id=None,
-                        key=key,
-                        value=value,
-                        updated_by=editor,
-                    )
-                else:
-                    row.change(value, editor)
-                await repos.values.save(row)
-                saved[key] = row
+            saved = await save_values(
+                repos.values, SettingScope.INSTANCE, None, checked, editor
+            )
             await self._uow.commit()
         if self._on_changed is not None:
             self._on_changed()

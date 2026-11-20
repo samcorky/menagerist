@@ -64,6 +64,9 @@ from app.modules.media.adapters.api.media.router import (
 from app.modules.presets.adapters.api.preset.router import router as preset_router
 from app.modules.scheduling.adapters.api.router import router as scheduling_router
 from app.modules.search.adapters.api.router import router as search_router
+from app.modules.settings.adapters.api.me_router import (
+    router as personal_settings_router,
+)
 from app.modules.settings.adapters.api.router import router as settings_router
 from app.modules.system.adapters.api.dependencies import get_branding
 from app.modules.system.adapters.api.router import (
@@ -110,6 +113,7 @@ api_v1_router.include_router(node_media_router)
 api_v1_router.include_router(preset_router)
 api_v1_router.include_router(scheduling_router)
 api_v1_router.include_router(settings_router)
+api_v1_router.include_router(personal_settings_router)
 api_v1_router.include_router(search_router)
 api_v1_router.include_router(example_router)
 api_v1_router.include_router(catalogue_router)

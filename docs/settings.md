@@ -4,206 +4,220 @@
 
 Every deployment setting is an environment variable. Put the ones you change in a `.env` file next to `compose.yaml`; [`.env.example`](../.env.example) lists them all with their defaults. A list is comma-separated, and a sensitive value (a secret or a URL with credentials) has no default here. Any setting can instead be read from a file named after its variable in `/run/secrets` (Docker and Compose secrets mount there); the environment variable wins when both are set. See [Secrets from files](DEPLOYING.md#secrets-from-files).
 
+The **In the app** column says what setting a variable does:
+
+- **Deployment only**: it can only be set here.
+- **Admin setting**: administrators can change it on the Admin settings page. Setting it here locks it there.
+- **Personal**: each person chooses their own on their Preferences page. Setting it here changes only the default for people who haven't chosen.
+
 The Docker image sets `MENAGERIST_API_FRONTEND_DIST_PATH=/app/frontend` and `MENAGERIST_SERVER_IN_CONTAINER=1` itself, so in a container those two differ from the defaults listed here.
 
 ## API
 
 API entrypoint settings.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_API_PUBLIC_ORIGIN` | origin | unset | any | The address people reach the app at, for example https://menagerist.example.com. Other settings default from it; each can still be set explicitly. |
-| `MENAGERIST_API_CORS_ORIGINS` | comma-separated list of origins | empty | `*` on its own | Browser origins; empty means same-origin, '*' means any origin. |
-| `MENAGERIST_API_FRONTEND_DIST_PATH` | path | unset | any | Built frontend directory; unset in API-only mode. |
-| `MENAGERIST_API_TRUSTED_PROXIES` | comma-separated list of IP addresses or networks | `127.0.0.1` | `*` on its own | Trusted proxy IPs/CIDRs (CSV); '*' trusts all peers. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_API_PUBLIC_ORIGIN` | origin | unset | any | Deployment only | The address people reach the app at, for example https://menagerist.example.com. Other settings default from it; each can still be set explicitly. |
+| `MENAGERIST_API_CORS_ORIGINS` | comma-separated list of origins | empty | `*` on its own | Deployment only | Browser origins; empty means same-origin, '*' means any origin. |
+| `MENAGERIST_API_FRONTEND_DIST_PATH` | path | unset | any | Deployment only | Built frontend directory; unset in API-only mode. |
+| `MENAGERIST_API_TRUSTED_PROXIES` | comma-separated list of IP addresses or networks | `127.0.0.1` | `*` on its own | Deployment only | Trusted proxy IPs/CIDRs (CSV); '*' trusts all peers. |
 
 ## Avatars
 
 Where Random cat gets its cats.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_AVATARS_CAT_SERVICE_ENABLED` | true or false | `true` | any | Whether this instance ever contacts the cat service for Random cat. Off makes the button draw a cat in the browser instead. Set by the deployment, so an administrator cannot turn it back on from the interface. |
-| `MENAGERIST_AVATARS_CAT_SERVICE_URL` | text | `https://cataas.com` | any | Base address of a cataas-compatible service. The server asks it for `/avatar/<random seed>` and stores the reply like an upload; browsers never contact it. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_AVATARS_CAT_SERVICE_ENABLED` | true or false | `true` | any | Deployment only | Whether this instance ever contacts the cat service for Random cat. Off makes the button draw a cat in the browser instead. Set by the deployment, so an administrator cannot turn it back on from the interface. |
+| `MENAGERIST_AVATARS_CAT_SERVICE_URL` | text | `https://cataas.com` | any | Deployment only | Base address of a cataas-compatible service. The server asks it for `/avatar/<random seed>` and stores the reply like an upload; browsers never contact it. |
 
 ## Backup
 
 Instance backup storage, retention and upload limits.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_BACKUP_PATH` | path | `/data/backups` | any | Directory used to store instance backup archives. |
-| `MENAGERIST_BACKUP_STAGING_PATH` | path | unset | any | Directory for the temporary copies a restore or upload makes, such as the original files it can put back if the restore fails. Unset keeps them in a .staging folder inside the backup directory. Set it when the backup directory is read-only or short of space; it needs room for your media and must be writable by the app. Menagerist keeps its files in a backup-staging folder inside it. |
-| `MENAGERIST_BACKUP_USER_EXPORT_TTL_HOURS` | whole number (hours) | `24` | more than 0 | Hours to retain a person's downloadable data export. Editable in the app's settings unless set here. |
-| `MENAGERIST_BACKUP_BEFORE_MIGRATE` | true or false | `true` | any | Create a backup before applying database migrations. Enabled by default. |
-| `MENAGERIST_BACKUP_KEEP_LAST` | whole number | `7` | 1 or more | Minimum number of ordinary backups to retain. Editable in the app's settings unless set here. |
-| `MENAGERIST_BACKUP_PRE_MIGRATION_KEEP` | whole number | `3` | 1 or more | Minimum number of pre-migration backups to retain. |
-| `MENAGERIST_BACKUP_SCHEDULE` | cron schedule | `0 3 * * *` | five fields; empty turns the job off | Cron expression for scheduled backups in the instance timezone. Empty disables scheduled backups; each success is followed by retention. Editable in the app's settings unless set here. |
-| `MENAGERIST_BACKUP_PRUNE_EXPORTS_SCHEDULE` | cron schedule | `0 * * * *` | five fields; empty turns the job off | Cron expression for expiring downloadable data exports. Empty disables the job. Editable in the app's settings unless set here. |
-| `MENAGERIST_BACKUP_MAX_UPLOAD_SIZE` | whole number | `8589934592` | more than 0 | Maximum accepted backup archive upload size in bytes. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_BACKUP_PATH` | path | `/data/backups` | any | Deployment only | Directory used to store instance backup archives. |
+| `MENAGERIST_BACKUP_STAGING_PATH` | path | unset | any | Deployment only | Directory for the temporary copies a restore or upload makes, such as the original files it can put back if the restore fails. Unset keeps them in a .staging folder inside the backup directory. Set it when the backup directory is read-only or short of space; it needs room for your media and must be writable by the app. Menagerist keeps its files in a backup-staging folder inside it. |
+| `MENAGERIST_BACKUP_USER_EXPORT_TTL_HOURS` | whole number (hours) | `24` | more than 0 | Admin setting | Hours to retain a person's downloadable data export. |
+| `MENAGERIST_BACKUP_BEFORE_MIGRATE` | true or false | `true` | any | Deployment only | Create a backup before applying database migrations. Enabled by default. |
+| `MENAGERIST_BACKUP_KEEP_LAST` | whole number | `7` | 1 or more | Admin setting | Minimum number of ordinary backups to retain. |
+| `MENAGERIST_BACKUP_PRE_MIGRATION_KEEP` | whole number | `3` | 1 or more | Deployment only | Minimum number of pre-migration backups to retain. |
+| `MENAGERIST_BACKUP_SCHEDULE` | cron schedule | `0 3 * * *` | five fields; empty turns the job off | Admin setting | Cron expression for scheduled backups in the instance timezone. Empty disables scheduled backups; each success is followed by retention. |
+| `MENAGERIST_BACKUP_PRUNE_EXPORTS_SCHEDULE` | cron schedule | `0 * * * *` | five fields; empty turns the job off | Admin setting | Cron expression for expiring downloadable data exports. Empty disables the job. |
+| `MENAGERIST_BACKUP_MAX_UPLOAD_SIZE` | whole number | `8589934592` | more than 0 | Deployment only | Maximum accepted backup archive upload size in bytes. |
 
 ## Branding
 
 How the instance names and describes itself when installed as an app.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_BRANDING_NAME` | text | `Menagerist` | any | The name an installed app shows, such as in an app list. Installed apps may keep the old value until the browser next checks the app, which can take a day or more. Editable in the app's settings unless set here. |
-| `MENAGERIST_BRANDING_SHORT_NAME` | text | `Menagerist` | any | The name under an installed app's icon, where there is little room: at most 12 characters. Installed apps may keep the old value until the browser next checks the app, which can take a day or more. Editable in the app's settings unless set here. |
-| `MENAGERIST_BRANDING_DESCRIPTION` | text | empty | any | What the instance is for, shown where a browser offers to install it. Empty uses Menagerist's own description. Editable in the app's settings unless set here. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_BRANDING_NAME` | text | `Menagerist` | any | Admin setting | The name an installed app shows, such as in an app list. Installed apps may keep the old value until the browser next checks the app, which can take a day or more. |
+| `MENAGERIST_BRANDING_SHORT_NAME` | text | `Menagerist` | any | Admin setting | The name under an installed app's icon, where there is little room: at most 12 characters. Installed apps may keep the old value until the browser next checks the app, which can take a day or more. |
+| `MENAGERIST_BRANDING_DESCRIPTION` | text | empty | any | Admin setting | What the instance is for, shown where a browser offers to install it. Empty uses Menagerist's own description. |
+
+## Calendar
+
+How calendars lay out weeks. People choose; the deployment sets defaults.
+
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_CALENDAR_FIRST_DAY` | text | `automatic` | `automatic`, `monday`, `sunday`, `saturday` | Personal | The day calendars start each week on. Automatic uses your region's usual start. |
 
 ## Database
 
 Database connection settings.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_DATABASE_URL` | database URL | `postgresql+asyncpg://menagerist:***@localhost:5432/menagerist` | any | PostgreSQL connection URL for the backend database. When set, it replaces the host, port, user, password and name settings; use it for query options such as TLS mode. Sensitive: best given as a secrets file. |
-| `MENAGERIST_DATABASE_HOST` | text | `localhost` | any | Database server host name or address. |
-| `MENAGERIST_DATABASE_PORT` | whole number | `5432` | 1 to 65535 | Database server port. |
-| `MENAGERIST_DATABASE_USER` | text | `menagerist` | any | Database user to connect as. |
-| `MENAGERIST_DATABASE_PASSWORD` | secret | none (sensitive) | any | Database password; any characters, no URL encoding. Sensitive: best given as a secrets file. |
-| `MENAGERIST_DATABASE_NAME` | text | `menagerist` | any | Name of the database to use. |
-| `MENAGERIST_DATABASE_POOL_SIZE` | whole number | `5` | 1 or more | Database connections each process (every web worker, and the background worker) keeps open in its pool. |
-| `MENAGERIST_DATABASE_MAX_OVERFLOW` | whole number | `10` | 0 or more | Extra database connections each process may open beyond the pool under load, closed again when idle. 0 caps a process at the pool size. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_DATABASE_URL` | database URL | `postgresql+asyncpg://menagerist:***@localhost:5432/menagerist` | any | Deployment only | PostgreSQL connection URL for the backend database. When set, it replaces the host, port, user, password and name settings; use it for query options such as TLS mode. Sensitive: best given as a secrets file. |
+| `MENAGERIST_DATABASE_HOST` | text | `localhost` | any | Deployment only | Database server host name or address. |
+| `MENAGERIST_DATABASE_PORT` | whole number | `5432` | 1 to 65535 | Deployment only | Database server port. |
+| `MENAGERIST_DATABASE_USER` | text | `menagerist` | any | Deployment only | Database user to connect as. |
+| `MENAGERIST_DATABASE_PASSWORD` | secret | none (sensitive) | any | Deployment only | Database password; any characters, no URL encoding. Sensitive: best given as a secrets file. |
+| `MENAGERIST_DATABASE_NAME` | text | `menagerist` | any | Deployment only | Name of the database to use. |
+| `MENAGERIST_DATABASE_POOL_SIZE` | whole number | `5` | 1 or more | Deployment only | Database connections each process (every web worker, and the background worker) keeps open in its pool. |
+| `MENAGERIST_DATABASE_MAX_OVERFLOW` | whole number | `10` | 0 or more | Deployment only | Extra database connections each process may open beyond the pool under load, closed again when idle. 0 caps a process at the pool size. |
 
 ## Identity
 
 Configuration for the identity module.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_IDENTITY_SESSION_TTL_HOURS` | whole number | `168` | 1 or more | Maximum lifetime of a session in hours, even while it is active. |
-| `MENAGERIST_IDENTITY_SESSION_IDLE_HOURS` | whole number | `0` | 0 or more | Idle timeout in hours; 0 disables this limit. |
-| `MENAGERIST_IDENTITY_PURGE_EXPIRED_SCHEDULE` | cron schedule | `15 4 * * *` | five fields; empty turns the job off | Cron expression for removing expired sessions, API tokens and devices in the instance timezone. Empty disables the job. Editable in the app's settings unless set here. |
-| `MENAGERIST_IDENTITY_COOKIE_NAME` | text | `menagerist-session` | matching `` ^[!#$%&'*+\-.^_`\|~0-9A-Za-z]+$ `` | Name of the HTTP-only session cookie. |
-| `MENAGERIST_IDENTITY_DEVICE_COOKIE_NAME` | text | `menagerist-device` | matching `` ^[!#$%&'*+\-.^_`\|~0-9A-Za-z]+$ `` | Name of the HTTP-only cookie that remembers a signed-in browser; it is kept on sign-out. |
-| `MENAGERIST_IDENTITY_DEVICE_TTL_DAYS` | whole number | `365` | 1 or more | Days a browser stays remembered after its last sign-in, for the device sign-in limit and the devices list. |
-| `MENAGERIST_IDENTITY_COOKIE_SECURE` | text | `auto` | `auto`, `origin`, `always`, `never` | Secure session cookies: auto detects HTTPS from each request, origin follows the scheme of api.public_origin, always and never force it. |
-| `MENAGERIST_IDENTITY_PASSWORD_HASHER` | text | `scrypt` | `scrypt` | Password-hashing scheme used for newly created password hashes. |
-| `MENAGERIST_IDENTITY_SIGN_IN_USERNAME_ATTEMPTS` | whole number | `5` | 1 or more | Failed sign-ins allowed per username in each throttle window. |
-| `MENAGERIST_IDENTITY_SIGN_IN_DEVICE_ATTEMPTS` | whole number | `20` | 1 or more | Failed sign-ins allowed per window from a remembered browser, counted apart from the username's limit so others cannot lock it out. |
-| `MENAGERIST_IDENTITY_SIGN_IN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed sign-ins allowed per IP address in each throttle window. |
-| `MENAGERIST_IDENTITY_API_TOKEN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Failed API-token checks allowed per IP address per window. |
-| `MENAGERIST_IDENTITY_SIGN_IN_WINDOW_MINUTES` | whole number | `15` | 1 or more | Duration of the failed sign-in throttle window in minutes. |
-| `MENAGERIST_IDENTITY_PASSWORD_HASH_CONCURRENCY` | whole number | `2` | 1 or more | Maximum number of simultaneous password-hash operations in this process. |
-| `MENAGERIST_IDENTITY_API_TOKEN_DEFAULT_DAYS` | whole number | `90` | 1 or more | Lifetime in days offered for a new API token. |
-| `MENAGERIST_IDENTITY_API_TOKEN_MAX_DAYS` | whole number | `365` | 1 or more | Longest lifetime in days an API token may be given. |
-| `MENAGERIST_IDENTITY_API_TOKENS_PER_USER` | whole number | `20` | 1 or more | Most active API tokens one person may hold. |
-| `MENAGERIST_IDENTITY_INITIAL_PASSWORD` | secret | none (sensitive) | any | Optional first-admin password; prefer its Docker secret file. Sensitive: best given as a secrets file. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_IDENTITY_SESSION_TTL_HOURS` | whole number | `168` | 1 or more | Deployment only | Maximum lifetime of a session in hours, even while it is active. |
+| `MENAGERIST_IDENTITY_SESSION_IDLE_HOURS` | whole number | `0` | 0 or more | Deployment only | Idle timeout in hours; 0 disables this limit. |
+| `MENAGERIST_IDENTITY_PURGE_EXPIRED_SCHEDULE` | cron schedule | `15 4 * * *` | five fields; empty turns the job off | Admin setting | Cron expression for removing expired sessions, API tokens and devices in the instance timezone. Empty disables the job. |
+| `MENAGERIST_IDENTITY_COOKIE_NAME` | text | `menagerist-session` | matching `` ^[!#$%&'*+\-.^_`\|~0-9A-Za-z]+$ `` | Deployment only | Name of the HTTP-only session cookie. |
+| `MENAGERIST_IDENTITY_DEVICE_COOKIE_NAME` | text | `menagerist-device` | matching `` ^[!#$%&'*+\-.^_`\|~0-9A-Za-z]+$ `` | Deployment only | Name of the HTTP-only cookie that remembers a signed-in browser; it is kept on sign-out. |
+| `MENAGERIST_IDENTITY_DEVICE_TTL_DAYS` | whole number | `365` | 1 or more | Deployment only | Days a browser stays remembered after its last sign-in, for the device sign-in limit and the devices list. |
+| `MENAGERIST_IDENTITY_COOKIE_SECURE` | text | `auto` | `auto`, `origin`, `always`, `never` | Deployment only | Secure session cookies: auto detects HTTPS from each request, origin follows the scheme of api.public_origin, always and never force it. |
+| `MENAGERIST_IDENTITY_PASSWORD_HASHER` | text | `scrypt` | `scrypt` | Deployment only | Password-hashing scheme used for newly created password hashes. |
+| `MENAGERIST_IDENTITY_SIGN_IN_USERNAME_ATTEMPTS` | whole number | `5` | 1 or more | Deployment only | Failed sign-ins allowed per username in each throttle window. |
+| `MENAGERIST_IDENTITY_SIGN_IN_DEVICE_ATTEMPTS` | whole number | `20` | 1 or more | Deployment only | Failed sign-ins allowed per window from a remembered browser, counted apart from the username's limit so others cannot lock it out. |
+| `MENAGERIST_IDENTITY_SIGN_IN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Deployment only | Failed sign-ins allowed per IP address in each throttle window. |
+| `MENAGERIST_IDENTITY_API_TOKEN_IP_ATTEMPTS` | whole number | `20` | 1 or more | Deployment only | Failed API-token checks allowed per IP address per window. |
+| `MENAGERIST_IDENTITY_SIGN_IN_WINDOW_MINUTES` | whole number | `15` | 1 or more | Deployment only | Duration of the failed sign-in throttle window in minutes. |
+| `MENAGERIST_IDENTITY_PASSWORD_HASH_CONCURRENCY` | whole number | `2` | 1 or more | Deployment only | Maximum number of simultaneous password-hash operations in this process. |
+| `MENAGERIST_IDENTITY_API_TOKEN_DEFAULT_DAYS` | whole number | `90` | 1 or more | Deployment only | Lifetime in days offered for a new API token. |
+| `MENAGERIST_IDENTITY_API_TOKEN_MAX_DAYS` | whole number | `365` | 1 or more | Deployment only | Longest lifetime in days an API token may be given. |
+| `MENAGERIST_IDENTITY_API_TOKENS_PER_USER` | whole number | `20` | 1 or more | Deployment only | Most active API tokens one person may hold. |
+| `MENAGERIST_IDENTITY_INITIAL_PASSWORD` | secret | none (sensitive) | any | Deployment only | Optional first-admin password; prefer its Docker secret file. Sensitive: best given as a secrets file. |
 
 ## Log
 
 Logging settings.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_LOG_LEVEL` | text | `INFO` | `CRITICAL`, `ERROR`, `WARNING`, `INFO`, `DEBUG`, `NOTSET` | Minimum severity emitted by Menagerist application loggers. |
-| `MENAGERIST_LOG_SQLALCHEMY_LEVEL` | text | `WARNING` | `CRITICAL`, `ERROR`, `WARNING`, `INFO`, `DEBUG`, `NOTSET` | Minimum severity emitted by SQLAlchemy's engine logger. |
-| `MENAGERIST_LOG_JSON_OUTPUT` | true or false | `false` | any | Emit structured logs as JSON instead of the development format. |
-| `MENAGERIST_LOG_ACCESS` | true or false | `true` | any | Emit HTTP access log entries for application requests. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_LOG_LEVEL` | text | `INFO` | `CRITICAL`, `ERROR`, `WARNING`, `INFO`, `DEBUG`, `NOTSET` | Deployment only | Minimum severity emitted by Menagerist application loggers. |
+| `MENAGERIST_LOG_SQLALCHEMY_LEVEL` | text | `WARNING` | `CRITICAL`, `ERROR`, `WARNING`, `INFO`, `DEBUG`, `NOTSET` | Deployment only | Minimum severity emitted by SQLAlchemy's engine logger. |
+| `MENAGERIST_LOG_JSON_OUTPUT` | true or false | `false` | any | Deployment only | Emit structured logs as JSON instead of the development format. |
+| `MENAGERIST_LOG_ACCESS` | true or false | `true` | any | Deployment only | Emit HTTP access log entries for application requests. |
 
 ## Media
 
 Configuration for the media module.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_MEDIA_STORAGE_PATH` | path | `/data/media` | any | Directory used to store uploaded media and generated assets. |
-| `MENAGERIST_MEDIA_CLEANUP_SCHEDULE` | cron schedule | `30 * * * *` | five fields; empty turns the job off | Cron expression for removing expired unattached and unreferenced media in the instance timezone. Empty disables the job. Editable in the app's settings unless set here. |
-| `MENAGERIST_MEDIA_STRAY_FILES_SCHEDULE` | cron schedule | `45 3 * * 0` | five fields; empty turns the job off | Cron expression for removing stored files that no upload refers to, in the instance timezone. Empty disables the job. Editable in the app's settings unless set here. |
-| `MENAGERIST_MEDIA_STAGED_TTL_HOURS` | whole number | `24` | 1 or more | Hours to keep media uploads that have not been attached. |
-| `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` | whole number | `72` | 1 or more | Hours to keep media files that are no longer referenced. |
-| `MENAGERIST_MEDIA_MAX_UPLOAD_SIZE` | whole number | `104857600` | more than 0 | Maximum accepted media upload size in bytes. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_MEDIA_STORAGE_PATH` | path | `/data/media` | any | Deployment only | Directory used to store uploaded media and generated assets. |
+| `MENAGERIST_MEDIA_CLEANUP_SCHEDULE` | cron schedule | `30 * * * *` | five fields; empty turns the job off | Admin setting | Cron expression for removing expired unattached and unreferenced media in the instance timezone. Empty disables the job. |
+| `MENAGERIST_MEDIA_STRAY_FILES_SCHEDULE` | cron schedule | `45 3 * * 0` | five fields; empty turns the job off | Admin setting | Cron expression for removing stored files that no upload refers to, in the instance timezone. Empty disables the job. |
+| `MENAGERIST_MEDIA_STAGED_TTL_HOURS` | whole number | `24` | 1 or more | Deployment only | Hours to keep media uploads that have not been attached. |
+| `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` | whole number | `72` | 1 or more | Deployment only | Hours to keep media files that are no longer referenced. |
+| `MENAGERIST_MEDIA_MAX_UPLOAD_SIZE` | whole number | `104857600` | more than 0 | Deployment only | Maximum accepted media upload size in bytes. |
 
 ## Http
 
 How Menagerist behaves when it calls out to other web services.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_HTTP_CONTACT` | text | empty | any | An email address or web address added to the User-Agent of every outbound request, so a service that throttles this instance can reach you. Empty sends no contact. Plain text only: no brackets or semicolons. |
-| `MENAGERIST_HTTP_USER_AGENT_NOTE` | text | empty | any | A short note added to the User-Agent of every outbound request after the contact, for example `self-hosted`. Empty adds nothing. Plain text only: no brackets or semicolons. |
-| `MENAGERIST_HTTP_PROXY` | secret | none (sensitive) | any | Proxy for outbound `http://` requests, as `http://host:port` with optional `user:password@`. Empty uses none, even when the standard `HTTP_PROXY` is set, which this overrides. Sensitive: best given as a secrets file. Also read from `HTTP_PROXY`. |
-| `MENAGERIST_HTTPS_PROXY` | secret | none (sensitive) | any | Proxy for outbound `https://` requests, as `http://host:port` with optional `user:password@`. Empty uses none, even when the standard `HTTPS_PROXY` is set, which this overrides. Sensitive: best given as a secrets file. Also read from `HTTPS_PROXY`. |
-| `MENAGERIST_NO_PROXY` | text | empty | any | Comma-separated host names, domains (`example.com` also matches its subdomains), IP addresses and network ranges that skip the proxy, or `*` for all. Overrides the standard `NO_PROXY`. Also read from `NO_PROXY`. |
-| `MENAGERIST_HTTP_PROXY_PIN_ADDRESSES` | true or false | `true` | any | Connect through the proxy to the address Menagerist checked, keeping the real host name for `Host` and the certificate, so a name cannot answer one way here and another to the proxy. A name this host cannot resolve is then refused. Turn off only if your proxy filters by host name and refuses an address; the proxy must then block internal networks itself. |
-| `MENAGERIST_HTTP_PROXY_ALLOW_UNRESOLVED` | true or false | `false` | any | Only when `MENAGERIST_HTTP_PROXY_PIN_ADDRESSES` is off: let a name this host cannot resolve go to the proxy, for a network where only the proxy has working DNS. The proxy must then refuse internal addresses itself. |
-| `MENAGERIST_HTTP_TRUSTED_HOSTS` | text | empty | any | Comma-separated exact host names, optionally with a port (`ollama,books.lan:8080`), that an administrator-configured service may resolve to a private address (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or fc00::/7). No wildcards or subdomain matching, and a URL a person types or imports never gets the allowance. Loopback, link-local (including cloud metadata), multicast and unspecified addresses are always refused. A trusted name is only as safe as the DNS that answers for it, and a public address that loops back into your network (NAT hairpinning) cannot be detected here. Empty trusts nothing. |
-| `MENAGERIST_HTTP_CONNECT_TIMEOUT_SECONDS` | text | `5.0` | more than 0 | Seconds to wait for a connection to an outbound service. |
-| `MENAGERIST_HTTP_READ_TIMEOUT_SECONDS` | text | `10.0` | more than 0 | Seconds to wait for each part of an outbound service's reply. |
-| `MENAGERIST_HTTP_TOTAL_TIMEOUT_SECONDS` | text | `30.0` | more than 0 | Seconds allowed for a whole outbound request, redirects included, so a reply that trickles in cannot hold it open. |
-| `MENAGERIST_HTTP_MAX_RESPONSE_BYTES` | whole number | `2097152` | 1024 or more | Largest reply, in bytes, accepted from an outbound service unless the caller asks for a smaller one. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_HTTP_CONTACT` | text | empty | any | Deployment only | An email address or web address added to the User-Agent of every outbound request, so a service that throttles this instance can reach you. Empty sends no contact. Plain text only: no brackets or semicolons. |
+| `MENAGERIST_HTTP_USER_AGENT_NOTE` | text | empty | any | Deployment only | A short note added to the User-Agent of every outbound request after the contact, for example `self-hosted`. Empty adds nothing. Plain text only: no brackets or semicolons. |
+| `MENAGERIST_HTTP_PROXY` | secret | none (sensitive) | any | Deployment only | Proxy for outbound `http://` requests, as `http://host:port` with optional `user:password@`. Empty uses none, even when the standard `HTTP_PROXY` is set, which this overrides. Sensitive: best given as a secrets file. Also read from `HTTP_PROXY`. |
+| `MENAGERIST_HTTPS_PROXY` | secret | none (sensitive) | any | Deployment only | Proxy for outbound `https://` requests, as `http://host:port` with optional `user:password@`. Empty uses none, even when the standard `HTTPS_PROXY` is set, which this overrides. Sensitive: best given as a secrets file. Also read from `HTTPS_PROXY`. |
+| `MENAGERIST_NO_PROXY` | text | empty | any | Deployment only | Comma-separated host names, domains (`example.com` also matches its subdomains), IP addresses and network ranges that skip the proxy, or `*` for all. Overrides the standard `NO_PROXY`. Also read from `NO_PROXY`. |
+| `MENAGERIST_HTTP_PROXY_PIN_ADDRESSES` | true or false | `true` | any | Deployment only | Connect through the proxy to the address Menagerist checked, keeping the real host name for `Host` and the certificate, so a name cannot answer one way here and another to the proxy. A name this host cannot resolve is then refused. Turn off only if your proxy filters by host name and refuses an address; the proxy must then block internal networks itself. |
+| `MENAGERIST_HTTP_PROXY_ALLOW_UNRESOLVED` | true or false | `false` | any | Deployment only | Only when `MENAGERIST_HTTP_PROXY_PIN_ADDRESSES` is off: let a name this host cannot resolve go to the proxy, for a network where only the proxy has working DNS. The proxy must then refuse internal addresses itself. |
+| `MENAGERIST_HTTP_TRUSTED_HOSTS` | text | empty | any | Deployment only | Comma-separated exact host names, optionally with a port (`ollama,books.lan:8080`), that an administrator-configured service may resolve to a private address (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or fc00::/7). No wildcards or subdomain matching, and a URL a person types or imports never gets the allowance. Loopback, link-local (including cloud metadata), multicast and unspecified addresses are always refused. A trusted name is only as safe as the DNS that answers for it, and a public address that loops back into your network (NAT hairpinning) cannot be detected here. Empty trusts nothing. |
+| `MENAGERIST_HTTP_CONNECT_TIMEOUT_SECONDS` | text | `5.0` | more than 0 | Deployment only | Seconds to wait for a connection to an outbound service. |
+| `MENAGERIST_HTTP_READ_TIMEOUT_SECONDS` | text | `10.0` | more than 0 | Deployment only | Seconds to wait for each part of an outbound service's reply. |
+| `MENAGERIST_HTTP_TOTAL_TIMEOUT_SECONDS` | text | `30.0` | more than 0 | Deployment only | Seconds allowed for a whole outbound request, redirects included, so a reply that trickles in cannot hold it open. |
+| `MENAGERIST_HTTP_MAX_RESPONSE_BYTES` | whole number | `2097152` | 1024 or more | Deployment only | Largest reply, in bytes, accepted from an outbound service unless the caller asks for a smaller one. |
 
 ## Rate_Limit
 
 Request limits on the endpoints that are expensive to serve.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_RATE_LIMIT_UPLOADS_PER_MINUTE` | whole number | `30` | 0 or more | Media and backup uploads allowed per user each minute. |
-| `MENAGERIST_RATE_LIMIT_THUMBNAILS_PER_MINUTE` | whole number | `600` | 0 or more | Thumbnail requests allowed per user each minute. |
-| `MENAGERIST_RATE_LIMIT_SEARCH_PER_MINUTE` | whole number | `120` | 0 or more | Item searches allowed per user each minute. |
-| `MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE` | whole number | `10` | 0 or more | Preset and user-data imports allowed per user each minute. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_RATE_LIMIT_UPLOADS_PER_MINUTE` | whole number | `30` | 0 or more | Deployment only | Media and backup uploads allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_THUMBNAILS_PER_MINUTE` | whole number | `600` | 0 or more | Deployment only | Thumbnail requests allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_SEARCH_PER_MINUTE` | whole number | `120` | 0 or more | Deployment only | Item searches allowed per user each minute. |
+| `MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE` | whole number | `10` | 0 or more | Deployment only | Preset and user-data imports allowed per user each minute. |
 
 ## Release
 
 Which releases the instance looks for and how often.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_RELEASE_CHECK_ENABLED` | true or false | `true` | any | Whether this instance ever contacts github.com and ghcr.io to look for newer builds. Off turns off both the scheduled check and the Status page's Check now, and is set by the deployment, so an administrator cannot turn it back on from the interface. |
-| `MENAGERIST_RELEASE_CHANNEL` | text | `stable` | `stable`, `preview` | Releases to report: stable only, or preview, which also includes release candidates and other prereleases. Editable in the app's settings unless set here. |
-| `MENAGERIST_RELEASE_CHECK_SCHEDULE` | cron schedule | `20 5 * * *` | five fields; empty turns the job off | Cron expression for looking for a newer release in the instance timezone. Empty turns the scheduled check off; an administrator can still check from the Status page. Editable in the app's settings unless set here. |
-| `MENAGERIST_RELEASE_CHECK_ON_STARTUP` | true or false | `true` | any | Whether the app also looks for a newer release each time it starts, so the Status page is current after a deploy rather than waiting for the next scheduled check. Has no effect while update checks are off. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_RELEASE_CHECK_ENABLED` | true or false | `true` | any | Deployment only | Whether this instance ever contacts github.com and ghcr.io to look for newer builds. Off turns off both the scheduled check and the Status page's Check now, and is set by the deployment, so an administrator cannot turn it back on from the interface. |
+| `MENAGERIST_RELEASE_CHANNEL` | text | `stable` | `stable`, `preview` | Admin setting | Releases to report: stable only, or preview, which also includes release candidates and other prereleases. |
+| `MENAGERIST_RELEASE_CHECK_SCHEDULE` | cron schedule | `20 5 * * *` | five fields; empty turns the job off | Admin setting | Cron expression for looking for a newer release in the instance timezone. Empty turns the scheduled check off; an administrator can still check from the Status page. |
+| `MENAGERIST_RELEASE_CHECK_ON_STARTUP` | true or false | `true` | any | Deployment only | Whether the app also looks for a newer release each time it starts, so the Status page is current after a deploy rather than waiting for the next scheduled check. Has no effect while update checks are off. |
 
 ## Retention
 
 How long deleted content stays recoverable before it is purged.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_RETENTION_DELETED_DAYS` | whole number | `30` | 1 or more | Days deleted content stays recoverable before it is purged. |
-| `MENAGERIST_RETENTION_PURGE_SCHEDULE` | cron schedule | empty | five fields; empty turns the job off | Cron expression for permanently removing content older than the retention period, in the instance timezone. Empty, the default, leaves it to the data purge-deleted command. Editable in the app's settings unless set here. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_RETENTION_DELETED_DAYS` | whole number | `30` | 1 or more | Deployment only | Days deleted content stays recoverable before it is purged. |
+| `MENAGERIST_RETENTION_PURGE_SCHEDULE` | cron schedule | empty | five fields; empty turns the job off | Admin setting | Cron expression for permanently removing content older than the retention period, in the instance timezone. Empty, the default, leaves it to the data purge-deleted command. |
 
 ## Scheduler
 
 Instance timezone, worker liveness and job history retention.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_TIMEZONE` | time zone (IANA name) | `UTC` | any | Timezone used to interpret recurring job schedules. Also read from `TZ`. |
-| `MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB` | whole number | `100` | 1 or more | Number of completed runs to retain for each job. Editable in the app's settings unless set here. |
-| `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS` | whole number | `300` | more than 0 | Seconds without a worker heartbeat before liveness checks warn. |
-| `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_INTERVAL_SECONDS` | whole number | `60` | more than 0 | Seconds between the worker's liveness heartbeats. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_TIMEZONE` | time zone (IANA name) | `UTC` | any | Deployment only | Timezone used to interpret recurring job schedules. Also read from `TZ`. |
+| `MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB` | whole number | `100` | 1 or more | Admin setting | Number of completed runs to retain for each job. |
+| `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_TIMEOUT_SECONDS` | whole number | `300` | more than 0 | Deployment only | Seconds without a worker heartbeat before liveness checks warn. |
+| `MENAGERIST_SCHEDULER_WORKER_HEARTBEAT_INTERVAL_SECONDS` | whole number | `60` | more than 0 | Deployment only | Seconds between the worker's liveness heartbeats. |
 
 ## Server
 
 How many web worker processes run, and whether this is a container.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_SERVER_WORKERS` | whole number | `auto` | 1 to 16, `auto` | Web worker processes, 1 to 16, or auto: one per CPU core on a host and one in a container or when reloading, as Granian advises. |
-| `MENAGERIST_SERVER_IN_CONTAINER` | true or false | unset | any | Whether the server runs in a container. Unset detects it; the image sets it, and 0 or 1 overrides detection. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_SERVER_WORKERS` | whole number | `auto` | 1 to 16, `auto` | Deployment only | Web worker processes, 1 to 16, or auto: one per CPU core on a host and one in a container or when reloading, as Granian advises. |
+| `MENAGERIST_SERVER_IN_CONTAINER` | true or false | unset | any | Deployment only | Whether the server runs in a container. Unset detects it; the image sets it, and 0 or 1 overrides detection. |
 
 ## Terminal
 
 What the terminal the process writes to can show.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `NO_COLOR` | text | unset | any | Set to any value that does not start with 0 to turn off colour in console logs (see https://no-color.org). |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `NO_COLOR` | text | unset | any | Deployment only | Set to any value that does not start with 0 to turn off colour in console logs (see https://no-color.org). |
 
 ## Compose
 
 Read by Docker Compose from `.env` when it starts the stack, not by Menagerist. Recreate the stack after changing one.
 
-| Variable | Type | Default | Allowed values | Notes |
-| --- | --- | --- | --- | --- |
-| `MENAGERIST_IMAGE` | text | `ghcr.io/samcorky/menagerist:latest` | any | Image the app and worker run. Set a version tag to pin a release or to roll back (see docs/DEPLOYING.md). The development override (compose.override.yml) defaults it to `menagerist:local`. |
-| `POSTGRES_PASSWORD` | text | `menagerist` | any | The database password, given once: the database container is created with it and the app and worker connect with it. Change it before the first start, as an existing database keeps the password it was created with. |
-| `POSTGRES_MEM_LIMIT` | text | `512m` | any | The database container's hard memory cap (Postgres has no limit of its own). Raise it together with the memory values below if the database is large. |
-| `POSTGRES_SHARED_BUFFERS` | text | `128MB` | any | Postgres `shared_buffers` (its own default is 128MB). About a quarter of the memory cap; the most useful one to raise on a bigger machine. |
-| `POSTGRES_EFFECTIVE_CACHE_SIZE` | text | `256MB` | any | Postgres `effective_cache_size` (its own default is 4GB), a planner hint for how much data the OS can cache. Keep it near half the memory cap so the planner is not too optimistic. |
-| `POSTGRES_WORK_MEM` | text | `4MB` | any | Postgres `work_mem` (its own default is 4MB), the memory per sort or hash in a query. Raise it only if large sorts spill to disk, as it applies to each step of each connection. |
-| `POSTGRES_MAX_CONNECTIONS` | text | `100` | any | Postgres `max_connections` (its own default is 100). Each worker process keeps a pool of connections (see `MENAGERIST_DATABASE_POOL_SIZE` and `MENAGERIST_DATABASE_MAX_OVERFLOW`): lower it on a very small machine, and keep it above the total of all pools. |
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_IMAGE` | text | `ghcr.io/samcorky/menagerist:latest` | any | Deployment only | Image the app and worker run. Set a version tag to pin a release or to roll back (see docs/DEPLOYING.md). The development override (compose.override.yml) defaults it to `menagerist:local`. |
+| `POSTGRES_PASSWORD` | text | `menagerist` | any | Deployment only | The database password, given once: the database container is created with it and the app and worker connect with it. Change it before the first start, as an existing database keeps the password it was created with. |
+| `POSTGRES_MEM_LIMIT` | text | `512m` | any | Deployment only | The database container's hard memory cap (Postgres has no limit of its own). Raise it together with the memory values below if the database is large. |
+| `POSTGRES_SHARED_BUFFERS` | text | `128MB` | any | Deployment only | Postgres `shared_buffers` (its own default is 128MB). About a quarter of the memory cap; the most useful one to raise on a bigger machine. |
+| `POSTGRES_EFFECTIVE_CACHE_SIZE` | text | `256MB` | any | Deployment only | Postgres `effective_cache_size` (its own default is 4GB), a planner hint for how much data the OS can cache. Keep it near half the memory cap so the planner is not too optimistic. |
+| `POSTGRES_WORK_MEM` | text | `4MB` | any | Deployment only | Postgres `work_mem` (its own default is 4MB), the memory per sort or hash in a query. Raise it only if large sorts spill to disk, as it applies to each step of each connection. |
+| `POSTGRES_MAX_CONNECTIONS` | text | `100` | any | Deployment only | Postgres `max_connections` (its own default is 100). Each worker process keeps a pool of connections (see `MENAGERIST_DATABASE_POOL_SIZE` and `MENAGERIST_DATABASE_MAX_OVERFLOW`): lower it on a very small machine, and keep it above the total of all pools. |
