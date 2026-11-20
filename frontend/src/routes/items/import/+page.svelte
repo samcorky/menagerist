@@ -100,7 +100,11 @@
 		if (!file || !itemType || loading) return;
 		loading = true;
 		fileError = null;
-		const result = await inspectItemImport({ body: { file, item_type: itemType } });
+		// The type's existing details come with the file, so a kept column can join one at once.
+		const [result, fields] = await Promise.all([
+			inspectItemImport({ body: { file, item_type: itemType } }),
+			fetchItemFields(itemType)
+		]);
 		loading = false;
 		if (result.error || !result.data) {
 			fileError = uploadErrorMessage(result);
@@ -109,7 +113,7 @@
 		inspection = result.data;
 		choices = choicesFrom(result.data.suggested_mapping);
 		// Suggestions only; the import works the same without them.
-		void fetchItemFields(itemType).then((found) => (itemFields = found ?? []));
+		itemFields = fields ?? [];
 		dateOrder = result.data.day_month_order ?? 'day_first';
 		step = 'match';
 	}

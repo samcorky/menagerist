@@ -198,9 +198,11 @@
 		addingField = true;
 		if (nodeType) {
 			const taken = new Set(takenKeys());
-			void fetchItemFields(nodeType.slug).then(
-				(found) => (otherFields = (found ?? []).filter((f) => !taken.has(f.key)))
-			);
+			void fetchItemFields(nodeType.slug).then((found) => {
+				otherFields = (found ?? []).filter((f) => !taken.has(f.key));
+				// A name typed before they arrived still joins its detail.
+				if (draftField?.label) nameDraft(draftField.label);
+			});
 		}
 	}
 
