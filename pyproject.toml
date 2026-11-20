@@ -104,7 +104,7 @@ deps = ["sync-backend"]
 
 [tool.poe.groups.setup.tasks.generate-pwa-icons]
 cmd = "uv run --project backend python scripts/generate_pwa_icons.py"
-help = "Regenerate the install icons in frontend/static from the Menagerist mark"
+help = "Regenerate the install, share and launcher shortcut icons in frontend/static"
 deps = ["sync-backend"]
 
 [tool.poe.groups.setup.tasks._run-frontend-generate]

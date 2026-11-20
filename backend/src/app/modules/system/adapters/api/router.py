@@ -696,17 +696,35 @@ class ManifestShortcutResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
-                {"name": "Add an item", "short_name": "Add item", "url": "/items/new"}
+                {
+                    "name": "Add an item",
+                    "short_name": "Add item",
+                    "description": "Add something new to your collection",
+                    "url": "/items/new",
+                    "icons": [
+                        {
+                            "src": "/shortcut-add-item.png",
+                            "sizes": "192x192",
+                            "type": "image/png",
+                            "purpose": "any",
+                        }
+                    ],
+                }
             ]
         }
     )
 
     name: Annotated[str, Field(description="Label shown in the launcher menu.")]
     short_name: Annotated[
-        str | None,
-        Field(description="Shorter label for tight spaces; absent when not needed."),
-    ] = None
+        str, Field(description="Shorter label for launchers with little room.")
+    ]
+    description: Annotated[
+        str, Field(description="What the shortcut does, for launchers that show it.")
+    ]
     url: Annotated[str, Field(description="Address the shortcut opens.")]
+    icons: Annotated[
+        list[ManifestIconResponse], Field(description="Icons for the shortcut.")
+    ]
 
 
 class ManifestScreenshotResponse(BaseModel):
@@ -813,7 +831,16 @@ class WebAppManifestResponse(BaseModel):
             background_color=manifest.background_color,
             theme_color=manifest.theme_color,
             icons=[ManifestIconResponse(**vars(i)) for i in manifest.icons],
-            shortcuts=[ManifestShortcutResponse(**vars(s)) for s in manifest.shortcuts],
+            shortcuts=[
+                ManifestShortcutResponse(
+                    name=s.name,
+                    short_name=s.short_name,
+                    description=s.description,
+                    url=s.url,
+                    icons=[ManifestIconResponse(**vars(i)) for i in s.icons],
+                )
+                for s in manifest.shortcuts
+            ],
             screenshots=[
                 ManifestScreenshotResponse(**vars(s)) for s in manifest.screenshots
             ],

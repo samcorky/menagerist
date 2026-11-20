@@ -15,6 +15,13 @@ function pngSize(file: string): string {
 	return `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`;
 }
 
+describe('launcher shortcut icons', () => {
+	it.each(['shortcut-add-item.png', 'shortcut-items.png', 'shortcut-collections.png'])(
+		'%s is the 192 pixel square the manifest declares',
+		(name) => expect(pngSize(STATIC + name)).toBe('192x192')
+	);
+});
+
 describe('app.html', () => {
 	it('links the manifest and the iOS home screen icon', () => {
 		expect(APP_HTML).toContain('<link rel="manifest" href="/manifest.webmanifest" />');

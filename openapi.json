@@ -35116,32 +35116,50 @@
             "description": "Label shown in the launcher menu."
           },
           "short_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Short Name",
-            "description": "Shorter label for tight spaces; absent when not needed."
+            "description": "Shorter label for launchers with little room."
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "What the shortcut does, for launchers that show it."
           },
           "url": {
             "type": "string",
             "title": "Url",
             "description": "Address the shortcut opens."
+          },
+          "icons": {
+            "items": {
+              "$ref": "#/components/schemas/ManifestIconResponse"
+            },
+            "type": "array",
+            "title": "Icons",
+            "description": "Icons for the shortcut."
           }
         },
         "type": "object",
         "required": [
           "name",
-          "url"
+          "short_name",
+          "description",
+          "url",
+          "icons"
         ],
         "title": "ManifestShortcutResponse",
         "description": "A launcher shortcut.",
         "examples": [
           {
+            "description": "Add something new to your collection",
+            "icons": [
+              {
+                "purpose": "any",
+                "sizes": "192x192",
+                "src": "/shortcut-add-item.png",
+                "type": "image/png"
+              }
+            ],
             "name": "Add an item",
             "short_name": "Add item",
             "url": "/items/new"
