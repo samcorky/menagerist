@@ -2,7 +2,7 @@
 	import { Select } from 'bits-ui';
 	import { ChevronDown } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { staleChoice } from './stale-choice';
+	import { optionLabel, staleChoice } from './stale-choice';
 	import { readPropMeta } from '$lib/schema-meta';
 	import type { JsonSchemaProperty } from '$lib/schema-types';
 
@@ -23,10 +23,11 @@
 	let stale = $derived(staleChoice(value, options));
 	let staleLabel = $derived(stale === null ? null : `${stale} (no longer an option)`);
 	let variant = $derived(readPropMeta(prop).display);
+	let labels = $derived(readPropMeta(prop).labels);
 	// Options for radio and chips, with a stale stored value shown as an extra entry.
 	let entries = $derived([
 		...(stale !== null && staleLabel !== null ? [{ value: stale, label: staleLabel }] : []),
-		...options.map((o) => ({ value: o, label: o }))
+		...options.map((o) => ({ value: o, label: optionLabel(labels, o) }))
 	]);
 	const uid = $props.id();
 </script>
@@ -81,7 +82,7 @@
 			aria-label={ariaLabel}
 		>
 			<span class={selected && stale === null ? '' : 'text-muted-foreground'}
-				>{staleLabel ?? (selected || '- select -')}</span
+				>{staleLabel ?? (selected ? optionLabel(labels, selected) : '- select -')}</span
 			>
 			<ChevronDown class="size-4 shrink-0 text-muted-foreground" />
 		</Select.Trigger>
@@ -107,10 +108,10 @@
 			{#each options as option (option)}
 				<Select.Item
 					value={option}
-					label={option}
+					label={optionLabel(labels, option)}
 					class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[selected]:font-medium"
 				>
-					{option}
+					{optionLabel(labels, option)}
 				</Select.Item>
 			{/each}
 		</Select.Content>

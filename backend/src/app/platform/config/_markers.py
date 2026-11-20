@@ -5,6 +5,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pydantic import GetJsonSchemaHandler
     from pydantic.json_schema import JsonSchemaValue
     from pydantic_core import CoreSchema
@@ -68,4 +70,27 @@ class UIMeta:
         }
         if hints:
             schema.setdefault("x-menagerist", {}).update(hints)
+        return schema
+
+
+class Labels:
+    """How each option of a fixed-choice setting reads, by stored value.
+
+    Written to `x-menagerist.labels`; the stored values stay the lowercase
+    names used in the API and environment. Every option needs exactly one label.
+    """
+
+    def __init__(self, labels: Mapping[str, str]) -> None:
+        self.labels = dict(labels)
+
+    def __get_pydantic_json_schema__(
+        self, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        schema = handler(core_schema)
+        # An enum class sits behind a `$ref`; its options are on the definition.
+        options = handler.resolve_ref_schema(schema).get("enum")
+        if options is None or set(options) != set(self.labels):
+            msg = f"labels {sorted(self.labels)} must match the options {options}"
+            raise ValueError(msg)
+        schema.setdefault("x-menagerist", {})["labels"] = dict(self.labels)
         return schema
