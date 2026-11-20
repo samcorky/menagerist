@@ -10,7 +10,7 @@ from app.platform.config.api import get_api_settings
 from app.platform.config.public_origin import public_is_https
 
 
-class IdentitySettings(MenageristBaseSettings, group="identity"):
+class IdentitySettings(MenageristBaseSettings, group="identity", label="Sign-in"):
     """Configuration for the identity module."""
 
     session_ttl_hours: int = Field(

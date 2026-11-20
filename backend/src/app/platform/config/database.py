@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
-class DatabaseSettings(MenageristBaseSettings, group="database"):
+class DatabaseSettings(MenageristBaseSettings, group="database", label="Database"):
     """Database connection settings.
 
     The connection is either given whole as `url`, or composed from `host`, `port`,

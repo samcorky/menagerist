@@ -128,3 +128,19 @@ def test_environment_guard_rejects_other_shared_names(
     )
     with pytest.raises(AssertionError, match=alias.casefold()):
         test_settings_environment_names_do_not_overlap()
+
+
+def test_every_group_names_itself_once() -> None:
+    """Each group has a title for people, and classes sharing a group agree on it."""
+    from app.platform.config import ALL_SETTINGS
+    from app.platform.config._fields import group_name
+
+    titles: dict[str, set[str | None]] = {}
+    for cls in ALL_SETTINGS:
+        if cls.group is not None:
+            titles.setdefault(group_name(cls), set()).add(cls.label)
+
+    untitled = sorted(group for group, names in titles.items() if None in names)
+    disagreeing = sorted(group for group, names in titles.items() if len(names) > 1)
+    assert untitled == []
+    assert disagreeing == []

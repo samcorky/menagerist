@@ -9,7 +9,7 @@ from app.platform.config._markers import Tunable
 from app.platform.config._types import Cron, Hours  # noqa: TC001 - pydantic resolves these at runtime
 
 
-class BackupSettings(MenageristBaseSettings, group="backup"):
+class BackupSettings(MenageristBaseSettings, group="backup", label="Backups"):
     """Instance backup storage, retention and upload limits."""
 
     path: Path = Field(

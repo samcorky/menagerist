@@ -17,14 +17,15 @@ const KEY = 'menagerist:preferences:';
 
 function setting(over: Partial<SettingResponse>): SettingResponse {
 	return {
-		key: 'calendar.first_day',
-		group: 'calendar',
+		key: 'datetime.first_day',
+		group: 'datetime',
+		group_title: 'Dates and times',
 		title: 'First day of the week',
 		description: null,
 		value: 'automatic',
 		source: 'default',
 		locked: false,
-		env_name: 'MENAGERIST_CALENDAR_FIRST_DAY',
+		env_name: 'MENAGERIST_DATETIME_FIRST_DAY',
 		restart_required: false,
 		stored_invalid: false,
 		hidden: false,
@@ -62,12 +63,12 @@ describe('PreferencesController', () => {
 		const prefs = new PreferencesController();
 
 		const loading = prefs.load('ann');
-		expect(prefs.value('calendar.first_day')).toBe('sunday');
+		expect(prefs.value('datetime.first_day')).toBe('sunday');
 		expect(prefs.loaded).toBe(false);
 
 		answer({ data: [setting({ value: 'monday', source: 'user' })] });
 		await loading;
-		expect(prefs.value('calendar.first_day')).toBe('monday');
+		expect(prefs.value('datetime.first_day')).toBe('monday');
 		expect(prefs.loaded).toBe(true);
 		expect(JSON.parse(localStorage.getItem(`${KEY}ann`) ?? '[]')[0].value).toBe('monday');
 	});
@@ -79,7 +80,7 @@ describe('PreferencesController', () => {
 
 		await prefs.load('ann');
 
-		expect(prefs.value('calendar.first_day')).toBe('sunday');
+		expect(prefs.value('datetime.first_day')).toBe('sunday');
 	});
 
 	it("never shows one person's copy to another, and clears every copy", async () => {
@@ -88,7 +89,7 @@ describe('PreferencesController', () => {
 		const prefs = new PreferencesController();
 
 		await prefs.load('bob');
-		expect(prefs.value('calendar.first_day')).toBeUndefined();
+		expect(prefs.value('datetime.first_day')).toBeUndefined();
 
 		prefs.clear();
 		expect(localStorage.getItem(`${KEY}ann`)).toBeNull();
@@ -102,13 +103,13 @@ describe('PreferencesController', () => {
 		const prefs = new PreferencesController();
 		await prefs.load('ann');
 
-		const outcome = await prefs.save('calendar.first_day', 'saturday');
+		const outcome = await prefs.save('datetime.first_day', 'saturday');
 
 		expect(outcome).toEqual({ ok: true });
 		expect(updateMySettings).toHaveBeenCalledWith({
-			body: { values: { 'calendar.first_day': 'saturday' } }
+			body: { values: { 'datetime.first_day': 'saturday' } }
 		});
-		expect(prefs.value('calendar.first_day')).toBe('saturday');
+		expect(prefs.value('datetime.first_day')).toBe('saturday');
 		expect(localStorage.getItem(`${KEY}ann`)).toContain('saturday');
 	});
 
@@ -119,12 +120,12 @@ describe('PreferencesController', () => {
 		const prefs = new PreferencesController();
 		await prefs.load('ann');
 
-		const saving = prefs.save('calendar.first_day', 'sunday');
-		expect(prefs.value('calendar.first_day')).toBe('sunday');
+		const saving = prefs.save('datetime.first_day', 'sunday');
+		expect(prefs.value('datetime.first_day')).toBe('sunday');
 
 		answer({ error: {}, response: new Response(null, { status: 500 }) });
 		expect((await saving).ok).toBe(false);
-		expect(prefs.value('calendar.first_day')).toBe('monday');
+		expect(prefs.value('datetime.first_day')).toBe('monday');
 	});
 
 	it('resets to the default', async () => {
@@ -133,17 +134,17 @@ describe('PreferencesController', () => {
 		const prefs = new PreferencesController();
 		await prefs.load('ann');
 
-		await prefs.reset('calendar.first_day');
+		await prefs.reset('datetime.first_day');
 
-		expect(resetMySetting).toHaveBeenCalledWith({ path: { key: 'calendar.first_day' } });
-		expect(prefs.value('calendar.first_day')).toBe('automatic');
+		expect(resetMySetting).toHaveBeenCalledWith({ path: { key: 'datetime.first_day' } });
+		expect(prefs.value('datetime.first_day')).toBe('automatic');
 	});
 
 	it('refuses a change offline, with the reason', async () => {
 		offline.offline = true;
 		const prefs = new PreferencesController();
 
-		const outcome = await prefs.save('calendar.first_day', 'monday');
+		const outcome = await prefs.save('datetime.first_day', 'monday');
 
 		expect(outcome).toEqual({ ok: false, message: OFFLINE_PREFERENCES });
 		expect(updateMySettings).not.toHaveBeenCalled();
@@ -151,12 +152,12 @@ describe('PreferencesController', () => {
 
 	it("reports the server's reason for a refused value", async () => {
 		updateMySettings.mockResolvedValue({
-			error: { detail: 'Invalid value for calendar.first_day' },
+			error: { detail: 'Invalid value for datetime.first_day' },
 			response: new Response(null, { status: 400 })
 		});
 		const prefs = new PreferencesController();
 
-		const outcome = await prefs.save('calendar.first_day', 'friday');
+		const outcome = await prefs.save('datetime.first_day', 'friday');
 
 		expect(outcome.ok).toBe(false);
 	});

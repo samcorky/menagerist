@@ -8,8 +8,10 @@ from app.platform.config._markers import Labels, Scope, Tunable
 from app.platform.config._types import TimeZoneChoice  # noqa: TC001 - pydantic resolves this at runtime
 
 
-class DateTimeSettings(MenageristBaseSettings, group="datetime"):
-    """How dates and times read. People choose; the deployment sets defaults."""
+class DateTimeSettings(
+    MenageristBaseSettings, group="datetime", label="Dates and times"
+):
+    """How dates, times and weeks read. People choose; the deployment sets defaults."""
 
     time_zone: Annotated[
         TimeZoneChoice,
@@ -56,6 +58,26 @@ class DateTimeSettings(MenageristBaseSettings, group="datetime"):
             title="Clock",
             description=(
                 "How times of day are written. Automatic uses your browser's language."
+            ),
+        ),
+        Tunable(scope=Scope.USER),
+    ] = "automatic"
+
+    first_day: Annotated[
+        Literal["automatic", "monday", "sunday", "saturday"],
+        Labels(
+            {
+                "automatic": "Automatic (from your region)",
+                "monday": "Monday",
+                "sunday": "Sunday",
+                "saturday": "Saturday",
+            }
+        ),
+        Field(
+            title="First day of the week",
+            description=(
+                "The day calendars start each week on. Automatic uses your "
+                + "region's usual start."
             ),
         ),
         Tunable(scope=Scope.USER),

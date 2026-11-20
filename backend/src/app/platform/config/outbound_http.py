@@ -19,7 +19,9 @@ _TRUSTED_HOST = re.compile(
 _PROXY_SCHEMES = frozenset({"http", "https"})
 
 
-class OutboundHttpSettings(MenageristBaseSettings, group="http"):
+class OutboundHttpSettings(
+    MenageristBaseSettings, group="http", label="Outbound requests"
+):
     """How Menagerist behaves when it calls out to other web services."""
 
     contact: str = Field(

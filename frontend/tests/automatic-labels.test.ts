@@ -9,8 +9,8 @@ const at = new Date(2026, 10, 20, 14, 30);
 
 describe('what Automatic comes to', () => {
 	it('names the first day of the week for the region', () => {
-		expect(automaticExample('calendar.first_day', at, 'en-GB')).toBe('Monday');
-		expect(automaticExample('calendar.first_day', at, 'en-US')).toBe('Sunday');
+		expect(automaticExample('datetime.first_day', at, 'en-GB')).toBe('Monday');
+		expect(automaticExample('datetime.first_day', at, 'en-US')).toBe('Sunday');
 	});
 
 	it("shows today's date in the language's usual order", () => {
@@ -34,7 +34,7 @@ describe('what Automatic comes to', () => {
 			'x-menagerist': { labels: { automatic: 'Automatic (from your region)', monday: 'Monday' } }
 		} as unknown as JsonSchemaProperty;
 
-		const labels = (withAutomaticExample('calendar.first_day', prop) as Record<string, unknown>)[
+		const labels = (withAutomaticExample('datetime.first_day', prop) as Record<string, unknown>)[
 			'x-menagerist'
 		] as { labels: Record<string, string> };
 

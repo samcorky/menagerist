@@ -23,7 +23,7 @@ class LogLevel(StrEnum):
         return None
 
 
-class LoggingSettings(MenageristBaseSettings, group="log"):
+class LoggingSettings(MenageristBaseSettings, group="log", label="Logging"):
     """Logging settings."""
 
     level: LogLevel = Field(

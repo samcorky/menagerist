@@ -52,7 +52,7 @@ TOKEN = Actor(id=ALICE.id, roles=frozenset({"member"}), grants=frozenset())
 def mine(make_descriptor: DescriptorFactory) -> PydanticSettingsCatalogue:
     """One instance setting, one per-person setting with an env default, one hidden."""
     first_day = replace(
-        make_descriptor("calendar.first_day", "sunday", SettingScope.USER),
+        make_descriptor("datetime.first_day", "sunday", SettingScope.USER),
         schema={"type": "string", "enum": ["automatic", "monday", "sunday"]},
         default_from_env=True,
     )
@@ -65,7 +65,7 @@ def mine(make_descriptor: DescriptorFactory) -> PydanticSettingsCatalogue:
         [make_descriptor("backup.keep_last", 7), first_day, home],
         {
             "backup.keep_last": TypeAdapter(int),
-            "calendar.first_day": TypeAdapter(Literal["automatic", "monday", "sunday"]),
+            "datetime.first_day": TypeAdapter(Literal["automatic", "monday", "sunday"]),
             "home.collections": TypeAdapter(list[str]),
         },
     )
@@ -106,7 +106,7 @@ async def test_list_shows_every_own_setting_with_the_env_default(
     listing = await _list(mine, InMemorySettingValueRepository(), ALICE)
 
     assert listing == {
-        "calendar.first_day": ("sunday", SettingSource.ENV_DEFAULT),
+        "datetime.first_day": ("sunday", SettingSource.ENV_DEFAULT),
         "home.collections": ([], SettingSource.DEFAULT),
     }
 
@@ -116,13 +116,13 @@ async def test_a_change_is_the_persons_own(mine: PydanticSettingsCatalogue) -> N
     repo = InMemorySettingValueRepository()
     changed: list[str] = []
 
-    await _update(mine, repo, ALICE, {"calendar.first_day": "monday"}, changed)
+    await _update(mine, repo, ALICE, {"datetime.first_day": "monday"}, changed)
 
-    assert (await _list(mine, repo, ALICE))["calendar.first_day"] == (
+    assert (await _list(mine, repo, ALICE))["datetime.first_day"] == (
         "monday",
         SettingSource.USER,
     )
-    assert (await _list(mine, repo, BOB))["calendar.first_day"] == (
+    assert (await _list(mine, repo, BOB))["datetime.first_day"] == (
         "sunday",
         SettingSource.ENV_DEFAULT,
     )
@@ -148,10 +148,10 @@ async def test_update_returns_what_it_saved(mine: PydanticSettingsCatalogue) -> 
     """The response carries each changed setting resolved."""
     result = await UpdateMySettings(
         _uow(InMemorySettingValueRepository()), get_access_guard(), mine
-    ).handle(UpdateMySettingsCommand(values={"calendar.first_day": "monday"}), ALICE)
+    ).handle(UpdateMySettingsCommand(values={"datetime.first_day": "monday"}), ALICE)
 
     assert [(r.descriptor.key, r.value, r.source) for r in result] == [
-        ("calendar.first_day", "monday", SettingSource.USER)
+        ("datetime.first_day", "monday", SettingSource.USER)
     ]
 
 
@@ -183,7 +183,7 @@ async def test_one_bad_value_saves_nothing(mine: PydanticSettingsCatalogue) -> N
             mine,
             repo,
             ALICE,
-            {"home.collections": ["a"], "calendar.first_day": "friday"},
+            {"home.collections": ["a"], "datetime.first_day": "friday"},
         )
 
     assert await repo.list(SettingScope.USER, ALICE.id) == {}
@@ -194,20 +194,20 @@ async def test_reset_restores_the_default_for_that_person_only(
 ) -> None:
     """Resetting drops the person's value; another person's stays."""
     repo = InMemorySettingValueRepository()
-    await _update(mine, repo, ALICE, {"calendar.first_day": "monday"})
-    await _update(mine, repo, BOB, {"calendar.first_day": "monday"})
+    await _update(mine, repo, ALICE, {"datetime.first_day": "monday"})
+    await _update(mine, repo, BOB, {"datetime.first_day": "monday"})
     changed: list[str] = []
     reset = ResetMySetting(
         _uow(repo), get_access_guard(), mine, lambda: changed.append("x")
     )
 
-    result = await reset.handle(ResetMySettingCommand(key="calendar.first_day"), ALICE)
-    again = await reset.handle(ResetMySettingCommand(key="calendar.first_day"), ALICE)
+    result = await reset.handle(ResetMySettingCommand(key="datetime.first_day"), ALICE)
+    again = await reset.handle(ResetMySettingCommand(key="datetime.first_day"), ALICE)
 
     assert (result.value, result.source) == ("sunday", SettingSource.ENV_DEFAULT)
     assert (again.value, again.source) == ("sunday", SettingSource.ENV_DEFAULT)
     assert changed == ["x"]
-    assert (await _list(mine, repo, BOB))["calendar.first_day"][0] == "monday"
+    assert (await _list(mine, repo, BOB))["datetime.first_day"][0] == "monday"
 
 
 async def test_reset_refuses_an_instance_key(mine: PydanticSettingsCatalogue) -> None:
@@ -224,7 +224,7 @@ async def test_schema_lists_only_form_settings(mine: PydanticSettingsCatalogue) 
         GetMySettingsSchemaQuery(), ALICE
     )
 
-    assert list(schema["properties"]) == ["calendar.first_day"]  # type: ignore[call-overload]
+    assert list(schema["properties"]) == ["datetime.first_day"]  # type: ignore[call-overload]
 
 
 async def test_a_token_is_refused(mine: PydanticSettingsCatalogue) -> None:

@@ -29,7 +29,7 @@ from app.modules.settings.application.get_my_settings_schema import GetMySetting
 from app.modules.settings.application.list_my_settings import ListMySettings
 from app.modules.settings.application.reset_my_setting import ResetMySetting
 from app.modules.settings.application.update_my_settings import UpdateMySettings
-from app.platform.config import CalendarSettings, MenageristBaseSettings
+from app.platform.config import DateTimeSettings, MenageristBaseSettings
 from app.platform.config._discovery import discover
 from app.platform.config._markers import Scope, Tunable
 from app.shared_kernel.actor import Actor
@@ -61,7 +61,7 @@ class Server(MenageristBaseSettings, group="server_example"):
 def make_app(repo: InMemorySettingValueRepository) -> FastAPI:
     """The app wired to an in-memory store and the calendar, home and server groups."""
     app: FastAPI = create_app()
-    groups: list[type[MenageristBaseSettings]] = [CalendarSettings, Home, Server]
+    groups: list[type[MenageristBaseSettings]] = [DateTimeSettings, Home, Server]
     catalogue = build_catalogue(discover(groups), {g: g() for g in groups})
     guard = get_access_guard()
     app.dependency_overrides[get_settings_catalogue] = lambda: catalogue
@@ -104,10 +104,16 @@ def test_list_returns_own_settings_including_hidden(
     assert response.status_code == 200
     assert response.headers["cache-control"] == "private, no-store"
     by_key = {item["key"]: item for item in response.json()}
-    assert set(by_key) == {"calendar.first_day", "home.collections"}
-    assert by_key["calendar.first_day"]["value"] == "automatic"
-    assert by_key["calendar.first_day"]["source"] == "default"
-    assert by_key["calendar.first_day"]["hidden"] is False
+    assert set(by_key) == {
+        "datetime.time_zone",
+        "datetime.date_order",
+        "datetime.clock",
+        "datetime.first_day",
+        "home.collections",
+    }
+    assert by_key["datetime.first_day"]["value"] == "automatic"
+    assert by_key["datetime.first_day"]["source"] == "default"
+    assert by_key["datetime.first_day"]["hidden"] is False
     assert by_key["home.collections"]["hidden"] is True
 
 
@@ -120,16 +126,19 @@ def test_patch_saves_for_the_signed_in_person_only(
 
     response = alice.patch(
         BASE,
-        json={"values": {"calendar.first_day": "monday", "home.collections": ["x"]}},
+        json={"values": {"datetime.first_day": "monday", "home.collections": ["x"]}},
     )
 
     assert response.status_code == 200
     assert sorted((i["key"], i["value"], i["source"]) for i in response.json()) == [
-        ("calendar.first_day", "monday", "user"),
+        ("datetime.first_day", "monday", "user"),
         ("home.collections", ["x"], "user"),
     ]
     theirs = {i["key"]: i["value"] for i in bob.get(BASE).json()}
-    assert theirs == {"calendar.first_day": "automatic", "home.collections": []}
+    assert (theirs["datetime.first_day"], theirs["home.collections"]) == (
+        "automatic",
+        [],
+    )
 
 
 def test_patch_refuses_an_instance_setting_and_a_bad_value(
@@ -139,11 +148,12 @@ def test_patch_refuses_an_instance_setting_and_a_bad_value(
     client = client_for(as_user, repo)
 
     instance = client.patch(BASE, json={"values": {"server_example.mode": "b"}})
-    invalid = client.patch(BASE, json={"values": {"calendar.first_day": "friday"}})
+    invalid = client.patch(BASE, json={"values": {"datetime.first_day": "friday"}})
 
     assert instance.status_code == 404
     assert invalid.status_code == 400
-    assert client.get(BASE).json()[0]["value"] == "automatic"
+    listed = {i["key"]: i["value"] for i in client.get(BASE).json()}
+    assert listed["datetime.first_day"] == "automatic"
 
 
 def test_reset_returns_the_default(
@@ -151,10 +161,10 @@ def test_reset_returns_the_default(
 ) -> None:
     """Reset removes the person's value; resetting again is harmless."""
     client = client_for(as_user, repo)
-    client.patch(BASE, json={"values": {"calendar.first_day": "sunday"}})
+    client.patch(BASE, json={"values": {"datetime.first_day": "sunday"}})
 
-    first = client.delete(f"{BASE}/calendar.first_day")
-    again = client.delete(f"{BASE}/calendar.first_day")
+    first = client.delete(f"{BASE}/datetime.first_day")
+    again = client.delete(f"{BASE}/datetime.first_day")
 
     assert (first.json()["value"], first.json()["source"]) == ("automatic", "default")
     assert again.status_code == 200
@@ -173,8 +183,9 @@ def test_schema_leaves_out_hidden_settings_and_carries_labels(
     )
 
     properties = response.json()["properties"]
-    assert list(properties) == ["calendar.first_day"]
-    labels = properties["calendar.first_day"]["x-menagerist"]["labels"]
+    assert "home.collections" not in properties
+    assert "datetime.first_day" in properties
+    labels = properties["datetime.first_day"]["x-menagerist"]["labels"]
     assert labels["automatic"] == "Automatic (from your region)"
     assert cached.status_code == 304
 
@@ -202,11 +213,11 @@ def test_an_env_default_is_reported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The deployment's default shows as `env_default` and can still be changed."""
-    monkeypatch.setenv("MENAGERIST_CALENDAR_FIRST_DAY", "sunday")
+    monkeypatch.setenv("MENAGERIST_DATETIME_FIRST_DAY", "sunday")
     client = client_for(as_user, repo)
 
-    listed = {i["key"]: i for i in client.get(BASE).json()}["calendar.first_day"]
-    changed = client.patch(BASE, json={"values": {"calendar.first_day": "monday"}})
+    listed = {i["key"]: i for i in client.get(BASE).json()}["datetime.first_day"]
+    changed = client.patch(BASE, json={"values": {"datetime.first_day": "monday"}})
 
     assert (listed["value"], listed["source"], listed["locked"]) == (
         "sunday",

@@ -272,6 +272,7 @@ async def test_a_user_hit_carries_no_more_than_the_users_page_shows() -> None:
         "title",
         "description",
         "group",
+        "group_title",
         "slug",
         "item_count",
         "attributes",

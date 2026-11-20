@@ -25,7 +25,7 @@ export function regionFirstDay(locale: string): WeekDay {
 	}
 }
 
-/** The first day for a `calendar.first_day` choice; anything unknown counts as automatic. */
+/** The first day for a `datetime.first_day` choice; anything unknown counts as automatic. */
 export function firstDayFor(choice: unknown, locale: string): WeekDay {
 	return typeof choice === 'string' && choice in FIXED ? FIXED[choice] : regionFirstDay(locale);
 }
@@ -33,5 +33,5 @@ export function firstDayFor(choice: unknown, locale: string): WeekDay {
 /** The signed-in person's first day of the week, from their preference and the browser. */
 export function firstDayOfWeek(): WeekDay {
 	const locale = typeof navigator === 'undefined' ? 'en-GB' : navigator.language;
-	return firstDayFor(preferences.value('calendar.first_day'), locale);
+	return firstDayFor(preferences.value('datetime.first_day'), locale);
 }

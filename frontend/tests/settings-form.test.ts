@@ -5,7 +5,6 @@ import {
 	choicesOf,
 	coerce,
 	formProp,
-	groupLabel,
 	groupOfSetting,
 	groupSettings,
 	isChanged,
@@ -24,6 +23,7 @@ function setting(over: Partial<SettingResponse>): SettingResponse {
 	return {
 		key: 'backup.schedule',
 		group: 'backup',
+		group_title: 'Backups',
 		title: 'Backup schedule',
 		description: null,
 		value: '0 3 * * *',
@@ -38,23 +38,21 @@ function setting(over: Partial<SettingResponse>): SettingResponse {
 }
 
 describe('grouping', () => {
-	it('labels known groups and tidies unknown ones', () => {
-		expect(groupLabel('backup')).toBe('Backups');
-		expect(groupLabel('scheduler')).toBe('Scheduled tasks');
-		expect(groupLabel('media_storage')).toBe('Media storage');
-	});
-
 	it('keeps groups in the order they first appear', () => {
 		const groups = groupSettings([
 			setting({ key: 'backup.schedule' }),
-			setting({ key: 'scheduler.run_history_per_job', group: 'scheduler' }),
+			setting({
+				key: 'scheduler.run_history_per_job',
+				group: 'scheduler',
+				group_title: 'Scheduled tasks'
+			}),
 			setting({ key: 'backup.other' })
 		]);
 		expect(groups.map((g) => [g.group, g.items.map((i) => i.key)])).toEqual([
 			['backup', ['backup.schedule', 'backup.other']],
 			['scheduler', ['scheduler.run_history_per_job']]
 		]);
-		expect(groups[0].label).toBe('Backups');
+		expect(groups.map((g) => g.label)).toEqual(['Backups', 'Scheduled tasks']);
 	});
 });
 

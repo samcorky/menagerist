@@ -4,24 +4,6 @@ import type { JsonSchemaProperty } from '$lib/json-schema';
 /** A value a setting can hold: one scalar, or a list of strings. */
 export type SettingValue = boolean | number | string | string[];
 
-const GROUP_LABELS: Record<string, string> = {
-	backup: 'Backups',
-	branding: 'Branding',
-	identity: 'Sign-in',
-	media: 'Media',
-	release: 'Updates',
-	retention: 'Deleted items',
-	scheduler: 'Scheduled tasks'
-};
-
-/** The heading for a group of settings. */
-export function groupLabel(group: string): string {
-	const label = GROUP_LABELS[group];
-	if (label) return label;
-	const words = group.replaceAll('_', ' ');
-	return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 export type SettingGroup = { group: string; label: string; items: SettingResponse[] };
 
 /** The prefix of each setting's element id, which a link's `#` fragment points at. */
@@ -49,7 +31,8 @@ export function groupSettings(items: SettingResponse[]): SettingGroup[] {
 	for (const item of items) {
 		let entry = groups.get(item.group);
 		if (!entry) {
-			entry = { group: item.group, label: groupLabel(item.group), items: [] };
+			// The server names each group (`group_title`), so every page and search agree.
+			entry = { group: item.group, label: item.group_title || item.group, items: [] };
 			groups.set(item.group, entry);
 		}
 		entry.items.push(item);

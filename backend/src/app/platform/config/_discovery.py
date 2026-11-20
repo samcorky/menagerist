@@ -14,6 +14,7 @@ from app.platform.config._fields import (
     env_name,
     field_adapter,
     group_name,
+    group_title,
     inline_schema,
     unwrap,
 )
@@ -38,6 +39,7 @@ class SettingSpec:
 
     key: str
     group: str
+    group_title: str
     field_name: str
     group_type: type[MenageristBaseSettings]
     field: FieldInfo
@@ -139,6 +141,7 @@ def _spec(
     return SettingSpec(
         key=f"{group}.{name}",
         group=group,
+        group_title=group_title(group_type),
         field_name=name,
         group_type=group_type,
         field=field,

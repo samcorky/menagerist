@@ -19,7 +19,7 @@ def _no_repeats(ids: list[str]) -> list[str]:
     return ids
 
 
-class HomeSettings(MenageristBaseSettings, group="home"):
+class HomeSettings(MenageristBaseSettings, group="home", label="Home"):
     """What each person's Home shows."""
 
     collections: Annotated[

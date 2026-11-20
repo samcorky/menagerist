@@ -16,6 +16,7 @@ class SearchKind(StrEnum):
     SAVED_FIELD = "saved_field"
     EXAMPLE_PACK = "example_pack"
     USER = "user"
+    PREFERENCE = "preference"
     SETTING = "setting"
     SCHEDULED_TASK = "scheduled_task"
 
@@ -65,7 +66,7 @@ class SearchHit:
 
     `ref` is what the owner calls it: an id for items, collections, saved fields
     and users, a slug for item types, a pack's id for example packs, a key for
-    settings and scheduled tasks.
+    settings, preferences and scheduled tasks.
     """
 
     kind: SearchKind
@@ -75,6 +76,8 @@ class SearchHit:
     # Where it lives or what it is: an item's type slug, a setting's group, a saved
     # field's kind, a user's role.
     group: str | None = None
+    # A setting's or preference's group as people know it ("Dates and times").
+    group_title: str | None = None
     # A collection's address segment and live item count.
     slug: str | None = None
     item_count: int | None = None
@@ -94,6 +97,7 @@ class SearchHit:
             title=self.title,
             description=self.description,
             group=self.group,
+            group_title=self.group_title,
             slug=self.slug,
             item_count=self.item_count,
             attributes=self.attributes,

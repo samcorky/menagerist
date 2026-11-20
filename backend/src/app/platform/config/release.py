@@ -8,7 +8,7 @@ from app.platform.config._markers import Labels, Tunable
 from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
-class ReleaseSettings(MenageristBaseSettings, group="release"):
+class ReleaseSettings(MenageristBaseSettings, group="release", label="Updates"):
     """Which releases the instance looks for and how often."""
 
     check_enabled: Annotated[

@@ -8,7 +8,9 @@ from app.platform.config._markers import Tunable
 from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
-class RetentionSettings(MenageristBaseSettings, group="retention"):
+class RetentionSettings(
+    MenageristBaseSettings, group="retention", label="Deleted items"
+):
     """How long deleted content stays recoverable before it is purged."""
 
     deleted_days: int = Field(

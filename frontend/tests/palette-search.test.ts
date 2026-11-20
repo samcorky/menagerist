@@ -11,6 +11,7 @@ import {
 	EXAMPLE_PACKS_PAGE,
 	SAVED_FIELDS_PAGE,
 	USERS_PAGE,
+	preferencePath,
 	settingPath,
 	taskPath,
 	descriptionSnippet,
@@ -29,6 +30,7 @@ describe('GROUP_CAPS', () => {
 			packs: 3,
 			users: 3,
 			pages: 4,
+			preferences: 4,
 			settings: 4,
 			tasks: 3,
 			collectionItems: 5
@@ -139,6 +141,9 @@ describe('result links', () => {
 		expect(settingPath({ key: 'backup.keep_last', group: 'backup' })).toBe(
 			'/settings/server?section=backup#setting-backup.keep_last'
 		);
+		expect(preferencePath({ key: 'datetime.clock', group: 'datetime' })).toBe(
+			'/settings/preferences?section=datetime#setting-datetime.clock'
+		);
 		expect(taskPath({ job_key: 'nightly backup' })).toBe(
 			'/admin/scheduled-tasks#job-nightly backup'
 		);
@@ -155,6 +160,7 @@ describe('paletteLayout', () => {
 			'savedFields',
 			'packs',
 			'pages',
+			'preferences',
 			'settings',
 			'tasks',
 			'users'
@@ -171,7 +177,8 @@ describe('paletteLayout', () => {
 		expect(paletteLayout('/settings/server').order.slice(0, 2)).toEqual(['settings', 'tasks']);
 		expect(first('/admin')).toBe('settings');
 		expect(first('/items/')).toBe('items');
-		expect(paletteLayout('/settings/server').order).toHaveLength(9);
+		expect(paletteLayout('/settings/server').order).toHaveLength(10);
+		expect(paletteLayout('/settings/preferences').order[0]).toBe('preferences');
 	});
 	it('leads with saved fields, example packs or users on the page that holds them', () => {
 		expect(first('/library/saved-fields')).toBe('savedFields');
@@ -184,7 +191,7 @@ describe('paletteLayout', () => {
 		const layout = paletteLayout('/collections/my%20films');
 		expect(layout.collection).toBe('my films');
 		expect(layout.order[0]).toBe('collectionItems');
-		expect(layout.order).toHaveLength(10);
+		expect(layout.order).toHaveLength(11);
 		expect(paletteLayout('/collections/%E0%A4%A').collection).toBe('%E0%A4%A');
 	});
 	it('gives no group extra rows when no page leads', () => {

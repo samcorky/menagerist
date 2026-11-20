@@ -14,7 +14,7 @@ CORS_OPEN_HINT = (
 )
 
 
-class ApiSettings(MenageristBaseSettings, group="api"):
+class ApiSettings(MenageristBaseSettings, group="api", label="API"):
     """API entrypoint settings."""
 
     public_origin: Origin | None = Field(

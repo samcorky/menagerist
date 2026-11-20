@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './fixtures';
-import { chooseItemType, createItemType, uniqueName } from './helpers';
+import { chooseItemType, createItemType, searchPopup, uniqueName } from './helpers';
 
 const FIRST_DAY = 'First day of the week';
 
@@ -16,7 +16,7 @@ async function firstCalendarColumn(page: Page, typeLabel: string): Promise<strin
 
 test.afterEach(async ({ request }) => {
 	// The e2e account is shared: leave the preference as it was found.
-	await request.delete('/api/v1/me/settings/calendar.first_day');
+	await request.delete('/api/v1/me/settings/datetime.first_day');
 });
 
 test('choose the first day of the week: it saves, survives a reload, reaches calendars and resets', async ({
@@ -55,7 +55,7 @@ test('offline, the preferences stay in force but cannot be changed, and say why'
 	request
 }) => {
 	await request.patch('/api/v1/me/settings', {
-		data: { values: { 'calendar.first_day': 'saturday' } }
+		data: { values: { 'datetime.first_day': 'saturday' } }
 	});
 	await page.goto('/settings/preferences');
 	const row = page.getByRole('listitem').filter({ hasText: FIRST_DAY });
@@ -73,4 +73,20 @@ test('offline, the preferences stay in force but cannot be changed, and say why'
 
 	await page.context().setOffline(false);
 	await expect(row.getByRole('button', { name: FIRST_DAY, exact: true })).toBeEnabled();
+});
+
+test('a preference is found in search and opens on its section, focused', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
+	await page.keyboard.press('/');
+	const popup = searchPopup(page);
+	await expect(popup).toBeVisible();
+	await popup.getByPlaceholder('Search everything…').fill('clock');
+	await popup.getByRole('option', { name: /Clock.*Preference · Dates and times/ }).click();
+
+	await expect(page).toHaveURL(
+		/\/settings\/preferences\?section=datetime#setting-datetime\.clock$/
+	);
+	await expect(page.getByRole('heading', { name: 'Dates and times', level: 2 })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Clock', level: 3 })).toBeFocused();
 });

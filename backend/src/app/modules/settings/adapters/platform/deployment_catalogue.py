@@ -49,6 +49,7 @@ def build_catalogue(
             SettingDescriptor(
                 key=spec.key,
                 group=spec.group,
+                group_title=spec.group_title,
                 title=spec.title,
                 description=spec.description,
                 scope=scope,

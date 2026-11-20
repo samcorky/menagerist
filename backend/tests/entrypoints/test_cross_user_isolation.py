@@ -158,6 +158,10 @@ from app.modules.presets.adapters.persistence.unit_of_work import (
     create_in_memory_preset_uow,
 )
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.settings.adapters.api.dependencies import get_setting_values
+from app.modules.settings.adapters.persistence.in_memory_setting_value_repository import (  # noqa: E501
+    InMemorySettingValueRepository,
+)
 from app.modules.system.adapters.api.dependencies import (
     get_get_health_ready_detail_use_case,
     get_get_health_ready_use_case,
@@ -792,6 +796,9 @@ class World:
             targets=companion_targets,
         )
         o[get_definition_checker] = lambda: GraphDefinitionChecker(graph)
+        # Settings and preferences (searched for everyone) read an in-memory store too.
+        setting_values = InMemorySettingValueRepository()
+        o[get_setting_values] = lambda: setting_values
         # Readiness would otherwise open a real database connection.
         ready = InMemoryHealthCheckAdapter(_PASSING_READINESS)
         o[get_get_health_ready_use_case] = lambda: GetHealthReady(

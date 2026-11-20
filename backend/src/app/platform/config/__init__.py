@@ -3,7 +3,6 @@ from app.platform.config.api import ApiSettings, get_api_settings
 from app.platform.config.avatars import AvatarSettings, get_avatar_settings
 from app.platform.config.backup import BackupSettings, get_backup_settings
 from app.platform.config.branding import BrandingSettings, get_branding_settings
-from app.platform.config.calendar import CalendarSettings, get_calendar_settings
 from app.platform.config.database import DatabaseSettings, get_database_settings
 from app.platform.config.date_time import DateTimeSettings, get_date_time_settings
 from app.platform.config.home import HomeSettings, get_home_settings
@@ -34,7 +33,6 @@ INSTANCE_SETTINGS = (
     get_avatar_settings,
     get_backup_settings,
     get_branding_settings,
-    get_calendar_settings,
     get_database_settings,
     get_date_time_settings,
     get_home_settings,
@@ -56,7 +54,6 @@ ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
     AvatarSettings,
     BackupSettings,
     BrandingSettings,
-    CalendarSettings,
     DatabaseSettings,
     DateTimeSettings,
     HomeSettings,
@@ -81,7 +78,6 @@ __all__ = [
     "AvatarSettings",
     "BackupSettings",
     "BrandingSettings",
-    "CalendarSettings",
     "DatabaseSettings",
     "DateTimeSettings",
     "HomeSettings",
@@ -103,7 +99,6 @@ __all__ = [
     "get_avatar_settings",
     "get_backup_settings",
     "get_branding_settings",
-    "get_calendar_settings",
     "get_database_settings",
     "get_date_time_settings",
     "get_home_settings",

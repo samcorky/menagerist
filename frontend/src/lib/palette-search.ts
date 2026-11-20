@@ -11,6 +11,7 @@ export const GROUP_CAPS = {
 	packs: 3,
 	users: 3,
 	pages: 4,
+	preferences: 4,
 	settings: 4,
 	tasks: 3,
 	collectionItems: 5
@@ -96,6 +97,14 @@ export function settingPath(
 	return `/settings/server?${section}#${settingId(setting.key)}`;
 }
 
+/** Where a preference lives: its section of the Preferences page, scrolled to it. */
+export function preferencePath(
+	preference: Pick<PaletteSetting, 'key' | 'group'>
+): `/settings/preferences?${string}#${string}` {
+	const section = new URLSearchParams({ section: preference.group }).toString();
+	return `/settings/preferences?${section}#${settingId(preference.key)}`;
+}
+
 /** Where a scheduled task is on the scheduled tasks page, highlighted. */
 export function taskPath(task: Pick<PaletteTask, 'job_key'>): `/admin/scheduled-tasks#${string}` {
 	return `/admin/scheduled-tasks#${jobId(task.job_key)}`;
@@ -117,6 +126,7 @@ const DEFAULT_ORDER: PaletteGroup[] = [
 	'savedFields',
 	'packs',
 	'pages',
+	'preferences',
 	'settings',
 	'tasks',
 	'users'
@@ -148,6 +158,7 @@ export function paletteLayout(pathname: string): PaletteLayout {
 	else if (path === '/admin' || path === '/settings/server' || path.startsWith('/admin/'))
 		lead = ['settings', 'tasks'];
 	else if (path === '/items') lead = ['items'];
+	else if (path === '/settings/preferences') lead = ['preferences'];
 
 	const order = [...lead, ...DEFAULT_ORDER.filter((key) => !lead.includes(key))];
 	const caps: Record<PaletteGroup, number> = { ...GROUP_CAPS };

@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 from app.platform.config._base import MenageristBaseSettings
 
 
-class AvatarSettings(MenageristBaseSettings, group="avatars"):
+class AvatarSettings(MenageristBaseSettings, group="avatars", label="Account pictures"):
     """Where Random cat gets its cats."""
 
     cat_service_enabled: bool = Field(

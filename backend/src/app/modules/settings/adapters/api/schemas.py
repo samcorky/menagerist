@@ -24,6 +24,7 @@ class SettingResponse(BaseModel):
                 {
                     "key": "backup.keep_last",
                     "group": "backup",
+                    "group_title": "Backups",
                     "title": "Backups to keep",
                     "description": "Minimum number of ordinary backups to retain.",
                     "value": 12,
@@ -40,6 +41,9 @@ class SettingResponse(BaseModel):
 
     key: str = Field(description="Stable name of the setting, `group.field`.")
     group: str = Field(description="The part of the app the setting belongs to.")
+    group_title: str = Field(
+        description="The group's name for people, such as `Backups`; a heading."
+    )
     title: str = Field(description="The setting's name, for people.")
     description: str | None = Field(
         description="What it does; null if the title says enough."
@@ -77,6 +81,7 @@ class SettingResponse(BaseModel):
         return cls(
             key=descriptor.key,
             group=descriptor.group,
+            group_title=descriptor.group_title or descriptor.group,
             title=descriptor.title,
             description=descriptor.description,
             value=resolved.value,
