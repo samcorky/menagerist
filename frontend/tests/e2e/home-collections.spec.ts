@@ -120,3 +120,26 @@ test('offline, Show on Home cannot be used and the page says why', async ({ page
 	await page.context().setOffline(false);
 	await expect(toggle).toBeEnabled();
 });
+
+test('each collection is put on Home and taken off on its own', async ({ page, request }) => {
+	const first = await makeCollection(request, uniqueName('Shelf'));
+	const second = await makeCollection(request, uniqueName('Shelf'));
+	const toggle = page.getByRole('button', { name: 'Show on Home' });
+
+	await page.goto(`/collections/${first.id}`);
+	await toggle.click();
+	await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+	await page.goto(`/collections/${second.id}`);
+	await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+	await toggle.click();
+	await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+	await page.goto(`/collections/${first.id}`);
+	await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+	await toggle.click();
+	await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+	await page.goto(`/collections/${second.id}`);
+	await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+});
