@@ -3152,16 +3152,44 @@
         "summary": "List Item Fields",
         "description": "List the fields your items carry themselves, most used first.\n\nThese are the per-item fields a search can filter on. A field appears once\nper name and kind, with how many of your items declare it. Removed fields\nand fields without a recorded kind are left out. At most 200 are returned.\n\n**Requires permission:** `graph:item:read`",
         "operationId": "list_item_fields",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Count only items of the item type with this slug.",
+              "title": "Type"
+            },
+            "description": "Count only items of the item type with this slug."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/ItemFieldResponse"
                   },
-                  "type": "array",
                   "title": "Response List Item Fields",
                   "description": "Each entry is a `ItemFieldResponse`."
                 },
@@ -3250,6 +3278,32 @@
               }
             }
           },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/fields"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -3273,6 +3327,18 @@
             }
           }
         },
+        "x-required-permission": "graph:item:read"
+      }
+    },
+    "/api/v1/nodes/fields/{key}/promote": {
+      "post": {
+        "tags": [
+          "v1",
+          "Nodes"
+        ],
+        "summary": "Promote Item Field",
+        "description": "Make a field your items carry themselves a field of their item type.\n\nEvery item of the type that defines the field loses its own copy, in one\nchange, and keeps its value. The definition most of them share is used, with\nthe choices of all of them. Refused when some define it as another kind.\n\n**Requires permission:** `graph:type:write`",
+        "operationId": "promote_item_field",
         "security": [
           {
             "APIKeyCookie": []
@@ -3281,7 +3347,221 @@
             "HTTPBearer": []
           }
         ],
-        "x-required-permission": "graph:item:read"
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The field's key in the item details.",
+              "title": "Key"
+            },
+            "description": "The field's key in the item details."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteExtraSchemaFieldRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromotedItemFieldResponse"
+                },
+                "example": {
+                  "items": 12,
+                  "node_type": {
+                    "colour": "red",
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "A motion picture.",
+                    "icon": "clapperboard",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "label": "Film",
+                    "slug": "film",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when attributes_schema is not valid JSON Schema.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidSchemaError",
+                  "status": 400,
+                  "detail": "2 items keep Signed as a different kind of field.",
+                  "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested node type does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NodeTypeNotFoundError",
+                  "status": 404,
+                  "detail": "NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+                  "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/nodes/fields/key/promote"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:type:write"
       }
     },
     "/api/v1/nodes/deleted": {
@@ -5623,7 +5903,7 @@
           "Nodes"
         ],
         "summary": "Promote Extra Schema Field",
-        "description": "Move an overlay field's definition onto the item type; the value is unchanged.\n\n**Requires permission:** `graph:type:write`",
+        "description": "Make one of this item's own fields a field of its item type.\n\nThis item's definition is used, and every other item of the type that has the\nfield loses its own copy too, as `POST /nodes/fields/{key}/promote` does.\nValues are unchanged.\n\n**Requires permission:** `graph:type:write`",
         "operationId": "promote_extra_schema_field",
         "security": [
           {
@@ -36798,6 +37078,41 @@
         "examples": [
           {
             "node_type_id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20"
+          }
+        ]
+      },
+      "PromotedItemFieldResponse": {
+        "properties": {
+          "items": {
+            "type": "integer",
+            "title": "Items",
+            "description": "How many items the field moved off."
+          },
+          "node_type": {
+            "$ref": "#/components/schemas/NodeTypeResponse",
+            "description": "The item type, with the field."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "node_type"
+        ],
+        "title": "PromotedItemFieldResponse",
+        "description": "What promoting a per-item field onto its item type changed.",
+        "examples": [
+          {
+            "items": 12,
+            "node_type": {
+              "colour": "red",
+              "created_at": "2026-08-23T10:14:44.465954Z",
+              "description": "A motion picture.",
+              "icon": "clapperboard",
+              "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+              "label": "Film",
+              "slug": "film",
+              "updated_at": "2026-08-23T10:14:44.465954Z"
+            }
           }
         ]
       },

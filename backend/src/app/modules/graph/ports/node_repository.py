@@ -128,9 +128,11 @@ class NodeRepository(Protocol):
         ...
 
     async def item_fields(
-        self, *, scope: ContentFilter, limit: int
+        self, *, scope: ContentFilter, limit: int, type_slug: str | None = None
     ) -> builtins.list[ItemFieldUse]:
         """List the per-item fields declared in the overlays of live nodes in `scope`.
+
+        With `type_slug`, only nodes of that item type count.
 
         Only properties with an explicit, filterable `x-menagerist.kind` that are
         not archived count. Rows group by (key, kind); `label` is the most common
@@ -252,6 +254,21 @@ class NodeRepository(Protocol):
 
         With `sub_key`, `key` names a group property and this lists nodes
         where any row of that array holds `sub_key`.
+        """
+        ...
+
+    async def list_with_item_field(
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        scope: ContentFilter,
+        after: uuid.UUID | None,
+        limit: int,
+    ) -> builtins.list[Node]:
+        """List non-deleted nodes of `type_slug` whose own overlay defines `key`.
+
+        Ordered by id, at most `limit`, after `after` when given.
         """
         ...
 

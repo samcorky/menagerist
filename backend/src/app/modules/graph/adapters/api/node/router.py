@@ -63,9 +63,11 @@ from app.modules.graph.adapters.api.node.schemas import (
     NodeSearchRequest,
     NodeSearchResponse,
     NodeTypeCountResponse,
+    PromotedItemFieldResponse,
     PromoteExtraSchemaFieldRequest,
     UpdateNodeRequest,
 )
+from app.modules.graph.adapters.api.node_type.schemas import NodeTypeResponse
 from app.modules.graph.application.count_node_types import (
     CountNodeTypes,
     CountNodeTypesQuery,
@@ -303,6 +305,10 @@ async def count_node_searches(
 async def list_item_fields(
     use_case: Annotated[ListItemFields, Depends(get_list_item_fields_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    type: Annotated[
+        str | None,
+        Query(description="Count only items of the item type with this slug."),
+    ] = None,
 ) -> list[ItemFieldResponse]:
     """List the fields your items carry themselves, most used first.
 
@@ -310,8 +316,47 @@ async def list_item_fields(
     per name and kind, with how many of your items declare it. Removed fields
     and fields without a recorded kind are left out. At most 200 are returned.
     """
-    fields = await use_case.handle(ListItemFieldsQuery(), actor)
+    fields = await use_case.handle(ListItemFieldsQuery(type_slug=type), actor)
     return [ItemFieldResponse.from_domain(field) for field in fields]
+
+
+@router.post(
+    "/fields/{key}/promote",
+    response_model=PromotedItemFieldResponse,
+    operation_id="promote_item_field",
+    responses={
+        **error_response(
+            NodeTypeNotFoundError,
+            detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            InvalidSchemaError,
+            detail="2 items keep Signed as a different kind of field.",
+        ),
+    },
+)
+async def promote_item_field(
+    key: FieldKey,
+    payload: PromoteExtraSchemaFieldRequest,
+    use_case: Annotated[
+        PromoteExtraSchemaField, Depends(get_promote_extra_schema_field_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> PromotedItemFieldResponse:
+    """Make a field your items carry themselves a field of their item type.
+
+    Every item of the type that defines the field loses its own copy, in one
+    change, and keeps its value. The definition most of them share is used, with
+    the choices of all of them. Refused when some define it as another kind.
+    """
+    promoted = await use_case.handle(
+        PromoteExtraSchemaFieldCommand(node_type_id=payload.node_type_id, key=key),
+        actor,
+    )
+    return PromotedItemFieldResponse(
+        items=promoted.items,
+        node_type=NodeTypeResponse.from_domain(promoted.node_type),
+    )
 
 
 @router.get(
@@ -699,14 +744,21 @@ async def promote_extra_schema_field(
     ],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> NodeResponse:
-    """Move an overlay field's definition onto the item type; the value is unchanged."""
-    node = await use_case.handle(
+    """Make one of this item's own fields a field of its item type.
+
+    This item's definition is used, and every other item of the type that has the
+    field loses its own copy too, as `POST /nodes/fields/{key}/promote` does.
+    Values are unchanged.
+    """
+    promoted = await use_case.handle(
         PromoteExtraSchemaFieldCommand(
             node_id=node_id, node_type_id=payload.node_type_id, key=key
         ),
         actor,
     )
-    return NodeResponse.from_domain(node)
+    if promoted.node is None:
+        raise NodeNotFoundError(f"Node {node_id} not found")
+    return NodeResponse.from_domain(promoted.node)
 
 
 @router.delete(

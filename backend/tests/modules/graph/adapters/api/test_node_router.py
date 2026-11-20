@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from starlette.testclient import TestClient
 
@@ -492,6 +492,77 @@ def test_promote_extra_schema_field_moves_the_property() -> None:
 
     updated_type = client.get(f"/api/v1/node-types/{node_type['id']}").json()
     assert "condition" in updated_type["attributes_schema"]["properties"]
+
+
+def _film_with_signed_items(client: TestClient, count: int) -> dict[str, Any]:
+    node_type = client.post(
+        "/api/v1/node-types", json={"slug": "film", "label": "Film"}
+    ).json()
+    schema = {
+        "type": "object",
+        "properties": {
+            "signed": {
+                "type": "boolean",
+                "title": "Signed",
+                "x-menagerist": {"kind": "boolean"},
+            }
+        },
+    }
+    for n in range(count):
+        client.post(
+            "/api/v1/nodes",
+            json={
+                "name": f"Film {n}",
+                "type": "film",
+                "attributes": {"signed": True},
+                "extra_schema": schema,
+            },
+        )
+    client.post("/api/v1/nodes", json={"name": "Dune", "extra_schema": schema})
+    return cast("dict[str, Any]", node_type)
+
+
+def test_list_item_fields_counts_one_item_type() -> None:
+    """GET /nodes/fields?type= counts only that type's items."""
+    client = TestClient(_app_with_in_memory_graph())
+    _film_with_signed_items(client, 2)
+
+    everything = client.get("/api/v1/nodes/fields").json()
+    films = client.get("/api/v1/nodes/fields", params={"type": "film"}).json()
+
+    assert [(f["key"], f["count"]) for f in everything] == [("signed", 3)]
+    assert [(f["key"], f["count"]) for f in films] == [("signed", 2)]
+
+
+def test_promote_item_field_moves_it_off_every_item_of_the_type() -> None:
+    """POST /nodes/fields/{key}/promote moves the field from all the type's items."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_type = _film_with_signed_items(client, 3)
+
+    response = client.post(
+        "/api/v1/nodes/fields/signed/promote", json={"node_type_id": node_type["id"]}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"] == 3
+    assert "signed" in body["node_type"]["attributes_schema"]["properties"]
+    left = client.get("/api/v1/nodes/fields", params={"type": "film"}).json()
+    assert left == []
+
+
+def test_promote_item_field_no_item_has_is_400() -> None:
+    """Promoting a field no item of the type carries is refused."""
+    client = TestClient(_app_with_in_memory_graph())
+    node_type = client.post(
+        "/api/v1/node-types", json={"slug": "film", "label": "Film"}
+    ).json()
+
+    response = client.post(
+        "/api/v1/nodes/fields/signed/promote", json={"node_type_id": node_type["id"]}
+    )
+
+    assert response.status_code == 400
 
 
 def test_promote_extra_schema_field_returns_404_when_node_missing() -> None:
