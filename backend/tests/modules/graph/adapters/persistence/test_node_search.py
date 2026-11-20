@@ -935,6 +935,31 @@ async def test_search_count_limit_caps_the_count(
     assert count == expected
 
 
+async def test_search_count_with_ids_counts_only_those_items(
+    repository: NodeRepository,
+) -> None:
+    """`ids` restricts the count to the named items that also match."""
+    await _seed(repository)
+    hits = await repository.search(
+        scope=ContentFilter.of(ALICE),
+        resolved=_resolve({"v": 1, "where": None}),
+        after=None,
+        limit=100,
+    )
+    by_name = {hit.node.name: hit.node.id for hit in hits}
+    films = _resolve({"v": 1, "where": {"op": "and", "children": [_FILM]}})
+    scope = ContentFilter.of(ALICE)
+
+    alien = await repository.search_count(
+        scope=scope, resolved=films, ids=[by_name["Alien"]]
+    )
+    chess = await repository.search_count(
+        scope=scope, resolved=films, ids=[by_name["Chess"]]
+    )
+
+    assert (alien, chess) == (1, 0)
+
+
 @pytest.mark.parametrize("by", ["name", "created"])
 @pytest.mark.parametrize("direction", ["asc", "desc"])
 async def test_paging_by_name_or_time_visits_every_item_once(

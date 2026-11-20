@@ -295,3 +295,85 @@ async def test_list_by_kind_still_filters_by_held_item(
     )
 
     assert [s.collection for s in result.items] == [shelves[2]]
+
+
+async def _smart(world: World, name: str, definition: dict[str, object]) -> Collection:
+    from app.shared_kernel.slug import Slug
+
+    collection = Collection.create(
+        name=name,
+        slug=Slug(name.lower()),
+        owner_id=uuid.uuid7(),
+        definition=definition,
+    )
+    await world.collections.add(collection)
+    return collection
+
+
+async def test_matches_item_keeps_only_matching_smart_collections(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """`matches_item` skips manual shelves and smart ones whose rule misses."""
+    item = uuid.uuid7()
+    world.items.live = {item}
+    shelf = make_collection(name="Shelf")
+    await world.collections.add(shelf)
+    await _hold(world, shelf, item)
+    films = await _smart(world, "Films", {"v": 1, "films": True})
+    await _smart(world, "Games", {"v": 1, "games": True})
+    world.items.misses.append(({"v": 1, "games": True}, item))
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(matches_item=item), SYSTEM_ACTOR
+    )
+
+    assert [s.collection for s in result.items] == [films]
+
+
+async def test_matches_item_fills_a_page_across_misses(world: World) -> None:
+    """A page of matches stays full when misses sit between them."""
+    item = uuid.uuid7()
+    world.items.live = {item}
+    smart = [await _smart(world, f"Smart{n}", {"v": 1, "n": n}) for n in range(5)]
+    smart.sort(key=lambda c: c.id)
+    for miss in smart[:3]:
+        assert miss.definition is not None
+        world.items.misses.append((miss.definition, item))
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(matches_item=item, limit=2), SYSTEM_ACTOR
+    )
+
+    assert [s.collection for s in result.items] == smart[3:]
+
+
+async def test_matches_item_with_the_manual_kind_is_empty(world: World) -> None:
+    """Manual collections have no rule to match, so asking for both finds none."""
+    from app.modules.collections.domain.collection import CollectionKind
+
+    item = uuid.uuid7()
+    world.items.live = {item}
+    await _smart(world, "Films", {"v": 1})
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(matches_item=item, kind=CollectionKind.MANUAL),
+        SYSTEM_ACTOR,
+    )
+
+    assert result.items == []
+
+
+async def test_matches_item_skips_a_smart_collection_with_no_definition(
+    world: World,
+) -> None:
+    """A smart row whose definition is missing has no rule, so it matches nothing."""
+    item = uuid.uuid7()
+    world.items.live = {item}
+    broken = await _smart(world, "Broken", {"v": 1})
+    broken.definition = None
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(matches_item=item), SYSTEM_ACTOR
+    )
+
+    assert result.items == []

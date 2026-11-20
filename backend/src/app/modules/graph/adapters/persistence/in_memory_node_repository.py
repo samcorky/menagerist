@@ -323,10 +323,18 @@ class InMemoryNodeRepository:
         return hits[:limit]
 
     async def search_count(
-        self, *, scope: ContentFilter, resolved: ResolvedQuery, limit: int | None = None
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        limit: int | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
     ) -> int:
         """Return how many live nodes in `scope` match the query, up to `limit`."""
-        count = len(self._matching(scope, resolved))
+        hits = self._matching(scope, resolved)
+        if ids is not None:
+            hits = [h for h in hits if h.node.id in ids]
+        count = len(hits)
         return count if limit is None else min(count, limit)
 
     async def random(

@@ -1,4 +1,4 @@
-"""Tests for ValidateQuery and count_matching."""
+"""Tests for ValidateQuery, count_matching and item_matches."""
 
 import uuid
 from datetime import date
@@ -18,7 +18,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_repository import (
 from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
     InMemoryNodeTypeRepository,
 )
-from app.modules.graph.application.prepare_query import count_matching
+from app.modules.graph.application.prepare_query import count_matching, item_matches
 from app.modules.graph.application.validate_query import (
     ValidateQuery,
     ValidateQueryQuery,
@@ -182,3 +182,45 @@ async def test_count_without_a_cap_is_exact() -> None:
     query = {"v": 1, "where": None}
     got = await count_matching(repos, query, ContentFilter.of(OWNER), cap=None)
     assert got == (5, False)
+
+
+async def _ids_by_name(repos: GraphRepos) -> dict[str, uuid.UUID]:
+    nodes = await repos.nodes.list(
+        scope=ContentFilter.everyone(), after=None, limit=100
+    )
+    return {node.name: node.id for node in nodes}
+
+
+async def test_item_matches_applies_the_conditions_to_one_item() -> None:
+    """Only the named item is checked against the conditions."""
+    repos = await _repos(3)
+    ids = await _ids_by_name(repos)
+    scope = ContentFilter.of(OWNER)
+    query = _rating_at_least(1)
+
+    assert await item_matches(repos, query, scope, ids["Film 2"]) is True
+    assert await item_matches(repos, query, scope, ids["Film 0"]) is False
+
+
+async def test_item_matches_nothing_outside_the_scope() -> None:
+    """Another owner's item never matches, even with no conditions."""
+    repos = await _repos(1)
+    ids = await _ids_by_name(repos)
+    query = {"v": 1, "where": None}
+
+    assert (
+        await item_matches(repos, query, ContentFilter.of(OWNER), ids["Theirs"])
+        is False
+    )
+
+
+async def test_item_matches_nothing_for_a_stale_field() -> None:
+    """A stale condition matches no item and does not raise."""
+    repos = await _repos(3)
+    ids = await _ids_by_name(repos)
+    query = _rating_at_least(0, key="gone")
+
+    assert (
+        await item_matches(repos, query, ContentFilter.of(OWNER), ids["Film 2"])
+        is False
+    )

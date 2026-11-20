@@ -20839,7 +20839,7 @@
           "Collections"
         ],
         "summary": "List Collections",
-        "description": "List collections with item counts, optionally only those holding an item.\n\n**Requires permission:** `collections:collection:read`",
+        "description": "List collections with item counts, optionally only those holding an item.\n\n`matches_item` keeps the smart collections whose definition matches it.\n\n**Requires permission:** `collections:collection:read`",
         "operationId": "list_collections",
         "security": [
           {
@@ -20901,6 +20901,25 @@
               "title": "Item Id"
             },
             "description": "Keep collections holding this item."
+          },
+          {
+            "name": "matches_item",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep smart collections whose definition matches this item. Each smart collection is checked, so page with a small limit.",
+              "title": "Matches Item"
+            },
+            "description": "Keep smart collections whose definition matches this item. Each smart collection is checked, so page with a small limit."
           },
           {
             "name": "q",

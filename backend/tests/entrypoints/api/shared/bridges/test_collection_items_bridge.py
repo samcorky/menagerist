@@ -83,3 +83,35 @@ async def test_ids_outside_the_scope_are_dropped(db_session: AsyncSession) -> No
 
     assert mine == {n.id for n in nodes}
     assert theirs == {other.id}
+
+
+async def test_matches_checks_one_item_against_a_definition(
+    db_session: AsyncSession,
+) -> None:
+    """Only the named item is tested, and a deleted item never matches."""
+    lookup, nodes = await _lookup_with_nodes(db_session, 2, deleted=1)
+    named = {
+        "v": 1,
+        "where": {
+            "op": "and",
+            "children": [{"kind": "name", "op": "=", "value": "Item 1"}],
+        },
+    }
+    scope = ContentFilter.everyone()
+
+    assert await lookup.matches(named, scope, nodes[1].id) is True
+    assert await lookup.matches({"v": 1}, scope, nodes[0].id) is False
+
+
+async def test_matches_nothing_for_an_unreadable_definition(
+    db_session: AsyncSession,
+) -> None:
+    """A definition that no longer parses matches nothing instead of raising."""
+    lookup, nodes = await _lookup_with_nodes(db_session, 1)
+
+    assert (
+        await lookup.matches(
+            {"v": 1, "where": {"op": "xor"}}, ContentFilter.everyone(), nodes[0].id
+        )
+        is False
+    )

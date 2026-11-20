@@ -113,12 +113,17 @@ class NodeRepository(Protocol):
         ...
 
     async def search_count(
-        self, *, scope: ContentFilter, resolved: ResolvedQuery, limit: int | None = None
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        limit: int | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
     ) -> int:
         """Return how many live nodes in `scope` match the query.
 
         With `limit`, the result never exceeds it and the database stops
-        counting once it has found that many.
+        counting once it has found that many. With `ids`, only those nodes count.
         """
         ...
 

@@ -392,6 +392,7 @@ class Seed:
 PATH_PARAMS: dict[str, Callable[[Seed], str]] = {
     "node_id": lambda s: s.item,
     "item_id": lambda s: s.item,
+    "matches_item": lambda s: s.item,
     "edge_id": lambda s: s.edge,
     "node_type_id": lambda s: s.film,
     "edge_type_id": lambda s: s.edge_type,
@@ -413,6 +414,7 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
     "collection": lambda s: s.collection,
     "node_id": lambda s: s.item,
     "item_id": lambda s: s.item,
+    "matches_item": lambda s: s.item,
     "after": lambda s: s.item,
     "relationship": lambda _: "owns",
     "depth": lambda _: "1",
@@ -1288,6 +1290,9 @@ EMPTY_FOR_A: dict[tuple[str, str], str] = {
         ): "nothing holds A's item; it holds one"
         for variant in ("bare", "query:relationship", "query:depth", "query:all")
     },
+    ("/api/v1/collections", "query:all"): (
+        "smart collections match items; kind 'manual' keeps none"
+    ),
     ("/api/v1/presets", "query:kind"): "no preset has the kind 'manual'",
     ("/api/v1/presets", "query:all"): "no preset has the kind 'manual'",
     ("/api/v1/search", "bare"): "blank text finds nothing",

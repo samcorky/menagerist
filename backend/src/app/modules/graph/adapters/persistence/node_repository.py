@@ -315,14 +315,22 @@ class SqlAlchemyNodeRepository:
         ]
 
     async def search_count(
-        self, *, scope: ContentFilter, resolved: ResolvedQuery, limit: int | None = None
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        limit: int | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
     ) -> int:
         """Return how many live nodes in `scope` match the query.
 
-        With `limit`, counting stops at that many matches.
+        With `limit`, counting stops at that many matches. With `ids`, only those
+        nodes count.
         """
         logger.debug("counting search results", limit=limit)
         matches = select(NodeModel.id).where(_in_scope(scope))
+        if ids is not None:
+            matches = matches.where(_id_in(ids))
         where = compile_where(resolved, QueryEnv(scope=scope, external=self._external))
         if where is not None:
             matches = matches.where(where)

@@ -26,3 +26,13 @@ class ItemLookup(Protocol):
         neither raises.
         """
         ...
+
+    async def matches(
+        self, definition: Mapping[str, Any], scope: ContentFilter, item_id: uuid.UUID
+    ) -> bool:
+        """Return whether the live item `item_id` in `scope` matches `definition`.
+
+        A stale definition matches nothing, and one that cannot be read matches
+        nothing; neither raises.
+        """
+        ...

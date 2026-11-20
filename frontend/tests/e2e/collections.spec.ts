@@ -72,9 +72,10 @@ test('adds an item from the item page and shows it on the collection page', asyn
 	const item = await makeItem(request, uniqueName('Alien'));
 
 	await page.goto(`/items/${item.id}`);
+	// Not the empty line: another test's smart collection may match the new item.
 	const card = page
 		.locator('[data-slot="card"]')
-		.filter({ hasText: 'Not added to any collection yet.' });
+		.filter({ has: page.getByRole('button', { name: 'Add to collection' }) });
 	await expect(card).toBeVisible({ timeout: 20_000 });
 	await card.getByRole('button', { name: 'Add to collection' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Add to collection' });

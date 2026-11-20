@@ -8,7 +8,7 @@ from fastapi import Depends
 from app.entrypoints.api.shared.bridges.collection_conditions import (
     build_search_graph_repos,
 )
-from app.modules.graph.application.prepare_query import count_matching
+from app.modules.graph.application.prepare_query import count_matching, item_matches
 from app.modules.graph.domain.query import InvalidQueryError
 from app.platform.database import get_session_factory
 
@@ -62,6 +62,19 @@ class GraphItemLookup:
         except InvalidQueryError as exc:
             logger.warning("stored collection definition unreadable", error=str(exc))
             return 0, False
+
+    async def matches(
+        self, definition: Mapping[str, Any], scope: ContentFilter, item_id: uuid.UUID
+    ) -> bool:
+        """Return whether the live item `item_id` in `scope` matches `definition`.
+
+        A definition that can no longer be read matches nothing and is logged.
+        """
+        try:
+            return await item_matches(self._repos, definition, scope, item_id)
+        except InvalidQueryError as exc:
+            logger.warning("stored collection definition unreadable", error=str(exc))
+            return False
 
 
 async def get_item_lookup(
