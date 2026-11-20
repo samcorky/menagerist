@@ -427,7 +427,7 @@
 	onReplace: () => void,
 	onFieldChange: (f: EditorField) => void
 )}
-	<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+	<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
 		<div class="min-w-0 sm:flex-1">
 			<FieldKindRow
 				{field}
@@ -470,7 +470,7 @@
 							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end">
+					<DropdownMenu.Content align="end" class="min-w-56">
 						{#if fieldFlags}
 							<FieldFlagItems
 								{field}

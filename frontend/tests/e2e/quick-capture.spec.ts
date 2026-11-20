@@ -95,4 +95,23 @@ test.describe('quick-capture fields', () => {
 			page.getByRole('radiogroup', { name: 'Score' }).getByRole('radio', { name: '4 stars' })
 		).toBeChecked();
 	});
+
+	test("a field's actions sit on its row, not below its chips", async ({ page }) => {
+		test.skip((page.viewportSize()?.width ?? 0) < 640, 'actions stack under the field on a phone');
+		await createItemType(page, {
+			label: uniqueName('Aligned'),
+			fields: [{ label: 'ISBN', capture: true }]
+		});
+		await page.getByRole('button', { name: 'Edit item type' }).first().click();
+		const form = page
+			.locator('form')
+			.filter({ has: page.getByRole('button', { name: /^Saving…$|^Save$/ }) });
+		const label = await form.getByLabel('Field label').first().boundingBox();
+		const menu = await form
+			.getByRole('button', { name: 'More field actions' })
+			.first()
+			.boundingBox();
+		const middle = (box: { y: number; height: number }) => box.y + box.height / 2;
+		expect(Math.abs(middle(label!) - middle(menu!))).toBeLessThan(3);
+	});
 });
