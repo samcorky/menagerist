@@ -31,6 +31,8 @@ class ListCollectionsQuery:
     """Request for a page of collections ordered by id, optionally holding an item.
 
     A `kind` keeps one kind only; the other kind is not loaded or counted.
+    `item_id` keeps the collections that item is in: manual ones holding it and
+    smart ones whose definition matches it.
     """
 
     after: uuid.UUID | None = None
@@ -88,8 +90,11 @@ class ListCollections(
                 q=query.q,
                 kind=query.kind,
             )
-        holding = await self._repos.memberships.collection_ids_for(
-            query.item_id, scope=scope
+        item_id = query.item_id
+        holding = (
+            set()
+            if query.kind is CollectionKind.DYNAMIC
+            else await self._repos.memberships.collection_ids_for(item_id, scope=scope)
         )
         found: list[Collection] = []
         after = query.after
@@ -101,8 +106,24 @@ class ListCollections(
                 q=query.q,
                 kind=query.kind,
             )
-            found.extend(c for c in batch if c.id in holding)
+            found.extend(
+                [c for c in batch if await self._holds(c, item_id, holding, scope)]
+            )
             if len(batch) < query.limit:
                 break
             after = batch[-1].id
         return found[: query.limit]
+
+    async def _holds(
+        self,
+        collection: Collection,
+        item_id: uuid.UUID,
+        holding: set[uuid.UUID],
+        scope: ContentFilter,
+    ) -> bool:
+        """Whether the item is in the collection: held if manual, matched if smart."""
+        if collection.kind is CollectionKind.MANUAL:
+            return collection.id in holding
+        if collection.definition is None:
+            return False
+        return await self._items.matches(collection.definition, scope, item_id)

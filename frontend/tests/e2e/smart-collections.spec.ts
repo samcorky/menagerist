@@ -348,13 +348,14 @@ test('a condition on a removed field shows a warning, and the list still loads',
 	await expect(card).toContainText('No items');
 });
 
-test('smart collections are not offered as places to add an item, and links use the slug', async ({
+test('the item page shows the smart collections it matches, never offers them, and links use the slug', async ({
 	page,
 	request
 }) => {
 	const tool = await makeTool(request);
 	const names = await seedItems(request, tool);
 	const smart = await makeSmart(request, uniqueName('Auto'), weightAtLeast(tool, 1));
+	const heavy = await makeSmart(request, uniqueName('Heavy'), weightAtLeast(tool, 50));
 	const manual = await makeCollection(request, uniqueName('Hand'));
 	const manualSlug = (
 		(await (await request.get(`/api/v1/collections/${manual.id}`)).json()) as Smart
@@ -374,12 +375,17 @@ test('smart collections are not offered as places to add an item, and links use 
 	);
 	await request.put(`/api/v1/collections/${manual.id}/items`, { data: { item_ids: [item.id] } });
 
-	// On the item page the picker lists the manual collection only, and the chip links by slug.
+	// On the item page the chips link by slug; the matched smart collection has no remove button
+	// and the one whose conditions miss the item is not shown.
 	await page.goto(`/items/${item.id}`);
 	const chip = page.getByRole('link', { name: manual.name });
 	await expect(chip).toBeVisible();
 	await expect(chip).toHaveAttribute('href', `/collections/${manualSlug}`);
-	await expect(page.getByRole('link', { name: smart.name })).toHaveCount(0);
+	const smartChip = page.getByRole('link', { name: `${smart.name} Smart` });
+	await expect(smartChip).toBeVisible();
+	await expect(smartChip).toHaveAttribute('href', `/collections/${smart.slug}`);
+	await expect(page.getByRole('button', { name: `Remove from ${smart.name}` })).toHaveCount(0);
+	await expect(page.getByRole('link', { name: heavy.name })).toHaveCount(0);
 	await page.getByRole('button', { name: `Remove from ${manual.name}` }).click();
 	await page.getByRole('button', { name: 'Add to collection' }).first().click();
 	const picker = page.getByRole('dialog', { name: 'Add to collection' });

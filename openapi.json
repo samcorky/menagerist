@@ -20839,7 +20839,7 @@
           "Collections"
         ],
         "summary": "List Collections",
-        "description": "List collections with item counts, optionally only those holding an item.\n\n**Requires permission:** `collections:collection:read`",
+        "description": "List collections with item counts, optionally only those an item is in.\n\n**Requires permission:** `collections:collection:read`",
         "operationId": "list_collections",
         "security": [
           {
@@ -20897,10 +20897,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Keep collections holding this item.",
+              "description": "Keep the collections this item is in: manual ones holding it and smart ones whose definition matches it. Each smart collection is checked, so pass `kind=manual` where smart ones are not wanted.",
               "title": "Item Id"
             },
-            "description": "Keep collections holding this item."
+            "description": "Keep the collections this item is in: manual ones holding it and smart ones whose definition matches it. Each smart collection is checked, so pass `kind=manual` where smart ones are not wanted."
           },
           {
             "name": "q",

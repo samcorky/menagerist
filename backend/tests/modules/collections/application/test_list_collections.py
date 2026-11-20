@@ -4,11 +4,17 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+import pytest
+
 from app.modules.collections.application.list_collections import (
     ListCollections,
     ListCollectionsQuery,
 )
-from app.modules.collections.domain.collection import Collection, Membership
+from app.modules.collections.domain.collection import (
+    Collection,
+    CollectionKind,
+    Membership,
+)
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
@@ -248,7 +254,6 @@ async def test_list_by_kind_never_summarises_the_other_kind(
     world: World, make_collection: MakeCollection
 ) -> None:
     """With `kind=manual` a smart row is neither loaded nor counted."""
-    from app.modules.collections.domain.collection import CollectionKind
     from app.shared_kernel.slug import Slug
 
     manual = make_collection(name="Shelf")
@@ -283,8 +288,6 @@ async def test_list_by_kind_still_filters_by_held_item(
     world: World, make_collection: MakeCollection
 ) -> None:
     """`kind` combines with `item_id`, with the filter applied while paging."""
-    from app.modules.collections.domain.collection import CollectionKind
-
     shelves = await _add_shelves(world, make_collection, 3)
     item = uuid.uuid7()
     await _hold(world, shelves[2], item)
@@ -295,3 +298,90 @@ async def test_list_by_kind_still_filters_by_held_item(
     )
 
     assert [s.collection for s in result.items] == [shelves[2]]
+
+
+async def _smart(world: World, name: str, definition: dict[str, object]) -> Collection:
+    from app.shared_kernel.slug import Slug
+
+    collection = Collection.create(
+        name=name,
+        slug=Slug(name.lower()),
+        owner_id=uuid.uuid7(),
+        definition=definition,
+    )
+    await world.collections.add(collection)
+    return collection
+
+
+async def test_item_id_keeps_held_shelves_and_matching_smart_collections(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """`item_id` keeps shelves holding the item and smart ones whose rule takes it."""
+    item = uuid.uuid7()
+    world.items.live = {item}
+    shelf = make_collection(name="Shelf")
+    await world.collections.add(shelf)
+    await _hold(world, shelf, item)
+    await world.collections.add(make_collection(name="Empty"))
+    films = await _smart(world, "Films", {"v": 1, "films": True})
+    await _smart(world, "Games", {"v": 1, "games": True})
+    world.items.misses.append(({"v": 1, "games": True}, item))
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item), SYSTEM_ACTOR
+    )
+
+    assert [s.collection for s in result.items] == [shelf, films]
+
+
+async def test_item_id_fills_a_page_across_misses(world: World) -> None:
+    """A page of matches stays full when misses sit between them."""
+    item = uuid.uuid7()
+    world.items.live = {item}
+    smart = [await _smart(world, f"Smart{n}", {"v": 1, "n": n}) for n in range(5)]
+    smart.sort(key=lambda c: c.id)
+    for miss in smart[:3]:
+        assert miss.definition is not None
+        world.items.misses.append((miss.definition, item))
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item, limit=2), SYSTEM_ACTOR
+    )
+
+    assert [s.collection for s in result.items] == smart[3:]
+
+
+@pytest.mark.parametrize("kind", ["manual", "dynamic"])
+async def test_item_id_with_a_kind_keeps_that_kind_only(
+    world: World, make_collection: MakeCollection, kind: str
+) -> None:
+    """A kind narrows `item_id` to held shelves or to matching smart collections."""
+    item = uuid.uuid7()
+    world.items.live = {item}
+    shelf = make_collection(name="Shelf")
+    await world.collections.add(shelf)
+    await _hold(world, shelf, item)
+    films = await _smart(world, "Films", {"v": 1})
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item, kind=CollectionKind(kind)), SYSTEM_ACTOR
+    )
+
+    expected = shelf if kind == "manual" else films
+    assert [s.collection for s in result.items] == [expected]
+
+
+async def test_item_id_skips_a_smart_collection_with_no_definition(
+    world: World,
+) -> None:
+    """A smart row whose definition is missing has no rule, so it matches nothing."""
+    item = uuid.uuid7()
+    world.items.live = {item}
+    broken = await _smart(world, "Broken", {"v": 1})
+    broken.definition = None
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item), SYSTEM_ACTOR
+    )
+
+    assert result.items == []

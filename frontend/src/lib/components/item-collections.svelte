@@ -23,7 +23,7 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
-	import { manualCollections } from '$lib/smart-collections';
+	import { isSmart, manualCollections } from '$lib/smart-collections';
 
 	const PAGE_SIZE = 50;
 	const MAX_PAGES = 10;
@@ -31,6 +31,7 @@
 	let { itemId }: { itemId: string } = $props();
 
 	let memberOf = $state<CollectionResponse[]>([]);
+	let matchedBy = $state<CollectionResponse[]>([]);
 	let loading = $state(true);
 	let loadFailed = $state(false);
 
@@ -49,12 +50,15 @@
 	const newNameHint = $derived(validateCollectionName(newName));
 	const showNewNameHint = $derived(newTouched && newNameHint !== null);
 
-	async function fetchAll(query: { item_id?: string }): Promise<CollectionResponse[] | null> {
+	async function fetchAll(query: {
+		item_id?: string;
+		kind?: 'manual';
+	}): Promise<CollectionResponse[] | null> {
 		const found: CollectionResponse[] = [];
 		let after: string | undefined;
 		for (let i = 0; i < MAX_PAGES; i++) {
 			const result = await listCollections({
-				query: { ...query, kind: 'manual', after, limit: PAGE_SIZE }
+				query: { ...query, after, limit: PAGE_SIZE }
 			});
 			if (result.error || !result.data) return null;
 			found.push(...result.data);
@@ -69,6 +73,7 @@
 		if (id !== itemId) return;
 		if (found) {
 			memberOf = manualCollections(found);
+			matchedBy = found.filter(isSmart);
 			loadFailed = false;
 		} else {
 			loadFailed = true;
@@ -85,7 +90,7 @@
 	async function loadPicker() {
 		pickerLoading = true;
 		pickerFailed = false;
-		const found = await fetchAll({});
+		const found = await fetchAll({ kind: 'manual' });
 		if (found) allCollections = manualCollections(found);
 		else pickerFailed = true;
 		pickerLoading = false;
@@ -188,9 +193,9 @@
 					Try again
 				</Button>
 			</div>
-		{:else if !loading && memberOf.length === 0}
-			<p class="text-sm text-muted-foreground">Not added to any collection yet.</p>
-		{:else if memberOf.length > 0}
+		{:else if !loading && memberOf.length === 0 && matchedBy.length === 0}
+			<p class="text-sm text-muted-foreground">Not in any collection yet.</p>
+		{:else if memberOf.length > 0 || matchedBy.length > 0}
 			<ul class="flex flex-wrap gap-2">
 				{#each memberOf as collection (collection.id)}
 					<li class="flex items-center rounded-full border bg-background text-sm">
@@ -209,6 +214,18 @@
 						>
 							<X class="size-3.5" />
 						</button>
+					</li>
+				{/each}
+				{#each matchedBy as collection (collection.id)}
+					<li class="flex items-center rounded-full border border-dashed bg-background text-sm">
+						<a
+							href={resolve('/collections/[id]', collectionRouteParams(collection))}
+							title="Matches this smart collection's conditions"
+							class="flex items-center gap-1.5 rounded-full py-1 pr-3 pl-3 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+						>
+							{collection.name}
+							<span class="text-xs text-muted-foreground">Smart</span>
+						</a>
 					</li>
 				{/each}
 			</ul>

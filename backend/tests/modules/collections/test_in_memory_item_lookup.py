@@ -36,3 +36,16 @@ async def test_count_matching_without_a_cap_is_exact(world: World) -> None:
     world.items.live = {uuid.uuid7() for _ in range(5)}
     assert await world.items.count_matching({}, ALL, cap=None) == (5, False)
     assert await world.items.count_matching({}, ALL, cap=3) == (3, True)
+
+
+async def test_matches_is_true_for_live_items_except_listed_misses(
+    world: World,
+) -> None:
+    """A live item matches any definition unless the pair is a listed miss."""
+    item, gone = uuid.uuid7(), uuid.uuid7()
+    world.items.live = {item}
+    world.items.misses.append(({"v": 2}, item))
+
+    assert await world.items.matches({"v": 1}, ALL, item) is True
+    assert await world.items.matches({"v": 2}, ALL, item) is False
+    assert await world.items.matches({"v": 1}, ALL, gone) is False

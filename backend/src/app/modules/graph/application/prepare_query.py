@@ -144,3 +144,23 @@ async def count_matching(
         scope=scope, resolved=resolved, limit=cap + 1
     )
     return min(counted, cap), counted > cap
+
+
+async def item_matches(
+    repos: GraphRepos,
+    raw: Mapping[str, Any],
+    scope: ContentFilter,
+    item_id: uuid.UUID,
+    *,
+    today: Callable[[], date] = utc_today,
+) -> bool:
+    """Return whether the live item `item_id` in `scope` matches the query.
+
+    Raises:
+        InvalidQueryError: As `prepare_query`.
+    """
+    resolved, _ = await prepare_query(repos, raw, today(), scope=scope)
+    counted = await repos.nodes.search_count(
+        scope=scope, resolved=resolved, limit=1, ids=[item_id]
+    )
+    return counted > 0

@@ -12,11 +12,12 @@ class InMemoryItemLookup:
 
     Ids in `live` are visible to every scope; `add_owned` registers items that
     only their owner's scope covers. A definition is not evaluated: every item
-    inside the scope counts as matching.
+    inside the scope counts as matching, except pairs listed in `misses`.
     """
 
     def __init__(self, live: set[uuid.UUID] | None = None) -> None:
         self.live: set[uuid.UUID] = set(live or ())
+        self.misses: list[tuple[Mapping[str, Any], uuid.UUID]] = []
         self._owners: dict[uuid.UUID, uuid.UUID] = {}
 
     def add_owned(self, item_id: uuid.UUID, owner_id: uuid.UUID) -> None:
@@ -39,3 +40,11 @@ class InMemoryItemLookup:
         if cap is None:
             return total, False
         return min(total, cap), total > cap
+
+    async def matches(
+        self, definition: Mapping[str, Any], scope: ContentFilter, item_id: uuid.UUID
+    ) -> bool:
+        """Whether `item_id` is live in `scope` and not listed with `definition`."""
+        if (definition, item_id) in self.misses:
+            return False
+        return bool(await self.live_ids([item_id], scope))

@@ -205,7 +205,14 @@ async def list_collections(
     after: PageAfter = None,
     limit: Annotated[int, Query(ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)] = 50,
     item_id: Annotated[
-        uuid.UUID | None, Query(description="Keep collections holding this item.")
+        uuid.UUID | None,
+        Query(
+            description=(
+                "Keep the collections this item is in: manual ones holding it and "
+                + "smart ones whose definition matches it. Each smart collection is "
+                + "checked, so pass `kind=manual` where smart ones are not wanted."
+            )
+        ),
     ] = None,
     q: Annotated[
         str | None,
@@ -226,10 +233,14 @@ async def list_collections(
         ),
     ] = None,
 ) -> list[CollectionResponse]:
-    """List collections with item counts, optionally only those holding an item."""
+    """List collections with item counts, optionally only those an item is in."""
     result = await use_case.handle(
         ListCollectionsQuery(
-            after=after, limit=limit + 1, item_id=item_id, q=q, kind=kind
+            after=after,
+            limit=limit + 1,
+            item_id=item_id,
+            q=q,
+            kind=kind,
         ),
         actor,
     )
