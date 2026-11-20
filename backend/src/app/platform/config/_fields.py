@@ -26,6 +26,13 @@ def group_name(group_type: type[MenageristBaseSettings]) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
 
+def group_title(group_type: type[MenageristBaseSettings]) -> str:
+    """The group's name for people, as declared with `label=`, else its name."""
+    if group_type.label is not None:
+        return group_type.label
+    return group_name(group_type).replace("_", " ").capitalize()
+
+
 def unwrap(field: FieldInfo) -> tuple[object, list[object]]:
     """Return the underlying type and every annotation, through `type` aliases."""
     markers = list(field.metadata)

@@ -3,7 +3,7 @@ from pydantic import Field, SecretStr
 from app.platform.config._base import MenageristBaseSettings
 
 
-class IdentityCliSettings(MenageristBaseSettings, group="identity"):
+class IdentityCliSettings(MenageristBaseSettings, group="identity", label="Sign-in"):
     """Settings read only by the `menagerist identity` CLI, never by the server.
 
     `initial_password` comes from `MENAGERIST_IDENTITY_INITIAL_PASSWORD` or, preferably,

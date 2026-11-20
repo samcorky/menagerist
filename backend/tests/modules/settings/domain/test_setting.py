@@ -79,7 +79,7 @@ def test_an_env_default_is_marked_as_the_deployments(
 ) -> None:
     """A per-person default from the environment says so and stays editable."""
     descriptor = replace(
-        make_descriptor("calendar.first_day", "sunday", SettingScope.USER),
+        make_descriptor("datetime.first_day", "sunday", SettingScope.USER),
         default_from_env=True,
     )
     resolved = resolve(descriptor, pin=None, stored=None, is_valid=lambda _: True)

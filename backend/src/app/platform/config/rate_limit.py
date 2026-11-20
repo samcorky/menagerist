@@ -5,7 +5,9 @@ from pydantic import Field
 from app.platform.config._base import MenageristBaseSettings
 
 
-class RateLimitSettings(MenageristBaseSettings, group="rate_limit"):
+class RateLimitSettings(
+    MenageristBaseSettings, group="rate_limit", label="Rate limits"
+):
     """Request limits on the endpoints that are expensive to serve.
 
     Each limit is per signed-in user per minute and counted in each server

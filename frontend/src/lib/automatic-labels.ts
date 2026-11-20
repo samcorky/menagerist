@@ -14,7 +14,7 @@ export function automaticExample(
 	locale: string = typeof navigator === 'undefined' ? 'en-GB' : navigator.language
 ): string | null {
 	switch (key) {
-		case 'calendar.first_day':
+		case 'datetime.first_day':
 			return weekdayName(regionFirstDay(locale), locale);
 		case 'datetime.date_order': {
 			const pad = (n: number) => String(n).padStart(2, '0');

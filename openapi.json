@@ -16837,6 +16837,7 @@
                     "description": "Minimum number of ordinary backups to retain.",
                     "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                     "group": "backup",
+                    "group_title": "Backups",
                     "hidden": false,
                     "key": "backup.keep_last",
                     "locked": false,
@@ -16984,6 +16985,7 @@
                     "description": "Minimum number of ordinary backups to retain.",
                     "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                     "group": "backup",
+                    "group_title": "Backups",
                     "hidden": false,
                     "key": "backup.keep_last",
                     "locked": false,
@@ -17193,6 +17195,7 @@
                   "description": "Minimum number of ordinary backups to retain.",
                   "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                   "group": "backup",
+                  "group_title": "Backups",
                   "hidden": false,
                   "key": "backup.keep_last",
                   "locked": false,
@@ -17392,7 +17395,7 @@
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "type": "object",
                   "properties": {
-                    "calendar.first_day": {
+                    "datetime.first_day": {
                       "type": "string",
                       "enum": [
                         "automatic",
@@ -17565,6 +17568,7 @@
                     "description": "Minimum number of ordinary backups to retain.",
                     "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                     "group": "backup",
+                    "group_title": "Backups",
                     "hidden": false,
                     "key": "backup.keep_last",
                     "locked": false,
@@ -17688,7 +17692,7 @@
                   "summary": "Start the week on Monday",
                   "value": {
                     "values": {
-                      "calendar.first_day": "monday"
+                      "datetime.first_day": "monday"
                     }
                   }
                 }
@@ -17715,6 +17719,7 @@
                     "description": "Minimum number of ordinary backups to retain.",
                     "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                     "group": "backup",
+                    "group_title": "Backups",
                     "hidden": false,
                     "key": "backup.keep_last",
                     "locked": false,
@@ -17739,7 +17744,7 @@
                   "type": "about:blank",
                   "title": "InvalidSettingValueError",
                   "status": 400,
-                  "detail": "Invalid value for calendar.first_day: Input should be 'automatic', 'monday', 'sunday' or 'saturday'",
+                  "detail": "Invalid value for datetime.first_day: Input should be 'automatic', 'monday', 'sunday' or 'saturday'",
                   "instance": "https://menagerist.example/api/v1/me/settings"
                 }
               }
@@ -17922,6 +17927,7 @@
                   "description": "Minimum number of ordinary backups to retain.",
                   "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                   "group": "backup",
+                  "group_title": "Backups",
                   "hidden": false,
                   "key": "backup.keep_last",
                   "locked": false,
@@ -37395,6 +37401,18 @@
             "title": "Group",
             "description": "An item's type slug, or a setting's section."
           },
+          "group_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Title",
+            "description": "A setting's or preference's section, as people know it."
+          },
           "slug": {
             "anyOf": [
               {
@@ -37469,6 +37487,7 @@
           {
             "description": "Minimum number of ordinary backups to retain.",
             "group": "backup",
+            "group_title": "Backups",
             "kind": "setting",
             "ref": "backup.keep_last",
             "score": 80,
@@ -37485,6 +37504,7 @@
           "saved_field",
           "example_pack",
           "user",
+          "preference",
           "setting",
           "scheduled_task"
         ],
@@ -37758,6 +37778,11 @@
             "title": "Group",
             "description": "The part of the app the setting belongs to."
           },
+          "group_title": {
+            "type": "string",
+            "title": "Group Title",
+            "description": "The group's name for people, such as `Backups`; a heading."
+          },
           "title": {
             "type": "string",
             "title": "Title",
@@ -37828,6 +37853,7 @@
         "required": [
           "key",
           "group",
+          "group_title",
           "title",
           "description",
           "value",
@@ -37845,6 +37871,7 @@
             "description": "Minimum number of ordinary backups to retain.",
             "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
             "group": "backup",
+            "group_title": "Backups",
             "hidden": false,
             "key": "backup.keep_last",
             "locked": false,

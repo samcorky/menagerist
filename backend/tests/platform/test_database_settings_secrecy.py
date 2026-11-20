@@ -79,7 +79,6 @@ def test_startup_log_does_not_contain_the_password(
         "AvatarSettings",
         "BackupSettings",
         "BrandingSettings",
-        "CalendarSettings",
         "DatabaseSettings",
         "DateTimeSettings",
         "HomeSettings",

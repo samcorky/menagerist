@@ -49,7 +49,7 @@ _TOKEN = error_response(
 _UNKNOWN = error_response(UnknownSettingError, detail="Unknown setting: calendar.nope")
 _INVALID = error_response(
     InvalidSettingValueError,
-    detail="Invalid value for calendar.first_day: Input should be 'automatic', "
+    detail="Invalid value for datetime.first_day: Input should be 'automatic', "
     + "'monday', 'sunday' or 'saturday'",
 )
 _NO_STORE = "private, no-store"
@@ -61,7 +61,7 @@ _UPDATE_BODY = {
                 "examples": {
                     "week": {
                         "summary": "Start the week on Monday",
-                        "value": {"values": {"calendar.first_day": "monday"}},
+                        "value": {"values": {"datetime.first_day": "monday"}},
                     }
                 }
             }
@@ -87,7 +87,7 @@ _SCHEMA_200: dict[int | str, dict[str, Any]] = {
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "type": "object",
                     "properties": {
-                        "calendar.first_day": {
+                        "datetime.first_day": {
                             "type": "string",
                             "enum": ["automatic", "monday", "sunday", "saturday"],
                             "title": "First day of the week",

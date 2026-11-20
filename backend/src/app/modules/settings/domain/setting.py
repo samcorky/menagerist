@@ -49,6 +49,8 @@ class SettingDescriptor:
     hidden: bool = False
     # The deployment's environment supplies `default` (per-person settings only).
     default_from_env: bool = False
+    # The group's name for people ("Dates and times"); empty means use the group key.
+    group_title: str = ""
 
 
 @dataclass(frozen=True, kw_only=True)

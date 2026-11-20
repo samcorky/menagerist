@@ -22,7 +22,8 @@ class MenageristBaseSettings(TrackedSettings):
 
     A subclass declared with `group="backup"` reads `MENAGERIST_BACKUP_<FIELD>` and
     names its tunable settings `backup.<field>`. Without a group it reads
-    `MENAGERIST_<FIELD>`.
+    `MENAGERIST_<FIELD>`. `label="Backups"` names the group for people: the settings
+    pages, search and the generated reference all use it.
     """
 
     model_config = SettingsConfigDict(
@@ -32,6 +33,8 @@ class MenageristBaseSettings(TrackedSettings):
     )
 
     group: ClassVar[str | None] = None
+    # Not `title`: Pydantic reads that class option as the model's JSON Schema title.
+    label: ClassVar[str | None] = None
 
     @classmethod
     def settings_customise_sources(
@@ -59,6 +62,7 @@ class MenageristBaseSettings(TrackedSettings):
     def __init_subclass__(
         cls,
         group: str | None = None,
+        label: str | None = None,
         **kwargs: Any,  # noqa: ANN401 - Pydantic class options
     ) -> None:
         super().__init_subclass__(**kwargs)
@@ -67,9 +71,11 @@ class MenageristBaseSettings(TrackedSettings):
     def __pydantic_init_subclass__(
         cls,
         group: str | None = None,
+        label: str | None = None,
         **kwargs: Any,  # noqa: ANN401 - Pydantic class options
     ) -> None:
         super().__pydantic_init_subclass__(**kwargs)
+        cls.label = label
         if group is None:
             return
         if not _GROUP.fullmatch(group):

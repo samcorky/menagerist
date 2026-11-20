@@ -14,7 +14,7 @@ _REFRESH_NOTE = (
 )
 
 
-class BrandingSettings(MenageristBaseSettings, group="branding"):
+class BrandingSettings(MenageristBaseSettings, group="branding", label="Branding"):
     """How the instance names and describes itself when installed as an app."""
 
     name: Annotated[

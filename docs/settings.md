@@ -23,7 +23,7 @@ API entrypoint settings.
 | `MENAGERIST_API_FRONTEND_DIST_PATH` | path | unset | any | Deployment only | Built frontend directory; unset in API-only mode. |
 | `MENAGERIST_API_TRUSTED_PROXIES` | comma-separated list of IP addresses or networks | `127.0.0.1` | `*` on its own | Deployment only | Trusted proxy IPs/CIDRs (CSV); '*' trusts all peers. |
 
-## Avatars
+## Account pictures
 
 Where Random cat gets its cats.
 
@@ -32,7 +32,7 @@ Where Random cat gets its cats.
 | `MENAGERIST_AVATARS_CAT_SERVICE_ENABLED` | true or false | `true` | any | Deployment only | Whether this instance ever contacts the cat service for Random cat. Off makes the button draw a cat in the browser instead. Set by the deployment, so an administrator cannot turn it back on from the interface. |
 | `MENAGERIST_AVATARS_CAT_SERVICE_URL` | text | `https://cataas.com` | any | Deployment only | Base address of a cataas-compatible service. The server asks it for `/avatar/<random seed>` and stores the reply like an upload; browsers never contact it. |
 
-## Backup
+## Backups
 
 Instance backup storage, retention and upload limits.
 
@@ -58,14 +58,6 @@ How the instance names and describes itself when installed as an app.
 | `MENAGERIST_BRANDING_SHORT_NAME` | text | `Menagerist` | any | Admin setting | The name under an installed app's icon, where there is little room: at most 12 characters. Installed apps may keep the old value until the browser next checks the app, which can take a day or more. |
 | `MENAGERIST_BRANDING_DESCRIPTION` | text | empty | any | Admin setting | What the instance is for, shown where a browser offers to install it. Empty uses Menagerist's own description. |
 
-## Calendar
-
-How calendars lay out weeks. People choose; the deployment sets defaults.
-
-| Variable | Type | Default | Allowed values | In the app | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `MENAGERIST_CALENDAR_FIRST_DAY` | text | `automatic` | `automatic`, `monday`, `sunday`, `saturday` | Personal | The day calendars start each week on. Automatic uses your region's usual start. |
-
 ## Database
 
 Database connection settings.
@@ -81,16 +73,17 @@ Database connection settings.
 | `MENAGERIST_DATABASE_POOL_SIZE` | whole number | `5` | 1 or more | Deployment only | Database connections each process (every web worker, and the background worker) keeps open in its pool. |
 | `MENAGERIST_DATABASE_MAX_OVERFLOW` | whole number | `10` | 0 or more | Deployment only | Extra database connections each process may open beyond the pool under load, closed again when idle. 0 caps a process at the pool size. |
 
-## Datetime
+## Dates and times
 
-How dates and times read. People choose; the deployment sets defaults.
+How dates, times and weeks read. People choose; the deployment sets defaults.
 
 | Variable | Type | Default | Allowed values | In the app | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `MENAGERIST_DATETIME_DATE_ORDER` | text | `automatic` | `automatic`, `dmy`, `mdy`, `ymd` | Personal | The order dates are written in. Automatic uses your browser's language. |
 | `MENAGERIST_DATETIME_CLOCK` | text | `automatic` | `automatic`, `12h`, `24h` | Personal | How times of day are written. Automatic uses your browser's language. |
+| `MENAGERIST_DATETIME_FIRST_DAY` | text | `automatic` | `automatic`, `monday`, `sunday`, `saturday` | Personal | The day calendars start each week on. Automatic uses your region's usual start. |
 
-## Identity
+## Sign-in
 
 Configuration for the identity module.
 
@@ -115,7 +108,7 @@ Configuration for the identity module.
 | `MENAGERIST_IDENTITY_API_TOKENS_PER_USER` | whole number | `20` | 1 or more | Deployment only | Most active API tokens one person may hold. |
 | `MENAGERIST_IDENTITY_INITIAL_PASSWORD` | secret | none (sensitive) | any | Deployment only | Optional first-admin password; prefer its Docker secret file. Sensitive: best given as a secrets file. |
 
-## Log
+## Logging
 
 Logging settings.
 
@@ -139,7 +132,7 @@ Configuration for the media module.
 | `MENAGERIST_MEDIA_ORPHANED_TTL_HOURS` | whole number | `72` | 1 or more | Deployment only | Hours to keep media files that are no longer referenced. |
 | `MENAGERIST_MEDIA_MAX_UPLOAD_SIZE` | whole number | `104857600` | more than 0 | Deployment only | Maximum accepted media upload size in bytes. |
 
-## Http
+## Outbound requests
 
 How Menagerist behaves when it calls out to other web services.
 
@@ -158,7 +151,7 @@ How Menagerist behaves when it calls out to other web services.
 | `MENAGERIST_HTTP_TOTAL_TIMEOUT_SECONDS` | text | `30.0` | more than 0 | Deployment only | Seconds allowed for a whole outbound request, redirects included, so a reply that trickles in cannot hold it open. |
 | `MENAGERIST_HTTP_MAX_RESPONSE_BYTES` | whole number | `2097152` | 1024 or more | Deployment only | Largest reply, in bytes, accepted from an outbound service unless the caller asks for a smaller one. |
 
-## Rate_Limit
+## Rate limits
 
 Request limits on the endpoints that are expensive to serve.
 
@@ -169,7 +162,7 @@ Request limits on the endpoints that are expensive to serve.
 | `MENAGERIST_RATE_LIMIT_SEARCH_PER_MINUTE` | whole number | `120` | 0 or more | Deployment only | Item searches allowed per user each minute. |
 | `MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE` | whole number | `10` | 0 or more | Deployment only | Preset and user-data imports allowed per user each minute. |
 
-## Release
+## Updates
 
 Which releases the instance looks for and how often.
 
@@ -180,7 +173,7 @@ Which releases the instance looks for and how often.
 | `MENAGERIST_RELEASE_CHECK_SCHEDULE` | cron schedule | `20 5 * * *` | five fields; empty turns the job off | Admin setting | Cron expression for looking for a newer release in the instance timezone. Empty turns the scheduled check off; an administrator can still check from the Status page. |
 | `MENAGERIST_RELEASE_CHECK_ON_STARTUP` | true or false | `true` | any | Deployment only | Whether the app also looks for a newer release each time it starts, so the Status page is current after a deploy rather than waiting for the next scheduled check. Has no effect while update checks are off. |
 
-## Retention
+## Deleted items
 
 How long deleted content stays recoverable before it is purged.
 
@@ -189,7 +182,7 @@ How long deleted content stays recoverable before it is purged.
 | `MENAGERIST_RETENTION_DELETED_DAYS` | whole number | `30` | 1 or more | Deployment only | Days deleted content stays recoverable before it is purged. |
 | `MENAGERIST_RETENTION_PURGE_SCHEDULE` | cron schedule | empty | five fields; empty turns the job off | Admin setting | Cron expression for permanently removing content older than the retention period, in the instance timezone. Empty, the default, leaves it to the data purge-deleted command. |
 
-## Scheduler
+## Scheduled tasks
 
 Worker liveness and job history retention.
 

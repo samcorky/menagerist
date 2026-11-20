@@ -9,7 +9,7 @@ from app.platform.config._markers import Tunable
 from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
-class MediaSettings(MenageristBaseSettings, group="media"):
+class MediaSettings(MenageristBaseSettings, group="media", label="Media"):
     """Configuration for the media module."""
 
     storage_path: Path = Field(

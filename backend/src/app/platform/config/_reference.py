@@ -30,6 +30,7 @@ from app.platform.config._fields import (
     env_name,
     field_adapter,
     group_name,
+    group_title,
     unwrap,
 )
 from app.platform.config._markers import Internal, Scope, Tunable
@@ -46,7 +47,6 @@ ENV_EXAMPLE_PATH = ".env.example"
 SETTINGS_DOC_PATH = "docs/settings.md"
 
 _WIDTH = 88
-_ACRONYMS = {"api": "API"}
 _INTRO = (
     "Every deployment setting is an environment variable. Put the ones you change in a "
     + "`.env` file next to `compose.yaml`; "
@@ -130,6 +130,7 @@ class SettingsSection:
     """The settings of one group, which may span several classes."""
 
     group: str
+    title: str
     summary: str
     entries: tuple[SettingEntry, ...]
 
@@ -164,11 +165,6 @@ def _is_sensitive(field: FieldInfo, schema: JsonObject) -> bool:
         isinstance(leaf, type) and issubclass(leaf, _SENSITIVE)
         for leaf in _leaves(base)
     )
-
-
-def group_title(group: str) -> str:
-    """Title-case a group name for a heading, keeping acronyms upper-case."""
-    return _ACRONYMS.get(group, group.title())
 
 
 def _code(text: str) -> str:
@@ -298,17 +294,24 @@ def build_sections(
     """
     entries: dict[str, list[SettingEntry]] = {}
     summaries: dict[str, str] = {}
+    titles: dict[str, str] = {}
     for group_type in groups:
         group = group_name(group_type)
         summary = (group_type.__doc__ or "").strip().splitlines()[0]
         summaries.setdefault(group, summary)
+        titles.setdefault(group, group_title(group_type))
         entries.setdefault(group, []).extend(
             _entry(group_type, name)
             for name, field in group_type.model_fields.items()
             if _documented(field)
         )
     sections = [
-        SettingsSection(group=group, summary=summaries[group], entries=tuple(items))
+        SettingsSection(
+            group=group,
+            title=titles[group],
+            summary=summaries[group],
+            entries=tuple(items),
+        )
         for group, items in entries.items()
         if items
     ]
@@ -323,6 +326,7 @@ def _compose_section(texts: Mapping[str, str]) -> SettingsSection:
     check_descriptions(variables)
     return SettingsSection(
         group=COMPOSE_GROUP,
+        title="Compose",
         summary=COMPOSE_SUMMARY,
         entries=tuple(
             SettingEntry(
@@ -369,7 +373,7 @@ def render_env_example(
         *_comment(_IMAGE_NOTE.replace("`", "")),
     ]
     for section in sections:
-        title = group_title(section.group)
+        title = section.title
         lines += [
             "",
             f"# {'=' * 4} {title} {'=' * (_WIDTH - 8 - len(title))}",
@@ -440,7 +444,7 @@ def render_settings_doc(sections: Iterable[SettingsSection]) -> str:
         _IMAGE_NOTE,
     ]
     for section in sections:
-        lines += ["", f"## {group_title(section.group)}", "", section.summary, ""]
+        lines += ["", f"## {section.title}", "", section.summary, ""]
         lines += [
             "| Variable | Type | Default | Allowed values | In the app | Notes |",
             "| --- | --- | --- | --- | --- | --- |",

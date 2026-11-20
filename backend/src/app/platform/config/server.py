@@ -13,7 +13,7 @@ from app.platform.config._markers import Internal
 MAX_WORKERS: Final = 16
 
 
-class ServerSettings(MenageristBaseSettings, group="server"):
+class ServerSettings(MenageristBaseSettings, group="server", label="Server"):
     """The server's time zone, its web workers, and whether it is a container."""
 
     # An empty variable counts as unset: an empty `MENAGERIST_TIME_ZONE` falls through

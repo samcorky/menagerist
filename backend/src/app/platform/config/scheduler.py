@@ -10,7 +10,9 @@ from app.platform.config._base import MenageristBaseSettings
 from app.platform.config._markers import Tunable
 
 
-class SchedulerSettings(MenageristBaseSettings, group="scheduler"):
+class SchedulerSettings(
+    MenageristBaseSettings, group="scheduler", label="Scheduled tasks"
+):
     """Worker liveness and job history retention."""
 
     model_config = SettingsConfigDict(extra="ignore", env_ignore_empty=True)

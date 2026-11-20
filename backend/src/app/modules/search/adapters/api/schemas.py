@@ -19,6 +19,10 @@ class SearchHitResponse(BaseModel):
     group: str | None = Field(
         default=None, description="An item's type slug, or a setting's section."
     )
+    group_title: str | None = Field(
+        default=None,
+        description="A setting's or preference's section, as people know it.",
+    )
     slug: str | None = Field(default=None, description="A collection's address.")
     item_count: int | None = Field(
         default=None, description="How many items a collection holds."
@@ -45,6 +49,7 @@ class SearchHitResponse(BaseModel):
                     "title": "Backups to keep",
                     "description": "Minimum number of ordinary backups to retain.",
                     "group": "backup",
+                    "group_title": "Backups",
                     "score": 80,
                 }
             ]

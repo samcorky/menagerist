@@ -25,6 +25,7 @@
 		paletteLayout,
 		roleLabel,
 		savedFieldKind,
+		preferencePath,
 		settingPath,
 		taskPath,
 		EXAMPLE_PACKS_PAGE,
@@ -33,7 +34,6 @@
 		type PaletteGroup,
 		type StaticRoute
 	} from '$lib/palette-search';
-	import { groupLabel } from '$lib/settings-form';
 	import { matchContext } from '$lib/search-context';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import {
@@ -63,6 +63,7 @@
 		'savedFields',
 		'packs',
 		'users',
+		'preferences',
 		'settings',
 		'tasks',
 		'collectionItems'
@@ -74,6 +75,7 @@
 		savedFields: 'saved fields',
 		packs: 'example packs',
 		users: 'users',
+		preferences: 'preferences',
 		settings: 'settings',
 		tasks: 'scheduled tasks',
 		collectionItems: 'items in this collection'
@@ -86,6 +88,7 @@
 		savedFields: { status: 'ok', rows: [] },
 		packs: { status: 'ok', rows: [] },
 		users: { status: 'ok', rows: [] },
+		preferences: { status: 'ok', rows: [] },
 		settings: { status: 'ok', rows: [] },
 		tasks: { status: 'ok', rows: [] },
 		collectionItems: { status: 'ok', rows: [] },
@@ -133,6 +136,7 @@
 			'saved fields',
 			'example packs',
 			'pages',
+			'preferences',
 			...(canSettings ? ['settings'] : []),
 			...(canTasks ? ['scheduled tasks'] : []),
 			...(canUsers ? ['users'] : [])
@@ -156,6 +160,7 @@
 			okRows(groups.savedFields).length +
 			okRows(groups.packs).length +
 			okRows(groups.users).length +
+			okRows(groups.preferences).length +
 			okRows(groups.settings).length +
 			okRows(groups.tasks).length +
 			groups.pages.length
@@ -183,6 +188,7 @@
 		score('savedFields', okRows(groups.savedFields));
 		score('packs', okRows(groups.packs));
 		score('users', okRows(groups.users));
+		score('preferences', okRows(groups.preferences));
 		score('settings', okRows(groups.settings));
 		score('tasks', okRows(groups.tasks));
 		score('collectionItems', okRows(groups.collectionItems));
@@ -221,6 +227,8 @@
 				return okRows(groups.packs).map((r) => `pack:${r.ref}`);
 			case 'users':
 				return okRows(groups.users).map((r) => `user:${r.ref}`);
+			case 'preferences':
+				return okRows(groups.preferences).map((r) => `preference:${r.ref}`);
 			case 'settings':
 				return okRows(groups.settings).map((r) => `setting:${r.ref}`);
 			case 'tasks':
@@ -427,6 +435,12 @@
 	const openSavedField = () => choose('savedFields', () => void goto(resolve(SAVED_FIELDS_PAGE)));
 	const openPack = () => choose('packs', () => void goto(resolve(EXAMPLE_PACKS_PAGE)));
 	const openUser = () => choose('users', () => void goto(resolve(USERS_PAGE)));
+	const openPreference = (preference: Hit) =>
+		choose(
+			'preferences',
+			() =>
+				void goto(resolve(preferencePath({ key: preference.ref, group: preference.group ?? '' })))
+		);
 	const openSetting = (setting: Hit) =>
 		choose(
 			'settings',
@@ -636,6 +650,35 @@
 	{/if}
 {/snippet}
 
+{#snippet preferencesGroup()}
+	{#if showFailed('preferences')}
+		<Command.Group heading="Preferences">{@render failedRow('preferences')}</Command.Group>
+	{:else if okRows(groups.preferences).length > 0}
+		<Command.Group heading="Preferences">
+			{#each okRows(groups.preferences) as preference (preference.ref)}
+				<Command.Item
+					disabled={isStale('preferences')}
+					value={`preference:${preference.ref}`}
+					class="pointer-coarse:min-h-11"
+					onSelect={() => openPreference(preference)}
+				>
+					<div class="min-w-0 flex-1">
+						<span class="block truncate font-medium">{preference.title}</span>
+						<p class="truncate text-xs text-muted-foreground">
+							Preference · {preference.group_title ?? preference.group}
+						</p>
+						{#if descriptionSnippet(preference.title, preference.description, query)}
+							<p class="truncate text-xs text-muted-foreground">
+								{descriptionSnippet(preference.title, preference.description, query)}
+							</p>
+						{/if}
+					</div>
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	{/if}
+{/snippet}
+
 {#snippet settingsGroup()}
 	{#if showFailed('settings')}
 		<Command.Group heading="Settings">{@render failedRow('settings')}</Command.Group>
@@ -651,7 +694,7 @@
 					<div class="min-w-0 flex-1">
 						<span class="block truncate font-medium">{setting.title}</span>
 						<p class="truncate text-xs text-muted-foreground">
-							Setting · {groupLabel(setting.group ?? '')}
+							Setting · {setting.group_title ?? setting.group}
 						</p>
 						{#if descriptionSnippet(setting.title, setting.description, query)}
 							<p class="truncate text-xs text-muted-foreground">
@@ -747,6 +790,8 @@
 					{@render packsGroup()}
 				{:else if key === 'users'}
 					{@render usersGroup()}
+				{:else if key === 'preferences'}
+					{@render preferencesGroup()}
 				{:else if key === 'settings'}
 					{@render settingsGroup()}
 				{:else if key === 'tasks'}

@@ -46,7 +46,14 @@ from app.modules.presets.application.list_presets import ListPresets, ListPreset
 from app.modules.scheduling.adapters.api.dependencies import get_list_jobs_use_case
 from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
 from app.modules.search.domain.search_hit import SearchHit, SearchKind
-from app.modules.settings.adapters.api.dependencies import get_list_settings_use_case
+from app.modules.settings.adapters.api.dependencies import (
+    get_list_my_settings_use_case,
+    get_list_settings_use_case,
+)
+from app.modules.settings.application.list_my_settings import (
+    ListMySettings,
+    ListMySettingsQuery,
+)
 from app.modules.settings.application.list_settings import (
     ListSettings,
     ListSettingsQuery,
@@ -302,13 +309,47 @@ class SettingSource:
                 title=setting.descriptor.title,
                 description=setting.descriptor.description,
                 group=setting.descriptor.group,
+                group_title=setting.descriptor.group_title,
             )
             for setting in settings
             if _mentions(
                 query,
                 setting.descriptor.title,
                 setting.descriptor.description,
-                setting.descriptor.group.replace("_", " "),
+                setting.descriptor.group_title,
+            )
+        ]
+
+
+class PreferenceSource:
+    """The person's own preferences, matched like settings; hidden ones never show."""
+
+    kind = SearchKind.PREFERENCE
+
+    def __init__(self, use_case: ListMySettings) -> None:
+        self._use_case = use_case
+
+    async def find(
+        self, query: str, limit: int, actor: Actor, *, collection: str | None = None
+    ) -> list[SearchHit]:
+        """Return the actor's preferences matching `query`."""
+        preferences = await self._use_case.handle(ListMySettingsQuery(), actor)
+        return [
+            SearchHit(
+                kind=self.kind,
+                ref=preference.descriptor.key,
+                title=preference.descriptor.title,
+                description=preference.descriptor.description,
+                group=preference.descriptor.group,
+                group_title=preference.descriptor.group_title,
+            )
+            for preference in preferences
+            if not preference.descriptor.hidden
+            and _mentions(
+                query,
+                preference.descriptor.title,
+                preference.descriptor.description,
+                preference.descriptor.group_title,
             )
         ]
 
@@ -352,6 +393,7 @@ def get_search_sources(
     packs: Annotated[ListExamplePacks, Depends(get_list_example_packs_use_case)],
     users: Annotated[ListUsers, Depends(get_list_users_use_case)],
     settings: Annotated[ListSettings, Depends(get_list_settings_use_case)],
+    preferences: Annotated[ListMySettings, Depends(get_list_my_settings_use_case)],
     jobs: Annotated[ListJobs, Depends(get_list_jobs_use_case)],
 ) -> list[SearchSource]:
     """Return one source per kind, each backed by its owner's use case."""
@@ -362,6 +404,7 @@ def get_search_sources(
         SavedFieldSource(presets),
         ExamplePackSource(packs),
         UserSource(users),
+        PreferenceSource(preferences),
         SettingSource(settings),
         ScheduledTaskSource(jobs),
     ]

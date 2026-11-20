@@ -6,7 +6,7 @@ from app.platform.config._base import MenageristBaseSettings
 from app.platform.config._markers import Internal
 
 
-class TerminalSettings(MenageristBaseSettings, group="terminal"):
+class TerminalSettings(MenageristBaseSettings, group="terminal", label="Terminal"):
     """What the terminal the process writes to can show.
 
     Both fields are the standard names other tools use, not `MENAGERIST_TERMINAL_*`.
