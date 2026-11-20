@@ -39,14 +39,34 @@ export function currentPrefs(): DateTimePrefs {
 	};
 }
 
-/** The zone times are shown in: the chosen one, or the browser's. */
+const zoneChecks = new Map<string, boolean>();
+
+/**
+ * Whether this browser can show times in `zone`. The server checks names against its own zone
+ * data, which can know a zone the browser does not; formatting in it would throw.
+ */
+export function browserKnowsZone(zone: string): boolean {
+	let known = zoneChecks.get(zone);
+	if (known === undefined) {
+		try {
+			new Intl.DateTimeFormat('en-GB', { timeZone: zone });
+			known = true;
+		} catch {
+			known = false;
+		}
+		zoneChecks.set(zone, known);
+	}
+	return known;
+}
+
+/** The zone times are shown in: the chosen one, or the browser's (also if it can't use it). */
 export function resolvedZone(prefs: DateTimePrefs = currentPrefs()): string {
-	return prefs.zone === 'browser' ? browserZone() : prefs.zone;
+	return prefs.zone === 'browser' || !browserKnowsZone(prefs.zone) ? browserZone() : prefs.zone;
 }
 
 /** Whether times should say their zone: only when it is not the device's own. */
 function marksZone(prefs: DateTimePrefs): boolean {
-	return prefs.zone !== 'browser' && prefs.zone !== browserZone();
+	return resolvedZone(prefs) !== browserZone();
 }
 
 function hourCycle(clock: Clock): Intl.DateTimeFormatOptions {
@@ -160,6 +180,13 @@ export function formatTime(value: string | Date, prefs: DateTimePrefs = currentP
 	const date = value instanceof Date ? value : new Date(value);
 	if (isNaN(date.getTime())) return String(value);
 	return timeText(date, prefs, { timeZone: resolvedZone(prefs), mark: marksZone(prefs) });
+}
+
+/** A weekday's name, such as "Monday", where 0 is Sunday. */
+export function weekdayName(day: number, locale?: string): string {
+	// 7 January 2024 was a Sunday.
+	const date = new Date(2024, 0, 7 + day);
+	return new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(date);
 }
 
 /** A zone's offset from UTC now, such as "GMT+1"; empty if the browser cannot say. */

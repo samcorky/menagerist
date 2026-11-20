@@ -33,6 +33,16 @@ describe('filterComboboxItems', () => {
 		expect(filterComboboxItems(ITEMS, 'café').map((i) => i.value)).toEqual(['film:cafe']);
 	});
 
+	it('also finds an item by its keywords', () => {
+		const items: ComboboxItem[] = [
+			{ value: 'Europe/Paris', label: 'Paris', group: 'Europe', keywords: 'Europe/Paris' },
+			{ value: 'Europe/London', label: 'London', group: 'Europe' }
+		];
+		expect(filterComboboxItems(items, 'europe/paris').map((i) => i.value)).toEqual([
+			'Europe/Paris'
+		]);
+	});
+
 	it('matches group names, so a group name lists its items', () => {
 		expect(filterComboboxItems(ITEMS, 'book').map((i) => i.value)).toEqual([
 			'book:year',

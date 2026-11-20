@@ -36,7 +36,10 @@ class DateTimeSettings(MenageristBaseSettings, group="datetime"):
         ),
         Field(
             title="Date format",
-            description="The order dates are written in.",
+            description=(
+                "The order dates are written in. Automatic uses your browser's "
+                + "language."
+            ),
         ),
         Tunable(scope=Scope.USER),
     ] = "automatic"
@@ -49,7 +52,12 @@ class DateTimeSettings(MenageristBaseSettings, group="datetime"):
                 "24h": "24-hour (14:30)",
             }
         ),
-        Field(title="Clock", description="How times of day are written."),
+        Field(
+            title="Clock",
+            description=(
+                "How times of day are written. Automatic uses your browser's language."
+            ),
+        ),
         Tunable(scope=Scope.USER),
     ] = "automatic"
 

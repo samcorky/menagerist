@@ -33,6 +33,20 @@ describe('time zone choices', () => {
 		]);
 	});
 
+	it('finds a zone by its IANA name as typed', () => {
+		const zones = timeZoneItems([
+			'Europe/Paris',
+			'Europe/London',
+			'America/Argentina/Buenos_Aires'
+		]);
+		expect(filterComboboxItems(zones, 'Europe/Paris').map((i) => i.value)).toEqual([
+			'Europe/Paris'
+		]);
+		expect(filterComboboxItems(zones, 'argentina/buenos_aires').map((i) => i.value)).toEqual([
+			'America/Argentina/Buenos_Aires'
+		]);
+	});
+
 	it('labels a stored value', () => {
 		expect(zoneLabel('America/Argentina/Buenos_Aires')).toBe('America/Argentina/Buenos Aires');
 		expect(zoneLabel(BROWSER_ZONE)).toBe('Match my browser (Europe/London)');

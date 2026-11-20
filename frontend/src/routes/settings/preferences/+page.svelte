@@ -9,6 +9,7 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { formatDateTime } from '$lib/format-date';
+	import { withAutomaticExample } from '$lib/automatic-labels';
 	import { coreForProp } from '$lib/field-types';
 	import { offlineController } from '$lib/offline.svelte';
 	import { OFFLINE_PREFERENCES, preferences } from '$lib/preferences.svelte';
@@ -57,7 +58,7 @@
 	}
 
 	function widgetFor(item: SettingResponse) {
-		const prop = formProp(props[item.key]);
+		const prop = withAutomaticExample(item.key, formProp(props[item.key]));
 		const core = coreForProp(prop);
 		return core ? { prop, core } : null;
 	}

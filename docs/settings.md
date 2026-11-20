@@ -87,8 +87,8 @@ How dates and times read. People choose; the deployment sets defaults.
 
 | Variable | Type | Default | Allowed values | In the app | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `MENAGERIST_DATETIME_DATE_ORDER` | text | `automatic` | `automatic`, `dmy`, `mdy`, `ymd` | Personal | The order dates are written in. |
-| `MENAGERIST_DATETIME_CLOCK` | text | `automatic` | `automatic`, `12h`, `24h` | Personal | How times of day are written. |
+| `MENAGERIST_DATETIME_DATE_ORDER` | text | `automatic` | `automatic`, `dmy`, `mdy`, `ymd` | Personal | The order dates are written in. Automatic uses your browser's language. |
+| `MENAGERIST_DATETIME_CLOCK` | text | `automatic` | `automatic`, `12h`, `24h` | Personal | How times of day are written. Automatic uses your browser's language. |
 
 ## Identity
 

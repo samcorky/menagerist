@@ -25,6 +25,8 @@ export function timeZoneItems(zones: readonly string[] = knownZones()): Combobox
 				label: (slash === -1 ? zone : zone.slice(slash + 1)).replaceAll('_', ' '),
 				group: slash === -1 ? 'Other' : zone.slice(0, slash),
 				selectedLabel: zoneLabel(zone),
+				// The IANA name as typed ("Europe/Paris"), and with spaces for its underscores.
+				keywords: `${zone} ${zoneLabel(zone)}`,
 				description: zoneOffset(zone, now)
 			};
 		})

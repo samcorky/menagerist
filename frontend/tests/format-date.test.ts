@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 process.env.TZ = 'America/Los_Angeles';
 
 import {
+	browserKnowsZone,
 	formatDateTime,
 	formatIsoDate,
 	formatPartialDate,
@@ -97,6 +98,21 @@ describe('date and time preferences', () => {
 		expect(formatDateTime(at, { seconds: true }, { ...prefs, clock: '24h' }).local).toContain(
 			'22:30:00'
 		);
+	});
+
+	it('falls back to the device zone for one the browser does not know', () => {
+		const unknown = {
+			...base,
+			zone: 'Mars/Olympus_Mons',
+			order: 'dmy' as const,
+			clock: '24h' as const
+		};
+		expect(browserKnowsZone('Mars/Olympus_Mons')).toBe(false);
+		expect(browserKnowsZone('Asia/Tokyo')).toBe(true);
+		expect(resolvedZone(unknown)).toBe('America/Los_Angeles');
+		// Formats in the device zone, with no marker, rather than throwing.
+		expect(formatDateTime(at, {}, unknown).local).toBe('31 Dec 2026, 14:30');
+		expect(formatTime(at, unknown)).toBe('14:30');
 	});
 
 	it('resolves the browser zone and names offsets', () => {
