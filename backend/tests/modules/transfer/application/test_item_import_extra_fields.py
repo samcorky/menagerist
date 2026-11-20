@@ -214,6 +214,7 @@ async def test_a_bad_cell_in_a_kept_column_blocks_the_run(shared: Shared) -> Non
         ((_keep("paper", ExtraFieldKind.TEXT, key="Paper Type"),), "not a usable key"),
         ((_keep("paper", ExtraFieldKind.TEXT, key="__proto__"),), "not a usable key"),
         ((_keep("paper", ExtraFieldKind.TEXT, title=" "),), "needs a name"),
+        ((_keep("colour", ExtraFieldKind.TEXT),), "no column 'colour'"),
         (
             (
                 ColumnMapping(
