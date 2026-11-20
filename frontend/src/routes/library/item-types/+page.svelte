@@ -1,7 +1,9 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
-	import { Download, Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { Download, Ellipsis, Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import { wide } from '$lib/viewport.svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
 	import ListFoot from '$lib/components/list-foot.svelte';
 	import { untrack } from 'svelte';
@@ -332,7 +334,7 @@
 		{#if shown.length > 0}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each shown as cat (cat.id)}
-					<li class="flex items-center gap-3 px-3 py-2">
+					<li class="flex items-center gap-2 px-3 py-2 sm:gap-3">
 						<Checkbox
 							aria-label="Select {cat.label}"
 							checked={selectedIds.has(cat.id)}
@@ -345,12 +347,13 @@
 							class="size-8 rounded-lg text-base"
 						/>
 						<div class="min-w-0 flex-1">
-							<div class="flex items-center gap-2">
-								<span class="truncate font-medium">{cat.label}</span>
+							<!-- On a phone the slug drops under the name so the name keeps the row's width. -->
+							<div class="flex flex-col items-start sm:flex-row sm:items-center sm:gap-2">
+								<span class="max-w-full font-medium wrap-break-word sm:truncate">{cat.label}</span>
 								{#if exampleTypeIds.has(cat.id)}
 									<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
 								{/if}
-								<span class="min-w-0 truncate font-mono text-xs text-muted-foreground"
+								<span class="max-w-full min-w-0 truncate font-mono text-xs text-muted-foreground"
 									>{cat.slug}</span
 								>
 							</div>
@@ -376,26 +379,71 @@
 						<span class="hidden shrink-0 text-xs text-muted-foreground sm:inline">
 							{fieldCount(cat) === 1 ? '1 field' : `${fieldCount(cat)} fields`}
 						</span>
-						<IconButton
-							labelOnTouch={false}
-							label="Export item type"
-							disabled={exportingId !== null}
-							onclick={() => handleExport(cat)}
-						>
-							<Download />
-						</IconButton>
-						<IconButton labelOnTouch={false} label="Edit item type" onclick={() => openEdit(cat)}>
-							<Pencil />
-						</IconButton>
-						{#if auth.can('graph:node_type:delete')}
+						{#if wide.current}
 							<IconButton
 								labelOnTouch={false}
-								label="Delete item type"
-								disabled={deletingId === cat.id}
-								onclick={() => handleDelete(cat)}
+								label="Export item type"
+								disabled={exportingId !== null}
+								onclick={() => handleExport(cat)}
 							>
-								<Trash2 />
+								<Download />
 							</IconButton>
+							<IconButton labelOnTouch={false} label="Edit item type" onclick={() => openEdit(cat)}>
+								<Pencil />
+							</IconButton>
+							{#if auth.can('graph:node_type:delete')}
+								<IconButton
+									labelOnTouch={false}
+									label="Delete item type"
+									disabled={deletingId === cat.id}
+									onclick={() => handleDelete(cat)}
+								>
+									<Trash2 />
+								</IconButton>
+							{/if}
+						{:else}
+							<!-- A phone has no room for three buttons beside the name, so they share one menu. -->
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Button
+											{...props}
+											type="button"
+											variant="ghost"
+											size="icon"
+											class="shrink-0 pointer-coarse:size-11"
+											aria-label="More actions for {cat.label}"
+										>
+											<Ellipsis class="size-4" />
+										</Button>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="end">
+									<DropdownMenu.Item class="pointer-coarse:min-h-11" onSelect={() => openEdit(cat)}>
+										<Pencil class="size-4" />
+										Edit
+									</DropdownMenu.Item>
+									<DropdownMenu.Item
+										class="pointer-coarse:min-h-11"
+										disabled={exportingId !== null}
+										onSelect={() => handleExport(cat)}
+									>
+										<Download class="size-4" />
+										Export
+									</DropdownMenu.Item>
+									{#if auth.can('graph:node_type:delete')}
+										<DropdownMenu.Item
+											class="pointer-coarse:min-h-11"
+											variant="destructive"
+											disabled={deletingId === cat.id}
+											onSelect={() => handleDelete(cat)}
+										>
+											<Trash2 class="size-4" />
+											Delete
+										</DropdownMenu.Item>
+									{/if}
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
 						{/if}
 					</li>
 				{/each}
