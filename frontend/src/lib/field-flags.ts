@@ -36,7 +36,8 @@ export const FIELD_FLAGS: readonly FieldFlag[] = [
 		label: 'Show in quick capture',
 		chip: 'Quick capture',
 		kinds: QUICK_CAPTURE_KINDS
-	}
+	},
+	{ member: 'barcode', label: 'Takes barcodes', chip: 'Barcodes', kinds: new Set(['text']) }
 ];
 
 /** The flags offered for a field of this kind. */

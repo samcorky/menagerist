@@ -60,3 +60,15 @@ describe('fieldChips', () => {
 		expect(fieldChips(field)).toEqual([]);
 	});
 });
+
+describe('the barcode flag', () => {
+	it('is offered on text fields only', () => {
+		expect(flagsFor('text').map((f) => f.member)).toEqual(['capture', 'barcode']);
+		expect(flagsFor('number').map((f) => f.member)).toEqual(['capture']);
+	});
+
+	it('shows as a Barcodes chip', () => {
+		const field = setFlag(textField, 'barcode', true);
+		expect(fieldChips(field)).toEqual(['Barcodes']);
+	});
+});

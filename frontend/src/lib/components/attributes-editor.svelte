@@ -1,12 +1,18 @@
 <script lang="ts">
-	import { Plus, X } from '@lucide/svelte';
+	import { Plus, ScanBarcode, X } from '@lucide/svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { rowsToAttributes } from '$lib/attribute-rows';
 	import type { AttributeRow, GroupRow } from '$lib/attribute-rows';
 	import type { AttributesSchema, JsonSchemaProperty, EditorField } from '$lib/schema-types';
 	import { generateFieldKey } from '$lib/field-key';
-	import { mergeAttributeSchemas, readSchemaMeta, validationSchema } from '$lib/schema-meta';
+	import {
+		mergeAttributeSchemas,
+		readPropMeta,
+		readSchemaMeta,
+		validationSchema
+	} from '$lib/schema-meta';
+	import BarcodeScanner from '$lib/components/barcode-scanner.svelte';
 	import { isSection, schemaToItems, itemsToSchema } from '$lib/schema-editor-items';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -62,6 +68,10 @@
 	);
 
 	const touched = new SvelteSet<string>();
+
+	// The field the last scan button was pressed for; the scanner closes before it reports.
+	let scanKey = $state<string | null>(null);
+	let scannerOpen = $state(false);
 
 	let clientErrors = $derived.by(() => {
 		const errors: Record<string, string> = {};
@@ -285,88 +295,105 @@
 				>{/if}
 		</span>
 		<div class="flex flex-1 flex-col gap-1">
-			<div
-				class="rounded-md transition-colors duration-150 {error
-					? 'ring-1 ring-destructive/60'
-					: ''}"
-			>
-				{#if desc?.kind === 'text' && nodeTypeId}
-					{@const currentValue = typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
-					{@const previousValues = previousValuesByKey[key] ?? []}
-					{@const matchingCandidates =
-						nodeCandidates.length > 0 && onLinkItem
-							? nodeCandidates
-									.filter((c) => c.name.toLowerCase().includes(currentValue.toLowerCase()))
-									.slice(0, 8)
-							: []}
-					<div class="relative">
+			<div class="flex items-start gap-2">
+				<div
+					class="min-w-0 flex-1 rounded-md transition-colors duration-150 {error
+						? 'ring-1 ring-destructive/60'
+						: ''}"
+				>
+					{#if desc?.kind === 'text' && nodeTypeId}
+						{@const currentValue = typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
+						{@const previousValues = previousValuesByKey[key] ?? []}
+						{@const matchingCandidates =
+							nodeCandidates.length > 0 && onLinkItem
+								? nodeCandidates
+										.filter((c) => c.name.toLowerCase().includes(currentValue.toLowerCase()))
+										.slice(0, 8)
+								: []}
+						<div class="relative">
+							<Input
+								value={currentValue}
+								autocomplete="off"
+								oninput={(e) => {
+									const v = (e.target as HTMLInputElement).value;
+									setValue(key, v);
+									void fetchPreviousValues(key, v);
+								}}
+								onfocus={() => {
+									typeaheadOpenKey = key;
+									if (currentValue) void fetchPreviousValues(key, currentValue);
+								}}
+								onblur={() => setTimeout(() => (typeaheadOpenKey = null), 150)}
+								class="flex-1"
+								aria-label={prop.title || key}
+								aria-invalid={!!error}
+							/>
+							{#if typeaheadOpenKey === key && (previousValues.length > 0 || matchingCandidates.length > 0)}
+								<ul class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
+									{#each previousValues as pv (pv.value)}
+										<li>
+											<button
+												type="button"
+												class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
+												onmousedown={() => {
+													setValue(key, pv.value);
+													typeaheadOpenKey = null;
+												}}
+											>
+												<span class="truncate">{pv.value}</span>
+												<span class="ml-2 shrink-0 text-xs text-muted-foreground">{pv.count}</span>
+											</button>
+										</li>
+									{/each}
+									{#each matchingCandidates as candidate (candidate.id)}
+										<li>
+											<button
+												type="button"
+												class="flex w-full items-center rounded px-2 py-1.5 text-sm hover:bg-accent"
+												onmousedown={() => {
+													onLinkItem?.(key, candidate);
+													setValue(key, '');
+													typeaheadOpenKey = null;
+												}}
+											>
+												<span class="truncate">{candidate.name}</span>
+											</button>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</div>
+					{:else if Widget}
+						<Widget
+							value={getValue(key)}
+							onChange={(v) => setValue(key, v)}
+							ariaLabel={prop.title || key}
+							{prop}
+						/>
+					{:else}
 						<Input
-							value={currentValue}
-							autocomplete="off"
-							oninput={(e) => {
-								const v = (e.target as HTMLInputElement).value;
-								setValue(key, v);
-								void fetchPreviousValues(key, v);
-							}}
-							onfocus={() => {
-								typeaheadOpenKey = key;
-								if (currentValue) void fetchPreviousValues(key, currentValue);
-							}}
-							onblur={() => setTimeout(() => (typeaheadOpenKey = null), 150)}
+							value={typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
+							oninput={(e) => setValue(key, (e.target as HTMLInputElement).value)}
 							class="flex-1"
 							aria-label={prop.title || key}
 							aria-invalid={!!error}
 						/>
-						{#if typeaheadOpenKey === key && (previousValues.length > 0 || matchingCandidates.length > 0)}
-							<ul class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
-								{#each previousValues as pv (pv.value)}
-									<li>
-										<button
-											type="button"
-											class="flex w-full items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent"
-											onmousedown={() => {
-												setValue(key, pv.value);
-												typeaheadOpenKey = null;
-											}}
-										>
-											<span class="truncate">{pv.value}</span>
-											<span class="ml-2 shrink-0 text-xs text-muted-foreground">{pv.count}</span>
-										</button>
-									</li>
-								{/each}
-								{#each matchingCandidates as candidate (candidate.id)}
-									<li>
-										<button
-											type="button"
-											class="flex w-full items-center rounded px-2 py-1.5 text-sm hover:bg-accent"
-											onmousedown={() => {
-												onLinkItem?.(key, candidate);
-												setValue(key, '');
-												typeaheadOpenKey = null;
-											}}
-										>
-											<span class="truncate">{candidate.name}</span>
-										</button>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					</div>
-				{:else if Widget}
-					<Widget
-						value={getValue(key)}
-						onChange={(v) => setValue(key, v)}
-						ariaLabel={prop.title || key}
-						{prop}
-					/>
-				{:else}
-					<Input
-						value={typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
-						oninput={(e) => setValue(key, (e.target as HTMLInputElement).value)}
-						class="flex-1"
-						aria-label={prop.title || key}
-						aria-invalid={!!error}
-					/>
+					{/if}
+				</div>
+				{#if desc?.kind === 'text' && readPropMeta(prop).barcode === true}
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						class="shrink-0"
+						aria-label="Scan barcode into {prop.title || key}"
+						onclick={() => {
+							scanKey = key;
+							scannerOpen = true;
+						}}
+					>
+						<ScanBarcode class="size-4" />
+					</Button>
 				{/if}
 			</div>
 			{#if error}
@@ -504,6 +531,13 @@
 		{/if}
 	{/if}
 </div>
+
+<BarcodeScanner
+	bind:open={scannerOpen}
+	onDetected={(code) => {
+		if (scanKey !== null) setValue(scanKey, code);
+	}}
+/>
 
 <PresetPickerDialog
 	open={fieldSetPickerOpen}

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
 	NEW_BARCODE_DETAIL,
+	barcodeFields,
+	defaultScanField,
 	scanFields,
+	scanTargets,
 	scannedAttributes,
 	suggestScanField
 } from '$lib/barcode/scan-field';
@@ -79,5 +82,46 @@ describe('scannedAttributes', () => {
 		const { attributes, extraSchema } = scannedAttributes('ABC-1', NEW_BARCODE_DETAIL, typed);
 		expect(attributes).toEqual({ barcode_2: 'ABC-1' });
 		expect(Object.keys(extraSchema?.properties ?? {})).toEqual(['barcode_2']);
+	});
+});
+
+const SHOP = schema({
+	isbn: { type: 'string', title: 'ISBN' },
+	shop_code: { type: 'string', title: 'Shop code', 'x-menagerist': { barcode: true } },
+	pages: { type: 'number', title: 'Pages', 'x-menagerist': { barcode: true } },
+	old: { type: 'string', title: 'Old', 'x-menagerist': { barcode: true, archived: true } }
+});
+
+describe('barcodeFields', () => {
+	it('lists the text fields marked as taking barcodes, not numbers or archived ones', () => {
+		expect(barcodeFields(SHOP)).toEqual([{ key: 'shop_code', label: 'Shop code' }]);
+	});
+
+	it('is empty when nothing is marked', () => {
+		expect(barcodeFields(BOOK)).toEqual([]);
+	});
+});
+
+describe('scanTargets', () => {
+	it('offers only the marked fields when there are some', () => {
+		expect(scanTargets(SHOP)).toEqual([{ key: 'shop_code', label: 'Shop code' }]);
+	});
+
+	it('offers every text field when none is marked', () => {
+		expect(scanTargets(BOOK)).toEqual(scanFields(BOOK));
+	});
+});
+
+describe('defaultScanField', () => {
+	it('prefers a marked field over a label that looks like a code', () => {
+		expect(defaultScanField(SHOP)).toBe('shop_code');
+	});
+
+	it('falls back to the label guess when nothing is marked', () => {
+		expect(defaultScanField(BOOK)).toBe('isbn');
+	});
+
+	it('is null without a type', () => {
+		expect(defaultScanField(null)).toBeNull();
 	});
 });

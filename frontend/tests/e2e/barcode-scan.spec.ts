@@ -1,5 +1,11 @@
 import { test, expect, type Page } from './fixtures';
-import { chooseItemType, createItemType, openQuickCapture, uniqueName } from './helpers';
+import {
+	chooseItemType,
+	createItem,
+	createItemType,
+	openQuickCapture,
+	uniqueName
+} from './helpers';
 
 /** A valid EAN-13 (the check digit is right), so the real detector accepts it. */
 const EAN = '4006381333931';
@@ -187,5 +193,66 @@ test.describe('when the barcode field is shown in quick capture', () => {
 
 		await expect(capture.getByLabel('ISBN')).toHaveValue(EAN);
 		await expect(capture.getByText('Saved as a Barcode detail.')).toHaveCount(0);
+	});
+});
+
+test.describe('a field that takes barcodes', () => {
+	async function scanInto(page: Page, label: string) {
+		await page.getByRole('button', { name: `Scan barcode into ${label}` }).click();
+		const scanner = page.getByRole('dialog', { name: 'Scan barcode' });
+		await scanner.getByLabel('Or type the code').fill(EAN);
+		await scanner.getByRole('button', { name: 'Use code' }).click();
+	}
+
+	test('can be scanned into on the new item form', async ({ page }) => {
+		await refuseCamera(page);
+		const type = await createItemType(page, {
+			label: uniqueName('Barcoded'),
+			fields: [{ label: 'Author' }, { label: 'ISBN', barcode: true }]
+		});
+
+		await page.goto('/items/new');
+		await chooseItemType(page, type.label);
+		await expect(page.getByRole('button', { name: 'Scan barcode into Author' })).toHaveCount(0);
+		await scanInto(page, 'ISBN');
+		await expect(page.getByLabel('ISBN', { exact: true })).toHaveValue(EAN);
+	});
+
+	test('can be scanned into when editing, replacing the value', async ({ page }) => {
+		await refuseCamera(page);
+		const type = await createItemType(page, {
+			label: uniqueName('Barcoded'),
+			fields: [{ label: 'ISBN', barcode: true }]
+		});
+		await createItem(page, { name: uniqueName('Edited by scan'), type: type.label });
+
+		await page.getByRole('button', { name: 'Edit', exact: true }).filter({ visible: true }).click();
+		await page.getByLabel('ISBN', { exact: true }).fill('111');
+		await scanInto(page, 'ISBN');
+		await expect(page.getByLabel('ISBN', { exact: true })).toHaveValue(EAN);
+		await page.getByRole('button', { name: 'Save changes' }).click();
+		await expect(page.getByText(EAN)).toBeVisible();
+	});
+
+	test('is chosen for a scan in quick capture ahead of a label guess', async ({ page }) => {
+		await refuseCamera(page);
+		const type = await createItemType(page, {
+			label: uniqueName('Shop stock'),
+			fields: [{ label: 'ISBN' }, { label: 'Shop code', barcode: true }]
+		});
+
+		await page.goto('/');
+		const capture = await openQuickCapture(page);
+		await chooseItemType(page, type.label);
+		await capture.getByRole('button', { name: 'Scan barcode', exact: true }).click();
+		const scanner = page.getByRole('dialog', { name: 'Scan barcode' });
+		await scanner.getByLabel('Or type the code').fill(EAN);
+		await scanner.getByRole('button', { name: 'Use code' }).click();
+
+		await expect(capture.getByLabel('Save in')).toHaveValue('shop_code');
+		await expect(capture.getByLabel('Save in').getByRole('option')).toHaveText([
+			'Shop code',
+			'A new Barcode detail'
+		]);
 	});
 });

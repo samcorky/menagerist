@@ -11,7 +11,8 @@
 	import BarcodeScanner from '$lib/components/barcode-scanner.svelte';
 	import {
 		NEW_BARCODE_DETAIL,
-		scanFields,
+		defaultScanField,
+		scanTargets,
 		scannedAttributes,
 		suggestScanField
 	} from '$lib/barcode/scan-field';
@@ -51,14 +52,16 @@
 			AttributesSchema | null | undefined) ?? null
 	);
 	const captureKeys = $derived(captureFieldKeys(typeSchema));
-	const textFields = $derived(scanFields(typeSchema));
-	// The field a code belongs in when it is shown here: the code goes into it, in view.
-	const shownCodeField = $derived.by(() => {
-		const key = suggestScanField(textFields);
-		return key !== null && captureKeys.includes(key) ? key : null;
-	});
+	// A field marked as taking barcodes, else one whose label looks like a code.
+	const defaultCodeField = $derived(defaultScanField(typeSchema));
+	// When that field is shown here, the code goes into it, in view.
+	const shownCodeField = $derived(
+		defaultCodeField !== null && captureKeys.includes(defaultCodeField) ? defaultCodeField : null
+	);
 	// Otherwise the person picks a field that isn't shown, or a new detail.
-	const codeFields = $derived(textFields.filter((field) => !captureKeys.includes(field.key)));
+	const codeFields = $derived(
+		scanTargets(typeSchema).filter((field) => !captureKeys.includes(field.key))
+	);
 
 	// Values typed for one type don't belong to another.
 	$effect.pre(() => {
@@ -89,7 +92,11 @@
 	}
 
 	// Follows the type until the person picks a field themselves.
-	let codeField = $derived(suggestScanField(codeFields) ?? NEW_BARCODE_DETAIL);
+	let codeField = $derived(
+		codeFields.some((field) => field.key === defaultCodeField)
+			? defaultCodeField!
+			: (suggestScanField(codeFields) ?? NEW_BARCODE_DETAIL)
+	);
 
 	function scanned() {
 		return code === null ? null : scannedAttributes(code, codeField, typeSchema);

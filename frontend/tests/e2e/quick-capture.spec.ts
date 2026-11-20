@@ -96,6 +96,24 @@ test.describe('quick-capture fields', () => {
 		).toBeChecked();
 	});
 
+	test("a barcode field's scan button lines up with its input", async ({ page }) => {
+		const { label } = await createItemType(page, {
+			label: uniqueName('Lined up'),
+			fields: [{ label: 'ISBN', capture: true, barcode: true }]
+		});
+
+		await page.goto('/');
+		const dialog = await openQuickCapture(page);
+		await chooseItemType(page, label);
+		const input = await dialog.getByLabel('ISBN', { exact: true }).boundingBox();
+		const button = await dialog
+			.getByRole('button', { name: 'Scan barcode into ISBN' })
+			.boundingBox();
+		expect(input && button).toBeTruthy();
+		const middle = (box: { y: number; height: number }) => box.y + box.height / 2;
+		expect(Math.abs(middle(input!) - middle(button!))).toBeLessThan(2);
+	});
+
 	test("a field's actions sit on its row, not below its chips", async ({ page }) => {
 		test.skip((page.viewportSize()?.width ?? 0) < 640, 'actions stack under the field on a phone');
 		await createItemType(page, {
