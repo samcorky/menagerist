@@ -5,10 +5,10 @@ import { SAVED_FIELDS_CAP, type SavedField } from '$lib/query/fields';
 /** A field individual items carry in their own overlay, with how many items use it. */
 export type ItemField = { key: string; kind: string; label: string; count: number };
 
-/** Read the per-item fields in use; null if the request fails. */
-export async function fetchItemFields(): Promise<ItemField[] | null> {
+/** Read the per-item fields in use, on items of the `type` slug if given; null if the request fails. */
+export async function fetchItemFields(type?: string): Promise<ItemField[] | null> {
 	try {
-		const result = await listItemFields();
+		const result = await listItemFields(type === undefined ? {} : { query: { type } });
 		return result.error || !result.data ? null : result.data;
 	} catch {
 		return null;

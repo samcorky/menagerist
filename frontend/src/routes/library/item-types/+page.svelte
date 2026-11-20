@@ -38,6 +38,7 @@
 	import TypeEditorDialog from '$lib/components/type-editor-dialog.svelte';
 	import TypeIcon from '$lib/components/type-icon.svelte';
 	import SchemaEditor from '$lib/components/schema-editor.svelte';
+	import ItemTypeExtraDetails from '$lib/components/item-type-extra-details.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 
 	const PAGE_SIZE = 50;
@@ -129,6 +130,20 @@
 		icon = null;
 		colour = null;
 		editorOpen = true;
+	}
+
+	const editingType = $derived(categories.find((c) => c.id === editingId) ?? null);
+	// The schema editor reads its schema once; a new value here remounts it.
+	let schemaRevision = $state(0);
+
+	// A promoted field is saved already: add it to the open, unsaved schema too, so Save keeps it.
+	function handlePromoted(updated: NodeTypeResponse, key: string) {
+		categories = categories.map((c) => (c.id === updated.id ? updated : c));
+		const property = (updated.attributes_schema as AttributesSchema | null)?.properties?.[key];
+		if (!property) return;
+		const current = schema ?? (updated.attributes_schema as AttributesSchema);
+		schema = { ...current, properties: { ...current.properties, [key]: property } };
+		schemaRevision += 1;
 	}
 
 	function openEdit(cat: NodeTypeResponse) {
@@ -501,13 +516,18 @@
 		<Textarea id="cat-description" bind:value={description} placeholder="Optional description" />
 	</div>
 	<TypeAppearanceFields bind:icon bind:colour />
-	<SchemaEditor
-		bind:schema
-		typeId={editingId ?? undefined}
-		typeKind={editingId ? 'node' : undefined}
-		highlights
-		fieldFlags
-	/>
+	{#key schemaRevision}
+		<SchemaEditor
+			bind:schema
+			typeId={editingId ?? undefined}
+			typeKind={editingId ? 'node' : undefined}
+			highlights
+			fieldFlags
+		/>
+	{/key}
+	{#if editingType}
+		<ItemTypeExtraDetails type={editingType} onpromoted={handlePromoted} />
+	{/if}
 </TypeEditorDialog>
 
 <ConfirmDialog

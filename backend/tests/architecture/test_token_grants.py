@@ -40,6 +40,7 @@ COMPOSITES: dict[UseCaseType, tuple[tuple[UseCaseType, ...], frozenset[str]]] = 
         (StageMedia, AttachMedia),
         frozenset({"media:item:write"}),
     ),
+    # Edits the items itself, checking UpdateNode's stance rather than calling it.
     PromoteExtraSchemaField: (
         (UpdateNodeType, UpdateNode),
         frozenset({"graph:type:write", "graph:item:write"}),

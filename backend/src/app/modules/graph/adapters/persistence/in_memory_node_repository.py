@@ -460,6 +460,28 @@ class InMemoryNodeRepository:
             nodes = [node for node in nodes if node.id > after]
         return [self._viewed(node, scope) for node in nodes[:limit]]
 
+    async def list_with_item_field(
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        scope: ContentFilter,
+        after: uuid.UUID | None,
+        limit: int,
+    ) -> builtins.list[Node]:
+        """List non-deleted nodes of `type_slug` whose own overlay defines `key`."""
+        nodes = sorted(
+            (
+                node
+                for node in self._visible(scope)
+                if node.type == type_slug
+                and (after is None or node.id > after)
+                and key in ((node.extra_schema or {}).get("properties") or {})
+            ),
+            key=lambda node: node.id,
+        )
+        return [self._viewed(node, scope) for node in nodes[:limit]]
+
     async def list_attribute_values(
         self,
         type_slug: str,
@@ -485,11 +507,13 @@ class InMemoryNodeRepository:
         return ordered[:limit]
 
     async def item_fields(
-        self, *, scope: ContentFilter, limit: int
+        self, *, scope: ContentFilter, limit: int, type_slug: str | None = None
     ) -> builtins.list[ItemFieldUse]:
         """List the per-item fields declared in the overlays of live nodes."""
         titles: dict[tuple[str, str], dict[str, int]] = {}
         for node in self._visible(scope):
+            if type_slug is not None and node.type != type_slug:
+                continue
             properties = (node.extra_schema or {}).get("properties")
             if not isinstance(properties, dict):
                 continue

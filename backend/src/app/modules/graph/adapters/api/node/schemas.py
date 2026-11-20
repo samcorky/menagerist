@@ -4,6 +4,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.modules.graph.adapters.api.node_type.schemas import (
+    NODE_TYPE_EXAMPLE,
+    NodeTypeResponse,
+)
 from app.modules.graph.application.create_node import CreateNodeCommand
 from app.modules.graph.application.duplicate_node import DuplicateNodeCommand
 from app.modules.graph.application.update_node import UpdateNodeCommand
@@ -558,6 +562,17 @@ class NodeTypeCountResponse(BaseModel):
     def from_domain(cls, row: TypeCount) -> NodeTypeCountResponse:
         """Build a response from a `TypeCount`."""
         return cls(type=row.type, count=row.count)
+
+
+class PromotedItemFieldResponse(BaseModel):
+    """What promoting a per-item field onto its item type changed."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"items": 12, "node_type": NODE_TYPE_EXAMPLE}]}
+    )
+
+    items: int = Field(description="How many items the field moved off.")
+    node_type: NodeTypeResponse = Field(description="The item type, with the field.")
 
 
 class ItemFieldResponse(BaseModel):

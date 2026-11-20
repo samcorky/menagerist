@@ -846,7 +846,7 @@
 									schema={nodeSchema}
 									supportsExtraFields={true}
 									nodeId={node?.id}
-									nodeTypeId={nodeTypes.find((nt) => nt.slug === node?.type)?.id}
+									nodeType={nodeTypes.find((nt) => nt.slug === node?.type)}
 									serverErrors={attributeServerErrors}
 									onPromoted={load}
 								/>

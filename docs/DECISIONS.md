@@ -1636,3 +1636,18 @@ Applying creates the link for each item it creates or matches, and re-points a l
 **Not in this slice:** JSON, pictures, connections, a key column and re-import, saved mappings, export and large files; they are sub-issues of #238 (#552 to #558). Sample rows and plan entries do not yet carry links, so running the same file twice adds every item twice until #556.
 
 **Rationale:** #238 asks for a spreadsheet importer that every other importer builds on. The conversion and the plan are the same whatever reads the file, so the first slice keeps the file reading small and puts the rules where later sources can reuse them.
+
+## Promoting a per-item field across its item type (2026-11-20)
+
+**Decision:** `PromoteExtraSchemaField` (#573) moves a field from every item of the type whose `extra_schema` overlay defines it, not from one item, in one transaction: the type gains the property, each overlay loses it (and the key leaves the overlay's `required` list), and values are untouched. `POST /nodes/fields/{key}/promote` with `node_type_id` starts from the type and uses the definition most of the items share; the older `POST /nodes/{node_id}/attributes/{key}/promote` starts from that item and uses its definition. `GET /nodes/fields?type=` lists one type's per-item fields with their counts, which the item type editor shows as "Extra details on its items", each with "Add to item type".
+
+**Choices that are not obvious:**
+
+- One item at a time cannot work: the type and an overlay may not both define a key (`merge_attribute_schemas`), so promoting one item left every other item with the key failing validation on its next edit.
+- The same field means the same key and kind. When some items keep the key as another kind, the promotion is refused, naming how many, rather than leaving those items to collide with the type. Choice and multi-choice options are combined from every item, so no stored value stops being an option; other differences (a title, a rule) follow the chosen definition.
+- The items are gathered 500 at a time and saved in the same transaction; no background job until #552 adds them.
+- The overlays are edited directly rather than through `UpdateNode`, so the use case checks `Content(graph:item:write)` itself: a token still needs both `graph:type:write` and `graph:item:write` (R8).
+- The hint is a quiet list in the type's editor, never a banner (design §16b: "do not automatically formalise them or nag the user"). It lists only fields with a recorded kind, as `GET /nodes/fields` always has.
+- The editor's schema state is updated with the promoted property and the schema editor remounted, so a Save after promoting keeps the field instead of writing over it.
+
+**Rationale:** #572 keeps unmatched CSV columns as per-item fields, putting the same field on thousands of items; promoting them must be one action.

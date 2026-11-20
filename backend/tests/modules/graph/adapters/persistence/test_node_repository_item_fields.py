@@ -1,4 +1,4 @@
-"""`NodeRepository.item_fields`, against the in-memory and Postgres adapters."""
+"""`NodeRepository.item_fields` and `list_with_item_field`, against both adapters."""
 
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -53,9 +53,10 @@ async def _add(
     *,
     owner: uuid.UUID = ALICE,
     name: str = "n",
+    type: str | None = None,
 ) -> Node:
     schema = None if props is None else {"type": "object", "properties": props}
-    node = Node.create(owner_id=owner, name=name, extra_schema=schema)
+    node = Node.create(owner_id=owner, name=name, type=type, extra_schema=schema)
     await repository.add(node)
     return node
 
@@ -175,3 +176,41 @@ async def test_limit_applies_after_ordering(repository: NodeRepository) -> None:
     rows = await repository.item_fields(scope=A, limit=1)
 
     assert [(r.key, r.count) for r in rows] == [("b", 2)]
+
+
+async def test_a_type_keeps_only_its_own_items_fields(
+    repository: NodeRepository,
+) -> None:
+    """With a type, only that type's items count."""
+    await _add(repository, {"signed": _prop("boolean")}, type="film")
+    await _add(repository, {"signed": _prop("boolean")}, type="film")
+    await _add(repository, {"signed": _prop("boolean")}, type="book")
+    await _add(repository, {"pages": _prop("number")}, type="book")
+
+    rows = await repository.item_fields(scope=A, limit=200, type_slug="film")
+
+    assert [(r.key, r.count) for r in rows] == [("signed", 2)]
+
+
+async def test_lists_the_type_s_items_that_define_the_field_in_pages(
+    repository: NodeRepository,
+) -> None:
+    """Only items of the type whose overlay has the key, by id, page by page."""
+    carriers = [
+        await _add(repository, {"signed": _prop("boolean")}, type="film")
+        for _ in range(3)
+    ]
+    await _add(repository, {"other": _prop("text")}, type="film")
+    await _add(repository, None, type="film")
+    await _add(repository, {"signed": _prop("boolean")}, type="book")
+    await _add(repository, {"signed": _prop("boolean")}, type="film", owner=BOB)
+    expected = sorted(node.id for node in carriers)
+
+    first = await repository.list_with_item_field(
+        "film", "signed", scope=A, after=None, limit=2
+    )
+    rest = await repository.list_with_item_field(
+        "film", "signed", scope=A, after=first[-1].id, limit=2
+    )
+
+    assert [n.id for n in first + rest] == expected

@@ -25,6 +25,8 @@
 	import { listAttributeValues, promoteExtraSchemaField } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import FieldKindRow from '$lib/components/field-kind-row.svelte';
+	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
+	import { fetchItemFields } from '$lib/item-fields';
 	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
 	import { definitionToFieldSet, type FieldSetDefinition, type Preset } from '$lib/presets';
 
@@ -37,7 +39,7 @@
 		extraSchema = $bindable(null),
 		supportsExtraFields = false,
 		nodeId,
-		nodeTypeId,
+		nodeType,
 		onPromoted,
 		serverErrors = null,
 		only
@@ -47,7 +49,8 @@
 		extraSchema?: AttributesSchema | null;
 		supportsExtraFields?: boolean;
 		nodeId?: string;
-		nodeTypeId?: string;
+		/** The item's type: its id for value suggestions, and its slug and label to promote a field. */
+		nodeType?: { id: string; slug: string; label: string };
 		onPromoted?: () => void;
 		serverErrors?: Record<string, string> | null;
 		/** Show just these fields of `schema`, flat and in this order, with nothing else (quick capture). */
@@ -131,12 +134,12 @@
 	let previousValuesByKey = $state<Record<string, { value: string; count: number }[]>>({});
 
 	async function fetchPreviousValues(key: string, q: string) {
-		if (!nodeTypeId || !q) {
+		if (!nodeType || !q) {
 			previousValuesByKey = { ...previousValuesByKey, [key]: [] };
 			return;
 		}
 		const result = await listAttributeValues({
-			path: { node_type_id: nodeTypeId, key },
+			path: { node_type_id: nodeType.id, key },
 			query: { q, limit: 8 }
 		});
 		if (result.data) {
@@ -247,20 +250,34 @@
 	}
 
 	let promotingKey = $state<string | null>(null);
+	// A field other items of the type also carry, waiting for the person to confirm.
+	let promoteAsk = $state<{ key: string; label: string; others: number } | null>(null);
+
+	// Promoting moves the field off every item of the type that has it, so say how many first.
+	async function askToPromote(key: string, label: string) {
+		if (!nodeType) return;
+		promotingKey = key;
+		const fields = await fetchItemFields(nodeType.slug);
+		const count = fields?.filter((f) => f.key === key).reduce((sum, f) => sum + f.count, 0) ?? 0;
+		promotingKey = null;
+		if (count > 1) promoteAsk = { key, label, others: count - 1 };
+		else await promoteField(key);
+	}
 
 	async function promoteField(key: string) {
-		if (!nodeId || !nodeTypeId) return;
+		if (!nodeId || !nodeType) return;
 		promotingKey = key;
 		const result = await promoteExtraSchemaField({
 			path: { node_id: nodeId, key },
-			body: { node_type_id: nodeTypeId }
+			body: { node_type_id: nodeType.id }
 		});
 		promotingKey = null;
+		promoteAsk = null;
 		if (result.error) {
 			toast.error("Couldn't make this a field", { description: errorMessage(result.error) });
 			return;
 		}
-		toast.success('Field added to the item type');
+		toast.success(`Field added to ${nodeType.label}`);
 		onPromoted?.();
 	}
 </script>
@@ -297,7 +314,7 @@
 						? 'ring-1 ring-destructive/60'
 						: ''}"
 				>
-					{#if desc?.kind === 'text' && nodeTypeId}
+					{#if desc?.kind === 'text' && nodeType}
 						{@const currentValue = typeof getValue(key) === 'string' ? String(getValue(key)) : ''}
 						{@const previousValues = previousValuesByKey[key] ?? []}
 						<div class="relative">
@@ -427,14 +444,14 @@
 						{@render fieldEntry(key, prop, true)}
 					</div>
 					<div class="flex flex-wrap items-center gap-2 sm:shrink-0">
-						{#if supportsExtraFields && nodeId && nodeTypeId}
+						{#if supportsExtraFields && nodeId && nodeType}
 							<Button
 								type="button"
 								variant="ghost"
 								size="sm"
 								class="mt-1 h-7 text-xs"
 								disabled={promotingKey === key}
-								onclick={() => promoteField(key)}
+								onclick={() => askToPromote(key, prop.title || key)}
 							>
 								Make this a field
 							</Button>
@@ -520,4 +537,20 @@
 	title="Add saved field group"
 	onOpenChange={(v) => (fieldSetPickerOpen = v)}
 	onPick={addFieldSetFromPreset}
+/>
+
+<ConfirmDialog
+	open={promoteAsk !== null}
+	title={promoteAsk && nodeType ? `Make ${promoteAsk.label} a field of ${nodeType.label}?` : ''}
+	description={promoteAsk
+		? `It moves off this item and ${promoteAsk.others === 1 ? '1 other item' : `${promoteAsk.others.toLocaleString()} other items`}, which all keep their values.`
+		: undefined}
+	destructive={false}
+	busy={promotingKey !== null}
+	busyLabel="Adding…"
+	confirmLabel="Make it a field"
+	onOpenChange={(open) => {
+		if (!open) promoteAsk = null;
+	}}
+	onConfirm={() => promoteAsk && void promoteField(promoteAsk.key)}
 />

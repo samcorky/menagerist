@@ -588,6 +588,32 @@ class SqlAlchemyNodeRepository:
         result = await self._session.execute(stmt)
         return await self._viewed([_to_domain(m) for m in result.scalars()], scope)
 
+    async def list_with_item_field(
+        self,
+        type_slug: str,
+        key: str,
+        *,
+        scope: ContentFilter,
+        after: uuid.UUID | None,
+        limit: int,
+    ) -> builtins.list[Node]:
+        """List non-deleted nodes of `type_slug` whose own overlay defines `key`."""
+        logger.debug("listing nodes with item field", type_slug=type_slug, key=key)
+        stmt = (
+            select(NodeModel)
+            .where(
+                _in_scope(scope),
+                NodeModel.type == type_slug,
+                NodeModel.extra_schema["properties"].has_key(key),
+            )
+            .order_by(NodeModel.id)
+            .limit(limit)
+        )
+        if after is not None:
+            stmt = stmt.where(NodeModel.id > after)
+        result = await self._session.execute(stmt)
+        return await self._viewed([_to_domain(m) for m in result.scalars()], scope)
+
     async def list_attribute_values(
         self,
         type_slug: str,
@@ -617,7 +643,7 @@ class SqlAlchemyNodeRepository:
         return [(row[0], row[1]) for row in result.all()]
 
     async def item_fields(
-        self, *, scope: ContentFilter, limit: int
+        self, *, scope: ContentFilter, limit: int, type_slug: str | None = None
     ) -> builtins.list[ItemFieldUse]:
         """List the per-item fields declared in the overlays of live nodes."""
         logger.debug("listing item fields")
@@ -655,6 +681,7 @@ class SqlAlchemyNodeRepository:
                 _in_scope(scope),
                 kind.in_(list(KIND_OPERATORS)),
                 meta["archived"].is_distinct_from(cast(literal("true"), JSONB)),
+                true() if type_slug is None else NodeModel.type == type_slug,
             )
             .group_by(fields.c.key, kind, title)
             .subquery()

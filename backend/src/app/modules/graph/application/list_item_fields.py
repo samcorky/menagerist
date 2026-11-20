@@ -21,7 +21,9 @@ MAX_ITEM_FIELDS = 200
 
 @dataclass(frozen=True)
 class ListItemFieldsQuery:
-    """Request for the per-item fields in use."""
+    """Request for the per-item fields in use, on items of `type_slug` if given."""
+
+    type_slug: str | None = None
 
 
 class ListItemFields(QueryHandler[GraphRepos, ListItemFieldsQuery, list[ItemFieldUse]]):
@@ -41,7 +43,7 @@ class ListItemFields(QueryHandler[GraphRepos, ListItemFieldsQuery, list[ItemFiel
     ) -> list[ItemFieldUse]:
         """Return at most `MAX_ITEM_FIELDS` fields, by count then key."""
         fields = await self._repos.nodes.item_fields(
-            scope=self.scope(actor), limit=MAX_ITEM_FIELDS
+            scope=self.scope(actor), limit=MAX_ITEM_FIELDS, type_slug=query.type_slug
         )
         logger.debug("item fields listed", count=len(fields))
         return fields

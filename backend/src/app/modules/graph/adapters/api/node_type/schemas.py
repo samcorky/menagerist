@@ -12,7 +12,7 @@ from app.platform.request_model import RequestModel
 if TYPE_CHECKING:
     from app.modules.graph.domain.node_type import NodeType
 
-_NODE_TYPE_EXAMPLE: dict[str, Any] = {
+NODE_TYPE_EXAMPLE: dict[str, Any] = {
     "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
     "slug": "film",
     "label": "Film",
@@ -117,7 +117,7 @@ class UpdateNodeTypeRequest(RequestModel):
 class NodeTypeResponse(BaseModel):
     """A node type as returned by the API."""
 
-    model_config = ConfigDict(json_schema_extra={"examples": [_NODE_TYPE_EXAMPLE]})
+    model_config = ConfigDict(json_schema_extra={"examples": [NODE_TYPE_EXAMPLE]})
 
     id: uuid.UUID = Field(description="The item type's id.")
     slug: str = Field(description="Its short name; items refer to it.")
