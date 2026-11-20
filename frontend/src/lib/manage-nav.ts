@@ -10,6 +10,7 @@ import {
 	Laptop,
 	LayoutGrid,
 	Library,
+	Settings2,
 	Shield,
 	SlidersHorizontal,
 	Sparkles,
@@ -93,6 +94,13 @@ const ACCOUNT: ManageItem[] = [
 		icon: UserRound,
 		hub: 'settings',
 		description: 'Change your password.'
+	},
+	{
+		href: '/settings/preferences',
+		label: 'Preferences',
+		icon: Settings2,
+		hub: 'settings',
+		description: 'Choose how Menagerist works for you.'
 	}
 ];
 

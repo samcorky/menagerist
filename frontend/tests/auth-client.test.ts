@@ -129,7 +129,8 @@ describe('can()', () => {
 		await auth.refresh();
 		expect(auth.passwordExpired).toBe(true);
 		expect(auth.can('graph:node_type:delete')).toBe(false);
-		expect(paths).toEqual(['/api/v1/me']);
+		expect(paths).toContain('/api/v1/me');
+		expect(paths).not.toContain('/api/v1/me/permissions');
 		auth.user = null;
 	});
 });

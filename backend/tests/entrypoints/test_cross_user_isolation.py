@@ -227,6 +227,9 @@ CREATES_OWN = "references no existing content; creates content owned by the call
 
 RECENTLY_DELETED = "own deleted rows only, empty in the seed; two-user router tests"
 SETTINGS = "administrator-only instance settings, not owned content; router tests"
+OWN_SETTINGS = (
+    "the caller's own preferences, keyed by the actor; two-person router tests"
+)
 SCHEDULING = "administrator-only scheduler views and run-now, no content; router tests"
 DIAGNOSTICS = (
     "administrator-only build and update status, not owned content; router tests"
@@ -243,6 +246,10 @@ ALLOWED: dict[Route, str] = {
     ("GET", "/api/v1/settings/instance"): SETTINGS,
     ("PATCH", "/api/v1/settings/instance"): SETTINGS,
     ("DELETE", "/api/v1/settings/instance/{key}"): SETTINGS,
+    ("GET", "/api/v1/me/settings/schema"): OWN_SETTINGS,
+    ("GET", "/api/v1/me/settings"): OWN_SETTINGS,
+    ("PATCH", "/api/v1/me/settings"): OWN_SETTINGS,
+    ("DELETE", "/api/v1/me/settings/{key}"): OWN_SETTINGS,
     ("GET", "/api/v1/nodes/deleted"): RECENTLY_DELETED,
     ("POST", "/api/v1/nodes/{node_id}/restore"): RECENTLY_DELETED,
     ("DELETE", "/api/v1/nodes/{node_id}/purge"): RECENTLY_DELETED,

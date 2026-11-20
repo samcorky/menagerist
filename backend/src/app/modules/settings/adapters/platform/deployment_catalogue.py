@@ -31,26 +31,36 @@ def build_catalogue(
     for spec in specs:
         if spec.scope is None:
             continue
+        scope = SettingScope(spec.scope.value)
+        default = spec.default
+        instance = instances[spec.group_type]
+        supplied = instance.is_pinned(spec.field_name)
+        if supplied:
+            value = spec.adapter.dump_python(
+                getattr(instance, spec.field_name), mode="json"
+            )
+            # The environment pins an instance setting but only sets the default
+            # of a per-person one, which each person can still change.
+            if scope is SettingScope.USER:
+                default = value
+            else:
+                pins[spec.key] = Pin(env_name=spec.env_name, value=value)
         descriptors.append(
             SettingDescriptor(
                 key=spec.key,
                 group=spec.group,
                 title=spec.title,
                 description=spec.description,
-                scope=SettingScope(spec.scope.value),
+                scope=scope,
                 restart_required=spec.restart_required,
-                default=spec.default,  # type: ignore[arg-type]
-                schema=spec.schema,
+                default=default,  # type: ignore[arg-type]
+                schema={**spec.schema, "default": default},
                 env_name=spec.env_name,
+                hidden=spec.hidden,
+                default_from_env=supplied and scope is SettingScope.USER,
             )
         )
         adapters[spec.key] = spec.adapter
-        instance = instances[spec.group_type]
-        if instance.is_pinned(spec.field_name):
-            value = spec.adapter.dump_python(
-                getattr(instance, spec.field_name), mode="json"
-            )
-            pins[spec.key] = Pin(env_name=spec.env_name, value=value)
     return PydanticSettingsCatalogue(descriptors, adapters, pins)
 
 

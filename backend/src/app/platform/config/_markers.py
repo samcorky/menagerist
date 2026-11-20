@@ -28,6 +28,8 @@ class Tunable:
 
     scope: Scope = Scope.INSTANCE
     restart_required: bool = False
+    # A per-person value changed elsewhere in the app, not on the settings form.
+    hidden: bool = False
 
 
 @dataclass(frozen=True)

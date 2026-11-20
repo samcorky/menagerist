@@ -30,6 +30,20 @@ class Display(MenageristBaseSettings, group="display"):
     )
 
 
+class Mixed(MenageristBaseSettings, group="mixed"):
+    """Both scopes, with a hidden per-person setting."""
+
+    zone: Annotated[str, Tunable(scope=Scope.USER)] = Field(
+        default="UTC", title="Zone", description="A per-person setting."
+    )
+    pinned_for_all: Annotated[int, Tunable()] = Field(
+        default=1, title="Instance", description="An instance setting."
+    )
+    recent: Annotated[list[str], Tunable(scope=Scope.USER, hidden=True)] = Field(
+        default_factory=list, title="Recent", description="Changed elsewhere."
+    )
+
+
 def test_descriptors_carry_the_discovered_facts() -> None:
     """Key, scope, title, default, env name and schema come from the field."""
     catalogue = build_catalogue(
@@ -59,6 +73,33 @@ def test_a_field_set_in_the_environment_is_pinned(
     assert pin is not None
     assert (pin.env_name, pin.value) == ("MENAGERIST_SCHEDULER_RUN_HISTORY_PER_JOB", 30)
     assert catalogue.pin("backup.schedule") is None
+
+
+def test_the_environment_sets_a_per_person_default_without_pinning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """For a per-person setting an env var is the default each person can change."""
+    monkeypatch.setenv("MENAGERIST_MIXED_ZONE", "Europe/London")
+    monkeypatch.setenv("MENAGERIST_MIXED_PINNED_FOR_ALL", "5")
+    catalogue = build_catalogue(discover([Mixed]), {Mixed: Mixed()})
+
+    zone = catalogue.descriptor("mixed.zone")
+    assert catalogue.pin("mixed.zone") is None
+    assert (zone.default, zone.default_from_env) == ("Europe/London", True)
+    assert zone.schema["default"] == "Europe/London"
+    pin = catalogue.pin("mixed.pinned_for_all")
+    assert pin is not None
+    assert pin.value == 5
+    assert not catalogue.descriptor("mixed.pinned_for_all").default_from_env
+
+
+def test_hidden_per_person_settings_are_marked() -> None:
+    """A hidden setting is described like any other, flagged hidden."""
+    catalogue = build_catalogue(discover([Mixed]), {Mixed: Mixed()})
+
+    assert catalogue.descriptor("mixed.recent").hidden
+    assert not catalogue.descriptor("mixed.zone").hidden
+    assert not catalogue.descriptor("mixed.zone").default_from_env
 
 
 def test_an_empty_schedule_in_the_environment_is_a_pin_that_turns_it_off(

@@ -56,6 +56,7 @@ describe('hubTiles', () => {
 			'Examples',
 			'Recently deleted',
 			'Account',
+			'Preferences',
 			'Status',
 			'Administration'
 		]);
@@ -113,6 +114,7 @@ describe('manageGroups', () => {
 			'/library/examples',
 			'/library/recently-deleted',
 			'/settings/account',
+			'/settings/preferences',
 			'/status'
 		]);
 	});

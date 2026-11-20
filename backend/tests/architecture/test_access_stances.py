@@ -96,6 +96,10 @@ EXPECTED_OWN_ACCOUNT: frozenset[str] = frozenset(
         "identity.SetOwnAvatarFromCatService",
         "identity.SetOwnDisplayName",
         "search.Search",
+        "settings.GetMySettingsSchema",
+        "settings.ListMySettings",
+        "settings.ResetMySetting",
+        "settings.UpdateMySettings",
     }
 )
 EXPECTED_CONTENT: frozenset[str] = frozenset(

@@ -16725,6 +16725,7 @@
                     "description": "Minimum number of ordinary backups to retain.",
                     "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                     "group": "backup",
+                    "hidden": false,
                     "key": "backup.keep_last",
                     "locked": false,
                     "restart_required": false,
@@ -16871,6 +16872,7 @@
                     "description": "Minimum number of ordinary backups to retain.",
                     "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                     "group": "backup",
+                    "hidden": false,
                     "key": "backup.keep_last",
                     "locked": false,
                     "restart_required": false,
@@ -17079,6 +17081,7 @@
                   "description": "Minimum number of ordinary backups to retain.",
                   "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
                   "group": "backup",
+                  "hidden": false,
                   "key": "backup.keep_last",
                   "locked": false,
                   "restart_required": false,
@@ -17223,6 +17226,727 @@
           }
         },
         "x-required-permission": "settings:instance:write"
+      }
+    },
+    "/api/v1/me/settings/schema": {
+      "get": {
+        "tags": [
+          "v1",
+          "Personal settings"
+        ],
+        "summary": "Get My Settings Schema",
+        "description": "Describe the settings a person changes on the Preferences page.\n\nA JSON Schema 2020-12 document with one property per setting, keyed by setting\nkey. Settings changed elsewhere in the app are left out. It carries an `ETag`.",
+        "operationId": "get_my_settings_schema",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An ETag from an earlier response; 304 if it still matches.",
+              "title": "If-None-Match"
+            },
+            "description": "An ETag from an earlier response; 304 if it still matches."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get My Settings Schema",
+                  "description": "A JSON Schema 2020-12 document with one property per setting."
+                },
+                "example": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "calendar.first_day": {
+                      "type": "string",
+                      "enum": [
+                        "automatic",
+                        "monday",
+                        "sunday",
+                        "saturday"
+                      ],
+                      "title": "First day of the week",
+                      "default": "automatic",
+                      "x-menagerist": {
+                        "labels": {
+                          "automatic": "Automatic (from your region)",
+                          "monday": "Monday",
+                          "sunday": "Sunday",
+                          "saturday": "Saturday"
+                        }
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Version of the schema, for `If-None-Match`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The schema has not changed."
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/schema"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/schema"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/schema"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "An API token cannot read or change account settings.",
+                  "instance": "https://menagerist.example/api/v1/me/settings/schema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/settings/schema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/schema"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/settings": {
+      "get": {
+        "tags": [
+          "v1",
+          "Personal settings"
+        ],
+        "summary": "List My Settings",
+        "description": "List every one of your own settings with its effective value and source.\n\nIncludes settings changed elsewhere in the app, marked `hidden`.",
+        "operationId": "list_my_settings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SettingResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List My Settings",
+                  "description": "Each entry is a `SettingResponse`."
+                },
+                "example": [
+                  {
+                    "description": "Minimum number of ordinary backups to retain.",
+                    "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
+                    "group": "backup",
+                    "hidden": false,
+                    "key": "backup.keep_last",
+                    "locked": false,
+                    "restart_required": false,
+                    "source": "instance",
+                    "stored_invalid": false,
+                    "title": "Backups to keep",
+                    "value": 12
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "An API token cannot read or change account settings.",
+                  "instance": "https://menagerist.example/api/v1/me/settings"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "v1",
+          "Personal settings"
+        ],
+        "summary": "Update My Settings",
+        "description": "Change the settings named in the body; the rest are left alone.\n\nEach value replaces the saved one whole. Every value is checked first, so one\nbad value saves nothing.",
+        "operationId": "update_my_settings",
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              },
+              "examples": {
+                "week": {
+                  "summary": "Start the week on Monday",
+                  "value": {
+                    "values": {
+                      "calendar.first_day": "monday"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SettingResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Update My Settings",
+                  "description": "Each entry is a `SettingResponse`."
+                },
+                "example": [
+                  {
+                    "description": "Minimum number of ordinary backups to retain.",
+                    "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
+                    "group": "backup",
+                    "hidden": false,
+                    "key": "backup.keep_last",
+                    "locked": false,
+                    "restart_required": false,
+                    "source": "instance",
+                    "stored_invalid": false,
+                    "title": "Backups to keep",
+                    "value": 12
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "A value does not satisfy the setting's type or constraints.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidSettingValueError",
+                  "status": 400,
+                  "detail": "Invalid value for calendar.first_day: Input should be 'automatic', 'monday', 'sunday' or 'saturday'",
+                  "instance": "https://menagerist.example/api/v1/me/settings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "An API token cannot read or change account settings.",
+                  "instance": "https://menagerist.example/api/v1/me/settings"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No tunable setting exists with the requested key.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "UnknownSettingError",
+                  "status": 404,
+                  "detail": "Unknown setting: calendar.nope",
+                  "instance": "https://menagerist.example/api/v1/me/settings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/settings"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/settings"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/settings/{key}": {
+      "delete": {
+        "tags": [
+          "v1",
+          "Personal settings"
+        ],
+        "summary": "Reset My Setting",
+        "description": "Remove your saved value so the default applies again.\n\nResetting a setting with nothing saved is harmless and returns the default.",
+        "operationId": "reset_my_setting",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The setting's key.",
+              "title": "Key"
+            },
+            "description": "The setting's key."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingResponse"
+                },
+                "example": {
+                  "description": "Minimum number of ordinary backups to retain.",
+                  "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
+                  "group": "backup",
+                  "hidden": false,
+                  "key": "backup.keep_last",
+                  "locked": false,
+                  "restart_required": false,
+                  "source": "instance",
+                  "stored_invalid": false,
+                  "title": "Backups to keep",
+                  "value": 12
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/key"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/key"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/key"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not permitted to do this.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "An API token cannot read or change account settings.",
+                  "instance": "https://menagerist.example/api/v1/me/settings/key"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No tunable setting exists with the requested key.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "UnknownSettingError",
+                  "status": 404,
+                  "detail": "Unknown setting: calendar.nope",
+                  "instance": "https://menagerist.example/api/v1/me/settings/key"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/settings/key"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/settings/key"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/search": {
@@ -36801,12 +37525,13 @@
             "type": "string",
             "enum": [
               "default",
+              "env_default",
               "instance",
               "user",
               "env"
             ],
             "title": "Source",
-            "description": "Which layer supplied the value."
+            "description": "Which layer supplied the value. `env_default` is a per-person setting's default that the deployment sets through `env_name`."
           },
           "locked": {
             "type": "boolean",
@@ -36834,6 +37559,11 @@
             "type": "boolean",
             "title": "Stored Invalid",
             "description": "True when a saved value no longer validates and is being ignored."
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden",
+            "description": "True for a per-person setting changed elsewhere in the app, so not offered on a settings form."
           }
         },
         "type": "object",
@@ -36847,7 +37577,8 @@
           "locked",
           "env_name",
           "restart_required",
-          "stored_invalid"
+          "stored_invalid",
+          "hidden"
         ],
         "title": "SettingResponse",
         "description": "One setting with its effective value and where that value came from.",
@@ -36856,6 +37587,7 @@
             "description": "Minimum number of ordinary backups to retain.",
             "env_name": "MENAGERIST_BACKUP_KEEP_LAST",
             "group": "backup",
+            "hidden": false,
             "key": "backup.keep_last",
             "locked": false,
             "restart_required": false,
@@ -38419,6 +39151,10 @@
     {
       "name": "Settings",
       "description": "Read and change instance settings, and fetch their schema."
+    },
+    {
+      "name": "Personal settings",
+      "description": "Read and change your own preferences, and fetch their schema."
     },
     {
       "name": "System",

@@ -114,11 +114,15 @@ overrides:
   - files: ["**#/components/schemas/ImportResultResponse"]
     rules:
       ibm-use-date-based-format: "off"
-  # The settings schema is a JSON Schema document, and the instance settings are a
-  # list that PATCH returns in the same shape as GET.
-  - files: ["**#/paths/~1api~1v1~1settings~1schema"]
+  # The settings schemas are JSON Schema documents, and the instance and personal
+  # settings are lists that PATCH returns in the same shape as GET.
+  - files:
+      - "**#/paths/~1api~1v1~1settings~1schema"
+      - "**#/paths/~1api~1v1~1me~1settings~1schema"
     rules:
       ibm-accept-and-return-models: "off"
-  - files: ["**#/paths/~1api~1v1~1settings~1instance"]
+  - files:
+      - "**#/paths/~1api~1v1~1settings~1instance"
+      - "**#/paths/~1api~1v1~1me~1settings"
     rules:
       ibm-resource-response-consistency: "off"

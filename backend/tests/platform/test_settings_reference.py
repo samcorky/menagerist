@@ -3,7 +3,7 @@
 import io
 import os
 from collections.abc import Callable  # noqa: TC003 - pydantic resolves this at runtime
-from typing import Literal
+from typing import Annotated, Literal
 
 import pytest
 from dotenv import dotenv_values
@@ -11,7 +11,7 @@ from pydantic import Field, PostgresDsn, SecretStr
 
 from app.platform.config import ALL_SETTINGS, MenageristBaseSettings
 from app.platform.config._fields import unwrap
-from app.platform.config._markers import Internal
+from app.platform.config._markers import Internal, Scope, Tunable
 from app.platform.config._reference import (
     build_sections,
     reference_files,
@@ -202,3 +202,37 @@ def test_the_defaults_in_the_env_file_load_back_as_the_defaults(
 
     for cls in ALL_SETTINGS:
         assert cls().model_dump() == defaults[cls], cls.__name__
+
+
+class Mixed(MenageristBaseSettings, group="mixed"):
+    """One setting of each kind the In the app column tells apart."""
+
+    fixed: int = Field(default=1, description="Only the deployment sets it.")
+    shared: Annotated[int, Tunable(restart_required=True)] = Field(
+        default=2, description="An administrator changes it."
+    )
+    mine: Annotated[str, Tunable(scope=Scope.USER)] = Field(
+        default="a", description="Each person changes it."
+    )
+
+
+def test_the_reference_says_who_changes_each_setting() -> None:
+    """Deployment-only, admin and personal settings are told apart, with a legend."""
+    doc = render_settings_doc(build_sections([Mixed]))
+
+    assert "| Variable | Type | Default | Allowed values | In the app | Notes |" in doc
+    assert "| any | Deployment only | Only the deployment sets it. |" in doc
+    assert (
+        "| any | Admin setting | An administrator changes it. Needs a restart. |" in doc
+    )
+    assert "| any | Personal | Each person changes it. |" in doc
+    assert "Setting it here locks it there." in doc
+    assert "Setting it here changes only the default" in doc
+
+    env = render_env_example(build_sections([Mixed]))
+    assert "# In the app: Deployment only.\n# MENAGERIST_MIXED_FIXED=1" in env
+    assert "# In the app: Admin setting.\n# MENAGERIST_MIXED_SHARED=2" in env
+    assert "# In the app: Personal.\n# MENAGERIST_MIXED_MINE=a" in env
+    assert "Personal (each person; set here, it is only the default)" in " ".join(
+        line.removeprefix("# ") for line in env.splitlines()
+    )

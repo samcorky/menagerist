@@ -7,7 +7,7 @@ import structlog
 
 from app.modules.settings.application.permissions import SettingsPermission
 from app.modules.settings.application.resolution import resolve_setting
-from app.modules.settings.domain.errors import SettingLockedError, UnknownSettingError
+from app.modules.settings.application.saving import editable
 from app.modules.settings.domain.setting import ResolvedSetting, SettingScope
 from app.modules.settings.ports.unit_of_work import SettingsUnitOfWork
 from app.shared_kernel.access import Access, Requires
@@ -51,12 +51,7 @@ class ResetSetting(
     async def _handle(
         self, request: ResetSettingCommand, actor: Actor
     ) -> ResolvedSetting:
-        descriptor = self._catalogue.descriptor(request.key)
-        if descriptor.scope is not SettingScope.INSTANCE:
-            raise UnknownSettingError(request.key)
-        pin = self._catalogue.pin(request.key)
-        if pin is not None:
-            raise SettingLockedError(request.key, pin.env_name)
+        descriptor = editable(self._catalogue, SettingScope.INSTANCE, request.key)
         async with self._uow as repos:
             removed = await repos.values.delete(
                 SettingScope.INSTANCE, None, request.key

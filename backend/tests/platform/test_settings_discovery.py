@@ -182,6 +182,18 @@ def test_labels_need_a_fixed_choice() -> None:
         discover([Bad], kinds=KINDS)
 
 
+def test_only_a_per_person_setting_can_be_hidden() -> None:
+    """A hidden instance setting would have no way to be changed."""
+
+    class Bad(MenageristBaseSettings):
+        value: Annotated[int, Tunable(hidden=True)] = Field(
+            default=1, title="Value", description="Hidden instance setting."
+        )
+
+    with pytest.raises(SettingDeclarationError, match="only a per-person"):
+        discover([Bad], kinds=KINDS)
+
+
 def test_ui_meta_rejects_unknown_hint_names() -> None:
     """Ui meta rejects unknown hint names."""
     with pytest.raises(TypeError):

@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 from uuid import uuid7
 
 import pytest
@@ -71,6 +72,24 @@ def test_the_default_applies_when_nothing_is_saved(
         SettingSource.DEFAULT,
         False,
     )
+
+
+def test_an_env_default_is_marked_as_the_deployments(
+    make_descriptor: DescriptorFactory,
+) -> None:
+    """A per-person default from the environment says so and stays editable."""
+    descriptor = replace(
+        make_descriptor("calendar.first_day", "sunday", SettingScope.USER),
+        default_from_env=True,
+    )
+    resolved = resolve(descriptor, pin=None, stored=None, is_valid=lambda _: True)
+    assert (resolved.value, resolved.source, resolved.locked) == (
+        "sunday",
+        SettingSource.ENV_DEFAULT,
+        False,
+    )
+    saved = resolve(descriptor, pin=None, stored="monday", is_valid=lambda _: True)
+    assert (saved.value, saved.source) == ("monday", SettingSource.USER)
 
 
 def test_an_invalid_stored_value_falls_back_and_is_flagged(

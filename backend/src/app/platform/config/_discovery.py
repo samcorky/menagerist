@@ -45,6 +45,7 @@ class SettingSpec:
     description: str | None
     scope: Scope | None
     restart_required: bool
+    hidden: bool
     public: bool
     env_name: str
     default: object
@@ -106,6 +107,9 @@ def _spec(
     except PydanticInvalidForJsonSchema as exc:
         msg = f"{label}: no JSON Schema for {base!r}; give it WithJsonSchema"
         raise SettingDeclarationError(msg) from exc
+    if tunable is not None and tunable.hidden and tunable.scope is not Scope.USER:
+        msg = f"{label}: only a per-person setting can be hidden"
+        raise SettingDeclarationError(msg)
     if tunable is not None and not _is_flat(schema):
         msg = (
             label
@@ -137,6 +141,7 @@ def _spec(
         description=field.description,
         scope=tunable.scope if tunable else None,
         restart_required=tunable.restart_required if tunable else False,
+        hidden=tunable.hidden if tunable else False,
         public=public,
         env_name=env_name(group_type, name),
         default=default,

@@ -13,9 +13,13 @@ from app.modules.settings.adapters.persistence.unit_of_work import (
     build_settings_repos,
     create_settings_uow,
 )
+from app.modules.settings.application.get_my_settings_schema import GetMySettingsSchema
 from app.modules.settings.application.get_settings_schema import GetSettingsSchema
+from app.modules.settings.application.list_my_settings import ListMySettings
 from app.modules.settings.application.list_settings import ListSettings
+from app.modules.settings.application.reset_my_setting import ResetMySetting
 from app.modules.settings.application.reset_setting import ResetSetting
+from app.modules.settings.application.update_my_settings import UpdateMySettings
 from app.modules.settings.application.update_settings import UpdateSettings
 from app.modules.settings.ports.setting_value_repository import SettingValueRepository
 from app.modules.settings.ports.settings_catalogue import SettingsCatalogue
@@ -78,5 +82,44 @@ def get_reset_setting_use_case(
     catalogue: Annotated[SettingsCatalogue, Depends(get_settings_catalogue)],
 ) -> ResetSetting:
     return ResetSetting(
+        create_settings_uow(session_factory), guard, catalogue, _invalidate_reader
+    )
+
+
+def get_list_my_settings_use_case(
+    values: Annotated[SettingValueRepository, Depends(get_setting_values)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    catalogue: Annotated[SettingsCatalogue, Depends(get_settings_catalogue)],
+) -> ListMySettings:
+    return ListMySettings(values, guard, catalogue)
+
+
+def get_get_my_settings_schema_use_case(
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    catalogue: Annotated[SettingsCatalogue, Depends(get_settings_catalogue)],
+) -> GetMySettingsSchema:
+    return GetMySettingsSchema(catalogue, guard)
+
+
+def get_update_my_settings_use_case(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    catalogue: Annotated[SettingsCatalogue, Depends(get_settings_catalogue)],
+) -> UpdateMySettings:
+    return UpdateMySettings(
+        create_settings_uow(session_factory), guard, catalogue, _invalidate_reader
+    )
+
+
+def get_reset_my_setting_use_case(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    catalogue: Annotated[SettingsCatalogue, Depends(get_settings_catalogue)],
+) -> ResetMySetting:
+    return ResetMySetting(
         create_settings_uow(session_factory), guard, catalogue, _invalidate_reader
     )
