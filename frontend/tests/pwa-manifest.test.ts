@@ -24,9 +24,9 @@ describe('app.html', () => {
 
 	it('gives a pasted link a preview, with a share image of the size it declares', () => {
 		for (const tag of [
-			'<meta property="og:title" content="Menagerist" />',
+			'<meta property="og:title" content="Menagerist" data-branding="name" />',
 			'<meta property="og:type" content="website" />',
-			'<meta property="og:image" content="/share-image.png" />',
+			'<meta property="og:image" content="/share-image.png" data-branding="absolute-url" />',
 			'<meta property="og:image:width" content="1200" />',
 			'<meta property="og:image:height" content="630" />',
 			'<meta name="twitter:card" content="summary_large_image" />'

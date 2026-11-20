@@ -65,6 +65,7 @@ from app.modules.presets.adapters.api.preset.router import router as preset_rout
 from app.modules.scheduling.adapters.api.router import router as scheduling_router
 from app.modules.search.adapters.api.router import router as search_router
 from app.modules.settings.adapters.api.router import router as settings_router
+from app.modules.system.adapters.api.dependencies import get_branding
 from app.modules.system.adapters.api.router import (
     manifest_router as system_manifest_router,
     probes_router as system_probes_router,
@@ -186,8 +187,14 @@ def create_app() -> FastAPI:
     configure_openapi(fastapi_app)
 
     # Last, so every API route above wins; the SPA only sees what is left.
-    if (frontend_dist_path := get_api_settings().frontend_dist_path) is not None:
-        fastapi_app.mount("/", SpaStaticFiles(directory=frontend_dist_path), name="spa")
+    api_settings = get_api_settings()
+    if (frontend_dist_path := api_settings.frontend_dist_path) is not None:
+        spa = SpaStaticFiles(
+            directory=frontend_dist_path,
+            branding=get_branding,
+            public_origin=api_settings.public_origin,
+        )
+        fastapi_app.mount("/", spa, name="spa")
 
     return fastapi_app
 
