@@ -17,6 +17,9 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { coreForProp } from '$lib/field-types';
+	import { optionLabel } from '$lib/field-types/choice/stale-choice';
+	import { readPropMeta } from '$lib/schema-meta';
+	import type { JsonSchemaProperty } from '$lib/schema-types';
 	import {
 		coerce,
 		formProp,
@@ -113,8 +116,10 @@
 		const widget = widgetFor(item);
 		return widget !== null && isChanged(widget.prop, item.value as SettingValue, drafts[item.key]);
 	}
-	function plainText(value: unknown) {
-		return Array.isArray(value) ? value.join(', ') : String(value ?? '');
+	function plainText(value: unknown, prop: JsonSchemaProperty | undefined) {
+		if (Array.isArray(value)) return value.join(', ');
+		const text = String(value ?? '');
+		return prop ? optionLabel(readPropMeta(prop).labels, text) : text;
 	}
 	function setDraft(key: string, value: unknown) {
 		drafts[key] = value;
@@ -369,7 +374,7 @@
 										{@const View = widget.core.ViewWidget}
 										<View value={item.value} prop={widget.prop} />
 									{:else}
-										<p class="text-sm">{plainText(item.value)}</p>
+										<p class="text-sm">{plainText(item.value, widget?.prop)}</p>
 									{/if}
 
 									{#if fieldErrors[item.key]}

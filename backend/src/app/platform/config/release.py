@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from app.platform.config._base import MenageristBaseSettings
-from app.platform.config._markers import Tunable
+from app.platform.config._markers import Labels, Tunable
 from app.platform.config._types import Cron  # noqa: TC001 - pydantic resolves this at runtime
 
 
@@ -25,6 +25,7 @@ class ReleaseSettings(MenageristBaseSettings, group="release"):
     ] = True
     channel: Annotated[
         Literal["stable", "preview"],
+        Labels({"stable": "Stable", "preview": "Preview"}),
         Field(
             title="Release channel",
             description=(

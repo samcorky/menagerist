@@ -16,6 +16,8 @@ export type PropertyMeta = {
 	columns?: string[];
 	/** A `list` field's items are edited/shown as a growing textarea rather than one line. */
 	multiline?: boolean;
+	/** How each option of a fixed choice reads, by stored value (settings declare these). */
+	labels?: Record<string, string>;
 	/** A choice field linked to a saved list (its id). The options come from that list. */
 	list?: string;
 	/** Unknown members are preserved on round-trip. */

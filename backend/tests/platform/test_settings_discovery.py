@@ -13,7 +13,7 @@ from app.platform.config._discovery import (
     SettingSpec,
     discover,
 )
-from app.platform.config._markers import Public, Scope, Tunable, UIMeta
+from app.platform.config._markers import Labels, Public, Scope, Tunable, UIMeta
 from app.platform.config._types import Cron, Hours  # noqa: TC001 - pydantic resolves these at runtime
 from app.platform.shared_data import shared_data_path
 
@@ -49,7 +49,9 @@ class ExampleSettings(MenageristBaseSettings):
         title="Schedule",
         description="A cron expression.",
     )
-    choice: Annotated[Mode, Tunable()] = Field(
+    choice: Annotated[
+        Mode, Labels({"fast": "Fast", "slow": "Slow, but thorough"}), Tunable()
+    ] = Field(
         default=Mode.FAST,
         validation_alias=AliasChoices("MENAGERIST_EXAMPLE_CHOICE", "EXAMPLE_CHOICE"),
         title="Choice",
@@ -140,6 +142,44 @@ def test_default_is_json_ready(specs: dict[str, SettingSpec]) -> None:
     """Default is json ready."""
     assert specs["example.choice"].default == "fast"
     assert specs["example.names"].default == []
+
+
+def test_labels_name_each_option(specs: dict[str, SettingSpec]) -> None:
+    """Labels reach the schema beside the options, which stay the stored values."""
+    schema = specs["example.choice"].schema
+
+    assert schema["enum"] == ["fast", "slow"]
+    assert schema["x-menagerist"] == {
+        "labels": {"fast": "Fast", "slow": "Slow, but thorough"}
+    }
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [{"fast": "Fast"}, {"fast": "Fast", "slow": "Slow", "warp": "Warp"}],
+)
+def test_labels_must_match_the_options(labels: dict[str, str]) -> None:
+    """A missing or extra label fails when the schema is built."""
+
+    class Bad(MenageristBaseSettings):
+        mode: Annotated[Mode, Labels(labels), Tunable()] = Field(
+            default=Mode.FAST, title="Mode", description="Bad labels."
+        )
+
+    with pytest.raises(ValueError, match="must match the options"):
+        discover([Bad], kinds=KINDS)
+
+
+def test_labels_need_a_fixed_choice() -> None:
+    """Labels on a setting with no options fail too."""
+
+    class Bad(MenageristBaseSettings):
+        name: Annotated[str, Labels({"a": "A"}), Tunable()] = Field(
+            default="a", title="Name", description="Not a choice."
+        )
+
+    with pytest.raises(ValueError, match="must match the options"):
+        discover([Bad], kinds=KINDS)
 
 
 def test_ui_meta_rejects_unknown_hint_names() -> None:
@@ -278,3 +318,19 @@ def test_type_without_a_json_schema_is_rejected() -> None:
 
     with pytest.raises(SettingDeclarationError, match="JSON Schema"):
         discover([Bad], kinds=KINDS)
+
+
+def test_every_tunable_choice_names_each_option() -> None:
+    """A fixed-choice setting people edit labels exactly its options, no more."""
+    from app.platform.config import ALL_SETTINGS
+
+    choices = {
+        spec.key: spec.schema
+        for spec in discover(ALL_SETTINGS)
+        if spec.tunable and "enum" in spec.schema
+    }
+
+    assert choices, "expected at least one tunable fixed-choice setting"
+    for key, schema in choices.items():
+        labels = schema.get("x-menagerist", {}).get("labels", {})
+        assert set(labels) == set(schema["enum"]), key
