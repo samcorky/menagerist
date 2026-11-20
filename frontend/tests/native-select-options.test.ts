@@ -9,8 +9,13 @@ import { join, relative } from 'node:path';
 const SRC = fileURLToPath(new URL('../src/', import.meta.url));
 
 // The wrapper renders the real element, and the calendar's month and year pickers style their own
-// (bits-ui hands them a bare <select>).
-const ALLOWED = ['lib/components/ui/native-select/', 'lib/components/ui/calendar/'];
+// (bits-ui hands them a bare <select>). Suggestions are options of a <datalist>, not a select: the
+// browser draws them in its own colours.
+const ALLOWED = [
+	'lib/components/ui/native-select/',
+	'lib/components/ui/calendar/',
+	'lib/components/suggest-input.svelte'
+];
 
 function svelteFiles(dir: string): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

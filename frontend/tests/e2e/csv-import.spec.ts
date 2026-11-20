@@ -197,3 +197,43 @@ test('a column the type has no field for is kept as each item’s own detail', a
 	// An empty cell leaves the detail off that item.
 	expect(byName[`${prefix}B`].extra_schema).toBeNull();
 });
+
+test('a kept column named after a detail the items already have joins it', async ({
+	page,
+	request
+}) => {
+	const type = await makeType(request);
+	prefix = uniqueName('Sig').replace(/\W+/g, '');
+	const existing = await request.post('/api/v1/nodes', {
+		data: {
+			name: `${prefix}Old`,
+			type: type.slug,
+			attributes: { signed: true },
+			extra_schema: {
+				type: 'object',
+				properties: {
+					signed: { title: 'Signed', type: 'boolean', 'x-menagerist': { kind: 'boolean' } }
+				}
+			}
+		}
+	});
+	expect(existing.ok(), await existing.text()).toBeTruthy();
+	const file = {
+		name: 'signatures.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from(`Title,Signed
+${prefix}A,no
+`)
+	};
+
+	await chooseFileAndType(page, file, type.label);
+	await page.getByLabel('Signed').selectOption({ label: 'Keep as an extra detail' });
+	await expect(page.getByText('Joins the Signed detail already on 1 item')).toBeVisible();
+	await expect(page.getByLabel('Kind')).toHaveValue('boolean');
+	await page.getByRole('button', { name: 'Preview' }).click();
+	await page.getByRole('button', { name: 'Add 1 item' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+
+	const fields = await (await request.get(`/api/v1/nodes/fields?type=${type.slug}`)).json();
+	expect(fields).toEqual([expect.objectContaining({ key: 'signed', count: 2 })]);
+});

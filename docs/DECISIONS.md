@@ -1666,3 +1666,14 @@ Applying creates the link for each item it creates or matches, and re-points a l
 - The end-to-end backends turn the per-person import limit off (`MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE=0`): every spec signs in as the same person, so ten imports a minute were shared by the whole run.
 
 **Rationale:** A spreadsheet often has columns the type has no field for. Keeping them means the person sees the data before deciding it earns a field on the type, instead of leaving the import to change the type first.
+
+## Suggestions use the browser's own list, and a suggested field name joins that field (2026-11-20)
+
+**Decision:** `suggest-input.svelte` is a text input with a native `<datalist>` (#680). It replaces the floating list of values used before on an item's text fields, and offers names in two places: the import's "Detail name" for a kept column and the item page's "Add field". A name offered there is an extra detail other items of the type already have (`GET /nodes/fields?type=`); choosing it, or a column header that matches it, reuses that field's key and kind, so the values join it and #573's promotion later moves them together. Choosing another kind breaks the match and makes a new key.
+
+**Choices that are not obvious:**
+
+- A datalist, not a custom combobox: the browser handles the keyboard, screen readers and phones, and a click on another field can never pick a suggestion (the flaw behind #677). The "used 12 times" counts go; the server's order, most used first, stays.
+- Values are fetched when a field gets focus (the most used) and again 250 ms after typing pauses (matches), and kept per field.
+- An input with a `list` is a combobox to assistive technology and to Playwright's `getByRole`, so tests find these fields by label.
+- Without the joining, typing "Signed?" next to existing "Signed" details made `signed_2`: a second field that promotion could never merge.

@@ -52,12 +52,16 @@ test('typing suggests values used before, never items to link', async ({ page, r
 
 	await page.goto(`/items/${item.id}`);
 	await page.getByRole('button', { name: 'Edit', exact: true }).filter({ visible: true }).click();
-	const field = page.getByRole('textbox', { name: 'Maker' });
+	// With suggestions the input is a combobox, so find it by its label.
+	const field = page.getByLabel('Maker', { exact: true });
 	await field.fill(other.name.slice(0, 12));
 	await expect(page.getByRole('button', { name: other.name })).toHaveCount(0);
 
+	// The values come as the browser's own suggestions, which a click elsewhere cannot pick.
 	await field.fill(maker.slice(0, 10));
-	await page.getByRole('button', { name: new RegExp(maker) }).click();
-	await expect(field).toHaveValue(maker);
+	await expect(field).toHaveAttribute('list', /.+/);
+	const list = await field.getAttribute('list');
+	await expect(page.locator(`datalist[id="${list}"] option[value="${maker}"]`)).toHaveCount(1);
+	await expect(page.locator(`datalist[id="${list}"] option[value="${other.name}"]`)).toHaveCount(0);
 	await expect(page.getByText(/^Linked to/)).toHaveCount(0);
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
+	import SuggestInput from '$lib/components/suggest-input.svelte';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import { allDescriptors, getDescriptor } from '$lib/field-types';
 	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
@@ -12,6 +13,7 @@
 		field,
 		allowGroup = true,
 		showFlags = false,
+		labelSuggestions,
 		onLabelChange,
 		onFieldChange
 	}: {
@@ -23,6 +25,8 @@
 		 * item's fields, which keep the checkbox.
 		 */
 		showFlags?: boolean;
+		/** Names to offer for the label, through the browser's own suggestions. */
+		labelSuggestions?: readonly string[];
 		onLabelChange: (value: string) => void;
 		onFieldChange: (field: EditorField) => void;
 	} = $props();
@@ -48,13 +52,24 @@
 </script>
 
 <div class="flex flex-wrap items-center gap-2">
-	<Input
-		value={field.label}
-		placeholder="Label"
-		class="w-full min-w-32 flex-1 sm:w-40 sm:flex-none"
-		aria-label="Field label"
-		oninput={(e) => onLabelChange((e.target as HTMLInputElement).value)}
-	/>
+	{#if labelSuggestions}
+		<SuggestInput
+			value={field.label}
+			suggestions={labelSuggestions}
+			placeholder="Label"
+			class="w-full min-w-32 flex-1 sm:w-40 sm:flex-none"
+			aria-label="Field label"
+			oninput={onLabelChange}
+		/>
+	{:else}
+		<Input
+			value={field.label}
+			placeholder="Label"
+			class="w-full min-w-32 flex-1 sm:w-40 sm:flex-none"
+			aria-label="Field label"
+			oninput={(e) => onLabelChange((e.target as HTMLInputElement).value)}
+		/>
+	{/if}
 	{#if field.kind === 'opaque'}
 		<span class="rounded border border-input px-1.5 text-xs text-muted-foreground">custom</span>
 	{:else}

@@ -19,8 +19,10 @@
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
+	import SuggestInput from '$lib/components/suggest-input.svelte';
 	import { getCore } from '$lib/field-types';
+	import { fieldNameSuggestions, matchItemField } from '$lib/field-suggestions';
+	import { fetchItemFields, type ItemField } from '$lib/item-fields';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import {
 		assignTarget,
@@ -66,6 +68,8 @@
 	let inspection = $state<ItemImportInspectionResponse | null>(null);
 	let choices = $state<ColumnChoice[]>([]);
 	let plan = $state<ImportPlan | null>(null);
+	// The extra details the type's items already have, for naming a kept column after one.
+	let itemFields = $state<ItemField[]>([]);
 	let loading = $state(false);
 	let busy = $state(false);
 	let fileError = $state<string | null>(null);
@@ -104,6 +108,8 @@
 		}
 		inspection = result.data;
 		choices = choicesFrom(result.data.suggested_mapping);
+		// Suggestions only; the import works the same without them.
+		void fetchItemFields(itemType).then((found) => (itemFields = found ?? []));
 		dateOrder = result.data.day_month_order ?? 'day_first';
 		step = 'match';
 	}
@@ -121,13 +127,31 @@
 	}
 
 	function choose(column: string, value: string) {
-		choices =
-			value === KEEP
-				? keepColumn(choices, column, inspection?.column_kinds?.[column] ?? 'text')
-				: assignTarget(choices, column, value || null);
+		if (value !== KEEP) {
+			choices = assignTarget(choices, column, value || null);
+			return;
+		}
+		choices = keepColumn(choices, column, inspection?.column_kinds?.[column] ?? 'text');
+		// A header that names a detail the items already have joins it from the start.
+		if (matchItemField(column, itemFields, KEPT_KINDS)) nameKept(column, column);
 	}
 
 	const kindLabel = (kind: ExtraFieldKind) => getCore(kind)?.label ?? kind;
+	const nameSuggestions = $derived(fieldNameSuggestions(itemFields, KEPT_KINDS));
+
+	/** A name the type's items already use joins that detail: same key, same kind. */
+	function nameKept(column: string, title: string) {
+		const match = matchItemField(title, itemFields, KEPT_KINDS);
+		choices = renameKept(
+			choices,
+			column,
+			title,
+			match && { key: match.key, kind: match.kind as ExtraFieldKind }
+		);
+	}
+
+	const joined = (key: string | undefined) =>
+		key === undefined ? undefined : itemFields.find((field) => field.key === key);
 
 	function body() {
 		return {
@@ -320,11 +344,11 @@
 											<label class="text-xs text-muted-foreground" for={`csv-kept-name-${index}`}>
 												Detail name
 											</label>
-											<Input
+											<SuggestInput
 												id={`csv-kept-name-${index}`}
 												value={extra.title}
-												oninput={(e) =>
-													(choices = renameKept(choices, choice.column, e.currentTarget.value))}
+												suggestions={nameSuggestions}
+												oninput={(title) => nameKept(choice.column, title)}
 											/>
 										</div>
 										<div class="space-y-1">
@@ -348,6 +372,12 @@
 											</NativeSelect>
 										</div>
 										<p class="text-xs text-muted-foreground sm:col-span-2">
+											{#if joined(extra.key)}
+												{@const field = joined(extra.key)!}
+												Joins the {field.label} detail already on {field.count === 1
+													? '1 item'
+													: `${field.count.toLocaleString('en-GB')} items`}.
+											{/if}
 											{extra.kind === 'choice'
 												? 'Each item gets this detail for itself, with every different value in the column to choose from.'
 												: 'Each item gets this detail for itself. Add it to the item type later to give every item the field.'}
