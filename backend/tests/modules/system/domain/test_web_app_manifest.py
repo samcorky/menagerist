@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from app.modules.system.domain.web_app_manifest import WebAppManifest
 
 
@@ -27,6 +29,7 @@ def test_urls_use_the_public_origin_when_set() -> None:
     urls = [
         *(icon.src for icon in manifest.icons),
         *(shortcut.url for shortcut in manifest.shortcuts),
+        *(icon.src for shortcut in manifest.shortcuts for icon in shortcut.icons),
         *(shot.src for shot in manifest.screenshots),
     ]
     assert all(u.startswith("https://menagerist.example.com/") for u in urls)
@@ -44,9 +47,37 @@ def test_installability_needs_192_512_and_maskable_icons() -> None:
     }
 
 
-def test_shortcut_short_name_is_optional() -> None:
-    """A shortcut only carries a short name when it has a distinct one."""
+def test_every_shortcut_has_a_short_name_a_description_and_an_icon() -> None:
+    """Launchers show the short name when space is tight, so it stays short."""
     shortcuts = WebAppManifest(description="An app.").shortcuts
 
-    assert shortcuts[0].short_name == "Add item"
-    assert shortcuts[-1].short_name is None
+    assert [s.url for s in shortcuts] == ["/items/new", "/items", "/collections"]
+    for shortcut in shortcuts:
+        assert 0 < len(shortcut.short_name) <= 12
+        assert shortcut.description
+        assert [(i.sizes, i.type) for i in shortcut.icons] == [("192x192", "image/png")]
+
+
+def test_shortcut_icons_use_the_public_origin_when_set() -> None:
+    """An icon address is built like every other one."""
+    manifest = WebAppManifest(
+        description="An app.", origin="https://menagerist.example.com"
+    )
+
+    assert manifest.shortcuts[0].icons[0].src == (
+        "https://menagerist.example.com/shortcut-add-item.png"
+    )
+
+
+def test_every_image_the_manifest_names_exists_in_the_frontend_static_folder() -> None:
+    """A renamed or forgotten icon would 404 in the launcher with no other sign."""
+    static = Path(__file__).resolve().parents[5] / "frontend" / "static"
+    manifest = WebAppManifest(description="An app.")
+    names = [
+        *(icon.src for icon in manifest.icons),
+        *(icon.src for shortcut in manifest.shortcuts for icon in shortcut.icons),
+        *(shot.src for shot in manifest.screenshots),
+    ]
+
+    assert names
+    assert [n for n in names if not (static / n.removeprefix("/")).is_file()] == []

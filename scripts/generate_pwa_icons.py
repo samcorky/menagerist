@@ -1,4 +1,4 @@
-"""Render the install icons and link-preview image in frontend/static from the mark.
+"""Render the install icons, shortcut icons and link-preview image in frontend/static.
 
     poe generate-pwa-icons
 
@@ -7,11 +7,18 @@ It reads the shapes in frontend/static/menagerist-icon.svg (a rounded tile, a
 polyline and a dot at each vertex) and draws them with Pillow, which the backend
 already depends on, at eight times the size before shrinking for smooth edges. It
 handles only those shapes, and fails if the SVG gains any other.
+
+The launcher shortcut icons are different: they are Lucide glyphs, drawn from the path
+data in `@lucide/svelte` and rasterised with resvg (`resvg-py`), since Pillow cannot
+draw SVG paths. So `poe sync` must have run, as it must for the share image's font.
 """
 
+import json
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import resvg_py
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 STATIC = Path(__file__).resolve().parent.parent / "frontend" / "static"
@@ -28,6 +35,20 @@ ICONS = [
     ("icon-maskable-512.png", 512, False),
     ("apple-touch-icon.png", 180, False),
 ]
+
+# Launcher shortcut icons: the glyph each shortcut's button uses in the phone tab bar
+# (frontend/src/lib/manage-nav.ts), white on the brand tile. A launcher draws the icon
+# on its own menu surface, light or dark, so the glyph carries its own background
+# rather than relying on either. The tile is full-bleed because the launcher masks it,
+# and the glyph fills GLYPH_SHARE of it, inside the safe zone a mask leaves clear.
+SHORTCUT_ICON_SIZE = 192
+SHORTCUT_ICONS = [
+    ("shortcut-add-item.png", "circle-plus"),
+    ("shortcut-items.png", "layout-grid"),
+    ("shortcut-collections.png", "library"),
+]
+GLYPH_SHARE = 0.6
+LUCIDE_ICONS = STATIC.parent / "node_modules" / "@lucide" / "svelte" / "dist" / "icons"
 
 # The link-preview card. 1200x630 is the size Open Graph and Twitter large cards
 # expect (about 1.9:1); app.html names the file and these dimensions.
@@ -95,6 +116,40 @@ def render(
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
+def lucide_glyph(name: str) -> str:
+    """Return the SVG elements of a Lucide icon, read from its `__iconData`."""
+    source = (LUCIDE_ICONS / f"{name}.svelte").read_text()
+    found = re.search(r"__iconData = (\{.*?\});", source, re.DOTALL)
+    assert found, f"no __iconData in {name}.svelte"
+    data = json.loads(found.group(1))
+    size = data["size"]
+    assert size == 24, f"{name} is not on Lucide's 24-unit grid"
+    shapes = []
+    for tag, attrs in data["node"]:
+        spelled = " ".join(f'{key}="{value}"' for key, value in attrs.items())
+        shapes.append(f"<{tag} {spelled}/>")
+    return "".join(shapes)
+
+
+def render_shortcut_icon(name: str, tile: str) -> bytes:
+    """Draw a Lucide glyph, white on the full-bleed tile, as PNG bytes."""
+    size = SHORTCUT_ICON_SIZE
+    scale = size * GLYPH_SHARE / 24
+    offset = (size - 24 * scale) / 2
+    glyph_style = 'fill="none" stroke="#FFFFFF" stroke-width="2"'
+    glyph_style += ' stroke-linecap="round" stroke-linejoin="round"'
+    svg = "".join(
+        [
+            '<svg xmlns="http://www.w3.org/2000/svg"',
+            f' width="{size}" height="{size}" viewBox="0 0 {size} {size}">',
+            f'<rect width="{size}" height="{size}" fill="{tile}"/>',
+            f'<g transform="translate({offset} {offset}) scale({scale})"',
+            f" {glyph_style}>{lucide_glyph(name)}</g></svg>",
+        ]
+    )
+    return bytes(resvg_py.svg_to_bytes(svg_string=svg, width=size, height=size))
+
+
 def render_share_image(icon: ET.Element) -> Image.Image:
     """Draw the link-preview card: the mark above the name, centred on the tile."""
     tile = next(shape for shape in icon if shape.tag.rpartition("}")[2] == "rect")
@@ -147,6 +202,10 @@ def main() -> None:
         print(f"{name} {size}x{size}")
     render_share_image(svg).save(STATIC / SHARE_IMAGE, optimize=True)
     print(f"{SHARE_IMAGE} {SHARE_SIZE[0]}x{SHARE_SIZE[1]}")
+    tile = next(s for s in svg if s.tag.rpartition("}")[2] == "rect").attrib["fill"]
+    for name, glyph in SHORTCUT_ICONS:
+        (STATIC / name).write_bytes(render_shortcut_icon(glyph, tile))
+        print(f"{name} {SHORTCUT_ICON_SIZE}x{SHORTCUT_ICON_SIZE}")
 
 
 if __name__ == "__main__":

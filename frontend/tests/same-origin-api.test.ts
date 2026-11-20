@@ -22,6 +22,8 @@ afterEach(() => {
 });
 
 describe('same-origin API calls', () => {
+	// Importing the client reads the whole generated API, which takes over five seconds (the
+	// default limit) on a slow machine, so allow for that rather than failing there.
 	it('uses a relative base URL in the browser', async () => {
 		vi.stubGlobal('window', {});
 		vi.resetModules();
@@ -29,7 +31,7 @@ describe('same-origin API calls', () => {
 		const { client } = await import('../src/lib/api/client');
 
 		expect(client.getConfig().baseUrl).toBe('');
-	});
+	}, 30_000);
 
 	it('proxies /api to the backend in the Vite dev server', () => {
 		const config = readFileSync(join(root, 'vite.config.ts'), 'utf8');

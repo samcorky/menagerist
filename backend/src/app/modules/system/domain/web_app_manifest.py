@@ -14,11 +14,33 @@ _ICONS: tuple[tuple[str, str, str], ...] = (
     ("/icon-512.png", "512x512", "any"),
     ("/icon-maskable-512.png", "512x512", "maskable"),
 )
-_SHORTCUTS: tuple[tuple[str, str | None, str], ...] = (
-    ("Add an item", "Add item", "/items/new"),
-    ("Browse items", "Items", "/items"),
-    ("Collections", None, "/collections"),
+# Name, short name (launchers show it when space is tight, so about 12 characters at
+# most), description, route and icon. Each icon is the glyph of the matching button in
+# the phone tab bar, drawn by `scripts/generate_pwa_icons.py`.
+_SHORTCUTS: tuple[tuple[str, str, str, str, str], ...] = (
+    (
+        "Add an item",
+        "Add item",
+        "Add something new to your collection",
+        "/items/new",
+        "/shortcut-add-item.png",
+    ),
+    (
+        "Browse items",
+        "Items",
+        "Search and browse everything you own",
+        "/items",
+        "/shortcut-items.png",
+    ),
+    (
+        "Collections",
+        "Collections",
+        "Open your collections",
+        "/collections",
+        "/shortcut-collections.png",
+    ),
 )
+_SHORTCUT_ICON_SIZE = "192x192"
 _SCREENSHOTS: tuple[tuple[str, str, str, str], ...] = (
     ("/screenshot-narrow.png", "780x1688", "narrow", "Browse your items on a phone"),
     ("/screenshot-wide.png", "1280x800", "wide", "Browse your items on a desktop"),
@@ -40,8 +62,10 @@ class ManifestShortcut:
     """A launcher shortcut into a route."""
 
     name: str
-    short_name: str | None
+    short_name: str
+    description: str
     url: str
+    icons: tuple[ManifestIcon, ...]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -107,8 +131,18 @@ class WebAppManifest:
     def shortcuts(self) -> tuple[ManifestShortcut, ...]:
         """Launcher shortcuts."""
         return tuple(
-            ManifestShortcut(name=name, short_name=short, url=self.url(path))
-            for name, short, path in _SHORTCUTS
+            ManifestShortcut(
+                name=name,
+                short_name=short,
+                description=description,
+                url=self.url(path),
+                icons=(
+                    ManifestIcon(
+                        src=self.url(icon), sizes=_SHORTCUT_ICON_SIZE, purpose="any"
+                    ),
+                ),
+            )
+            for name, short, description, path, icon in _SHORTCUTS
         )
 
     @property

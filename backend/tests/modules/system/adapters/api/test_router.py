@@ -494,14 +494,26 @@ def test_manifest_describes_the_app_as_the_api_does() -> None:
     assert description == client.get("/api/openapi.json").json()["info"]["summary"]
 
 
-def test_manifest_omits_an_absent_shortcut_short_name() -> None:
-    """Optional fields are left out rather than sent as null, which browsers reject."""
+def test_manifest_shortcuts_carry_a_description_and_an_icon() -> None:
+    """The launcher menu shows each shortcut's names, description and icon."""
     shortcuts = (
         TestClient(create_app()).get("/manifest.webmanifest").json()["shortcuts"]
     )
 
-    assert shortcuts[0]["short_name"] == "Add item"
-    assert "short_name" not in shortcuts[-1]
+    assert shortcuts[0] == {
+        "name": "Add an item",
+        "short_name": "Add item",
+        "description": "Add something new to your collection",
+        "url": "/items/new",
+        "icons": [
+            {
+                "src": "/shortcut-add-item.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any",
+            }
+        ],
+    }
 
 
 def test_manifest_revalidates_by_etag() -> None:

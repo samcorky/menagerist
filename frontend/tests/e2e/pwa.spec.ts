@@ -10,8 +10,14 @@ test('serves a web app manifest and its icons with the right types', async ({ re
 	expect(manifest.status()).toBe(200);
 	expect(manifest.headers()['content-type']).toContain('application/manifest+json');
 
-	const { icons } = (await manifest.json()) as { icons: { src: string }[] };
-	for (const { src } of icons) {
+	const { icons, shortcuts } = (await manifest.json()) as {
+		icons: { src: string }[];
+		shortcuts: { icons: { src: string }[] }[];
+	};
+	// The launcher shortcuts carry their own icons, so those must be served too.
+	const sources = [...icons, ...shortcuts.flatMap((shortcut) => shortcut.icons)].map((i) => i.src);
+	expect(shortcuts).toHaveLength(3);
+	for (const src of sources) {
 		const icon = await request.get(src);
 		expect(icon.status(), src).toBe(200);
 		expect(icon.headers()['content-type'], src).toBe('image/png');
