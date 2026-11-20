@@ -20,9 +20,17 @@ async function setUp(
 const row = (page: Page, label: string) => page.getByRole('listitem').filter({ hasText: label });
 const viewportWidth = (page: Page) => page.viewportSize()!.width;
 
+/** On a phone a row's actions share one menu. */
+async function openEditor(page: Page, label: string) {
+	await row(page, label)
+		.getByRole('button', { name: /^More actions for/ })
+		.tap();
+	await page.getByRole('menuitem', { name: 'Edit' }).tap();
+}
+
 test('the list row fits the screen, with its actions inside it', async ({ page, request }) => {
 	const type = await setUp(page, request);
-	const edit = row(page, type.label).getByRole('button', { name: 'Edit item type' });
+	const edit = row(page, type.label).getByRole('button', { name: /^More actions for/ });
 	await expect(edit).toBeVisible();
 
 	const box = (await edit.boundingBox())!;
@@ -40,7 +48,7 @@ test('a long type name shrinks inside the row instead of widening the page', asy
 	request
 }) => {
 	const type = await setUp(page, request, 'A rather long item type name for a phone');
-	const edit = row(page, type.label).getByRole('button', { name: 'Edit item type' });
+	const edit = row(page, type.label).getByRole('button', { name: /^More actions for/ });
 	await expect(edit).toBeVisible();
 
 	const box = (await edit.boundingBox())!;
@@ -53,14 +61,14 @@ test('a long type name shrinks inside the row instead of widening the page', asy
 
 test('tapping a button does not pop up a tooltip', async ({ page, request }) => {
 	const type = await setUp(page, request);
-	await row(page, type.label).getByRole('button', { name: 'Edit item type' }).tap();
+	await openEditor(page, type.label);
 	await expect(page.getByRole('dialog', { name: 'Edit item type' })).toBeVisible();
 	await expect(page.locator('[data-slot="tooltip-content"]')).toHaveCount(0);
 });
 
 test('the editor fits the screen and does not scroll sideways', async ({ page, request }) => {
 	const type = await setUp(page, request);
-	await row(page, type.label).getByRole('button', { name: 'Edit item type' }).tap();
+	await openEditor(page, type.label);
 	const dialog = page.getByRole('dialog', { name: 'Edit item type' });
 	await expect(dialog).toBeVisible();
 
@@ -79,7 +87,7 @@ test('the icon picker opens inside the editor, in reach of the keyboard', async 
 	request
 }) => {
 	const type = await setUp(page, request);
-	await row(page, type.label).getByRole('button', { name: 'Edit item type' }).tap();
+	await openEditor(page, type.label);
 	const dialog = page.getByRole('dialog', { name: 'Edit item type' });
 	await dialog.getByRole('button', { name: 'Choose icon' }).tap();
 
@@ -100,7 +108,7 @@ test('the page behind a dialog cannot scroll while it is open', async ({ page, r
 	const scroller = page.locator('#main-scroll');
 	await expect(scroller).toHaveCSS('overflow-y', 'auto');
 
-	await row(page, type.label).getByRole('button', { name: 'Edit item type' }).tap();
+	await openEditor(page, type.label);
 	await expect(page.getByRole('dialog', { name: 'Edit item type' })).toBeVisible();
 	await expect(scroller).toHaveCSS('overflow-y', 'hidden');
 
