@@ -60,13 +60,16 @@
 		typeId,
 		typeKind = 'node',
 		highlights = false,
-		highlightList = 'card'
+		highlightList = 'card',
+		fieldFlags = false
 	}: {
 		schema?: AttributesSchema | null;
 		typeId?: string;
 		typeKind?: 'node' | 'edge';
 		highlights?: boolean;
 		highlightList?: HighlightList;
+		/** Offer the item-type field switches (quick capture, barcodes). */
+		fieldFlags?: boolean;
 	} = $props();
 
 	let maxShown = $derived(maxHighlights(highlightList));
@@ -428,6 +431,7 @@
 			<FieldKindRow
 				{field}
 				{allowGroup}
+				showFlags={fieldFlags}
 				{onLabelChange}
 				onFieldChange={(next) => onFieldChange(handleFieldRowChange(field, next))}
 			/>

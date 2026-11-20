@@ -16,7 +16,11 @@
 		suggestScanField
 	} from '$lib/barcode/scan-field';
 	import { loadItemTypes } from '$lib/palette-sources';
+	import { captureFieldKeys } from '$lib/quick-capture';
+	import { rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
+	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import { mergeAttributeSchemas } from '$lib/schema-meta';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -32,10 +36,11 @@
 	let scannerOpen = $state(false);
 	let code = $state<string | null>(null);
 	let types = $state<NodeTypeResponse[]>([]);
+	let rows = $state<AttributeRow[]>([]);
 
-	// Types are read only once a code is scanned, to offer the chosen type's fields.
+	// Types are read once a type is chosen or a code is scanned, to offer the type's fields.
 	$effect(() => {
-		if (code !== null)
+		if (selectedType !== null || code !== null)
 			void loadItemTypes()
 				.then((all) => (types = all))
 				.catch(() => {});
@@ -45,7 +50,44 @@
 		(types.find((type) => type.slug === selectedType)?.attributes_schema as
 			AttributesSchema | null | undefined) ?? null
 	);
-	const codeFields = $derived(scanFields(typeSchema));
+	const captureKeys = $derived(captureFieldKeys(typeSchema));
+	const textFields = $derived(scanFields(typeSchema));
+	// The field a code belongs in when it is shown here: the code goes into it, in view.
+	const shownCodeField = $derived.by(() => {
+		const key = suggestScanField(textFields);
+		return key !== null && captureKeys.includes(key) ? key : null;
+	});
+	// Otherwise the person picks a field that isn't shown, or a new detail.
+	const codeFields = $derived(textFields.filter((field) => !captureKeys.includes(field.key)));
+
+	// Values typed for one type don't belong to another.
+	$effect.pre(() => {
+		void selectedType;
+		rows = [];
+	});
+
+	$effect(() => {
+		if (code === null || shownCodeField === null) return;
+		const key = shownCodeField;
+		rows = [...rows.filter((row) => row.key !== key), { key, value: code }];
+		code = null;
+	});
+
+	/** The fields filled in as form rows, with a scanned code in its field (or a new detail). */
+	function details() {
+		const barcode = scanned();
+		const codeRows = Object.entries(barcode?.attributes ?? {}).map(([key, value]) => ({
+			key,
+			value
+		}));
+		const kept = $state
+			.snapshot(rows)
+			.filter((row) => !codeRows.some((code) => code.key === row.key));
+		const handed = [...kept, ...codeRows];
+		if (handed.length === 0) return null;
+		return { rows: handed, extraSchema: barcode?.extraSchema ?? null };
+	}
+
 	// Follows the type until the person picks a field themselves.
 	let codeField = $derived(suggestScanField(codeFields) ?? NEW_BARCODE_DETAIL);
 
@@ -77,12 +119,20 @@
 	async function save() {
 		if (!name.trim() || saving || creatingType) return;
 		saving = true;
-		const barcode = scanned();
+		const filled = details();
+		const attributes =
+			filled &&
+			rowsToAttributes(filled.rows, mergeAttributeSchemas(typeSchema, filled.extraSchema));
 		const result = await createNode({
 			body: {
 				name: name.trim(),
 				type: selectedType || null,
-				...(barcode && { attributes: barcode.attributes, extra_schema: barcode.extraSchema })
+				...(filled &&
+					attributes &&
+					Object.keys(attributes).length > 0 && {
+						attributes,
+						extra_schema: filled.extraSchema
+					})
 			}
 		});
 		if (result.error || !result.data) {
@@ -106,7 +156,7 @@
 			name,
 			selectedType,
 			stagedPhoto: stagedAsset,
-			barcode: scanned()
+			details: details()
 		});
 		captureController.hide();
 		name = '';
@@ -127,6 +177,7 @@
 		if (stagedAsset) URL.revokeObjectURL(stagedAsset.previewUrl);
 		stagedAsset = null;
 		code = null;
+		rows = [];
 	}
 </script>
 
@@ -186,6 +237,10 @@
 					oncreate={(type) => (types = [...types, type])}
 				/>
 			</div>
+
+			{#if captureKeys.length > 0}
+				<AttributesEditor bind:rows schema={typeSchema} only={captureKeys} />
+			{/if}
 
 			<!-- Barcode -->
 			{#if code === null}

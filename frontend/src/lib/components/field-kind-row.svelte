@@ -5,15 +5,24 @@
 	import { allowedKinds, changeKind, kindChangeWarning } from '$lib/field-types/kind-changes';
 	import { displayChoices, displayValue, setDisplayValue } from '$lib/field-types/display-options';
 	import type { EditorField } from '$lib/schema-types';
+	import FieldOptionsMenu from '$lib/components/field-options-menu.svelte';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { fieldChips } from '$lib/field-flags';
 
 	let {
 		field,
 		allowGroup = true,
+		showFlags = false,
 		onLabelChange,
 		onFieldChange
 	}: {
 		field: EditorField;
 		allowGroup?: boolean;
+		/**
+		 * Put Required and the type-level switches (quick capture, barcodes) in a field menu, with
+		 * chips for what is on; not for a single item's fields, which keep the Required checkbox.
+		 */
+		showFlags?: boolean;
 		onLabelChange: (value: string) => void;
 		onFieldChange: (field: EditorField) => void;
 	} = $props();
@@ -35,6 +44,7 @@
 
 	let warning = $derived(kindChangeWarning(field.originalKind, field.kind));
 	let desc = $derived(getDescriptor(field.kind));
+	let chips = $derived(fieldChips(field));
 </script>
 
 <div class="flex flex-wrap items-center gap-2">
@@ -73,17 +83,28 @@
 			</NativeSelect>
 		</span>
 	{/each}
-	<label class="flex items-center gap-1.5 text-sm">
-		<input
-			type="checkbox"
-			checked={field.required}
-			onchange={(e) =>
-				onFieldChange({ ...field, required: (e.target as HTMLInputElement).checked })}
-			class="h-4 w-4 rounded border-input accent-primary"
-		/>
-		Required
-	</label>
+	{#if showFlags}
+		<FieldOptionsMenu {field} onChange={onFieldChange} />
+	{:else}
+		<label class="flex items-center gap-1.5 text-sm">
+			<input
+				type="checkbox"
+				checked={field.required}
+				onchange={(e) =>
+					onFieldChange({ ...field, required: (e.target as HTMLInputElement).checked })}
+				class="h-4 w-4 rounded border-input accent-primary"
+			/>
+			Required
+		</label>
+	{/if}
 </div>
+{#if showFlags && chips.length > 0}
+	<div class="mt-1.5 flex flex-wrap gap-1.5">
+		{#each chips as chip (chip)}
+			<Badge variant="outline">{chip}</Badge>
+		{/each}
+	</div>
+{/if}
 {#if warning}
 	<p class="text-xs text-muted-foreground" role="status">{warning}</p>
 {/if}

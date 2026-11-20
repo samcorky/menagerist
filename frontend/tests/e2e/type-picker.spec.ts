@@ -111,3 +111,22 @@ test('an item with no type is given one on its own page, by search or by creatin
 	await expect(page.getByText(created, { exact: true }).first()).toBeVisible();
 	await expect(page.getByText('No item type - pick or create one:')).toHaveCount(0);
 });
+
+test('offers no Create row until the item types have loaded', async ({ page, request }) => {
+	const existing = await makeItemType(request, uniqueName('Slow type'));
+	let release!: () => void;
+	const released = new Promise<void>((resolve) => (release = resolve));
+	await page.route(/\/api\/v1\/node-types(\?.*)?$/, async (route) => {
+		await released;
+		await route.continue();
+	});
+
+	await page.goto('/items/new');
+	await picker(page).click();
+	await page.getByPlaceholder('Search item types…').fill(existing.label);
+	await expect(page.getByRole('option', { name: `Create “${existing.label}”` })).toHaveCount(0);
+
+	release();
+	await page.getByRole('option', { name: existing.label, exact: true }).click();
+	await expect(picker(page)).toContainText(existing.label);
+});

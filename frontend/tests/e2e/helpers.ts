@@ -33,6 +33,8 @@ export type FieldSpec = {
 	label: string;
 	/** Kind key from the field-types registry (e.g. 'money', 'url'); defaults to 'text'. */
 	kind?: string;
+	/** Switch on "Show in quick capture" for the field. */
+	capture?: boolean;
 };
 
 /** Create an item type and return its label. */
@@ -56,6 +58,15 @@ export async function createItemType(
 		await form.getByLabel('Field label').last().fill(field.label);
 		if (field.kind && field.kind !== 'text') {
 			await form.getByLabel('Field type').last().selectOption(field.kind);
+		}
+		if (field.capture) {
+			await form
+				.getByRole('button', { name: /^Field options for/ })
+				.last()
+				.click();
+			await page.getByRole('menuitemcheckbox', { name: 'Show in quick capture' }).click();
+			await page.keyboard.press('Escape');
+			await expect(page.getByRole('menu')).toBeHidden();
 		}
 	}
 

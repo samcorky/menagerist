@@ -506,6 +506,7 @@
 		typeId={editingId ?? undefined}
 		typeKind={editingId ? 'node' : undefined}
 		highlights
+		fieldFlags
 	/>
 </TypeEditorDialog>
 

@@ -145,3 +145,47 @@ test('carries the scanned code into the full form', async ({ page }) => {
 	await page.waitForURL(/\/items\/new$/);
 	await expect(page.getByLabel('Barcode', { exact: true })).toHaveValue(EAN);
 });
+
+test.describe('when the barcode field is shown in quick capture', () => {
+	async function typeCode(page: Page, capture: ReturnType<Page['getByRole']>) {
+		await capture.getByRole('button', { name: 'Scan barcode' }).click();
+		const scanner = page.getByRole('dialog', { name: 'Scan barcode' });
+		await scanner.getByLabel('Or type the code').fill(EAN);
+		await scanner.getByRole('button', { name: 'Use code' }).click();
+	}
+
+	test('a scan fills the field, replacing what was typed, with no Save in choice', async ({
+		page
+	}) => {
+		await refuseCamera(page);
+		const type = await createItemType(page, {
+			label: uniqueName('Shown book'),
+			fields: [{ label: 'ISBN', capture: true }]
+		});
+
+		await page.goto('/');
+		const capture = await openQuickCapture(page);
+		await chooseItemType(page, type.label);
+		await capture.getByLabel('ISBN').fill('111');
+		await typeCode(page, capture);
+
+		await expect(capture.getByLabel('ISBN')).toHaveValue(EAN);
+		await expect(capture.getByLabel('Save in')).toHaveCount(0);
+	});
+
+	test('a code scanned before choosing the type moves into the field', async ({ page }) => {
+		await refuseCamera(page);
+		const type = await createItemType(page, {
+			label: uniqueName('Shown book'),
+			fields: [{ label: 'ISBN', capture: true }]
+		});
+
+		await page.goto('/');
+		const capture = await openQuickCapture(page);
+		await typeCode(page, capture);
+		await chooseItemType(page, type.label);
+
+		await expect(capture.getByLabel('ISBN')).toHaveValue(EAN);
+		await expect(capture.getByText('Saved as a Barcode detail.')).toHaveCount(0);
+	});
+});
