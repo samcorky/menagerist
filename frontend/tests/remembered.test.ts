@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readFlag, readList, readOptionalFlag, writeFlag, writeList } from '$lib/remembered';
+import { readFlag, readOptionalFlag, writeFlag } from '$lib/remembered';
 
 function memoryStorage() {
 	const data = new Map<string, string>();
@@ -70,38 +70,5 @@ describe('optional flags', () => {
 			}
 		});
 		expect(readOptionalFlag('a')).toBeUndefined();
-	});
-});
-
-describe('remembered lists', () => {
-	it('round-trips a list in order and reads [] when nothing is stored', () => {
-		vi.stubGlobal('localStorage', memoryStorage());
-		expect(readList('l')).toEqual([]);
-		writeList('l', ['b', 'a']);
-		expect(readList('l')).toEqual(['b', 'a']);
-	});
-
-	it('reads [] from unreadable JSON and drops anything that is not a string', () => {
-		const storage = memoryStorage();
-		vi.stubGlobal('localStorage', storage);
-		storage.setItem('menagerist:l', '{oops');
-		expect(readList('l')).toEqual([]);
-		storage.setItem('menagerist:l', '["a", 1, null, "b"]');
-		expect(readList('l')).toEqual(['a', 'b']);
-		storage.setItem('menagerist:l', '{"a": 1}');
-		expect(readList('l')).toEqual([]);
-	});
-
-	it('falls back when storage throws', () => {
-		vi.stubGlobal('localStorage', {
-			getItem: () => {
-				throw new Error('blocked');
-			},
-			setItem: () => {
-				throw new Error('blocked');
-			}
-		});
-		expect(readList('l')).toEqual([]);
-		expect(() => writeList('l', ['a'])).not.toThrow();
 	});
 });

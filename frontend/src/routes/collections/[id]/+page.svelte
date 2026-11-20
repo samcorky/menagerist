@@ -106,7 +106,11 @@
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import SurpriseButton from '$lib/components/surprise-button.svelte';
-	import { homeCollectionIds, toggleHomeCollection } from '$lib/home-collections';
+	import {
+		homeCollectionIds,
+		homeToggleBlocked,
+		toggleHomeCollection
+	} from '$lib/home-collections';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import NotFound from '$lib/components/not-found.svelte';
@@ -149,8 +153,9 @@
 	const collectionId = $derived(page.params.id ?? '');
 
 	let collection = $state<CollectionResponse | null>(null);
-	let homeIds = $state(homeCollectionIds());
-	const onHome = $derived(collection !== null && homeIds.includes(collection.id));
+	const onHome = $derived(collection !== null && homeCollectionIds().includes(collection.id));
+	// Why "Show on Home" can't be used now (offline, or Home is full), or null.
+	const homeBlocked = $derived(collection ? homeToggleBlocked(collection.id) : null);
 	const canonicalId = $derived(collection?.id ?? '');
 	// The first page of results has arrived; the exact count waits for it
 	let firstPageLoaded = $state(false);
@@ -325,14 +330,16 @@
 	let deleting = $state(false);
 	let exporting = $state(false);
 
-	/** Save the collection, with its items when it is a manual one, as a file to import again. */
-	function toggleOnHome() {
+	/** Show on Home or take off it: applies at once, and flips back if it can't be saved. */
+	async function toggleOnHome() {
 		if (!collection) return;
-		const shown = toggleHomeCollection(collection.id);
-		homeIds = homeCollectionIds();
-		toast.success(shown ? 'Shown on Home' : 'Removed from Home');
+		const shown = !onHome;
+		const outcome = await toggleHomeCollection(collection.id);
+		if (outcome.ok) toast.success(shown ? 'Shown on Home' : 'Removed from Home');
+		else toast.error(outcome.message);
 	}
 
+	/** Save the collection, with its items when it is a manual one, as a file to import again. */
 	async function handleExport() {
 		if (!collection || exporting) return;
 		exporting = true;
@@ -1100,6 +1107,8 @@
 						label="Show on Home"
 						variant={onHome ? 'secondary' : 'outline'}
 						aria-pressed={onHome}
+						aria-disabled={homeBlocked !== null}
+						class={homeBlocked ? 'opacity-50' : undefined}
 						onclick={toggleOnHome}
 					>
 						<HousePlus />

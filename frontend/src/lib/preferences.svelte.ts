@@ -85,9 +85,22 @@ export class PreferencesController {
 		removeCopies();
 	}
 
-	/** Save one value; the whole value replaces what was saved. */
-	save(key: string, value: SettingResponse['value']): Promise<PreferenceOutcome> {
-		return this.send(() => updateMySettings({ body: { values: { [key]: value } } }));
+	/**
+	 * Save one value; the whole value replaces what was saved. It shows at once, and goes back
+	 * to what it was if the server does not take it.
+	 */
+	async save(key: string, value: SettingResponse['value']): Promise<PreferenceOutcome> {
+		if (offlineController.offline) return { ok: false, message: OFFLINE_PREFERENCES };
+		const previous = this.items.find((item) => item.key === key);
+		this.replace(key, previous && { ...previous, value, source: 'user' });
+		const outcome = await this.send(() => updateMySettings({ body: { values: { [key]: value } } }));
+		if (!outcome.ok) this.replace(key, previous);
+		return outcome;
+	}
+
+	/** Swap one setting's entry in place; nothing when it isn't loaded. */
+	private replace(key: string, item: SettingResponse | undefined): void {
+		if (item) this.items = this.items.map((other) => (other.key === key ? item : other));
 	}
 
 	/** Go back to the default for one setting. */
