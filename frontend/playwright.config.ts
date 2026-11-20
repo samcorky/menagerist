@@ -47,6 +47,9 @@ function instanceEnv(name: string, extraEnv: Record<string, string> = {}) {
 		MENAGERIST_MEDIA_STORAGE_PATH: mediaPath,
 		MENAGERIST_BACKUP_PATH: backupPath,
 		MENAGERIST_BACKUP_BEFORE_MIGRATE: 'false',
+		// Every spec signs in as the same person, so the per-person import limit (10 a minute)
+		// would be shared by the whole run; an import flow alone makes up to three calls.
+		MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE: '0',
 		...extraEnv
 	};
 }

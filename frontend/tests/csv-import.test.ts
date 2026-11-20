@@ -7,7 +7,12 @@ import {
 	confirmText,
 	hasName,
 	itemsToAdd,
+	keepColumn,
+	keptDetails,
 	mappingJson,
+	MAX_KEPT,
+	renameKept,
+	setKeptKind,
 	rowsAndColumns,
 	targetOptions,
 	type ColumnChoice
@@ -110,8 +115,67 @@ describe('choicesFrom and mappingJson', () => {
 	});
 
 	it('writes the JSON text the server takes, and it reads back the same', () => {
-		const text = mappingJson(choices);
+		const text = mappingJson(choices, []);
 		expect(JSON.parse(text)).toEqual(choices);
+	});
+});
+
+describe('keeping a column as an extra detail', () => {
+	it('names the detail after the column and takes the suggested kind', () => {
+		const next = keepColumn(choices, 'misc', 'number');
+		expect(next[2]).toEqual({
+			column: 'misc',
+			target: null,
+			extra: { title: 'misc', kind: 'number' }
+		});
+	});
+
+	it('drops the field a column had when it is kept instead', () => {
+		const next = keepColumn(choices, 'when', 'text');
+		expect(next[1].target).toBeNull();
+		expect(hasName(next)).toBe(true);
+	});
+
+	it('stops keeping a column once it is matched to a field again', () => {
+		const kept = keepColumn(choices, 'misc', 'text');
+		expect(assignTarget(kept, 'misc', 'position')[2]).toEqual({
+			column: 'misc',
+			target: 'position'
+		});
+	});
+
+	it('renames a kept detail and changes its kind', () => {
+		let next = keepColumn(choices, 'misc', 'text');
+		next = renameKept(next, 'misc', 'Paper type');
+		next = setKeptKind(next, 'misc', 'choice');
+		expect(next[2].extra).toEqual({ title: 'Paper type', kind: 'choice' });
+	});
+
+	it('sends each kept detail with a key unique among the fields and the others', () => {
+		let next = keepColumn(choices, 'misc', 'text');
+		next = renameKept(next, 'misc', 'Signed on');
+		next = [
+			...next,
+			{ column: 'other', target: null, extra: { title: 'Signed on', kind: 'text' } }
+		];
+		const sent = JSON.parse(mappingJson(next, ['signed_on']));
+		expect(sent[2].extra).toEqual({ key: 'signed_on_2', title: 'Signed on', kind: 'text' });
+		expect(sent[3].extra.key).toBe('signed_on_3');
+	});
+
+	it('never gives a detail the key of a built-in target', () => {
+		const next = renameKept(keepColumn(choices, 'misc', 'text'), 'misc', 'Name');
+		expect(JSON.parse(mappingJson(next, []))[2].extra.key).toBe('name_2');
+	});
+
+	it('lists the kept details for the preview', () => {
+		let next = keepColumn(choices, 'misc', 'boolean');
+		next = renameKept(next, 'misc', 'Signed');
+		expect(keptDetails(next)).toEqual([{ title: 'Signed', kind: 'boolean' }]);
+	});
+
+	it('allows as many as an item can have', () => {
+		expect(MAX_KEPT).toBe(50);
 	});
 });
 

@@ -2,18 +2,42 @@ import type {
 	ColumnMappingEntry,
 	CsvEncoding,
 	DayMonthOrder,
+	ExtraFieldKind,
 	ItemImportFieldResponse,
 	ItemImportInspectionResponse
 } from '$lib/api/client';
+import { generateFieldKey } from '$lib/field-key';
 import type { ImportPlan } from '$lib/import-plan';
 
 /** Where a column goes: `name`, `description`, `tags`, a field's key, or nowhere. */
 export type Target = string | null;
 
+/** A column kept as each item's own field: its name and kind. The key is made when sending. */
+export interface KeptDetail {
+	title: string;
+	kind: ExtraFieldKind;
+}
+
 export interface ColumnChoice {
 	column: string;
 	target: Target;
+	/** Set when the column is kept as an extra detail; `target` is then null. */
+	extra?: KeptDetail;
 }
+
+/** The select value that keeps a column as an extra detail. */
+export const KEEP = '__keep__';
+/** An item can have at most this many extra details (design §16b). */
+export const MAX_KEPT = 50;
+/** The kinds a kept column can be, in the order they are offered. */
+export const KEPT_KINDS: ExtraFieldKind[] = [
+	'text',
+	'number',
+	'boolean',
+	'date',
+	'partialdate',
+	'choice'
+];
 
 /** Every item has these, whatever its type. */
 export const BUILT_IN_TARGETS: { value: 'name' | 'description' | 'tags'; label: string }[] = [
@@ -56,6 +80,40 @@ export function assignTarget(
 	});
 }
 
+/** Keep a column as an extra detail, named after the column, instead of matching it. */
+export function keepColumn(
+	choices: ColumnChoice[],
+	column: string,
+	kind: ExtraFieldKind
+): ColumnChoice[] {
+	return choices.map((choice) =>
+		choice.column === column ? { column, target: null, extra: { title: column, kind } } : choice
+	);
+}
+
+function updateKept(
+	choices: ColumnChoice[],
+	column: string,
+	change: Partial<KeptDetail>
+): ColumnChoice[] {
+	return choices.map((choice) =>
+		choice.column === column && choice.extra
+			? { ...choice, extra: { ...choice.extra, ...change } }
+			: choice
+	);
+}
+
+export const renameKept = (choices: ColumnChoice[], column: string, title: string) =>
+	updateKept(choices, column, { title });
+
+export const setKeptKind = (choices: ColumnChoice[], column: string, kind: ExtraFieldKind) =>
+	updateKept(choices, column, { kind });
+
+/** The extra details the items will get, in column order. */
+export function keptDetails(choices: ColumnChoice[]): KeptDetail[] {
+	return choices.flatMap((choice) => (choice.extra ? [choice.extra] : []));
+}
+
 /** An item cannot be made without a name. */
 export function hasName(choices: ColumnChoice[]): boolean {
 	return choices.some((choice) => choice.target === 'name');
@@ -65,9 +123,19 @@ export function choicesFrom(suggested: ColumnMappingEntry[]): ColumnChoice[] {
 	return suggested.map((s) => ({ column: s.column, target: s.target ?? null }));
 }
 
-/** The JSON text the server takes for the matching. */
-export function mappingJson(choices: ColumnChoice[]): string {
-	return JSON.stringify(choices);
+/**
+ * The JSON text the server takes for the matching. Each kept detail gets a key from its name,
+ * unique among the type's `fieldKeys`, the built-in targets and the other kept details.
+ */
+export function mappingJson(choices: ColumnChoice[], fieldKeys: string[]): string {
+	const taken = new Set([...fieldKeys, ...BUILT_IN_TARGETS.map((t) => t.value)]);
+	const entries: ColumnMappingEntry[] = choices.map(({ column, target, extra }) => {
+		if (!extra) return { column, target };
+		const key = generateFieldKey(extra.title, taken);
+		taken.add(key);
+		return { column, target: null, extra: { key, title: extra.title.trim(), kind: extra.kind } };
+	});
+	return JSON.stringify(entries);
 }
 
 /** How many items going ahead would add. */

@@ -7,6 +7,7 @@
 		inspectItemImport,
 		planItemImport,
 		type DayMonthOrder,
+		type ExtraFieldKind,
 		type ItemImportInspectionResponse
 	} from '$lib/api/client';
 	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
@@ -18,6 +19,8 @@
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { getCore } from '$lib/field-types';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import {
 		assignTarget,
@@ -27,8 +30,15 @@
 		encodingName,
 		hasName,
 		itemsToAdd,
+		KEEP,
+		keepColumn,
+		keptDetails,
+		KEPT_KINDS,
 		mappingJson,
+		MAX_KEPT,
+		renameKept,
 		rowsAndColumns,
+		setKeptKind,
 		targetOptions,
 		type ColumnChoice
 	} from '$lib/csv-import';
@@ -62,7 +72,9 @@
 	let planError = $state<string | null>(null);
 
 	const options = $derived(inspection ? targetOptions(inspection.fields) : []);
-	const named = $derived(hasName(choices));
+	const kept = $derived(keptDetails(choices));
+	// Every kept detail needs a name, as every item does.
+	const named = $derived(hasName(choices) && kept.every((detail) => detail.title.trim() !== ''));
 	// A blocked run adds nothing, so it lists no items as about to be added.
 	const shown = $derived(plan && !plan.ready ? { ...plan, entities: [] } : plan);
 
@@ -104,15 +116,27 @@
 		return values.length > 0 ? values.join(' · ') : 'Nothing in the first rows';
 	}
 
-	function targetOf(column: string): string {
-		return choices.find((choice) => choice.column === column)?.target ?? '';
+	function targetOf(choice: ColumnChoice): string {
+		return choice.extra ? KEEP : (choice.target ?? '');
 	}
+
+	function choose(column: string, value: string) {
+		choices =
+			value === KEEP
+				? keepColumn(choices, column, inspection?.column_kinds?.[column] ?? 'text')
+				: assignTarget(choices, column, value || null);
+	}
+
+	const kindLabel = (kind: ExtraFieldKind) => getCore(kind)?.label ?? kind;
 
 	function body() {
 		return {
 			file: file!,
 			item_type: itemType!,
-			mapping: mappingJson(choices),
+			mapping: mappingJson(
+				choices,
+				(inspection?.fields ?? []).map((f) => f.key)
+			),
 			list_separator: separator,
 			day_month_order: dateOrder
 		};
@@ -269,10 +293,8 @@
 								<NativeSelect
 									id={`csv-column-${index}`}
 									class="w-full pointer-coarse:[&_select]:min-h-11"
-									value={targetOf(choice.column)}
-									onchange={(e) => {
-										choices = assignTarget(choices, choice.column, e.currentTarget.value || null);
-									}}
+									value={targetOf(choice)}
+									onchange={(e) => choose(choice.column, e.currentTarget.value)}
 								>
 									<NativeSelectOption value="">Don't import</NativeSelectOption>
 									{#each options as option (option.value)}
@@ -284,7 +306,54 @@
 											{option.label}{option.disabled ? ' (not supported yet)' : ''}
 										</NativeSelectOption>
 									{/each}
+									<NativeSelectOption
+										value={KEEP}
+										disabled={!choice.extra && kept.length >= MAX_KEPT}
+									>
+										Keep as an extra detail
+									</NativeSelectOption>
 								</NativeSelect>
+								{#if choice.extra}
+									{@const extra = choice.extra}
+									<div class="grid gap-2 sm:col-span-3 sm:grid-cols-[minmax(0,1fr)_14rem] sm:pl-4">
+										<div class="space-y-1">
+											<label class="text-xs text-muted-foreground" for={`csv-kept-name-${index}`}>
+												Detail name
+											</label>
+											<Input
+												id={`csv-kept-name-${index}`}
+												value={extra.title}
+												oninput={(e) =>
+													(choices = renameKept(choices, choice.column, e.currentTarget.value))}
+											/>
+										</div>
+										<div class="space-y-1">
+											<label class="text-xs text-muted-foreground" for={`csv-kept-kind-${index}`}>
+												Kind
+											</label>
+											<NativeSelect
+												id={`csv-kept-kind-${index}`}
+												class="w-full pointer-coarse:[&_select]:min-h-11"
+												value={extra.kind}
+												onchange={(e) =>
+													(choices = setKeptKind(
+														choices,
+														choice.column,
+														e.currentTarget.value as ExtraFieldKind
+													))}
+											>
+												{#each KEPT_KINDS as kind (kind)}
+													<NativeSelectOption value={kind}>{kindLabel(kind)}</NativeSelectOption>
+												{/each}
+											</NativeSelect>
+										</div>
+										<p class="text-xs text-muted-foreground sm:col-span-2">
+											{extra.kind === 'choice'
+												? 'Each item gets this detail for itself, with every different value in the column to choose from.'
+												: 'Each item gets this detail for itself. Add it to the item type later to give every item the field.'}
+										</p>
+									</div>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -320,8 +389,10 @@
 					</p>
 				{/if}
 
-				{#if !named}
+				{#if !hasName(choices)}
 					<p class="text-sm text-muted-foreground">Choose a column for Name.</p>
+				{:else if !named}
+					<p class="text-sm text-muted-foreground">Give each extra detail a name.</p>
 				{/if}
 
 				<div class="flex justify-end gap-2">
@@ -333,6 +404,14 @@
 					</Button>
 				</div>
 			{:else}
+				{#if kept.length > 0}
+					<p class="text-sm text-muted-foreground">
+						Each item also gets {kept.length === 1 ? 'an extra detail' : 'extra details'} of its own when
+						its cell has a value: {kept
+							.map((detail) => `${detail.title.trim()} (${kindLabel(detail.kind)})`)
+							.join(', ')}.
+					</p>
+				{/if}
 				<PlanPreview
 					plan={shown}
 					{loading}

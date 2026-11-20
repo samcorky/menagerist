@@ -1651,3 +1651,18 @@ Applying creates the link for each item it creates or matches, and re-points a l
 - The editor's schema state is updated with the promoted property and the schema editor remounted, so a Save after promoting keeps the field instead of writing over it.
 
 **Rationale:** #572 keeps unmatched CSV columns as per-item fields, putting the same field on thousands of items; promoting them must be one action.
+
+## Keeping CSV columns as the items' own fields (2026-11-20)
+
+**Decision:** A column of a CSV import (#572) can be kept as an extra field on each item instead of matched to one of the type's fields: a mapping entry carries `extra: {key, title, kind}` and a null `target`. The type is not changed; each item gets the field in its `extra_schema` overlay, and #573's promotion moves it onto the type later, for every item at once. `POST /imports/items/inspect` returns `column_kinds`, a kind for each column.
+
+**Choices that are not obvious:**
+
+- Six kinds: text, number, yes/no, date, partial date and choice, the ones the import already converts. The server writes each definition the way the item page's Add field does (`transfer/application/extra_columns.py`), so a kept field looks like a hand-made one.
+- The client makes the key, with the same `generateFieldKey` as Add field, unique among the type's fields, the built-in targets and the other kept columns. The server refuses a key the type already has, one used twice, one that is not lowercase letters, digits and `_`, `__proto__` and `constructor`, and more than 50 kept columns (an item's extra field limit).
+- The kind is guessed on the server, from every row, with the import's own converters: the first of number, yes/no, date and partial date that takes every value, else text. A year column is a number. Choice is never guessed.
+- A choice offers the column's different values in the order they first appear, up to 50; past that the mapping is refused with "keep it as text".
+- An item gets the field only when its cell has a value, so a sparse column does not leave empty fields on most items. The values are checked by their own definition; the type's schema checks only the type's fields.
+- The end-to-end backends turn the per-person import limit off (`MENAGERIST_RATE_LIMIT_IMPORTS_PER_MINUTE=0`): every spec signs in as the same person, so ten imports a minute were shared by the whole run.
+
+**Rationale:** A spreadsheet often has columns the type has no field for. Keeping them means the person sees the data before deciding it earns a field on the type, instead of leaving the import to change the type first.

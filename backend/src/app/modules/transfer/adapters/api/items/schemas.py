@@ -2,7 +2,13 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.transfer.domain.tabular import CsvEncoding, DayMonthOrder
+from app.modules.transfer.domain.tabular import (
+    ColumnMapping,
+    CsvEncoding,
+    DayMonthOrder,
+    ExtraField,
+    ExtraFieldKind,
+)
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
@@ -35,7 +41,36 @@ INSPECT_EXAMPLE: dict[str, Any] = {
     "encoding": "utf_8",
     "day_month_order": None,
     "day_month_order_certain": False,
+    "column_kinds": {
+        "title": "text",
+        "signed_on": "partialdate",
+        "authenticated": "boolean",
+    },
 }
+
+
+class ExtraFieldEntry(RequestModel):
+    """A field each imported item gets for itself, filled from the column."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [{"key": "paper", "title": "Paper", "kind": "choice"}]
+        },
+    )
+
+    key: str = Field(
+        description="The field's key: lowercase letters, digits and `_`, not one the "
+        + "item type has.",
+        max_length=64,
+    )
+    title: str = Field(
+        description="The field's name, as people see it.", max_length=200
+    )
+    kind: ExtraFieldKind = Field(
+        description="What sort of value it holds. A `choice` offers each different "
+        + "value in the column, up to 50."
+    )
 
 
 class ColumnMappingEntry(RequestModel):
@@ -54,6 +89,22 @@ class ColumnMappingEntry(RequestModel):
         description="`name`, `description`, `tags`, a field's key, or null to ignore "
         + "the column.",
     )
+    extra: ExtraFieldEntry | None = Field(
+        default=None,
+        description="Keep the column as each item's own field instead; `target` must "
+        + "then be null. An item gets the field only when its cell has a value.",
+    )
+
+    def to_domain(self) -> ColumnMapping:
+        """The mapping entry the import reads."""
+        extra = self.extra
+        return ColumnMapping(
+            column=self.column,
+            target=self.target,
+            extra=None
+            if extra is None
+            else ExtraField(key=extra.key, title=extra.title, kind=extra.kind),
+        )
 
 
 class ItemImportFieldResponse(BaseModel):
@@ -101,6 +152,12 @@ class ItemImportInspectionResponse(BaseModel):
     day_month_order_certain: bool = Field(
         description="Whether the values prove the suggested order, or it is a guess."
     )
+    column_kinds: dict[str, ExtraFieldKind] = Field(
+        default_factory=dict,
+        description="For each column, the kind its values suggest should it be kept "
+        + "as an extra field: the first of number, yes/no, date and partial date "
+        + "that takes every value, else text.",
+    )
 
     @classmethod
     def from_domain(cls, found: ItemImportInspection) -> ItemImportInspectionResponse:
@@ -131,6 +188,7 @@ class ItemImportInspectionResponse(BaseModel):
             encoding=found.encoding,
             day_month_order=guess.order if guess else None,
             day_month_order_certain=guess.certain if guess else False,
+            column_kinds={c.column: c.kind for c in found.column_kinds},
         )
 
 

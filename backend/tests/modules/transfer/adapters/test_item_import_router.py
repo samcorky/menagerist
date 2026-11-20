@@ -246,3 +246,50 @@ def test_inspect_suggests_a_day_month_order(shared: Shared) -> None:
         True,
     )
     assert (plain["day_month_order"], plain["day_month_order_certain"]) == (None, False)
+
+
+def test_inspect_suggests_a_kind_for_each_column(shared: Shared) -> None:
+    """Each column's values suggest the kind it would be kept as."""
+    client = _with_type(shared)
+
+    response = _post(client, "/inspect")
+
+    assert response.json()["column_kinds"] == {
+        "title": "text",
+        "signed_on": "partialdate",
+        "authenticated": "boolean",
+    }
+
+
+async def test_run_keeps_a_column_as_each_item_s_own_field(shared: Shared) -> None:
+    """A column with `extra` becomes a field on each item, not on the type."""
+    client = _with_type(shared)
+    mapping = [
+        {"column": "title", "target": "name"},
+        {
+            "column": "authenticated",
+            "extra": {"key": "checked", "title": "Checked", "kind": "boolean"},
+        },
+    ]
+
+    response = _post(client, "", mapping=mapping)
+
+    assert response.status_code == 200, response.text
+    nodes = await shared.graph_repos.nodes.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
+    alien = next(n for n in nodes if n.name == "Alien #1")
+    assert alien.attributes == {"checked": True}
+    assert alien.extra_schema is not None
+    assert alien.extra_schema["properties"]["checked"]["title"] == "Checked"
+
+
+def test_an_extra_field_with_an_unknown_kind_is_a_422(shared: Shared) -> None:
+    """The kinds an import can keep are listed in the contract."""
+    client = _with_type(shared)
+    mapping = [
+        {"column": "title", "target": "name"},
+        {"column": "signed_on", "extra": {"key": "s", "title": "S", "kind": "money"}},
+    ]
+
+    assert _post(client, "/plan", mapping=mapping).status_code == 422
