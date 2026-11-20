@@ -6,6 +6,8 @@ keeps a working default in its `content`, so the page is complete without the se
 
 * `name`, `description`: the instance's branding, as an administrator set it
 * `absolute-url`: the tag's own path, on the public origin when one is configured
+* `versioned-url`: as `absolute-url`, with `?v=<build version>`, so a preview crawler
+  that caches the image by address fetches it again after each release
 * `page-url`: the requested page on the public origin; dropped when there is none
 
 The shell is parsed once with the standard library's HTML parser, so the rewrite does
@@ -17,13 +19,14 @@ import html
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Literal, get_args
+from urllib.parse import quote
 
 from app.shared_kernel.errors import InfrastructureError
 
 if TYPE_CHECKING:
     from app.modules.system.domain.branding import Branding
 
-type Field = Literal["name", "description", "absolute-url", "page-url"]
+type Field = Literal["name", "description", "absolute-url", "versioned-url", "page-url"]
 MARKER = "data-branding"
 _FIELDS: frozenset[str] = frozenset(get_args(Field.__value__))
 
@@ -106,18 +109,42 @@ class ShellTemplate:
         """The markers the shell uses, so a test can tell none went missing."""
         return frozenset(s.field for s in self._segments if isinstance(s, _MarkedTag))
 
-    def render(self, branding: Branding, *, origin: str | None, path: str) -> str:
+    def render(
+        self,
+        branding: Branding,
+        *,
+        origin: str | None,
+        path: str,
+        version: str | None = None,
+    ) -> str:
         """The shell with every marked tag filled in for this instance and page."""
         base = origin.rstrip("/") if origin else None
         return "".join(
             segment
             if isinstance(segment, str)
-            else _render(segment, branding, base=base, path=path)
+            else _render(segment, branding, base=base, path=path, version=version)
             for segment in self._segments
         )
 
 
-def _render(tag: _MarkedTag, branding: Branding, *, base: str | None, path: str) -> str:
+def _absolute(path: str, base: str | None) -> str:
+    """`path` on the public origin when there is one, as it stands otherwise."""
+    return f"{base}{path}" if base and path.startswith("/") else path
+
+
+def _versioned(address: str, version: str | None) -> str:
+    """`address` with the build version as a query, so a cached copy is not reused."""
+    return f"{address}?v={quote(version, safe='')}" if version else address
+
+
+def _render(
+    tag: _MarkedTag,
+    branding: Branding,
+    *,
+    base: str | None,
+    path: str,
+    version: str | None,
+) -> str:
     """One marked tag with its `content` filled in, or nothing if it is dropped."""
     current = dict(tag.attrs).get("content") or ""
     match tag.field:
@@ -126,7 +153,9 @@ def _render(tag: _MarkedTag, branding: Branding, *, base: str | None, path: str)
         case "description":
             value = branding.description
         case "absolute-url":
-            value = f"{base}{current}" if base and current.startswith("/") else current
+            value = _absolute(current, base)
+        case "versioned-url":
+            value = _versioned(_absolute(current, base), version)
         case "page-url":
             if base is None:
                 return ""

@@ -32,7 +32,7 @@ SHELL = """<!doctype html>
 		<meta
 			property="og:image"
 			content="/share-image.png"
-			data-branding="absolute-url" />
+			data-branding="versioned-url" />
 		<meta property="og:image:alt" content="The Menagerist mark beside its name." />
 		<meta name="apple-mobile-web-app-title" content="Menagerist" />
 		<script>if (a < b && "<meta data-branding=\\"name\\">") {}</script>
@@ -45,9 +45,11 @@ HOARD = Branding(
 )
 
 
-def render(origin: str | None = None, path: str = "/") -> str:
+def render(
+    origin: str | None = None, path: str = "/", version: str | None = None
+) -> str:
     """The test shell filled in for The Hoard."""
-    return ShellTemplate(SHELL).render(HOARD, origin=origin, path=path)
+    return ShellTemplate(SHELL).render(HOARD, origin=origin, path=path, version=version)
 
 
 def test_marked_tags_take_the_branding_however_they_are_written() -> None:
@@ -103,6 +105,21 @@ def test_with_a_public_origin_urls_are_absolute() -> None:
     assert f'<meta property="og:url" content="{page}" />' in html
 
 
+def test_the_image_address_carries_the_build_version() -> None:
+    """A crawler that caches the image by address fetches it again per release."""
+    html = render(origin="https://hoard.example.com", version="0.2026.11.5")
+
+    image = "https://hoard.example.com/share-image.png?v=0.2026.11.5"
+    assert f'<meta property="og:image" content="{image}" />' in html
+
+
+def test_the_version_in_the_image_address_is_escaped() -> None:
+    """A version with a plus or a space cannot break the address."""
+    html = render(version="1.0+build 7")
+
+    assert 'content="/share-image.png?v=1.0%2Bbuild%207"' in html
+
+
 def test_an_unknown_marker_fails_loudly() -> None:
     """A typo in app.html is an error, not a tag silently left unfilled."""
     with pytest.raises(UnknownBrandingFieldError, match="nmae"):
@@ -115,7 +132,7 @@ def test_the_real_app_html_marks_every_preview_tag() -> None:
 
     html = template.render(HOARD, origin="https://hoard.example.com", path="/items/1")
 
-    assert template.fields == {"name", "description", "absolute-url", "page-url"}
+    assert template.fields == {"name", "description", "versioned-url", "page-url"}
     image = "https://hoard.example.com/share-image.png"
     for tag in (
         '<meta property="og:site_name" content="The Hoard" />',
@@ -137,11 +154,18 @@ def dist(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _client(dist: Path, branding: Branding, origin: str | None = None) -> TestClient:
+def _client(
+    dist: Path,
+    branding: Branding,
+    origin: str | None = None,
+    version: str | None = None,
+) -> TestClient:
     async def current() -> Branding:
         return branding
 
-    spa = SpaStaticFiles(directory=dist, branding=current, public_origin=origin)
+    spa = SpaStaticFiles(
+        directory=dist, branding=current, public_origin=origin, version=version
+    )
     return TestClient(Starlette(routes=[Mount("/", spa)]))
 
 
@@ -154,6 +178,13 @@ def test_every_shell_response_is_branded(dist: Path, path: str) -> None:
     assert '<meta property="og:site_name" content="The Hoard" />' in response.text
     assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate"
     assert response.headers["content-type"].startswith("text/html")
+
+
+def test_the_served_shell_names_the_image_by_build_version(dist: Path) -> None:
+    """The version the server was started with reaches the served page's image tag."""
+    response = _client(dist, HOARD, version="0.2026.11.5").get("/items/1")
+
+    assert 'content="/share-image.png?v=0.2026.11.5"' in response.text
 
 
 def test_the_build_s_compressed_shell_is_not_served_stale(dist: Path) -> None:

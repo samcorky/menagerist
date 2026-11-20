@@ -193,6 +193,7 @@ def create_app() -> FastAPI:
             directory=frontend_dist_path,
             branding=get_branding,
             public_origin=api_settings.public_origin,
+            version=load_app_info().version,
         )
         fastapi_app.mount("/", spa, name="spa")
 
