@@ -18,12 +18,14 @@ import {
 	EDITED_LIMIT,
 	loadCollections,
 	loadEdited,
+	loadCollectionItems,
 	loadNewest,
 	loadStats,
 	loadTidy,
 	loadTypeBreakdown
 } from '$lib/dashboard-sources';
 import { favouriteQuery, monthQuery, newestQuery, noPhotoQuery, photoQuery } from '$lib/dashboard';
+import { HOME_COLLECTION_ITEMS, homeCollectionQuery } from '$lib/home-collections';
 
 const page = (items: unknown[]) => ({
 	data: { items, total: items.length, total_capped: false, next_cursor: null, warnings: [] }
@@ -69,6 +71,21 @@ describe('newest and edited lists', () => {
 		searchNodes.mockRejectedValue(new Error('offline'));
 		expect(await loadNewest()).toEqual({ status: 'error' });
 		expect(await loadEdited()).toEqual({ status: 'error' });
+	});
+});
+
+describe('loadCollectionItems', () => {
+	it('asks for the newest few items of the collection', async () => {
+		searchNodes.mockResolvedValue(page([{ id: 'a' }]));
+		expect(await loadCollectionItems('c1')).toEqual({ status: 'ok', data: [{ id: 'a' }] });
+		const body = searchNodes.mock.calls[0][0].body;
+		expect(body.query).toEqual(homeCollectionQuery('c1'));
+		expect(body.limit).toBe(HOME_COLLECTION_ITEMS);
+	});
+
+	it('reports an error instead of throwing', async () => {
+		searchNodes.mockRejectedValue(new Error('offline'));
+		expect(await loadCollectionItems('c1')).toEqual({ status: 'error' });
 	});
 });
 

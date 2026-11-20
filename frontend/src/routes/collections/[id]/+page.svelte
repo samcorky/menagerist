@@ -11,6 +11,7 @@
 	import {
 		Download,
 		EyeOff,
+		HousePlus,
 		LayoutGrid,
 		Library,
 		List,
@@ -105,6 +106,7 @@
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import SurpriseButton from '$lib/components/surprise-button.svelte';
+	import { homeCollectionIds, toggleHomeCollection } from '$lib/home-collections';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import NotFound from '$lib/components/not-found.svelte';
@@ -147,6 +149,8 @@
 	const collectionId = $derived(page.params.id ?? '');
 
 	let collection = $state<CollectionResponse | null>(null);
+	let homeIds = $state(homeCollectionIds());
+	const onHome = $derived(collection !== null && homeIds.includes(collection.id));
 	const canonicalId = $derived(collection?.id ?? '');
 	// The first page of results has arrived; the exact count waits for it
 	let firstPageLoaded = $state(false);
@@ -322,6 +326,13 @@
 	let exporting = $state(false);
 
 	/** Save the collection, with its items when it is a manual one, as a file to import again. */
+	function toggleOnHome() {
+		if (!collection) return;
+		const shown = toggleHomeCollection(collection.id);
+		homeIds = homeCollectionIds();
+		toast.success(shown ? 'Shown on Home' : 'Removed from Home');
+	}
+
 	async function handleExport() {
 		if (!collection || exporting) return;
 		exporting = true;
@@ -1085,6 +1096,14 @@
 						</IconButton>
 					{/if}
 					<SurpriseButton collection={collection.id} />
+					<IconButton
+						label="Show on Home"
+						variant={onHome ? 'secondary' : 'outline'}
+						aria-pressed={onHome}
+						onclick={toggleOnHome}
+					>
+						<HousePlus />
+					</IconButton>
 					<IconButton label="Edit" variant="outline" onclick={openEdit}>
 						<Pencil />
 					</IconButton>
