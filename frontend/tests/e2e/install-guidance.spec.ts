@@ -90,6 +90,17 @@ test('Settings lists Install the app, and says when a browser cannot install', a
 	await expect(page.getByTestId('install-panel')).toContainText("can't install the app");
 });
 
+test('after Install the Settings page never says the browser cannot install', async ({ page }) => {
+	await page.goto('/settings/install');
+	await offerNativeInstall(page);
+	const panel = page.getByTestId('install-panel');
+	await panel.getByRole('button', { name: 'Install' }).click();
+
+	// The browser reported the prompt closed, which is not the same as being unable to install.
+	await expect(panel).toContainText('You closed the install prompt');
+	await expect(panel).not.toContainText("can't install the app");
+});
+
 test('the Settings page offers the native Install button when the browser does', async ({
 	page
 }) => {
