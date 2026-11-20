@@ -15,6 +15,7 @@ import {
 	photoQuery,
 	type TidyRow
 } from '$lib/dashboard';
+import { HOME_COLLECTION_ITEMS, homeCollectionQuery } from '$lib/home-collections';
 import { runSearch } from '$lib/query/search';
 import type { Query } from '$lib/query/types';
 
@@ -55,6 +56,13 @@ export const loadNewest = (): Promise<Block<NodeResponse[]>> =>
 
 export const loadEdited = (): Promise<Block<NodeResponse[]>> =>
 	guarded(async () => (await runSearch({ query: editedQuery(), limit: EDITED_LIMIT })).items);
+
+/** The newest few items of a collection chosen for Home, manual or smart. */
+export const loadCollectionItems = (id: string): Promise<Block<NodeResponse[]>> =>
+	guarded(
+		async () =>
+			(await runSearch({ query: homeCollectionQuery(id), limit: HOME_COLLECTION_ITEMS })).items
+	);
 
 /** Every collection (a smart collection's count is capped at 1,000 by the server). */
 export const loadCollections = (): Promise<Block<CollectionResponse[]>> =>

@@ -28,3 +28,21 @@ export function readOptionalFlag(key: string): boolean | undefined {
 		return undefined;
 	}
 }
+
+/** A remembered list of strings, in order; `[]` when nothing readable was stored. */
+export function readList(key: string): string[] {
+	try {
+		const parsed: unknown = JSON.parse(localStorage.getItem(PREFIX + key) ?? '[]');
+		return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+	} catch {
+		return [];
+	}
+}
+
+export function writeList(key: string, values: readonly string[]): void {
+	try {
+		localStorage.setItem(PREFIX + key, JSON.stringify(values));
+	} catch {
+		// Not remembering is harmless.
+	}
+}

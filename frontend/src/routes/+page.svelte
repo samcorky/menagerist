@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import Page from '$lib/components/page.svelte';
 	import CollapsibleSection from '$lib/components/collapsible-section.svelte';
+	import IconButton from '$lib/components/icon-button.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
 	import SurpriseButton from '$lib/components/surprise-button.svelte';
 	import { resolve } from '$app/paths';
@@ -23,6 +24,12 @@
 	import { pickEmptyLine } from '$lib/empty-lines';
 	import { formatRelativeTime } from '$lib/format-date';
 	import {
+		chosenCollections,
+		homeCollectionIds,
+		toggleHomeCollection
+	} from '$lib/home-collections';
+	import {
+		loadCollectionItems,
 		loadCollections,
 		loadEdited,
 		loadNewest,
@@ -63,6 +70,9 @@
 	let collections = $state<Block<CollectionResponse[]> | null>(null);
 	let breakdown = $state<Block<TypeBreakdown> | null>(null);
 	let tidy = $state<TidyResult[] | null>(null);
+	// The collections chosen for Home (per device), and each one's newest items by id.
+	let chosenIds = $state(homeCollectionIds());
+	let chosenItems = $state<Record<string, Block<NodeResponse[]>>>({});
 	let types = $state<NodeTypeResponse[]>([]);
 	// null until the pack list has loaded, so the line never shifts the layout
 	let hasExamples = $state<boolean | null>(null);
@@ -78,6 +88,9 @@
 		collections?.status === 'ok'
 			? [...collections.data].sort((a, b) => b.item_count - a.item_count).slice(0, 5)
 			: []
+	);
+	const shownCollections = $derived(
+		collections?.status === 'ok' ? chosenCollections(chosenIds, collections.data) : []
 	);
 	const smartCount = $derived(
 		collections?.status === 'ok' ? collections.data.filter((c) => c.kind === 'dynamic').length : 0
@@ -120,6 +133,14 @@
 		const collectionsResult = await loadCollections();
 		if (stale()) return;
 		collections = collectionsResult;
+		chosenIds = homeCollectionIds();
+		if (collectionsResult.status === 'ok') {
+			for (const chosen of chosenCollections(chosenIds, collectionsResult.data)) {
+				void loadCollectionItems(chosen.id).then(
+					(result) => !stale() && (chosenItems[chosen.id] = result)
+				);
+			}
+		}
 		const loadedTypes = await typesPromise;
 		if (stale()) return;
 		types = loadedTypes;
@@ -140,8 +161,15 @@
 	}
 
 	const anyFailed = $derived(
-		[stats, newest, edited, collections, breakdown].some((block) => block?.status === 'error')
+		[stats, newest, edited, collections, breakdown, ...Object.values(chosenItems)].some(
+			(block) => block?.status === 'error'
+		)
 	);
+
+	function removeFromHome(collection: CollectionResponse) {
+		toggleHomeCollection(collection.id);
+		chosenIds = homeCollectionIds();
+	}
 
 	// Coming back online, or Retry in the banner, reloads when any block had failed.
 	$effect(() => {
@@ -164,6 +192,25 @@
 
 {#snippet retry(what: string)}
 	<LoadFailed {what} compact onretry={() => void loadData()} />
+{/snippet}
+
+{#snippet itemGrid(list: NodeResponse[])}
+	<div
+		data-slot="node-grid"
+		class="grid grid-cols-2 gap-2 max-sm:flex max-sm:snap-x max-sm:overflow-x-auto sm:grid-cols-[repeat(auto-fill,minmax(11rem,1fr))]"
+	>
+		{#each list as item (item.id)}
+			<div class="max-sm:w-40 max-sm:shrink-0 max-sm:snap-start">
+				<NodeGridCard
+					{item}
+					schema={schemaOf(item.type)}
+					categoryLabel={typeBySlug.get(item.type ?? '')?.label}
+					typeIcon={typeBySlug.get(item.type ?? '')?.icon}
+					typeColour={typeBySlug.get(item.type ?? '')?.colour}
+				/>
+			</div>
+		{/each}
+	</div>
 {/snippet}
 
 {#snippet tile(
@@ -343,22 +390,7 @@
 				{:else if newest.status === 'error'}
 					{@render retry('your newest items')}
 				{:else}
-					<div
-						data-slot="node-grid"
-						class="grid grid-cols-2 gap-2 max-sm:flex max-sm:snap-x max-sm:overflow-x-auto sm:grid-cols-[repeat(auto-fill,minmax(11rem,1fr))]"
-					>
-						{#each newest.data as item (item.id)}
-							<div class="max-sm:w-40 max-sm:shrink-0 max-sm:snap-start">
-								<NodeGridCard
-									{item}
-									schema={schemaOf(item.type)}
-									categoryLabel={typeBySlug.get(item.type ?? '')?.label}
-									typeIcon={typeBySlug.get(item.type ?? '')?.icon}
-									typeColour={typeBySlug.get(item.type ?? '')?.colour}
-								/>
-							</div>
-						{/each}
-					</div>
+					{@render itemGrid(newest.data)}
 				{/if}
 			</CollapsibleSection>
 
@@ -390,6 +422,45 @@
 				{/if}
 			</CollapsibleSection>
 		</div>
+
+		{#each shownCollections as collection (collection.id)}
+			{@const block = chosenItems[collection.id]}
+			<CollapsibleSection
+				id="home-collection-{collection.id}"
+				title={collection.name}
+				class="gap-3"
+			>
+				{#snippet actions()}
+					<div class="flex shrink-0 items-center gap-1">
+						<a
+							href={resolve('/collections/[id]', collectionRouteParams(collection))}
+							class="flex items-center gap-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+						>
+							View all {formatCount(collection.item_count, collection.item_count_capped ?? false)}
+							<ChevronRight class="size-3.5" />
+						</a>
+						<IconButton
+							label="Remove {collection.name} from Home"
+							labelOnTouch={false}
+							onclick={() => removeFromHome(collection)}
+						>
+							<X />
+						</IconButton>
+					</div>
+				{/snippet}
+				{#if block === undefined}
+					<div class="h-32 animate-pulse rounded-xl bg-muted"></div>
+				{:else if block.status === 'error'}
+					{@render retry(`the items in ${collection.name}`)}
+				{:else if block.data.length === 0}
+					<p class="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
+						Nothing in this collection yet.
+					</p>
+				{:else}
+					{@render itemGrid(block.data)}
+				{/if}
+			</CollapsibleSection>
+		{/each}
 
 		<div class="grid items-start gap-x-6 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
 			<CollapsibleSection id="home-collections" title="Collections" class="gap-3">
