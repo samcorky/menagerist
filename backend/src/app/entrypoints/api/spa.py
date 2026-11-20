@@ -135,11 +135,13 @@ class SpaStaticFiles(StaticFiles):
         directory: str | PathLike[str],
         branding: BrandingSource | None = None,
         public_origin: str | None = None,
+        version: str | None = None,
     ) -> None:
         super().__init__(directory=directory)
         self._shell_path = Path(directory) / _SHELL
         self._branding = branding
         self._public_origin = public_origin
+        self._version = version
         self._template: tuple[int, ShellTemplate] | None = None
 
     async def get_response(self, path: str, scope: Scope) -> Response:
@@ -213,7 +215,10 @@ class SpaStaticFiles(StaticFiles):
         page, as the build's precompressed copies hold the unbranded tags.
         """
         body = self._shell_template().render(
-            await source(), origin=self._public_origin, path=scope["path"]
+            await source(),
+            origin=self._public_origin,
+            path=scope["path"],
+            version=self._version,
         )
         return self._shell(Response(body, media_type="text/html"))
 
