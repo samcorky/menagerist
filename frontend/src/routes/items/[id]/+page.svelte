@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Copy, Download, Pencil, Star, Trash2, X } from '@lucide/svelte';
+	import { Copy, Download, Pencil, Share, Star, Trash2, X } from '@lucide/svelte';
 	import { downloadBundle, exportItemsBundle, presetFilename } from '$lib/preset-packs';
 	import {
 		createEdge,
@@ -34,6 +34,7 @@
 	import { slugify } from '$lib/utils.js';
 	import { loadExampleIds } from '$lib/examples';
 	import { coarsePointer } from '$lib/viewport.svelte';
+	import { absoluteUrl, shareLinkWithFeedback } from '$lib/share';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import DuplicateItemDialog from '$lib/components/duplicate-item-dialog.svelte';
@@ -512,6 +513,12 @@
 		await goto(resolve('/items/[id]', { id: copy.id }));
 	}
 
+	function handleShare() {
+		if (!node) return;
+		const url = absoluteUrl(resolve('/items/[id]', { id: node.id }));
+		void shareLinkWithFeedback({ title: node.name, url });
+	}
+
 	async function handleToggleFavourite() {
 		if (!node) return;
 		const newValue = !node.favourite;
@@ -786,6 +793,16 @@
 									<Star class="size-4 {node?.favourite ? 'fill-current' : ''}" />
 								</Toggle>
 								{#if mode === 'read'}
+									<!-- Shown at every width: on a phone the other header actions move to the bar below. -->
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										onclick={handleShare}
+										aria-label="Share"
+									>
+										<Share class="size-4" />
+									</Button>
 									<Button
 										type="button"
 										variant="ghost"
