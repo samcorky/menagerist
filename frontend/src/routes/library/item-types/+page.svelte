@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
 	import { resolve } from '$app/paths';
-	import { Download, Ellipsis, Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { Download, MoreVertical, Tag, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { wide } from '$lib/viewport.svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
@@ -414,7 +414,7 @@
 											class="shrink-0 pointer-coarse:size-11"
 											aria-label="More actions for {cat.label}"
 										>
-											<Ellipsis class="size-4" />
+											<MoreVertical class="size-4" />
 										</Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
@@ -506,6 +506,7 @@
 		typeId={editingId ?? undefined}
 		typeKind={editingId ? 'node' : undefined}
 		highlights
+		fieldFlags
 	/>
 </TypeEditorDialog>
 

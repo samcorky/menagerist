@@ -44,6 +44,9 @@
 
 	// svelte-ignore state_referenced_locally
 	let types = $state<NodeTypeResponse[]>(nodeTypes ?? []);
+	// Until the types arrive, a name that already exists would look new and be offered to create.
+	// svelte-ignore state_referenced_locally
+	let loaded = $state(nodeTypes !== undefined);
 	let counts = $state(new Map<string, number>());
 	let query = $state('');
 	let comboValue = $derived(value ?? NONE_VALUE);
@@ -51,7 +54,10 @@
 	$effect(() => {
 		if (!nodeTypes)
 			void refreshItemTypes()
-				.then((all) => (types = all))
+				.then((all) => {
+					types = all;
+					loaded = true;
+				})
 				.catch(() => {});
 		void countNodeTypes().then((result) => {
 			counts = new Map(
@@ -61,7 +67,9 @@
 	});
 
 	const bySlug = $derived(new Map(types.map((type) => [type.slug, type])));
-	const items = $derived(buildTypeItems({ types, counts, query, allowClear, allowCreate }));
+	const items = $derived(
+		buildTypeItems({ types, counts, query, allowClear, allowCreate: allowCreate && loaded })
+	);
 	const selectedType = $derived(value ? bySlug.get(value) : undefined);
 	const selectedItem = $derived<ComboboxItem | undefined>(
 		value ? { value, label: selectedType?.label ?? value } : undefined

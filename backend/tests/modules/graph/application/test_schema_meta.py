@@ -98,6 +98,9 @@ def test_check_meta_shape_accepts_valid_and_unknown_members() -> None:
     )
     check_meta_shape({"properties": {"g": {"x-menagerist": {"columns": ["a", "b"]}}}})
     check_meta_shape({"properties": {"a": {"x-menagerist": {"multiline": True}}}})
+    check_meta_shape(
+        {"properties": {"a": {"x-menagerist": {"capture": True, "barcode": True}}}}
+    )
     check_meta_shape({"type": "object"})
     check_meta_shape({"properties": {"a": {"items": {"type": "string"}}}})
     check_meta_shape({"properties": {"a": "not-a-dict"}})
@@ -116,6 +119,8 @@ def test_check_meta_shape_accepts_valid_and_unknown_members() -> None:
         {"properties": {"a": {"x-menagerist": {"kind": 1}}}},
         {"properties": {"a": {"x-menagerist": {"archived": "yes"}}}},
         {"properties": {"a": {"x-menagerist": {"multiline": "yes"}}}},
+        {"properties": {"a": {"x-menagerist": {"capture": "yes"}}}},
+        {"properties": {"a": {"x-menagerist": {"barcode": "yes"}}}},
         {"properties": {"a": {"x-menagerist": {"config": []}}}},
         {"properties": {"a": {"x-menagerist": {"columns": "not-a-list"}}}},
         {"properties": {"a": {"x-menagerist": {"columns": [1, 2]}}}},

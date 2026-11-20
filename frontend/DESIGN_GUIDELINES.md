@@ -187,7 +187,7 @@ Heavy create and edit forms (a type with its fields, for example) open in a larg
 Fixed-choice value pickers default to **native `<select>`** (`ui/native-select`) for mobile and accessibility support. Exceptions:
 
 - Searchable or rich options need a suitable custom picker.
-- Actions use `DropdownMenu`, not a value select.
+- Actions use `DropdownMenu`, not a value select. Its trigger for a row's or card's other actions is the vertical dots icon (`MoreVertical`), one per row, beside that row's other icon buttons; the horizontal ellipsis means hidden content (a collapsed breadcrumb), never a menu.
 - Open-ended, user-authored options (such as categories with “+ New”) use a chip/search picker.
 
 ## 16. Metadata Presentation

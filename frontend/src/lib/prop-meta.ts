@@ -20,6 +20,10 @@ export type PropertyMeta = {
 	labels?: Record<string, string>;
 	/** A choice field linked to a saved list (its id). The options come from that list. */
 	list?: string;
+	/** The field is shown in quick capture for its item type. See `field-flags.ts`. */
+	capture?: boolean;
+	/** The field takes scanned barcodes. See `field-flags.ts`. */
+	barcode?: boolean;
 	/** Unknown members are preserved on round-trip. */
 	[member: string]: unknown;
 };

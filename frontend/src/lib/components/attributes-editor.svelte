@@ -35,7 +35,8 @@
 		nodeCandidates = [],
 		onLinkItem,
 		onPromoted,
-		serverErrors = null
+		serverErrors = null,
+		only
 	}: {
 		rows: AttributeRow[];
 		schema?: AttributesSchema | null;
@@ -47,6 +48,8 @@
 		onLinkItem?: (key: string, item: { id: string; name: string }) => void;
 		onPromoted?: () => void;
 		serverErrors?: Record<string, string> | null;
+		/** Show just these fields of `schema`, flat and in this order, with nothing else (quick capture). */
+		only?: readonly string[];
 	} = $props();
 
 	let mergedSchema = $derived(mergeAttributeSchemas(schema, extraSchema));
@@ -376,14 +379,22 @@
 {/snippet}
 
 <div class="space-y-2">
-	<Label>Details</Label>
+	{#if !only}
+		<Label>Details</Label>
+	{/if}
 	{#if validator?.degraded}
 		<p class="text-xs text-muted-foreground" role="status">
 			Some rules could not be checked here. They are still checked when you save.
 		</p>
 	{/if}
 
-	{#if schema && schemaLayout.length > 0}
+	{#if only}
+		{#each only as key (key)}
+			{#if schema && key in schema.properties}
+				{@render fieldEntry(key, schema.properties[key])}
+			{/if}
+		{/each}
+	{:else if schema && schemaLayout.length > 0}
 		{#each schemaLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
 			{#if isSectionItem(layoutItem)}
 				<div class="space-y-2 pt-1">
@@ -404,7 +415,7 @@
 		{/each}
 	{/if}
 
-	{#if extraSchema && extraLayout.length > 0}
+	{#if !only && extraSchema && extraLayout.length > 0}
 		{#each extraLayout as layoutItem (isSectionItem(layoutItem) ? layoutItem.id : layoutItem.key)}
 			{#if !isSectionItem(layoutItem) && layoutItem.key in extraSchema.properties}
 				{@const key = layoutItem.key}
@@ -442,7 +453,7 @@
 		{/each}
 	{/if}
 
-	{#if supportsExtraFields}
+	{#if supportsExtraFields && !only}
 		{#if addingField && draftField}
 			<div class="space-y-2 rounded-md border border-input bg-muted/30 p-3">
 				<FieldKindRow

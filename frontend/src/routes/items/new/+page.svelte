@@ -118,12 +118,9 @@
 				stagedAsset = pending.stagedPhoto;
 				photoPreview = pending.stagedPhoto.previewUrl;
 			}
-			if (pending.barcode) {
-				attrRows = Object.entries(pending.barcode.attributes).map(([key, value]) => ({
-					key,
-					value
-				}));
-				extraSchema = pending.barcode.extraSchema;
+			if (pending.details) {
+				attrRows = pending.details.rows;
+				extraSchema = pending.details.extraSchema;
 			}
 		}
 	});

@@ -54,19 +54,23 @@
 	import SavePresetDialog from '$lib/components/save-preset-dialog.svelte';
 	import PresetPickerDialog from '$lib/components/preset-picker-dialog.svelte';
 	import FieldKindRow from '$lib/components/field-kind-row.svelte';
+	import FieldFlagItems from '$lib/components/field-flag-items.svelte';
 
 	let {
 		schema = $bindable<AttributesSchema | null>(null),
 		typeId,
 		typeKind = 'node',
 		highlights = false,
-		highlightList = 'card'
+		highlightList = 'card',
+		fieldFlags = false
 	}: {
 		schema?: AttributesSchema | null;
 		typeId?: string;
 		typeKind?: 'node' | 'edge';
 		highlights?: boolean;
 		highlightList?: HighlightList;
+		/** Offer the item-type field switches (quick capture, barcodes). */
+		fieldFlags?: boolean;
 	} = $props();
 
 	let maxShown = $derived(maxHighlights(highlightList));
@@ -423,11 +427,12 @@
 	onReplace: () => void,
 	onFieldChange: (f: EditorField) => void
 )}
-	<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+	<div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
 		<div class="min-w-0 sm:flex-1">
 			<FieldKindRow
 				{field}
 				{allowGroup}
+				showFlags={fieldFlags}
 				{onLabelChange}
 				onFieldChange={(next) => onFieldChange(handleFieldRowChange(field, next))}
 			/>
@@ -450,7 +455,7 @@
 					<Pin class="size-4 {pinned ? 'fill-current' : ''}" />
 				</Button>
 			{/if}
-			{#if field.kind !== 'opaque'}
+			{#if field.kind !== 'opaque' || fieldFlags}
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
@@ -465,17 +470,28 @@
 							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end">
-						{#if !field.keyPending}
-							<DropdownMenu.Item onSelect={onReplace}>
-								<Replace class="size-4" />
-								Replace field
+					<DropdownMenu.Content align="end" class="min-w-56">
+						{#if fieldFlags}
+							<FieldFlagItems
+								{field}
+								onChange={(next) => onFieldChange(handleFieldRowChange(field, next))}
+							/>
+						{/if}
+						{#if field.kind !== 'opaque'}
+							{#if fieldFlags}
+								<DropdownMenu.Separator />
+							{/if}
+							{#if !field.keyPending}
+								<DropdownMenu.Item onSelect={onReplace}>
+									<Replace class="size-4" />
+									Replace field
+								</DropdownMenu.Item>
+							{/if}
+							<DropdownMenu.Item onSelect={() => (savingField = field)}>
+								<BookmarkPlus class="size-4" />
+								Save field for reuse
 							</DropdownMenu.Item>
 						{/if}
-						<DropdownMenu.Item onSelect={() => (savingField = field)}>
-							<BookmarkPlus class="size-4" />
-							Save field for reuse
-						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			{/if}
