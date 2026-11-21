@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { firstCode, nativeFormats } from '$lib/barcode/detector';
-import { cameraProblem } from '$lib/barcode/camera';
+import { cameraProblem, hasTorch, setTorch } from '$lib/barcode/camera';
 
 describe('nativeFormats', () => {
 	it('asks a native detector only for the formats it can read', () => {
@@ -35,5 +35,39 @@ describe('cameraProblem', () => {
 
 	it('treats anything else as no camera', () => {
 		expect(cameraProblem('odd')).toBe('unavailable');
+	});
+});
+
+/** A stream whose one video track reports these capabilities. */
+function streamWith(capabilities: object | undefined, applyConstraints = vi.fn()) {
+	const track = { applyConstraints, getCapabilities: capabilities && (() => capabilities) };
+	return { getVideoTracks: () => [track] } as unknown as MediaStream;
+}
+
+describe('hasTorch', () => {
+	it('is true when the camera reports a torch', () => {
+		expect(hasTorch(streamWith({ torch: true }))).toBe(true);
+	});
+
+	it('is false when it does not, or the browser cannot say', () => {
+		expect(hasTorch(streamWith({}))).toBe(false);
+		expect(hasTorch(streamWith(undefined))).toBe(false);
+		expect(hasTorch(null)).toBe(false);
+	});
+});
+
+describe('setTorch', () => {
+	it('switches the light with an advanced constraint', async () => {
+		const applyConstraints = vi.fn().mockResolvedValue(undefined);
+
+		expect(await setTorch(streamWith({ torch: true }, applyConstraints), true)).toBe(true);
+		expect(applyConstraints).toHaveBeenCalledWith({ advanced: [{ torch: true }] });
+	});
+
+	it('says so when the browser refuses', async () => {
+		const refuse = vi.fn().mockRejectedValue(new DOMException('', 'OverconstrainedError'));
+
+		expect(await setTorch(streamWith({ torch: true }, refuse), true)).toBe(false);
+		expect(await setTorch(null, true)).toBe(false);
 	});
 });

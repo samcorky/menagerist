@@ -33,3 +33,24 @@ export async function openCamera(): Promise<{ stream: MediaStream } | { problem:
 export function stopCamera(stream: MediaStream | null): void {
 	stream?.getTracks().forEach((track) => track.stop());
 }
+
+/** `torch` is not in TypeScript's capability and constraint types yet. */
+type TorchTrack = { getCapabilities?: () => { torch?: boolean } };
+
+/** Whether the camera in this stream has a light to switch on (not offered on iOS Safari). */
+export function hasTorch(stream: MediaStream | null): boolean {
+	const track = stream?.getVideoTracks()[0] as unknown as TorchTrack | undefined;
+	return Boolean(track?.getCapabilities?.().torch);
+}
+
+/** Switch the camera's light on or off; false when the browser refuses. */
+export async function setTorch(stream: MediaStream | null, on: boolean): Promise<boolean> {
+	const track = stream?.getVideoTracks()[0];
+	if (!track) return false;
+	try {
+		await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+		return true;
+	} catch {
+		return false;
+	}
+}

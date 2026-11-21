@@ -1,11 +1,14 @@
 <script lang="ts">
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
+	import { Flashlight, FlashlightOff } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import {
 		CAMERA_PROBLEM_TEXT,
+		hasTorch,
 		openCamera,
+		setTorch,
 		stopCamera,
 		type CameraProblem
 	} from '$lib/barcode/camera';
@@ -27,6 +30,10 @@
 	let problem = $state<CameraProblem | null>(null);
 	let starting = $state(true);
 	let typed = $state('');
+	let canLight = $state(false);
+	let lightOn = $state(false);
+	/** The stream being filmed, for the light button. */
+	let filming: MediaStream | null = null;
 
 	/** Runs the camera for as long as the preview is on screen, which is while the dialog is open. */
 	function scanWith(el: HTMLVideoElement) {
@@ -36,6 +43,8 @@
 		problem = null;
 		starting = true;
 		typed = '';
+		canLight = false;
+		lightOn = false;
 
 		async function scan(detector: Detector) {
 			if (stopped) return;
@@ -59,6 +68,8 @@
 			}
 			if (stopped) return stopCamera(camera.stream);
 			stream = camera.stream;
+			filming = stream;
+			canLight = hasTorch(stream);
 			el.srcObject = stream;
 			await el.play().catch(() => {});
 			const detector = await detectorReady;
@@ -71,6 +82,8 @@
 		function fail(reason: CameraProblem) {
 			stopCamera(stream);
 			stream = null;
+			filming = null;
+			canLight = false;
 			problem = reason;
 			starting = false;
 		}
@@ -80,8 +93,16 @@
 			stopped = true;
 			clearTimeout(timer);
 			stopCamera(stream);
+			filming = null;
+			canLight = false;
+			lightOn = false;
 			el.srcObject = null;
 		};
+	}
+
+	async function toggleLight() {
+		const next = !lightOn;
+		if (await setTorch(filming, next)) lightOn = next;
 	}
 
 	function finish(code: string) {
@@ -110,6 +131,21 @@
 					aria-hidden="true"
 					class="pointer-events-none absolute inset-x-[12%] top-1/2 h-1/3 -translate-y-1/2 rounded-md border-2 border-white/80"
 				></div>
+				{#if canLight}
+					<button
+						type="button"
+						onclick={toggleLight}
+						aria-pressed={lightOn}
+						aria-label={lightOn ? 'Turn the light off' : 'Turn the light on'}
+						class="absolute right-2 bottom-2 flex size-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none pointer-coarse:size-11"
+					>
+						{#if lightOn}
+							<Flashlight class="size-5" />
+						{:else}
+							<FlashlightOff class="size-5" />
+						{/if}
+					</button>
+				{/if}
 			</div>
 
 			<p class="text-sm text-muted-foreground" role="status">
