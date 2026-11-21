@@ -3,7 +3,6 @@
 import asyncio
 from typing import TYPE_CHECKING
 
-from app.entrypoints.api.shared.backup_operations import create_backup, media_files
 from app.platform import alembic_runner
 from app.platform.advisory_locks import AdvisoryLock, session_lock
 from app.platform.config.backup import get_backup_settings
@@ -25,6 +24,9 @@ async def backup_before_upgrade(revision: str) -> None:
     current = await alembic_runner.db_current_revisions(factory)
     if not current or not await alembic_runner.pending(revision):
         return
+    # Only an upgrade with work reaches a backup; the start-up path stays light.
+    from app.entrypoints.api.shared.backup_operations import create_backup
+
     target = alembic_runner.target_revisions(revision)
     await create_backup(
         label="pre-migration",
@@ -66,6 +68,7 @@ async def restore_backup(
     from sqlalchemy import func, select
 
     from app.entrypoints.api.shared.backup_dependencies import get_picture_files
+    from app.entrypoints.api.shared.backup_operations import media_files
     from app.modules.backup.adapters.persistence.database_restorer import (
         SqlAlchemyDatabaseRestorer,
     )
@@ -118,6 +121,7 @@ async def export_user_data(
 ) -> BackupSummary:
     """Export one explicit owner and stream their archive to a local file."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.entrypoints.api.shared.backup_operations import media_files
     from app.modules.backup.adapters.persistence.user_database_snapshot import (
         SqlAlchemyUserDatabaseSnapshot,
     )
@@ -156,6 +160,7 @@ async def import_user_data(
 ) -> None:
     """Verify a user archive in the owner's namespace before importing it."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.entrypoints.api.shared.backup_operations import media_files
     from app.entrypoints.api.shared.bridges.backup_user_validator import (
         BackupUserImportValidator,
     )

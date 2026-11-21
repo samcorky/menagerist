@@ -26,7 +26,7 @@ def test_worker_health_command_reports_status_and_exit_code(
 ) -> None:
     """Docker receives zero for healthy and one for unhealthy, with readable output."""
     operation = AsyncMock(return_value=healthy)
-    monkeypatch.setattr(cli, "check_worker_health_cli", operation)
+    monkeypatch.setattr(scheduling, "check_worker_health_cli", operation)
     if healthy:
         cli.app(["worker-health"])
         assert "healthy" in capsys.readouterr().out
@@ -42,7 +42,9 @@ def test_unhealthy_without_a_worker_identity_says_no_worker_started(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Run in the API container, the answer is "no worker here", not a stale beat."""
-    monkeypatch.setattr(cli, "check_worker_health_cli", AsyncMock(return_value=False))
+    monkeypatch.setattr(
+        scheduling, "check_worker_health_cli", AsyncMock(return_value=False)
+    )
 
     with pytest.raises(SystemExit, match="1"):
         cli.app(["worker-health", "--identity-file", str(tmp_path / "missing")])
@@ -60,7 +62,9 @@ def test_unhealthy_with_a_worker_identity_blames_the_heartbeat(
     """A worker that started but stopped beating still reports the heartbeat."""
     identity = tmp_path / "worker-id"
     identity.write_text("worker-1", encoding="utf-8")
-    monkeypatch.setattr(cli, "check_worker_health_cli", AsyncMock(return_value=False))
+    monkeypatch.setattr(
+        scheduling, "check_worker_health_cli", AsyncMock(return_value=False)
+    )
 
     with pytest.raises(SystemExit, match="1"):
         cli.app(["worker-health", "--identity-file", str(identity)])
@@ -76,7 +80,7 @@ def test_worker_health_output_stays_free_of_asyncio_debug_logs(
     async def probe(*, identity_file: Path | None = None) -> bool:
         return True
 
-    monkeypatch.setattr(cli, "check_worker_health_cli", probe)
+    monkeypatch.setattr(scheduling, "check_worker_health_cli", probe)
     caplog.set_level(logging.DEBUG)
     cli.app(["worker-health"])
     assert not [record for record in caplog.records if record.name == "asyncio"]
@@ -168,8 +172,8 @@ def test_worker_commands_accept_a_shared_identity_path(
     path = tmp_path / "custom-id"
     running = AsyncMock()
     checking = AsyncMock(return_value=True)
-    monkeypatch.setattr(cli, "run_worker_cli", running)
-    monkeypatch.setattr(cli, "check_worker_health_cli", checking)
+    monkeypatch.setattr(scheduling, "run_worker_cli", running)
+    monkeypatch.setattr(scheduling, "check_worker_health_cli", checking)
     cli.app(["worker", "--identity-file", str(path)])
     cli.app(
         ["worker-health", "--identity-file", str(path)], result_action="return_value"

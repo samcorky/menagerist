@@ -68,7 +68,7 @@ def test_job_commands_translate_operations_to_json(
 def test_worker_command_calls_async_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
     """The worker entrypoint is registered on the existing root CLI."""
     operation = AsyncMock()
-    monkeypatch.setattr(cli, "run_worker_cli", operation)
+    monkeypatch.setattr(scheduling, "run_worker_cli", operation)
     cli.app(["worker"])
     operation.assert_awaited_once_with()
 

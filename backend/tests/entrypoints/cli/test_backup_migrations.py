@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.entrypoints.api.shared import backup_operations
 from app.entrypoints.cli import backups
 from app.platform import alembic_runner
 
@@ -132,7 +133,7 @@ async def test_pending_upgrade_creates_labelled_backup(
     )
     monkeypatch.setattr(alembic_runner, "pending", AsyncMock(return_value=True))
     monkeypatch.setattr(alembic_runner, "target_revisions", Mock(return_value=("new",)))
-    monkeypatch.setattr(backups, "create_backup", create)
+    monkeypatch.setattr(backup_operations, "create_backup", create)
     await backups.backup_before_upgrade("head")
     create.assert_awaited_once_with(
         label="pre-migration", from_revision="old", to_revision="new"
