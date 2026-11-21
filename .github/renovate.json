@@ -51,6 +51,7 @@
     "dependencies"
   ],
   "vulnerabilityAlerts": {
+    "description": "Security fixes are raised at any time, skip the release-age wait and are never automerged, so a person reviews each one",
     "labels": [
       "security",
       "dependencies"
@@ -64,6 +65,7 @@
     "minimumReleaseAge": null
   },
   "lockFileMaintenance": {
+    "description": "Refresh the lock files on Mondays, one pull request per lock file, and review it by hand",
     "enabled": true,
     "schedule": [
       "before 6am on monday"
@@ -209,7 +211,21 @@
       "groupName": "postgres image",
       "dependencyDashboardCategory": "Docker images and compose files",
       "pinDigests": false,
-      "automerge": false
+      "automerge": false,
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "description": "Wait three months before proposing a new Postgres major, so its first point releases have fixed what early adopters find. Moving a database across a major also needs an upgrade path for existing installs, so there is no rush",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "postgres"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "minimumReleaseAge": "90 days"
     },
     {
       "description": "Group all Python interpreter version bumps (.python-version and the requires-python floors) into one PR, and treat as a major/manual-review change",
