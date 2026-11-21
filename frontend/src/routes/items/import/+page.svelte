@@ -19,6 +19,7 @@
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import SuggestInput from '$lib/components/suggest-input.svelte';
 	import { getCore } from '$lib/field-types';
 	import { fieldNameSuggestions, matchItemField } from '$lib/field-suggestions';
@@ -29,13 +30,17 @@
 		choicesFrom,
 		confirmText,
 		DATE_ORDERS,
+		deletedRows,
 		encodingName,
+		fieldTitles,
 		hasName,
 		itemsToAdd,
 		KEEP,
 		keepColumn,
 		keptDetails,
 		KEPT_KINDS,
+		keyColumns,
+		keyFieldFor,
 		mappingJson,
 		MAX_KEPT,
 		renameKept,
@@ -57,6 +62,8 @@
 		{ value: '|', label: 'Pipe' }
 	];
 	const SAMPLES = 3;
+	// Rows deleted after importing, listed one by one before "and N more".
+	const DELETED_SHOWN = 20;
 	const STEPS = ['Choose file', 'Match columns', 'Preview'];
 	const STEP_ORDER: Step[] = ['choose', 'match', 'preview'];
 
@@ -74,6 +81,9 @@
 	let busy = $state(false);
 	let fileError = $state<string | null>(null);
 	let planError = $state<string | null>(null);
+	// The column that recognises rows imported before, and the keys of deleted rows to bring back.
+	let keyColumn = $state<string | null>(null);
+	let restore = $state<string[]>([]);
 
 	const options = $derived(inspection ? targetOptions(inspection.fields) : []);
 	const kept = $derived(keptDetails(choices));
@@ -81,6 +91,13 @@
 	const named = $derived(hasName(choices) && kept.every((detail) => detail.title.trim() !== ''));
 	// A blocked run adds nothing, so it lists no items as about to be added.
 	const shown = $derived(plan && !plan.ready ? { ...plan, entities: [] } : plan);
+	const keyChoices = $derived(keyColumns(choices));
+	// A column matched elsewhere since it was chosen no longer recognises rows.
+	const activeKey = $derived(
+		keyColumn !== null && keyChoices.includes(keyColumn) ? keyColumn : null
+	);
+	const titles = $derived(inspection ? fieldTitles(choices, inspection.fields) : {});
+	const deleted = $derived(plan ? deletedRows(plan, restore) : []);
 
 	/** A different file or item type means the old matching no longer applies. */
 	function startAgain() {
@@ -89,6 +106,8 @@
 		plan = null;
 		fileError = null;
 		planError = null;
+		keyColumn = null;
+		restore = [];
 	}
 
 	function chooseFile(files: FileList | File[]) {
@@ -158,15 +177,15 @@
 		key === undefined ? undefined : itemFields.find((field) => field.key === key);
 
 	function body() {
+		const fieldKeys = (inspection?.fields ?? []).map((f) => f.key);
 		return {
 			file: file!,
 			item_type: itemType!,
-			mapping: mappingJson(
-				choices,
-				(inspection?.fields ?? []).map((f) => f.key)
-			),
+			mapping: mappingJson(choices, fieldKeys),
 			list_separator: separator,
-			day_month_order: dateOrder
+			day_month_order: dateOrder,
+			key_field: keyFieldFor(choices, fieldKeys, activeKey),
+			restore: JSON.stringify(restore)
 		};
 	}
 
@@ -174,6 +193,12 @@
 		if (!file || !itemType || !named) return;
 		step = 'preview';
 		plan = null;
+		restore = [];
+		await planAgain();
+	}
+
+	/** Work the preview out again; the one shown stays until the new one arrives. */
+	async function planAgain() {
 		planError = null;
 		loading = true;
 		const result = await planItemImport({ body: body() });
@@ -183,6 +208,16 @@
 			return;
 		}
 		plan = result.data;
+	}
+
+	function bringBack(key: string, on: boolean) {
+		restore = on ? [...restore, key] : restore.filter((k) => k !== key);
+		void planAgain();
+	}
+
+	function bringAllBack() {
+		restore = deleted.map((row) => row.key);
+		void planAgain();
 	}
 
 	async function addItems() {
@@ -393,6 +428,29 @@
 					</ul>
 				</div>
 
+				{#if keyChoices.length > 0}
+					<div class="space-y-1.5">
+						<label class="text-sm font-medium" for="csv-key"
+							>Recognise rows already imported by</label
+						>
+						<NativeSelect
+							id="csv-key"
+							class="w-full sm:w-80 pointer-coarse:[&_select]:min-h-11"
+							value={activeKey ?? ''}
+							onchange={(e) => (keyColumn = e.currentTarget.value || null)}
+						>
+							<NativeSelectOption value="">Nothing: add every row</NativeSelectOption>
+							{#each keyChoices as column (column)}
+								<NativeSelectOption value={column}>{column}</NativeSelectOption>
+							{/each}
+						</NativeSelect>
+						<p class="text-xs text-muted-foreground">
+							Pick a column that is different on every row, such as an ID. Importing the file again
+							then adds only the new rows, and leaves out any you deleted.
+						</p>
+					</div>
+				{/if}
+
 				{#if inspection?.day_month_order}
 					<div class="space-y-1.5">
 						<label class="text-sm font-medium" for="csv-date-order">Dates like 03/04/2019</label>
@@ -446,11 +504,50 @@
 							.join(', ')}.
 					</p>
 				{/if}
+				{#if deleted.length > 0}
+					<section class="space-y-2" aria-label="Deleted after importing">
+						<h3 class="text-sm font-medium">Deleted after importing</h3>
+						<p class="text-xs text-muted-foreground">
+							You deleted {deleted.length === 1 ? 'this' : 'these'} after an earlier import, so
+							{deleted.length === 1 ? 'it is' : 'they are'} left out. Tick one to bring it back.
+						</p>
+						<ul class="space-y-1.5">
+							{#each deleted.slice(0, DELETED_SHOWN) as row, index (row.key)}
+								<li class="flex items-center gap-2 text-sm">
+									<Checkbox
+										id={`csv-restore-${index}`}
+										checked={row.restored}
+										disabled={loading}
+										onCheckedChange={(on) => bringBack(row.key, on === true)}
+									/>
+									<label for={`csv-restore-${index}`}>{row.label}</label>
+								</li>
+							{/each}
+							{#if deleted.length > DELETED_SHOWN}
+								<li class="text-sm text-muted-foreground">
+									and {(deleted.length - DELETED_SHOWN).toLocaleString('en-GB')} more
+								</li>
+							{/if}
+						</ul>
+						{#if deleted.some((row) => !row.restored)}
+							<Button
+								variant="outline"
+								size="sm"
+								class="pointer-coarse:h-11"
+								disabled={loading}
+								onclick={bringAllBack}
+							>
+								Bring them all back
+							</Button>
+						{/if}
+					</section>
+				{/if}
 				<PlanPreview
 					plan={shown}
 					{loading}
 					{busy}
 					error={planError}
+					fieldTitles={titles}
 					confirmLabel={confirmText(plan ? itemsToAdd(plan) : 0)}
 					cancelLabel="Back"
 					onCancel={() => (step = 'match')}

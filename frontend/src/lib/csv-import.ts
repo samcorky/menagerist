@@ -139,14 +139,75 @@ export function choicesFrom(suggested: ColumnMappingEntry[]): ColumnChoice[] {
  * unique among the type's `fieldKeys`, the built-in targets and the other kept details.
  */
 export function mappingJson(choices: ColumnChoice[], fieldKeys: string[]): string {
+	return JSON.stringify(mappingEntries(choices, fieldKeys));
+}
+
+function mappingEntries(choices: ColumnChoice[], fieldKeys: string[]): ColumnMappingEntry[] {
 	const taken = new Set([...fieldKeys, ...BUILT_IN_TARGETS.map((t) => t.value)]);
-	const entries: ColumnMappingEntry[] = choices.map(({ column, target, extra }) => {
+	return choices.map(({ column, target, extra }) => {
 		if (!extra) return { column, target };
 		const key = extra.key ?? generateFieldKey(extra.title, taken);
 		taken.add(key);
 		return { column, target: null, extra: { key, title: extra.title.trim(), kind: extra.kind } };
 	});
-	return JSON.stringify(entries);
+}
+
+/** The columns that can recognise rows imported before: the name, a field, or a kept detail. */
+export function keyColumns(choices: ColumnChoice[]): string[] {
+	return choices
+		.filter(
+			(c) => c.extra || (c.target !== null && c.target !== 'description' && c.target !== 'tags')
+		)
+		.map((c) => c.column);
+}
+
+/** The field the server recognises rows by, for the key `column`: what it fills or is kept as. */
+export function keyFieldFor(
+	choices: ColumnChoice[],
+	fieldKeys: string[],
+	column: string | null
+): string | null {
+	const entry = mappingEntries(choices, fieldKeys).find((e) => e.column === column);
+	return entry?.extra?.key ?? entry?.target ?? null;
+}
+
+/** The name people know each field by, keyed as a plan's `changed` lists it. */
+export function fieldTitles(
+	choices: ColumnChoice[],
+	fields: ItemImportFieldResponse[]
+): Record<string, string> {
+	const titles: Record<string, string> = Object.fromEntries(
+		BUILT_IN_TARGETS.map((t) => [t.value, t.label])
+	);
+	for (const f of fields) titles[`attributes.${f.key}`] = f.title;
+	for (const e of mappingEntries(
+		choices,
+		fields.map((f) => f.key)
+	)) {
+		if (e.extra) titles[`attributes.${e.extra.key}`] = e.extra.title;
+	}
+	return titles;
+}
+
+export interface DeletedRow {
+	key: string;
+	label: string;
+	/** Whether it is to be created again. */
+	restored: boolean;
+}
+
+/**
+ * Rows whose item was deleted after an earlier import, ticked when `restore` brings them back.
+ * Left out, a row is unchanged with a key and no item it matched; brought back, it is created.
+ */
+export function deletedRows(plan: ImportPlan, restore: string[]): DeletedRow[] {
+	return plan.entities.flatMap((e) => {
+		const key = e.source_key;
+		if (e.kind !== 'item' || !key) return [];
+		const left = e.action === 'unchanged' && !e.matched_id;
+		const restored = e.action === 'create' && restore.includes(key);
+		return left || restored ? [{ key, label: e.label, restored }] : [];
+	});
 }
 
 /** How many items going ahead would add. */

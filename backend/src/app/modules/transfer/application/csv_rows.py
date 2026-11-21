@@ -4,6 +4,7 @@ import codecs
 import csv
 import io
 import re
+import unicodedata
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -37,6 +38,15 @@ class CsvTable:
     numbers: tuple[int, ...] = ()
     # The encoding the bytes were read as, named as people know it.
     encoding: CsvEncoding = CsvEncoding.UTF_8
+
+
+def normalise_text(text: str) -> str:
+    """Return `text` composed (NFC), trimmed, with each run of spaces as one space.
+
+    Keys and names are compared in this form, so a stray space or a differently
+    encoded accent in a cell does not make a second key or a second item.
+    """
+    return " ".join(unicodedata.normalize("NFC", text).split())
 
 
 def read_csv(data: bytes) -> CsvTable:

@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -32,13 +33,23 @@ class ClashPolicy(StrEnum):
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class PlannedEntity:
-    """One entity of the bundle and what applying the plan would do with it."""
+    """One entity of the bundle and what applying the plan would do with it.
+
+    An item recognised as one the person has names it in `matched_id` and
+    `matched_name`, and `changed` lists the fields whose value in the source differs
+    from what was last imported (`name`, `description`, `tags`, `attributes.<key>`).
+    `source_key` is the key the entity has in its source, if it has one.
+    """
 
     kind: EntityKind
     ref: str
     label: str
     action: PlanAction
     reason: str | None = None
+    matched_id: uuid.UUID | None = None
+    matched_name: str | None = None
+    changed: tuple[str, ...] = ()
+    source_key: str | None = None
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)

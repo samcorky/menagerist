@@ -219,11 +219,13 @@ class BundleSource:
     """A source whose rows can be imported again, such as a database or a sheet.
 
     `name` identifies the source in source links. `key_field` is the item field
-    (`name` or an attribute key) that finds an item the person made by hand.
+    (`name` or an attribute key) that finds an item the person made by hand. With
+    `require_keys`, an item without a source key is skipped rather than created.
     """
 
     name: str
     key_field: str | None = None
+    require_keys: bool = False
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)

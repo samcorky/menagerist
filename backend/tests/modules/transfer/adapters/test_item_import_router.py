@@ -14,6 +14,14 @@ from app.entrypoints.api.shared.bridges.transfer_targets import (
 )
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.presets.adapters.api.dependencies import get_preset_repos
+from app.modules.transfer.adapters.api.dependencies import (
+    get_transfer_repos,
+    get_transfer_uow,
+)
+from app.modules.transfer.adapters.persistence.unit_of_work import (
+    create_in_memory_transfer_uow,
+)
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.tabular import MAX_IMPORT_BYTES
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -74,6 +82,10 @@ def _client(shared: Shared, actor: Actor = ALICE) -> TestClient:
     app.dependency_overrides[get_collection_pack_target] = lambda: targets.collections
     app.dependency_overrides[get_preset_repos] = lambda: shared.preset_repos
     app.dependency_overrides[get_current_actor] = lambda: actor
+    app.dependency_overrides[get_transfer_repos] = lambda: shared.transfer_repos
+    app.dependency_overrides[get_transfer_uow] = lambda: create_in_memory_transfer_uow(
+        shared.transfer_repos
+    )
     return TestClient(app)
 
 
@@ -293,3 +305,39 @@ def test_an_extra_field_with_an_unknown_kind_is_a_422(shared: Shared) -> None:
     ]
 
     assert _post(client, "/plan", mapping=mapping).status_code == 422
+
+
+KEYED = b"title,signed_on,authenticated\nAlien #1,2019-08,yes\n"
+
+
+def test_plan_with_a_key_column_reports_recognised_rows(shared: Shared) -> None:
+    """Planning again with a key column names the item each row matched."""
+    client = _with_type(shared)
+    assert _post(client, "", data=KEYED, key_field="name").status_code == 200
+    changed = b"title,signed_on,authenticated\nAlien #1,2019-09,yes\n"
+
+    response = _post(client, "/plan", data=changed, key_field="name")
+
+    (entity,) = response.json()["entities"]
+    assert entity["action"] == "unchanged"
+    assert entity["matched_name"] == "Alien #1"
+    assert uuid.UUID(entity["matched_id"])
+    assert entity["changed"] == ["attributes.signed_on"]
+
+
+async def test_restore_is_read_as_json(shared: Shared) -> None:
+    """Keys to restore arrive as a JSON list and bring a deleted row back."""
+    client = _with_type(shared)
+    assert _post(client, "", data=KEYED, key_field="name").status_code == 200
+    (node,) = await shared.graph_repos.nodes.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
+    await shared.targets(ALICE).graph.remove(EntityKind.ITEM, node.id)
+
+    kept = _post(client, "/plan", data=KEYED, key_field="name").json()
+    restored = _post(
+        client, "/plan", data=KEYED, key_field="name", restore=json.dumps(["Alien #1"])
+    ).json()
+
+    assert kept["entities"][0]["reason"] == "You deleted this after importing it."
+    assert restored["entities"][0]["action"] == "create"

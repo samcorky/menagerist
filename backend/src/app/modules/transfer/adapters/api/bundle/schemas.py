@@ -313,6 +313,7 @@ IMPORT_PLAN_EXAMPLE: dict[str, Any] = {
             "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
             "label": "Condition grades",
             "action": "unchanged",
+            "changed": [],
             "reason": "You already have one the same.",
         }
     ],
