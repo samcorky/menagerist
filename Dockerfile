@@ -264,10 +264,14 @@ EXPOSE 8000
 
 USER 1000:1000
 
+# During the start period the probe runs every `start-interval`, so the container
+# is reported healthy shortly after it can serve rather than up to `interval` later.
+# A slow device may take a minute or more to import the application.
 HEALTHCHECK \
     --interval=30s \
     --timeout=5s \
-    --start-period=3s \
+    --start-period=120s \
+    --start-interval=2s \
     --retries=3 \
     CMD ["/app/.venv/bin/python", "/app/healthcheck.py"]
 
