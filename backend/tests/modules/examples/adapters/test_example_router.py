@@ -228,6 +228,7 @@ def test_plan_lists_what_adding_would_do_and_writes_nothing(
         "matched_name": None,
         "changed": [],
         "source_key": None,
+        "deleted": False,
     }
     assert {e["action"] for e in body["entities"]} == {"create"}
     assert (

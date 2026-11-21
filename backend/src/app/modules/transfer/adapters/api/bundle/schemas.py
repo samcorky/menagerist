@@ -314,6 +314,7 @@ IMPORT_PLAN_EXAMPLE: dict[str, Any] = {
             "label": "Condition grades",
             "action": "unchanged",
             "changed": [],
+            "deleted": False,
             "reason": "You already have one the same.",
         }
     ],

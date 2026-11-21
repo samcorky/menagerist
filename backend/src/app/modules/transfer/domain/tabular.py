@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.modules.transfer.domain.bundle import NameLookup
+
 
 class CsvEncoding(StrEnum):
     """The encodings a CSV file is read in."""
@@ -120,3 +122,29 @@ class CellProblem:
     row: int
     field: str
     message: str
+
+
+class ConnectionEnd(StrEnum):
+    """Which end of a connection the row's own item is."""
+
+    SOURCE = "source"
+    TARGET = "target"
+
+
+# Columns one import may connect; each may name one item per row.
+MAX_CONNECTION_COLUMNS = 5
+
+
+@dataclass(kw_only=True, frozen=True)
+class ConnectionColumn:
+    """A column naming, on each row, an item of `item_type` the row connects to.
+
+    The name is looked up within `item_type`, ignoring case and spacing; with no
+    match the item is created or left out, as `on_missing` says.
+    """
+
+    column: str
+    relationship_type: str
+    item_type: str
+    row_end: ConnectionEnd
+    on_missing: NameLookup = NameLookup.CREATE

@@ -4,10 +4,19 @@ import { countOf, kindName, summarisePlan, type ImportPlan } from '$lib/import-p
 function entity(
 	kind: string,
 	label: string,
-	action: 'create' | 'unchanged' | 'conflict' | 'ambiguous' = 'create',
+	action: 'create' | 'unchanged' | 'skip' | 'conflict' | 'ambiguous' = 'create',
 	over: Partial<ImportPlan['entities'][number]> = {}
 ) {
-	return { kind, ref: label.toLowerCase(), label, action, reason: null, changed: [], ...over };
+	return {
+		kind,
+		ref: label.toLowerCase(),
+		label,
+		action,
+		reason: null,
+		changed: [],
+		deleted: false,
+		...over
+	};
 }
 
 function plan(over: Partial<ImportPlan> = {}): ImportPlan {
@@ -95,24 +104,35 @@ describe('summarisePlan', () => {
 });
 
 describe('summarisePlan for an import done before', () => {
-	it('lists skipped rows with their reasons', () => {
-		const summary = summarisePlan(
-			plan({ entities: [entity('item', 'Ada', 'ambiguous', { reason: 'No key.' })] })
-		);
-
-		expect(summary.skipped.map((e) => [e.label, e.reason])).toEqual([['Ada', 'No key.']]);
-	});
-
-	it('leaves rows deleted after importing out of what you already have', () => {
+	it('lists what is left out with its reasons, ambiguous or skipped', () => {
 		const summary = summarisePlan(
 			plan({
 				entities: [
-					entity('item', 'Gone', 'unchanged', { source_key: '5' }),
+					entity('item', 'Ada', 'skip', { reason: 'No key.' }),
+					entity('item', 'Rick', 'ambiguous', { reason: 'Two of them.' }),
+					entity('connection', 'Photo to eBay', 'skip', { reason: 'Left out.' })
+				]
+			})
+		);
+
+		expect(summary.skipped.map((e) => [e.label, e.reason])).toEqual([
+			['Ada', 'No key.'],
+			['Rick', 'Two of them.'],
+			['Photo to eBay', 'Left out.']
+		]);
+	});
+
+	it('leaves what was deleted after importing to the page that can bring it back', () => {
+		const summary = summarisePlan(
+			plan({
+				entities: [
+					entity('item', 'Gone', 'skip', { source_key: '5', deleted: true }),
 					entity('item', 'Kept', 'unchanged', { source_key: '7', matched_id: 'x' })
 				]
 			})
 		);
 
 		expect(summary.have.map((e) => e.label)).toEqual(['Kept']);
+		expect(summary.skipped).toEqual([]);
 	});
 });

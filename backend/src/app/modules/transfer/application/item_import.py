@@ -28,6 +28,7 @@ from app.modules.transfer.application.extra_columns import (
     suggest_kind,
 )
 from app.modules.transfer.application.extras import BundleExtras
+from app.modules.transfer.application.item_connections import ImportedRow, connect_rows
 from app.modules.transfer.application.permissions import TransferPermission
 from app.modules.transfer.application.pipeline import (
     AppliedBundle,
@@ -42,14 +43,16 @@ from app.modules.transfer.domain.bundle import (
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.errors import CellValueError, InvalidImportFileError
-from app.modules.transfer.domain.plan import ClashPolicy, Plan, PlanBlocker
+from app.modules.transfer.domain.plan import ClashPolicy, Plan, PlanAction, PlanBlocker
 from app.modules.transfer.domain.tabular import (
+    MAX_CONNECTION_COLUMNS,
     MAX_EXTRA_FIELDS,
     MAX_IMPORT_ROWS,
     MAX_LISTED_PROBLEMS,
     CellProblem,
     ColumnKind,
     ColumnMapping,
+    ConnectionColumn,
     CsvEncoding,
     DayMonthOrder,
     DayMonthOrderGuess,
@@ -73,6 +76,8 @@ logger = structlog.get_logger()
 
 _BUILT_IN = ("name", "description", "tags")
 _SAMPLE_ROWS = 5
+# Kinds the import builds on but never makes, so its preview does not list them.
+_NOT_LISTED = (EntityKind.ITEM_TYPE, EntityKind.RELATIONSHIP_TYPE)
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
@@ -80,8 +85,9 @@ class ItemImportRequest:
     """A CSV file, the item type it becomes, and how its columns map to fields.
 
     `key_field` is the field or kept detail that recognises rows imported before,
-    and `restore` holds the keys of rows whose item was deleted that are to be
-    created again.
+    and `restore` holds the keys of rows and connections deleted after importing
+    that are to be created again. Each of `connections` joins every row to an item
+    its column names.
     """
 
     data: bytes
@@ -91,6 +97,7 @@ class ItemImportRequest:
     day_month_order: DayMonthOrder = DayMonthOrder.DAY_FIRST
     key_field: str | None = None
     restore: tuple[str, ...] = ()
+    connections: tuple[ConnectionColumn, ...] = ()
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
@@ -117,16 +124,19 @@ def build_item_bundle(
     list_separator: str,
     day_month_order: DayMonthOrder = DayMonthOrder.DAY_FIRST,
     key_field: str | None = None,
+    connections: Sequence[ConnectionColumn] = (),
 ) -> tuple[Bundle, list[CellProblem]]:
     """Turn the rows into a bundle of items of `item_type`, with what is wrong.
 
     A row with a problem is left out of the bundle and reported. With `key_field`,
     the bundle's source is the type and that field, and each item's source key is
-    its cell in that column as written, normalised.
+    its cell in that column as written, normalised. Each of `connections` adds the
+    items its column names, found by name, and a connection from each row to one.
 
     Raises:
         InvalidImportFileError: the mapping cannot be used for this file and type,
-            or `key_field` is not a column it maps or keeps.
+            `key_field` is not a column it maps or keeps, or a connection column is
+            not in the file.
     """
     columns, kept = _columns(table.headers, mapping, fields)
     key_index = None if key_field is None else _key_index(key_field, columns, kept)
@@ -140,6 +150,7 @@ def build_item_bundle(
     ]
     filled.extend(_extras(table, kept))
     items: list[BundleItem] = []
+    rows: list[ImportedRow] = []
     problems: list[CellProblem] = []
     for number, cells in zip(table.numbers, table.rows, strict=True):
         name = cells[columns["name"]].strip()
@@ -169,6 +180,7 @@ def build_item_bundle(
         if found:
             problems.extend(found)
             continue
+        key = None if key_index is None else normalise_text(cells[key_index]) or None
         items.append(
             BundleItem(
                 ref=f"row-{number}",
@@ -178,13 +190,11 @@ def build_item_bundle(
                 attributes=attributes,
                 tags=_tags(cells, columns, list_separator),
                 extra_schema={"type": "object", "properties": own} if own else None,
-                source_key=(
-                    None
-                    if key_index is None
-                    else normalise_text(cells[key_index]) or None
-                ),
+                source_key=key,
             )
         )
+        rows.append(ImportedRow(ref=f"row-{number}", cells=cells, key=key))
+    connected = connect_rows(table.headers, rows, connections, item_type)
     bundle = Bundle(
         id=f"csv-{item_type}",
         source=(
@@ -196,9 +206,16 @@ def build_item_bundle(
                 require_keys=True,
             )
         ),
-        item_types=(BundleItemType(ref=item_type, slug=item_type, label=item_type),),
-        items=tuple(items),
-        item_limit=MAX_IMPORT_ROWS,
+        relationship_types=connected.relationship_types,
+        item_types=(
+            BundleItemType(ref=item_type, slug=item_type, label=item_type),
+            *connected.item_types,
+        ),
+        items=(*items, *connected.items),
+        connections=connected.connections,
+        # Rows, and an item named in each connection column of each row.
+        item_limit=MAX_IMPORT_ROWS * (1 + MAX_CONNECTION_COLUMNS),
+        connection_limit=MAX_IMPORT_ROWS * MAX_CONNECTION_COLUMNS,
     )
     return bundle, problems
 
@@ -351,11 +368,26 @@ class _Importer:
             raise InvalidImportFileError(f"You have no item type called '{slug}'.")
         return fields
 
+    async def _check_connections(self, columns: Sequence[ConnectionColumn]) -> None:
+        """Refuse too many connection columns, or types the person does not have."""
+        if len(columns) > MAX_CONNECTION_COLUMNS:
+            raise InvalidImportFileError(
+                f"Connect at most {MAX_CONNECTION_COLUMNS} columns."
+            )
+        for column in columns:
+            await self.fields(column.item_type)
+            slug = column.relationship_type
+            if not await self.graph.slug_taken(EntityKind.RELATIONSHIP_TYPE, slug):
+                raise InvalidImportFileError(
+                    f"You have no relationship type called '{slug}'."
+                )
+
     async def plan(
         self, request: ItemImportRequest, extras: BundleExtras
     ) -> tuple[Bundle, Plan]:
         """Plan the file; every problem in it becomes a blocker on the plan."""
         fields = await self.fields(request.item_type)
+        await self._check_connections(request.connections)
         bundle, problems = build_item_bundle(
             read_csv(request.data),
             request.mapping,
@@ -364,9 +396,12 @@ class _Importer:
             request.list_separator,
             request.day_month_order,
             request.key_field,
+            request.connections,
         )
         listed = [(p.row, f"Row {p.row}, {p.field}: {p.message}.") for p in problems]
         for item in bundle.items:
+            if item.lookup is not None:
+                continue  # just a name; a type's required fields are advisory
             number = int(item.ref.removeprefix("row-"))
             own = (item.extra_schema or {}).get("properties", {})
             found = await self.graph.check_item_attributes(
@@ -381,7 +416,7 @@ class _Importer:
         return bundle, Plan(
             bundle_id=plan.bundle_id,
             entities=plan.entities,
-            blockers=(*plan.blockers, *blockers),
+            blockers=(*plan.blockers, *_too_many(plan), *blockers),
         )
 
 
@@ -392,6 +427,23 @@ def _link_extras(
     return BundleExtras(
         links=links, owner_id=actor.id, restore=frozenset(request.restore)
     )
+
+
+def _too_many(plan: Plan) -> list[PlanBlocker]:
+    """Block an import that would create more items than a file may have rows."""
+    creating = sum(
+        1
+        for e in plan.entities
+        if e.kind is EntityKind.ITEM and e.action is PlanAction.CREATE
+    )
+    if creating <= MAX_IMPORT_ROWS:
+        return []
+    return [
+        PlanBlocker(
+            code="ImportTooLargeError",
+            reason=f"This import would create more than {MAX_IMPORT_ROWS:,} items.",
+        )
+    ]
 
 
 def _blockers(texts: Sequence[str]) -> list[PlanBlocker]:
@@ -476,15 +528,13 @@ class PlanItemImport(QueryHandler[TransferRepos, ItemImportRequest, Plan]):
         self._importer = _Importer(presets, graph)
 
     async def _handle(self, request: ItemImportRequest, actor: Actor) -> Plan:
-        """Plan the items, leaving out the type they go under."""
+        """Plan the items and connections, leaving out the types they build on."""
         _, plan = await self._importer.plan(
             request, _link_extras(request, self._repos.links, actor)
         )
         return Plan(
             bundle_id=plan.bundle_id,
-            entities=tuple(
-                e for e in plan.entities if e.kind is not EntityKind.ITEM_TYPE
-            ),
+            entities=tuple(e for e in plan.entities if e.kind not in _NOT_LISTED),
             blockers=plan.blockers,
         )
 

@@ -3,6 +3,7 @@
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Final
 
 from app.modules.transfer.domain.errors import InvalidBundleError
@@ -175,9 +176,20 @@ class BundleItemType:
             )
 
 
+class NameLookup(StrEnum):
+    """What happens to an item found by name when the person has none called that."""
+
+    CREATE = "create"
+    SKIP = "skip"
+
+
 @dataclass(kw_only=True, frozen=True, eq=False)
 class BundleItem:
-    """An item (a node) the pack creates; `type_ref` is `None` for an untyped item."""
+    """An item (a node) the pack creates; `type_ref` is `None` for an untyped item.
+
+    With `lookup`, the item is the person's own of its type with the same name, if
+    there is exactly one; otherwise it is created or left out, as `lookup` says.
+    """
 
     ref: str
     name: str
@@ -187,16 +199,21 @@ class BundleItem:
     tags: tuple[str, ...] = ()
     extra_schema: dict[str, Any] | None = None
     source_key: str | None = None
+    lookup: NameLookup | None = None
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class BundleConnection:
-    """A connection (an edge) between two pack items."""
+    """A connection (an edge) between two pack items.
+
+    A `source_key` links it, as an item's does, so importing it again finds it.
+    """
 
     source_ref: str
     target_ref: str
     type_ref: str
     attributes: dict[str, Any] = field(default_factory=dict)
+    source_key: str | None = None
 
 
 @dataclass(kw_only=True, frozen=True, eq=False)
@@ -234,13 +251,15 @@ class Bundle:
 
     A source (a file, a catalogue entry) is decoded into a bundle, which is then
     planned and applied the same way. Refs are unique within each kind. A bundle
-    with a `source` gives its items `source_key`s, so they can be linked. A source
-    that reads whole spreadsheets may raise `item_limit` above the default.
+    with a `source` gives its items and connections `source_key`s, so they can be
+    linked. A source that reads whole spreadsheets may raise `item_limit` and
+    `connection_limit` above the defaults.
     """
 
     id: str
     source: BundleSource | None = None
     item_limit: int = MAX_ITEMS
+    connection_limit: int = MAX_CONNECTIONS
     presets: tuple[BundlePreset, ...] = ()
     relationship_types: tuple[BundleRelationshipType, ...] = ()
     item_types: tuple[BundleItemType, ...] = ()
@@ -266,28 +285,49 @@ class Bundle:
                 raise InvalidBundleError(f"each {name} needs its own ref")
         self._check_size()
         self._check_collections()
+        self._check_lookups()
         self._check_source()
+
+    def _check_lookups(self) -> None:
+        for item in self.items:
+            if item.lookup is None:
+                continue
+            if item.source_key is not None:
+                raise InvalidBundleError(
+                    f"item '{item.ref}': an item found by name has no source key"
+                )
+            if item.type_ref is None:
+                raise InvalidBundleError(
+                    f"item '{item.ref}': an item found by name needs a type"
+                )
 
     def _check_source(self) -> None:
         source = self.source
+        keyed: list[BundleItem | BundleConnection] = [*self.items, *self.connections]
         if source is None:
-            if any(item.source_key is not None for item in self.items):
+            if any(spec.source_key is not None for spec in keyed):
                 raise InvalidBundleError(
-                    "items have source keys but there is no source"
+                    "items or connections have source keys but there is no source"
                 )
             return
         if not source.name.strip():
             raise InvalidBundleError("a source needs a name")
         if source.key_field is not None and not source.key_field.strip():
             raise InvalidBundleError("a source's key field cannot be blank")
+        self._check_keys()
+
+    def _check_keys(self) -> None:
         for item in self.items:
             if item.source_key is not None and not item.source_key.strip():
                 raise InvalidBundleError(f"item '{item.ref}' has a blank source key")
+        for n, connection in enumerate(self.connections):
+            if connection.source_key is not None and not connection.source_key.strip():
+                raise InvalidBundleError(f"connection {n} has a blank source key")
 
     def _check_size(self) -> None:
         for name, count, limit in (
             ("items", len(self.items), self.item_limit),
-            ("connections", len(self.connections), MAX_CONNECTIONS),
+            ("connections", len(self.connections), self.connection_limit),
             ("collections", len(self.collections), MAX_COLLECTIONS),
         ):
             if count > limit:
