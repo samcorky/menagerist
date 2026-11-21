@@ -5,10 +5,14 @@ import {
 	assignTarget,
 	choicesFrom,
 	confirmText,
+	deletedRows,
+	fieldTitles,
 	hasName,
 	itemsToAdd,
 	keepColumn,
 	keptDetails,
+	keyColumns,
+	keyFieldFor,
 	mappingJson,
 	MAX_KEPT,
 	renameKept,
@@ -206,7 +210,8 @@ describe('itemsToAdd', () => {
 		ref: Math.random().toString(),
 		label: 'x',
 		action,
-		reason: null
+		reason: null,
+		changed: []
 	});
 
 	it('counts the items that would be created', () => {
@@ -247,5 +252,61 @@ describe('rowsAndColumns', () => {
 
 	it('uses the singular for one of each', () => {
 		expect(rowsAndColumns(inspection(1, ['a']))).toBe('1 row, 1 column');
+	});
+});
+
+describe('recognising rows by a key column', () => {
+	const keyed: ColumnChoice[] = [
+		{ column: 'ID', target: null, extra: { title: 'Ref', kind: 'text' } },
+		{ column: 'Who', target: 'name' },
+		{ column: 'When', target: 'signed_on' },
+		{ column: 'Notes', target: 'description' },
+		{ column: 'Labels', target: 'tags' },
+		{ column: 'Misc', target: null }
+	];
+
+	it('offers the name, mapped fields and kept details, in column order', () => {
+		expect(keyColumns(keyed)).toEqual(['ID', 'Who', 'When']);
+	});
+
+	it('sends the field a column fills, or the key a kept detail is given', () => {
+		const sent = JSON.parse(mappingJson(keyed, ['signed_on']));
+		expect(keyFieldFor(keyed, ['signed_on'], 'ID')).toBe(sent[0].extra.key);
+		expect(keyFieldFor(keyed, ['signed_on'], 'Who')).toBe('name');
+		expect(keyFieldFor(keyed, ['signed_on'], 'When')).toBe('signed_on');
+		expect(keyFieldFor(keyed, ['signed_on'], null)).toBeNull();
+	});
+
+	it('names each changed field as people see it', () => {
+		const titles = fieldTitles(keyed, [field('signed_on', { title: 'Signed on' })]);
+		expect(titles['name']).toBe('Name');
+		expect(titles['attributes.signed_on']).toBe('Signed on');
+		expect(titles[`attributes.${keyFieldFor(keyed, ['signed_on'], 'ID')}`]).toBe('Ref');
+	});
+});
+
+describe('deletedRows', () => {
+	const row = (
+		label: string,
+		action: 'create' | 'unchanged',
+		over: Partial<ImportPlan['entities'][number]> = {}
+	) => ({ kind: 'item', ref: label, label, action, reason: null, changed: [], ...over });
+
+	it('lists rows deleted after importing, and keeps a restored one ticked', () => {
+		const plan: ImportPlan = {
+			ready: true,
+			blockers: [],
+			entities: [
+				row('Gone', 'unchanged', { source_key: '5' }),
+				row('Back', 'create', { source_key: '6' }),
+				row('Kept', 'unchanged', { source_key: '7', matched_id: 'x', matched_name: 'Kept' }),
+				row('New', 'create', { source_key: '8' })
+			]
+		};
+
+		expect(deletedRows(plan, ['6'])).toEqual([
+			{ key: '5', label: 'Gone', restored: false },
+			{ key: '6', label: 'Back', restored: true }
+		]);
 	});
 });

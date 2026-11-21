@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from app.modules.transfer.ports.targets import (
         Created,
         GraphTarget,
+        Inspection,
         PresetOutcome,
         PresetTarget,
     )
@@ -45,6 +46,9 @@ if TYPE_CHECKING:
 _PRESET_EXISTS = "You already have one the same."
 _NAME_TAKEN = "You already have one with this name."
 _TAKEN_BACK = "Kept from an earlier install, and taken back as it is."
+_ALREADY_IMPORTED = "Already imported."
+_DELETED = "You deleted this after importing it."
+_NO_KEY = "No key."
 _NOUNS = {
     EntityKind.ITEM_TYPE: "an item type",
     EntityKind.RELATIONSHIP_TYPE: "a relationship type",
@@ -144,6 +148,11 @@ def _key_value(spec: BundleItem, key_field: str) -> str | None:
     return text if text.strip() else None
 
 
+def _name_of(found: Inspection | None, fallback: str) -> str:
+    """The name an inspected item has now, or `fallback` if it has none."""
+    return fallback if found is None else str(found.content.get("name", fallback))
+
+
 class _Planner:
     """Decides each entity in apply order, so later kinds see earlier choices."""
 
@@ -173,9 +182,23 @@ class _Planner:
         label: str,
         action: PlanAction,
         reason: str | None = None,
+        *,
+        matched: tuple[uuid.UUID, str] | None = None,
+        changed: tuple[str, ...] = (),
+        source_key: str | None = None,
     ) -> None:
         self.entities.append(
-            PlannedEntity(kind=kind, ref=ref, label=label, action=action, reason=reason)
+            PlannedEntity(
+                kind=kind,
+                ref=ref,
+                label=label,
+                action=action,
+                reason=reason,
+                matched_id=None if matched is None else matched[0],
+                matched_name=None if matched is None else matched[1],
+                changed=changed,
+                source_key=source_key,
+            )
         )
 
     def _unchanged_or_create(
@@ -257,6 +280,9 @@ class _Planner:
                 continue
             self._item_names[spec.ref] = spec.name
             if keyed is None or spec.source_key is None:
+                if keyed is not None and keyed.source.require_keys:
+                    self._ambiguous(spec.ref, spec.name, _NO_KEY)
+                    continue
                 self._add(EntityKind.ITEM, spec.ref, spec.name, PlanAction.CREATE)
             else:
                 await self._keyed_item(spec, keyed, graph)
@@ -282,22 +308,24 @@ class _Planner:
         ref, name = spec.ref, spec.name
         if keyed.counts[key] > 1:
             self._ambiguous(
-                ref, name, f"Another row in this file has the same key '{key}'."
+                ref,
+                name,
+                f"Another row in this file has the same key '{key}'.",
+                source_key=key,
             )
             return
         link = await keyed.links.get_by_key(
             keyed.source.name, EntityKind.ITEM, key, scope=keyed.scope
         )
-        if link is not None and await graph.inspect(EntityKind.ITEM, link.entity_id):
-            self._extras.linked[ref] = self._item_ids[ref] = link.entity_id
-            self._skip(ref, name, f"Already imported from {keyed.source.name}.")
+        if link is not None:
+            await self._linked_item(spec, link, graph)
             return
-        # No link, or one whose item has gone: look for an item the person made.
+        # Never imported: look for an item the person made.
         field = keyed.source.key_field
         slug = self._item_type_slug(spec.type_ref)
         value = _key_value(spec, field) if field is not None else None
         if field is None or slug is None or value is None:
-            self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE)
+            self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE, source_key=key)
             return
         found = await graph.find_items_by_field(slug, field, value)
         if len(found) > 1:
@@ -306,25 +334,81 @@ class _Planner:
                 name,
                 f"More than one of your items has {field} '{value}'. "
                 + "Make it unique, then try again.",
+                source_key=key,
             )
         elif found:
             self._extras.matched[ref] = self._item_ids[ref] = found[0]
+            mine = await graph.inspect(EntityKind.ITEM, found[0])
             self._skip(
                 ref,
                 name,
                 "Matches your existing item. It will be linked, not changed.",
+                matched=(found[0], _name_of(mine, name)),
+                source_key=key,
             )
         else:
-            self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE)
+            self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE, source_key=key)
 
-    def _skip(self, ref: str, name: str, reason: str) -> None:
+    async def _linked_item(
+        self, spec: BundleItem, link: SourceLink, graph: GraphTarget
+    ) -> None:
+        """Plan an item an earlier import made: as it is, deleted, or restored.
+
+        An item the person deleted stays deleted unless its key is in `restore`.
+        """
+        ref, name, key = spec.ref, spec.name, link.key
+        found = await graph.inspect(EntityKind.ITEM, link.entity_id)
+        if found is None:
+            if key in self._extras.restore:
+                self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE, source_key=key)
+            else:
+                self._skip(ref, name, _DELETED, source_key=key)
+            return
+        self._extras.linked[ref] = self._item_ids[ref] = link.entity_id
+        self._skip(
+            ref,
+            name,
+            _ALREADY_IMPORTED,
+            matched=(link.entity_id, _name_of(found, name)),
+            changed=tuple(sorted(link.changed_fields(item_field_hashes(spec)))),
+            source_key=key,
+        )
+
+    def _skip(
+        self,
+        ref: str,
+        name: str,
+        reason: str,
+        *,
+        matched: tuple[uuid.UUID, str] | None = None,
+        changed: tuple[str, ...] = (),
+        source_key: str | None = None,
+    ) -> None:
         self._not_created.add(ref)
-        self._add(EntityKind.ITEM, ref, name, PlanAction.UNCHANGED, reason)
+        self._add(
+            EntityKind.ITEM,
+            ref,
+            name,
+            PlanAction.UNCHANGED,
+            reason,
+            matched=matched,
+            changed=changed,
+            source_key=source_key,
+        )
 
-    def _ambiguous(self, ref: str, name: str, reason: str) -> None:
+    def _ambiguous(
+        self, ref: str, name: str, reason: str, *, source_key: str | None = None
+    ) -> None:
         self._not_created.add(ref)
         self._ambiguous_refs.add(ref)
-        self._add(EntityKind.ITEM, ref, name, PlanAction.AMBIGUOUS, reason)
+        self._add(
+            EntityKind.ITEM,
+            ref,
+            name,
+            PlanAction.AMBIGUOUS,
+            reason,
+            source_key=source_key,
+        )
 
     def _item_type_slug(self, type_ref: str | None) -> str | None:
         """The slug of the item type `type_ref`, in this bundle or a required pack."""

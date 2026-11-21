@@ -4,9 +4,10 @@ import { countOf, kindName, summarisePlan, type ImportPlan } from '$lib/import-p
 function entity(
 	kind: string,
 	label: string,
-	action: 'create' | 'unchanged' | 'conflict' = 'create'
+	action: 'create' | 'unchanged' | 'conflict' | 'ambiguous' = 'create',
+	over: Partial<ImportPlan['entities'][number]> = {}
 ) {
-	return { kind, ref: label.toLowerCase(), label, action, reason: null };
+	return { kind, ref: label.toLowerCase(), label, action, reason: null, changed: [], ...over };
 }
 
 function plan(over: Partial<ImportPlan> = {}): ImportPlan {
@@ -90,5 +91,28 @@ describe('summarisePlan', () => {
 		);
 
 		expect(summary.adding.map((g) => g.kind)).toEqual(['item', 'mystery']);
+	});
+});
+
+describe('summarisePlan for an import done before', () => {
+	it('lists skipped rows with their reasons', () => {
+		const summary = summarisePlan(
+			plan({ entities: [entity('item', 'Ada', 'ambiguous', { reason: 'No key.' })] })
+		);
+
+		expect(summary.skipped.map((e) => [e.label, e.reason])).toEqual([['Ada', 'No key.']]);
+	});
+
+	it('leaves rows deleted after importing out of what you already have', () => {
+		const summary = summarisePlan(
+			plan({
+				entities: [
+					entity('item', 'Gone', 'unchanged', { source_key: '5' }),
+					entity('item', 'Kept', 'unchanged', { source_key: '7', matched_id: 'x' })
+				]
+			})
+		);
+
+		expect(summary.have.map((e) => e.label)).toEqual(['Kept']);
 	});
 });

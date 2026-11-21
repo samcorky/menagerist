@@ -73,6 +73,23 @@ _MAPPING = Annotated[
         ],
     ),
 ]
+_KEY_FIELD = Annotated[
+    str | None,
+    Form(
+        description="The field or kept detail that recognises rows imported "
+        + "before: `name`, a field key the mapping fills, or a kept detail's key. "
+        + "Without it, every row is imported."
+    ),
+]
+_RESTORE = Annotated[
+    Json[list[str]],
+    Form(
+        default_factory=list,
+        description="Keys of rows whose item was deleted after an earlier import "
+        + "that are to be created again, as a JSON list.",
+        examples=['["A14", "A15"]'],
+    ),
+]
 _SEPARATOR = Annotated[
     str,
     Form(description="What separates several choices or tags in one cell."),
@@ -141,8 +158,10 @@ async def plan_item_import(
     mapping: _MAPPING,
     use_case: Annotated[PlanItemImport, Depends(get_plan_item_import_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    restore: _RESTORE,
     list_separator: _SEPARATOR = ",",
     day_month_order: _DAY_MONTH_ORDER = DayMonthOrder.DAY_FIRST,
+    key_field: _KEY_FIELD = None,
 ) -> ImportPlanResponse:
     """See what importing a CSV file would do, without importing anything.
 
@@ -156,6 +175,8 @@ async def plan_item_import(
         mapping=_mapping(mapping),
         list_separator=list_separator,
         day_month_order=day_month_order,
+        key_field=key_field,
+        restore=tuple(restore),
     )
     return ImportPlanResponse.from_domain(await use_case.handle(request, actor))
 
@@ -173,8 +194,10 @@ async def import_items(
     mapping: _MAPPING,
     use_case: Annotated[ImportItems, Depends(get_import_items_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    restore: _RESTORE,
     list_separator: _SEPARATOR = ",",
     day_month_order: _DAY_MONTH_ORDER = DayMonthOrder.DAY_FIRST,
+    key_field: _KEY_FIELD = None,
 ) -> ItemImportResultResponse:
     """Import a CSV file as items of one item type.
 
@@ -187,6 +210,8 @@ async def import_items(
         mapping=_mapping(mapping),
         list_separator=list_separator,
         day_month_order=day_month_order,
+        key_field=key_field,
+        restore=tuple(restore),
     )
     applied = await use_case.handle(request, actor)
     return ItemImportResultResponse.from_domain(applied, EntityKind.ITEM)
