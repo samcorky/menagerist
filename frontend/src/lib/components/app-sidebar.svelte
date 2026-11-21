@@ -176,8 +176,10 @@
 			class={cn(
 				'truncate whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none',
 				rail && 'opacity-0'
-			)}>{item.label}</span
+			)}
 		>
+			{item.label}
+		</span>
 	</a>
 {/snippet}
 
@@ -201,8 +203,10 @@
 			class={cn(
 				'truncate whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none',
 				rail && 'opacity-0'
-			)}>API docs</span
+			)}
 		>
+			API docs
+		</span>
 	</a>
 {/snippet}
 

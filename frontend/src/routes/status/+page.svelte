@@ -777,8 +777,9 @@
 												: ''}"
 										>
 											<span class="text-sm text-muted-foreground">{label}</span>
-											<span class="max-w-[60%] text-right font-mono text-sm break-all">{value}</span
-											>
+											<span class="max-w-[60%] text-right font-mono text-sm break-all">
+												{value}
+											</span>
 										</div>
 									{/each}
 								</Card.Content>

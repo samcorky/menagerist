@@ -39,9 +39,9 @@
 								<Widget value={item.value} prop={item.prop} {size} />
 							</span>
 						{:else}
-							<span {...props} tabindex="-1" class={wrap ? 'break-words' : 'truncate'}
-								>{item.text}</span
-							>
+							<span {...props} tabindex="-1" class={wrap ? 'break-words' : 'truncate'}>
+								{item.text}
+							</span>
 						{/if}
 					{/snippet}
 				</Tooltip.Trigger>

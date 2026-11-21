@@ -25,8 +25,8 @@
 		<code class="font-mono text-xs break-all text-muted-foreground">{text}</code>
 	{/if}
 	{#if preview.state.status === 'ready' && preview.state.runs}
-		<span class="text-xs text-muted-foreground" title={preview.state.runs.timezone}
-			>Next run: {preview.state.runs.next}</span
-		>
+		<span class="text-xs text-muted-foreground" title={preview.state.runs.timezone}>
+			Next run: {preview.state.runs.next}
+		</span>
 	{/if}
 </span>

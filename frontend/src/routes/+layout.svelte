@@ -478,9 +478,9 @@
 						aria-current={collectionsActive ? 'page' : undefined}
 					>
 						<Library class="size-5" />
-						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter"
-							>Collections</span
-						>
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">
+							Collections
+						</span>
 					</a>
 
 					<button
@@ -513,9 +513,9 @@
 						aria-current={settingsActive ? 'page' : undefined}
 					>
 						<Settings class="size-5" />
-						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter"
-							>Settings</span
-						>
+						<span class="max-w-full truncate text-[10px] font-medium tracking-tighter">
+							Settings
+						</span>
 					</a>
 				</div>
 			</nav>

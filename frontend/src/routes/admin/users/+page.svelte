@@ -595,9 +595,9 @@
 								Copy password
 							{/if}
 						</Button>
-						<Button variant="ghost" class="pointer-coarse:h-11" onclick={() => (issued = null)}
-							>Done</Button
-						>
+						<Button variant="ghost" class="pointer-coarse:h-11" onclick={() => (issued = null)}>
+							Done
+						</Button>
 					</div>
 				</Alert.Description>
 			</Alert.Root>
@@ -766,9 +766,9 @@
 								</div>
 							</Table.Cell>
 							<Table.Cell class="text-muted-foreground">
-								<span title={lastSignIn(user.last_login_at).title}
-									>{lastSignIn(user.last_login_at).text}</span
-								>
+								<span title={lastSignIn(user.last_login_at).title}>
+									{lastSignIn(user.last_login_at).text}
+								</span>
 							</Table.Cell>
 							<Table.Cell>
 								<div class="flex flex-wrap items-center justify-end gap-1.5">
@@ -797,9 +797,9 @@
 									</div>
 
 									<p class="text-xs text-muted-foreground">
-										Last sign-in: <span title={lastSignIn(user.last_login_at).title}
-											>{lastSignIn(user.last_login_at).text}</span
-										>
+										Last sign-in: <span title={lastSignIn(user.last_login_at).title}>
+											{lastSignIn(user.last_login_at).text}
+										</span>
 									</p>
 
 									{#if canUpdate || canReset || canUnlock || canListSessions}

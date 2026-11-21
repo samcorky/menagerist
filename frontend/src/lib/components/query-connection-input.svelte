@@ -112,8 +112,10 @@
 				size="sm"
 				class="min-h-9"
 				aria-label="{name}, retry loading relationships"
-				onclick={() => view.retryRelationships()}>Retry</Button
+				onclick={() => view.retryRelationships()}
 			>
+				Retry
+			</Button>
 		</div>
 	{/if}
 

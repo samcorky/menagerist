@@ -339,11 +339,16 @@
 	>
 		<span class="w-full pt-1.5 text-sm text-muted-foreground sm:w-32 sm:shrink-0">
 			{prop.title || key}{#if isRequired}{#if isEmptyValue(getValue(key))}<span
-						class="ml-1 text-xs text-muted-foreground">Recommended</span
-					>{:else}<span class="ml-0.5 text-muted-foreground">*</span>{/if}{/if}{#if overlay}<span
+						class="ml-1 text-xs text-muted-foreground"
+					>
+						Recommended
+					</span>{:else}<span class="ml-0.5 text-muted-foreground">
+						*
+					</span>{/if}{/if}{#if overlay}<span
 					class="ml-1.5 rounded border border-input px-1.5 text-xs text-muted-foreground"
-					>This item only</span
-				>{/if}
+				>
+					This item only
+				</span>{/if}
 		</span>
 		<div class="flex flex-1 flex-col gap-1">
 			<div class="flex items-start gap-2">

@@ -74,8 +74,9 @@
 		<Card.Content class="space-y-3">
 			{#if failed}
 				<p role="alert" class="text-sm text-destructive">Could not load what is inside.</p>
-				<Button variant="outline" size="sm" onclick={() => void load(choice.slug)}>Try again</Button
-				>
+				<Button variant="outline" size="sm" onclick={() => void load(choice.slug)}>
+					Try again
+				</Button>
 			{:else if entries.length === 0 && !loading}
 				<p class="text-sm text-muted-foreground">Nothing inside yet.</p>
 			{:else}

@@ -204,9 +204,9 @@
 					oninput={(e) => updateSubFieldLabel(si, (e.target as HTMLInputElement).value)}
 				/>
 				{#if sf.kind === 'opaque'}
-					<span class="rounded border border-input px-1.5 text-xs text-muted-foreground"
-						>custom</span
-					>
+					<span class="rounded border border-input px-1.5 text-xs text-muted-foreground">
+						custom
+					</span>
 				{:else}
 					<NativeSelect
 						value={sf.kind}

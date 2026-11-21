@@ -85,9 +85,9 @@
 			<div class="flex items-center gap-1.5">
 				<p class="min-w-0 truncate text-sm leading-tight font-medium">{item.name}</p>
 				{#if isExample}
-					<Badge variant="outline" class="shrink-0 px-1.5 py-0 text-xs text-muted-foreground"
-						>Example</Badge
-					>
+					<Badge variant="outline" class="shrink-0 px-1.5 py-0 text-xs text-muted-foreground">
+						Example
+					</Badge>
 				{/if}
 			</div>
 			{#if categoryLabel}

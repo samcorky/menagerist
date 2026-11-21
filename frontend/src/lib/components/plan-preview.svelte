@@ -64,9 +64,9 @@
 				<ul class="space-y-1 text-sm">
 					{#each summary.adding as group (group.kind)}
 						<li>
-							<span class="font-medium">{group.heading}</span><span class="text-muted-foreground"
-								>{detail(group)}</span
-							>
+							<span class="font-medium">{group.heading}</span><span class="text-muted-foreground">
+								{detail(group)}
+							</span>
 						</li>
 					{/each}
 				</ul>
