@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { PlannedEntityResponse } from '$lib/api/client';
 	import { LISTED, summarisePlan, type ImportPlan, type PlanGroup } from '$lib/import-plan';
 	import { Button } from '$lib/components/ui/button/index.js';
 
@@ -10,6 +11,7 @@
 		confirmLabel = 'Add',
 		busyLabel = 'Adding…',
 		cancelLabel = 'Cancel',
+		fieldTitles = {},
 		onCancel,
 		onConfirm
 	}: {
@@ -22,6 +24,8 @@
 		confirmLabel?: string;
 		busyLabel?: string;
 		cancelLabel?: string;
+		/** What people call each field a recognised row lists as changed, by its plan key. */
+		fieldTitles?: Record<string, string>;
 		onCancel: () => void;
 		onConfirm: () => void;
 	} = $props();
@@ -31,6 +35,20 @@
 		summary !== null && (summary.blockers.length > 0 || summary.conflicts.length > 0)
 	);
 	const haveShown = $derived(summary ? summary.have.slice(0, LISTED) : []);
+	const skippedShown = $derived(summary ? summary.skipped.slice(0, LISTED) : []);
+
+	/** Why it is left as you have it: the reason, what it is called now and what changed. */
+	function note(entity: PlannedEntityResponse): string {
+		const parts = entity.reason ? [entity.reason] : [];
+		if (entity.matched_name && entity.matched_name !== entity.label) {
+			parts.push(`Yours is called ${entity.matched_name}`);
+		}
+		if (entity.changed.length > 0) {
+			const names = entity.changed.map((key) => fieldTitles[key] ?? key);
+			parts.push(`Changed in the file: ${names.join(', ')}`);
+		}
+		return parts.map((part) => ` · ${part}`).join('');
+	}
 
 	function detail(group: PlanGroup): string {
 		if (group.names.length === 0) return '';
@@ -79,10 +97,23 @@
 				<h3 class="text-sm font-medium">You already have</h3>
 				<ul class="space-y-1 text-sm text-muted-foreground">
 					{#each haveShown as entity (entity.kind + entity.ref)}
-						<li>{entity.label}{entity.reason ? ` · ${entity.reason}` : ''}</li>
+						<li>{entity.label}{note(entity)}</li>
 					{/each}
 					{#if summary.have.length > haveShown.length}
 						<li>and {summary.have.length - haveShown.length} more</li>
+					{/if}
+				</ul>
+			</section>
+		{/if}
+		{#if summary.skipped.length > 0}
+			<section class="space-y-1" aria-label="What is left out">
+				<h3 class="text-sm font-medium">Left out</h3>
+				<ul class="space-y-1 text-sm text-muted-foreground">
+					{#each skippedShown as entity (entity.kind + entity.ref)}
+						<li>{entity.label}{entity.reason ? ` · ${entity.reason}` : ''}</li>
+					{/each}
+					{#if summary.skipped.length > skippedShown.length}
+						<li>and {summary.skipped.length - skippedShown.length} more</li>
 					{/if}
 				</ul>
 			</section>

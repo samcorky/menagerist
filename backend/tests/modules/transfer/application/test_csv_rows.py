@@ -2,7 +2,11 @@
 
 import pytest
 
-from app.modules.transfer.application.csv_rows import read_csv, suggest_mapping
+from app.modules.transfer.application.csv_rows import (
+    normalise_text,
+    read_csv,
+    suggest_mapping,
+)
 from app.modules.transfer.domain.errors import InvalidImportFileError
 from app.modules.transfer.domain.tabular import (
     MAX_IMPORT_BYTES,
@@ -182,3 +186,20 @@ def test_a_single_cell_over_the_csv_field_limit_is_refused() -> None:
     data = b"title,notes\nAlien," + b"x" * 200_000 + b"\n"
     with pytest.raises(InvalidImportFileError, match="not valid CSV"):
         read_csv(data)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("  eBay ", "eBay"),
+        ("Rick   Astley", "Rick Astley"),
+        ("Rick	Astley", "Rick Astley"),
+        ("Café", "Café"),
+        ("   ", ""),
+    ],
+)
+def test_normalise_text_trims_collapses_spaces_and_composes(
+    text: str, expected: str
+) -> None:
+    """Text is trimmed, its runs of spaces collapsed and its accents composed."""
+    assert normalise_text(text) == expected

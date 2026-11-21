@@ -18970,13 +18970,15 @@
                       "kind": "item_type",
                       "ref": "album",
                       "label": "Album",
-                      "action": "create"
+                      "action": "create",
+                      "changed": []
                     },
                     {
                       "kind": "item",
                       "ref": "blue",
                       "label": "Blue",
                       "action": "unchanged",
+                      "changed": [],
                       "reason": "Kept from an earlier install, and taken back as it is."
                     }
                   ]
@@ -20002,13 +20004,15 @@
                       "ref": "person",
                       "label": "Person",
                       "action": "unchanged",
+                      "changed": [],
                       "reason": "You already have one with this name."
                     },
                     {
                       "kind": "item_type",
                       "ref": "place",
                       "label": "Place",
-                      "action": "create"
+                      "action": "create",
+                      "changed": []
                     }
                   ]
                 }
@@ -20194,6 +20198,7 @@
                       "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30",
                       "label": "Condition grades",
                       "action": "unchanged",
+                      "changed": [],
                       "reason": "You already have one the same."
                     }
                   ]
@@ -21288,6 +21293,7 @@
                   "entities": [
                     {
                       "action": "unchanged",
+                      "changed": [],
                       "kind": "preset",
                       "label": "Condition grades",
                       "reason": "You already have one the same.",
@@ -32313,6 +32319,7 @@
             "entities": [
               {
                 "action": "unchanged",
+                "changed": [],
                 "kind": "item_type",
                 "label": "Person",
                 "reason": "You already have one with this name.",
@@ -32320,6 +32327,7 @@
               },
               {
                 "action": "create",
+                "changed": [],
                 "kind": "item_type",
                 "label": "Place",
                 "ref": "place"
@@ -34410,6 +34418,21 @@
               "[{\"column\": \"title\", \"target\": \"name\"}, {\"column\": \"paper\", \"extra\": {\"key\": \"paper\", \"title\": \"Paper\", \"kind\": \"text\"}}]"
             ]
           },
+          "restore": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Restore",
+            "description": "Keys of rows whose item was deleted after an earlier import that are to be created again, as a JSON list.",
+            "examples": [
+              "[\"A14\", \"A15\"]"
+            ]
+          },
           "list_separator": {
             "type": "string",
             "title": "List Separator",
@@ -34420,6 +34443,18 @@
             "$ref": "#/components/schemas/DayMonthOrder",
             "description": "Which number of a date written as `03/04/2019` is the day. Two-digit years: 00 to 49 are 2000 to 2049, 50 to 99 are 1950 to 1999.",
             "default": "day_first"
+          },
+          "key_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Field",
+            "description": "The field or kept detail that recognises rows imported before: `name`, a field key the mapping fills, or a kept detail's key. Without it, every row is imported."
           }
         },
         "type": "object",
@@ -34469,6 +34504,7 @@
             "entities": [
               {
                 "action": "unchanged",
+                "changed": [],
                 "kind": "preset",
                 "label": "Condition grades",
                 "reason": "You already have one the same.",
@@ -34648,12 +34684,14 @@
             "entities": [
               {
                 "action": "create",
+                "changed": [],
                 "kind": "item_type",
                 "label": "Album",
                 "ref": "album"
               },
               {
                 "action": "unchanged",
+                "changed": [],
                 "kind": "item",
                 "label": "Blue",
                 "reason": "Kept from an earlier install, and taken back as it is.",
@@ -36883,6 +36921,21 @@
               "[{\"column\": \"title\", \"target\": \"name\"}, {\"column\": \"paper\", \"extra\": {\"key\": \"paper\", \"title\": \"Paper\", \"kind\": \"text\"}}]"
             ]
           },
+          "restore": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Restore",
+            "description": "Keys of rows whose item was deleted after an earlier import that are to be created again, as a JSON list.",
+            "examples": [
+              "[\"A14\", \"A15\"]"
+            ]
+          },
           "list_separator": {
             "type": "string",
             "title": "List Separator",
@@ -36893,6 +36946,18 @@
             "$ref": "#/components/schemas/DayMonthOrder",
             "description": "Which number of a date written as `03/04/2019` is the day. Two-digit years: 00 to 49 are 2000 to 2049, 50 to 99 are 1950 to 1999.",
             "default": "day_first"
+          },
+          "key_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Field",
+            "description": "The field or kept detail that recognises rows imported before: `name`, a field key the mapping fills, or a kept detail's key. Without it, every row is imported."
           }
         },
         "type": "object",
@@ -36935,6 +37000,51 @@
             ],
             "title": "Reason",
             "description": "Why it is unchanged, conflicts or is ambiguous."
+          },
+          "matched_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Id",
+            "description": "The id of the item you have that this one was recognised as."
+          },
+          "matched_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Name",
+            "description": "That item's name, as it is now."
+          },
+          "changed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed",
+            "description": "Fields whose value in the file differs from what was last imported: `name`, `description`, `tags` or `attributes.<key>`."
+          },
+          "source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Key",
+            "description": "The key it has in its source, such as the row's key column; send it in `restore` to bring back an item deleted after importing."
           }
         },
         "type": "object",
@@ -36942,17 +37052,32 @@
           "kind",
           "ref",
           "label",
-          "action"
+          "action",
+          "changed"
         ],
         "title": "PlannedEntityResponse",
         "description": "One entity of what is being installed, and what installing would do with it.",
         "examples": [
           {
             "action": "conflict",
+            "changed": [],
             "kind": "item_type",
             "label": "Album",
             "reason": "You already have an item type called 'album'. Rename or remove it, then try again.",
             "ref": "album"
+          },
+          {
+            "action": "unchanged",
+            "changed": [
+              "attributes.signed_on"
+            ],
+            "kind": "item",
+            "label": "Alien #1",
+            "matched_id": "0192f4a8-5c3e-7d21-9a6b-3e8f1c2d4b5a",
+            "matched_name": "Alien #1",
+            "reason": "Already imported.",
+            "ref": "row-14",
+            "source_key": "A14"
           }
         ]
       },

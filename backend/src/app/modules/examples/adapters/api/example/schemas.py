@@ -239,6 +239,7 @@ PLAN_EXAMPLE: dict[str, Any] = {
             "ref": "album",
             "label": "Album",
             "action": "create",
+            "changed": [],
             "reason": None,
         },
         {
@@ -246,6 +247,7 @@ PLAN_EXAMPLE: dict[str, Any] = {
             "ref": "blue",
             "label": "Blue",
             "action": "unchanged",
+            "changed": [],
             "reason": "Kept from an earlier install, and taken back as it is.",
         },
     ],

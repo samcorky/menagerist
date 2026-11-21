@@ -21,7 +21,12 @@ from app.modules.transfer.domain.bundle import (
     BundleSource,
 )
 from app.modules.transfer.domain.entity_kind import EntityKind
-from app.modules.transfer.domain.plan import ClashPolicy, Plan, PlanAction
+from app.modules.transfer.domain.plan import (
+    ClashPolicy,
+    Plan,
+    PlanAction,
+    PlannedEntity,
+)
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
 
@@ -123,24 +128,53 @@ async def test_a_linked_item_is_unchanged(shared: Shared) -> None:
     plan = await _plan(t, bundle, _extras(links))
 
     assert _item_actions(plan) == {"a": PlanAction.UNCHANGED}
-    assert _reason(plan, "a") == "Already imported from lddb."
+    assert _reason(plan, "a") == "Already imported."
 
 
-async def test_a_stale_link_plans_create(shared: Shared) -> None:
-    """A stale link plans create."""
-    t = shared.targets(ALICE)
-    links = InMemorySourceLinkRepository()
-    bundle = _bundle(_film("a", "k1", upc="k1"))
+async def _import_then_delete(
+    t: Targets, bundle: Bundle, links: InMemorySourceLinkRepository
+) -> SourceLink:
     await _import(t, bundle, _extras(links))
     link = await links.get_by_key(
         "lddb", EntityKind.ITEM, "k1", scope=ContentFilter.of(ALICE.id)
     )
     assert link is not None
     await t.graph.remove(EntityKind.ITEM, link.entity_id)
+    return link
+
+
+async def test_an_item_deleted_after_import_is_not_created_again(
+    shared: Shared,
+) -> None:
+    """An item the person deleted after importing it stays deleted."""
+    t = shared.targets(ALICE)
+    links = InMemorySourceLinkRepository()
+    bundle = _bundle(_film("a", "k1", upc="k1"))
+    await _import_then_delete(t, bundle, links)
+
+    plan = await _import(t, bundle, _extras(links))
+
+    assert _item_actions(plan) == {"a": PlanAction.UNCHANGED}
+    assert _reason(plan, "a") == "You deleted this after importing it."
+    nodes = await shared.graph_repos.nodes.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
+    assert nodes == []
+
+
+async def test_a_deleted_item_is_not_matched_to_a_hand_made_one(
+    shared: Shared,
+) -> None:
+    """Deleting an imported item does not let its key find another item."""
+    t = shared.targets(ALICE)
+    links = InMemorySourceLinkRepository()
+    bundle = _bundle(_film("a", "k1", upc="k1"))
+    await _import_then_delete(t, bundle, links)
+    await _own_film(shared, t, "My Alien", "k1")
 
     plan = await _plan(t, bundle, _extras(links))
 
-    assert _item_actions(plan) == {"a": PlanAction.CREATE}
+    assert _reason(plan, "a") == "You deleted this after importing it."
 
 
 async def test_a_hand_made_item_with_the_key_is_matched(shared: Shared) -> None:
@@ -158,6 +192,82 @@ async def test_a_hand_made_item_with_the_key_is_matched(shared: Shared) -> None:
         "Matches your existing item. It will be linked, not changed."
     )
     assert plan.ready
+
+
+def _item(plan: Plan, ref: str) -> PlannedEntity:
+    return next(e for e in plan.entities if e.ref == ref and e.kind is EntityKind.ITEM)
+
+
+async def test_a_recognised_row_names_the_item_it_matched(shared: Shared) -> None:
+    """A row an earlier import made names that item, as it is now called."""
+    t = shared.targets(ALICE)
+    links = InMemorySourceLinkRepository()
+    bundle = _bundle(_film("a", "k1", upc="k1"))
+    await _import(t, bundle, _extras(links))
+    link = await _link(links, "k1")
+    assert link is not None
+
+    entity = _item(await _plan(t, bundle, _extras(links)), "a")
+
+    assert entity.matched_id == link.entity_id
+    assert entity.matched_name == "Alien"
+    assert entity.changed == ()
+
+
+async def test_a_recognised_row_lists_the_fields_changed_in_the_file(
+    shared: Shared,
+) -> None:
+    """A changed value is reported, and the item is left as it is."""
+    t = shared.targets(ALICE)
+    links = InMemorySourceLinkRepository()
+    await _import(t, _bundle(_film("a", "k1", upc="k1", year=1979)), _extras(links))
+
+    plan = await _import(
+        t, _bundle(_film("a", "k1", upc="k1", year=1980)), _extras(links)
+    )
+
+    assert _item(plan, "a").changed == ("attributes.year",)
+    nodes = await shared.graph_repos.nodes.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
+    assert [n.attributes["year"] for n in nodes] == [1979]
+
+
+async def test_a_hand_made_match_names_the_item_too(shared: Shared) -> None:
+    """A hand-made item the key found is named, with nothing changed."""
+    t = shared.targets(ALICE)
+    await _with_film_type(t)
+    own = await _own_film(shared, t, "My Alien", "k1")
+
+    plan = await _plan(
+        t, _bundle(_film("a", "k1", upc="k1")), _extras(InMemorySourceLinkRepository())
+    )
+
+    assert _item(plan, "a").matched_id == own
+    assert _item(plan, "a").matched_name == "My Alien"
+    assert _item(plan, "a").changed == ()
+
+
+async def test_a_row_without_a_key_is_ambiguous_when_keys_are_required(
+    shared: Shared,
+) -> None:
+    """A source that requires keys skips a row without one."""
+    t = shared.targets(ALICE)
+    bundle = Bundle(
+        id="b",
+        source=BundleSource(name="lddb", key_field="upc", require_keys=True),
+        item_types=(FILM,),
+        items=(_film("a", None),),
+    )
+
+    plan = await _import(t, bundle, _extras(InMemorySourceLinkRepository()))
+
+    assert _item_actions(plan) == {"a": PlanAction.AMBIGUOUS}
+    assert _reason(plan, "a") == "No key."
+    nodes = await shared.graph_repos.nodes.list(
+        after=None, limit=10, scope=ContentFilter.everyone()
+    )
+    assert nodes == []
 
 
 async def test_two_existing_matches_are_ambiguous(shared: Shared) -> None:
@@ -332,18 +442,23 @@ async def test_a_matched_item_is_linked_and_not_modified(shared: Shared) -> None
     assert [n.name for n in nodes] == ["My Alien"]
 
 
-async def test_a_stale_link_is_repointed_not_duplicated(shared: Shared) -> None:
-    """A stale link is repointed not duplicated."""
+async def test_a_restored_key_creates_the_item_and_repoints_its_link(
+    shared: Shared,
+) -> None:
+    """A deleted item whose key is restored is created, its link re-pointed."""
     t = shared.targets(ALICE)
     links = InMemorySourceLinkRepository()
     bundle = _bundle(_film("a", "k1", upc="k1"))
-    await _import(t, bundle, _extras(links))
-    old = await _link(links, "k1")
-    assert old is not None
+    old = await _import_then_delete(t, bundle, links)
     old_id, old_entity = old.id, old.entity_id
-    await t.graph.remove(EntityKind.ITEM, old_entity)
 
-    await _import(t, bundle, _extras(links))
+    plan = await _import(
+        t,
+        bundle,
+        BundleExtras(links=links, owner_id=ALICE.id, restore=frozenset({"k1"})),
+    )
+
+    assert _item_actions(plan) == {"a": PlanAction.CREATE}
 
     again = await _link(links, "k1")
     assert again is not None
@@ -605,3 +720,28 @@ async def test_a_collection_of_only_ambiguous_items_is_not_made(
     applied = await apply_bundle(plan, bundle, t.presets, t.graph, extras=extras)
 
     assert applied.created[EntityKind.COLLECTION] == 0
+
+
+async def test_a_keyed_item_carries_its_source_key(shared: Shared) -> None:
+    """Every keyed item names its key, so a deleted one can be restored by it."""
+    t = shared.targets(ALICE)
+    links = InMemorySourceLinkRepository()
+    bundle = _bundle(_film("a", "k1", upc="k1"), _film("b", "k2", upc="k2"))
+    await _import(t, bundle, _extras(links))
+    gone = await _link(links, "k1")
+    assert gone is not None
+    await t.graph.remove(EntityKind.ITEM, gone.entity_id)
+
+    plan = await _plan(
+        t, _bundle(*bundle.items, _film("c", "k3", upc="k3")), _extras(links)
+    )
+
+    assert [(e.ref, e.source_key) for e in _items_of(plan)] == [
+        ("a", "k1"),
+        ("b", "k2"),
+        ("c", "k3"),
+    ]
+
+
+def _items_of(plan: Plan) -> list[PlannedEntity]:
+    return [e for e in plan.entities if e.kind is EntityKind.ITEM]

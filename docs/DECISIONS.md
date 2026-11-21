@@ -1677,3 +1677,17 @@ Applying creates the link for each item it creates or matches, and re-points a l
 - Values are fetched when a field gets focus (the most used) and again 250 ms after typing pauses (matches), and kept per field.
 - An input with a `list` is a combobox to assistive technology and to Playwright's `getByRole`, so tests find these fields by label.
 - Without the joining, typing "Signed?" next to existing "Signed" details made `signed_2`: a second field that promotion could never merge.
+
+## Recognising CSV rows imported before (2026-11-21)
+
+**Decision:** A CSV import may name a key column (#556): `key_field` on `POST /imports/items/plan` and `POST /imports/items`, which is `name`, a field key the mapping fills, or a kept detail's key. The bundle's source is then `csv:{item_type}:{key_field}` with `require_keys`, each row's source key is its cell in that column (NFC, trimmed, runs of spaces collapsed; case counts), and planning and applying share one `BundleExtras` with the person's links. `PlanItemImport` is a query over `TransferRepos` and `ImportItems` a command over `TransferUnitOfWork`, which commits the links once the items are made.
+
+**Choices that are not obvious:**
+
+- An item deleted after it was imported stays deleted: its row is `unchanged`, "You deleted this after importing it.", and is created again only when its key is in `restore`, sent with both the plan and the import. Before this, a link whose item had gone fell through to the hand-made match and was created again; no production source relied on that.
+- A row with an empty key cell is `ambiguous`, "No key.", when the source sets `require_keys`; other sources keep "no key, so created".
+- A recognised row names the item it matched (`matched_id`, `matched_name`) and lists the fields whose value in the file differs from the last import (`changed`, as field-hash keys). Nothing is written to it; updating is #234. Its reason is "Already imported.": the source name is an identifier, not copy.
+- Every keyed plan entry carries its `source_key`, so the page can offer a deleted row back by its key without parsing the file or matching on reason text.
+- The graph targets commit each item in its own transaction, so links cannot share one with the items. If an import fails part-way, the next one finds the items it made by their key field's value and links them, so nothing is duplicated. Imports made before this recorded no links and are found the same way; there is no backfill.
+
+**Rationale:** A collector's sheet is imported more than once, after adding rows or in parts; the second run must add only the new rows and must not undo a deletion made in the app.
