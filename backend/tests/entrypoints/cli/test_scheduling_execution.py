@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
+from app.entrypoints.api.shared import backup_operations
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.job_catalogue import (
     build_catalogue,
@@ -542,7 +543,7 @@ async def test_cli_restore_holds_exclusive_lock_through_use_case(
         if fail:
             raise RuntimeError("restore failed")
 
-    monkeypatch.setattr(backups, "media_files", media)
+    monkeypatch.setattr(backup_operations, "media_files", media)
     monkeypatch.setattr(RestoreBackup, "handle", restore)
     try:
         if fail:

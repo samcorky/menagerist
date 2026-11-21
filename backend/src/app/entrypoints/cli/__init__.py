@@ -16,21 +16,7 @@ from rich.table import Table
 from rich.text import Text
 
 from app.entrypoints.api.shared.access_guard import get_access_guard
-from app.entrypoints.api.shared.backup_operations import create_backup
-from app.entrypoints.api.shared.settings_reader import get_settings_reader
-from app.entrypoints.cli.backups import (
-    export_user_data,
-    import_user_data,
-    restore_backup,
-)
 from app.entrypoints.cli.data import data_app
-from app.entrypoints.cli.scheduling import (
-    check_worker_health_cli,
-    default_worker_identity_file,
-    list_jobs_cli,
-    run_job_cli,
-    run_worker_cli,
-)
 from app.modules.backup.adapters.cli.backup_app import (
     backup_app,
     use_access_guard as use_backup_access_guard,
@@ -61,9 +47,17 @@ from app.platform.cli_progress import activity, confirm
 from app.platform.logging_config import CurrentStderr, configure_logging
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.modules.backup.domain.backup import BackupSummary
     from app.modules.identity.ports.existing_data_claim import ExistingDataClaim
+    from app.modules.scheduling.application.list_jobs import JobStatus
+    from app.modules.scheduling.domain.job_run import JobRun
+    from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.progress import ProgressReporter
+    from app.shared_kernel.settings import SettingsReader
 
 configure_logging()
 app_info = load_app_info()
@@ -127,20 +121,67 @@ def main(
 migrate_app = App(name="migrate", help="Manage database migrations.")
 app.command(migrate_app)
 
+# The operations below are wired by name but imported when a command runs: they pull
+# in the backup, scheduling and database code, which `serve` and `worker-health`
+# (run every 30 s by the worker's health check) do not need to start.
+
+
+async def _list_jobs() -> list[JobStatus]:
+    from app.entrypoints.cli.scheduling import list_jobs_cli
+
+    return await list_jobs_cli()
+
+
+async def _run_job(job_key: str) -> JobRun:
+    from app.entrypoints.cli.scheduling import run_job_cli
+
+    return await run_job_cli(job_key)
+
+
+def _settings_reader() -> SettingsReader:
+    from app.entrypoints.api.shared.settings_reader import get_settings_reader
+
+    return get_settings_reader()
+
+
+async def _create_backup(label: str, progress: ProgressReporter) -> BackupSummary:
+    from app.entrypoints.api.shared.backup_operations import create_backup
+
+    return await create_backup(label=label, progress=progress)
+
+
+async def _restore_backup(
+    backup_id: UUID, replace: bool, guard: AccessGuard, progress: ProgressReporter
+) -> None:
+    from app.entrypoints.cli.backups import restore_backup
+
+    await restore_backup(backup_id, replace=replace, guard=guard, progress=progress)
+
+
+async def _export_user(
+    user_id: UUID, output: Path, progress: ProgressReporter
+) -> BackupSummary:
+    from app.entrypoints.cli.backups import export_user_data
+
+    return await export_user_data(user_id, output, progress)
+
+
+async def _import_user(
+    user_id: UUID, archive: Path, progress: ProgressReporter
+) -> None:
+    from app.entrypoints.cli.backups import import_user_data
+
+    await import_user_data(user_id, archive, progress)
+
+
 app.command(media_app)
 app.command(data_app)
-use_job_operations(list_jobs_cli, run_job_cli)
+use_job_operations(_list_jobs, _run_job)
 app.command(job_app)
 use_backup_access_guard(get_access_guard())
-use_backup_settings_reader(get_settings_reader)
-
-use_operations(
-    lambda label, progress: create_backup(label=label, progress=progress),
-    lambda backup_id, replace, guard, progress: restore_backup(
-        backup_id, replace=replace, guard=guard, progress=progress
-    ),
-)
-use_user_operations(export_user_data, import_user_data)
+use_backup_settings_reader(_settings_reader)
+use_operations(_create_backup, _restore_backup)
+use_user_operations(_export_user, _import_user)
 app.command(backup_app)
 
 
@@ -152,6 +193,8 @@ def worker(*, identity_file: Path | None = None) -> None:
         identity_file: Process identity shared with worker-health; defaults to /tmp
             in the container. Use a separate path for each local worker.
     """
+    from app.entrypoints.cli.scheduling import run_worker_cli
+
     if identity_file is None:
         asyncio.run(run_worker_cli())
     else:
@@ -165,6 +208,11 @@ def worker_health(*, identity_file: Path | None = None) -> Report:
     Args:
         identity_file: The identity file used by the worker being checked.
     """
+    from app.entrypoints.cli.scheduling import (
+        check_worker_health_cli,
+        default_worker_identity_file,
+    )
+
     # Docker stores probe output; asyncio.run logs its event loop at DEBUG.
     logging.getLogger("asyncio").setLevel(logging.INFO)
     if asyncio.run(check_worker_health_cli(identity_file=identity_file)):
