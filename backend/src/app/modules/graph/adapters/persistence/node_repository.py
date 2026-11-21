@@ -494,7 +494,7 @@ class SqlAlchemyNodeRepository:
         self,
         type_slug: str,
         key: str,
-        value: str,
+        value: str | int | float,
         *,
         scope: ContentFilter,
         limit: int,
@@ -514,17 +514,24 @@ class SqlAlchemyNodeRepository:
         return list((await self._session.execute(stmt)).scalars())
 
     async def ids_with_name(
-        self, type_slug: str, name: str, *, scope: ContentFilter, limit: int
+        self,
+        type_slug: str,
+        name: str,
+        *,
+        scope: ContentFilter,
+        limit: int,
+        ignore_case: bool = False,
     ) -> builtins.list[uuid.UUID]:
         """Return ids of non-deleted nodes of `type_slug` named exactly `name`."""
         logger.debug("finding nodes by name", type_slug=type_slug)
+        named = (
+            func.lower(NodeModel.name) == func.lower(name)
+            if ignore_case
+            else NodeModel.name == name
+        )
         stmt = (
             select(NodeModel.id)
-            .where(
-                _in_scope(scope),
-                NodeModel.type == type_slug,
-                NodeModel.name == name,
-            )
+            .where(_in_scope(scope), NodeModel.type == type_slug, named)
             .order_by(NodeModel.id)
             .limit(limit)
         )

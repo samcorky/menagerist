@@ -82,6 +82,7 @@ def test_plan_import_and_export_round_trip(shared: Shared) -> None:
                 "matched_name": None,
                 "changed": [],
                 "source_key": None,
+                "deleted": False,
             }
         ],
     }
