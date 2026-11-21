@@ -59,9 +59,9 @@
 		<Tooltip.Content>
 			{label}
 			{#if shortcut}
-				<kbd data-slot="kbd" class="rounded-md bg-background/20 px-1 font-mono text-[10px]"
-					>{shortcut}</kbd
-				>
+				<kbd data-slot="kbd" class="rounded-md bg-background/20 px-1 font-mono text-[10px]">
+					{shortcut}
+				</kbd>
 			{/if}
 		</Tooltip.Content>
 	</Tooltip.Root>

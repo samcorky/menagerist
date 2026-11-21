@@ -297,8 +297,10 @@
 					You have example items. Remove them when you're ready.
 					<a
 						href={resolve('/library/examples')}
-						class="font-medium underline-offset-2 hover:underline">Manage examples</a
+						class="font-medium underline-offset-2 hover:underline"
 					>
+						Manage examples
+					</a>
 				</p>
 				<Button
 					variant="ghost"
@@ -497,9 +499,12 @@
 				{:else if topCollections.length === 0}
 					<p class="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
 						No collections yet.
-						<a href={resolve('/collections')} class="font-medium underline-offset-2 hover:underline"
-							>Create one</a
+						<a
+							href={resolve('/collections')}
+							class="font-medium underline-offset-2 hover:underline"
 						>
+							Create one
+						</a>
 					</p>
 				{:else}
 					<ul class="divide-y rounded-xl border bg-card">
@@ -530,8 +535,10 @@
 						None of your items has an item type yet.
 						<a
 							href={resolve('/library/item-types')}
-							class="font-medium underline-offset-2 hover:underline">Set up item types</a
+							class="font-medium underline-offset-2 hover:underline"
 						>
+							Set up item types
+						</a>
 					</p>
 				{:else}
 					<ul class="space-y-1.5 rounded-xl border bg-card p-3">
@@ -543,9 +550,9 @@
 								>
 									<span class="flex justify-between gap-3">
 										<span class="truncate">{row.label}</span>
-										<span class="text-muted-foreground tabular-nums"
-											>{formatCount(row.count, false)}</span
-										>
+										<span class="text-muted-foreground tabular-nums">
+											{formatCount(row.count, false)}
+										</span>
 									</span>
 									<span class="mt-1 block h-1.5 rounded-full bg-muted">
 										<span

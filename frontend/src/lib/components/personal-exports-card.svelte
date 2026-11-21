@@ -136,9 +136,9 @@
 		<Alert.Root variant="destructive">
 			<Alert.Description>{loadError}</Alert.Description>
 		</Alert.Root>
-		<Button type="button" variant="outline" class="pointer-coarse:h-11" onclick={() => void load()}
-			>Retry</Button
-		>
+		<Button type="button" variant="outline" class="pointer-coarse:h-11" onclick={() => void load()}>
+			Retry
+		</Button>
 	{:else if loading && exports.length === 0}
 		<Skeleton class="h-20 w-full rounded-xl" />
 	{:else if exports.length === 0}

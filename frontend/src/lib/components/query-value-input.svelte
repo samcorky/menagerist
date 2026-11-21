@@ -393,8 +393,10 @@
 					size="sm"
 					class="min-h-9"
 					aria-label="{name}, retry loading collections"
-					onclick={() => view.retryCollections()}>Retry</Button
+					onclick={() => view.retryCollections()}
 				>
+					Retry
+				</Button>
 			</div>
 		{:else if chosenCollections.length >= MAX_COLLECTION_IDS}
 			<p class="text-sm text-muted-foreground">

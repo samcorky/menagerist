@@ -226,8 +226,10 @@
 	<div class="flex flex-wrap items-center gap-2">
 		<span
 			class="w-6 shrink-0 text-xs font-medium text-muted-foreground tabular-nums"
-			aria-hidden="true">{number}</span
+			aria-hidden="true"
 		>
+			{number}
+		</span>
 		<Combobox.Root
 			class="h-9 min-w-0 flex-1 basis-48"
 			aria-label="{name}, field"
@@ -304,8 +306,8 @@
 			{#if stray}The current value “{stray}” does not fit.{/if}
 			{problem}
 			{#if condition.kind !== 'field' || field}<span class="sr-only">
-					This condition is not applied yet.</span
-				>{/if}
+					This condition is not applied yet.
+				</span>{/if}
 		</p>
 	{/if}
 </li>

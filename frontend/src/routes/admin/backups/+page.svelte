@@ -272,9 +272,9 @@
 		</p>
 	</div>
 	{#if !canRead}
-		<Alert.Root
-			><Alert.Description>Only administrators can manage backups.</Alert.Description></Alert.Root
-		>
+		<Alert.Root>
+			<Alert.Description>Only administrators can manage backups.</Alert.Description>
+		</Alert.Root>
 	{:else}
 		<div class="flex flex-wrap gap-2">
 			{#if canCreate}<Button
@@ -285,8 +285,10 @@
 						label = 'manual';
 						createError = null;
 						createOpen = true;
-					}}><Plus class="size-4" aria-hidden="true" />Create backup</Button
-				>{/if}
+					}}
+				>
+					<Plus class="size-4" aria-hidden="true" />Create backup
+				</Button>{/if}
 			{#if canCreate}<Button
 					variant="outline"
 					class="pointer-coarse:h-11"
@@ -294,14 +296,18 @@
 					onclick={() => {
 						uploadError = null;
 						uploadOpen = true;
-					}}><Upload class="size-4" aria-hidden="true" />Upload backup</Button
-				>{/if}
+					}}
+				>
+					<Upload class="size-4" aria-hidden="true" />Upload backup
+				</Button>{/if}
 			<Button
 				variant="outline"
 				class="pointer-coarse:h-11"
 				disabled={loading || busy !== null}
-				onclick={load}><RefreshCw class="size-4" aria-hidden="true" />Refresh</Button
+				onclick={load}
 			>
+				<RefreshCw class="size-4" aria-hidden="true" />Refresh
+			</Button>
 		</div>
 		{#if loadFailed && !loading && backups.length === 0}<LoadFailed
 				what="the backups"
@@ -338,9 +344,9 @@
 									</div>
 								</Table.Cell>
 								<Table.Cell class="text-muted-foreground">
-									<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}
-										>{formatDateTime(backup.created_at).local}</time
-									>
+									<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}>
+										{formatDateTime(backup.created_at).local}
+									</time>
 								</Table.Cell>
 								<Table.Cell class="text-muted-foreground">{size(backup.size)}</Table.Cell>
 								<Table.Cell class="max-w-48 text-xs text-muted-foreground">
@@ -374,9 +380,12 @@
 										{@render verifyBadge(backup)}
 									</div>
 									<Card.Description>
-										<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}
-											>{formatDateTime(backup.created_at).local}</time
+										<time
+											datetime={backup.created_at}
+											title={formatDateTime(backup.created_at).utc}
 										>
+											{formatDateTime(backup.created_at).local}
+										</time>
 										- {size(backup.size)}
 									</Card.Description>
 								</Card.Header>
@@ -412,9 +421,9 @@
 	}}
 >
 	<ResponsiveDialog.Content title="Upload backup">
-		<ResponsiveDialog.Description
-			>Uploading stores an archive for later recovery. It does not replace any current content.</ResponsiveDialog.Description
-		>
+		<ResponsiveDialog.Description>
+			Uploading stores an archive for later recovery. It does not replace any current content.
+		</ResponsiveDialog.Description>
 		<form onsubmit={upload} class="mt-4 space-y-4">
 			<div class="space-y-2">
 				<Label for="backup-archive">Backup archive</Label>
@@ -427,23 +436,29 @@
 				/>
 				{#if file}<p class="text-sm text-muted-foreground">{file.name}</p>{/if}
 			</div>
-			{#if uploadError}<Alert.Root variant="destructive"
-					><Alert.Description>{uploadError}</Alert.Description></Alert.Root
-				>{/if}
+			{#if uploadError}<Alert.Root variant="destructive">
+					<Alert.Description>{uploadError}</Alert.Description>
+				</Alert.Root>{/if}
 			<div class="flex justify-end gap-2">
 				<Button
 					variant="outline"
 					class="pointer-coarse:h-11"
 					disabled={loading || busy !== null}
-					onclick={() => (uploadOpen = false)}><X class="size-4" aria-hidden="true" />Cancel</Button
-				><Button type="submit" class="pointer-coarse:h-11" disabled={!file || busy !== null}
-					>{#if busy === 'upload'}<Spinner
+					onclick={() => (uploadOpen = false)}
+				>
+					<X class="size-4" aria-hidden="true" />Cancel
+				</Button><Button
+					type="submit"
+					class="pointer-coarse:h-11"
+					disabled={!file || busy !== null}
+				>
+					{#if busy === 'upload'}<Spinner
 							class="motion-reduce:animate-none"
 							aria-hidden="true"
 						/>{:else}<Upload class="size-4" aria-hidden="true" />{/if}{busy === 'upload'
 						? 'Uploading...'
-						: 'Upload backup'}</Button
-				>
+						: 'Upload backup'}
+				</Button>
 			</div>
 		</form>
 	</ResponsiveDialog.Content>
@@ -454,33 +469,36 @@
 		if (!open && !busy) deleteTarget = null;
 	}}
 >
-	<ResponsiveDialog.Content title="Delete backup" size="sm"
-		><ResponsiveDialog.Description
-			>Delete "{deleteTarget?.label}"? This permanently removes the stored archive. Download a copy
-			first if you need to keep it.</ResponsiveDialog.Description
-		>{#if deleteError}<Alert.Root variant="destructive" class="mt-4"
-				><Alert.Description>{deleteError}</Alert.Description></Alert.Root
-			>{/if}
+	<ResponsiveDialog.Content title="Delete backup" size="sm">
+		<ResponsiveDialog.Description>
+			Delete "{deleteTarget?.label}"? This permanently removes the stored archive. Download a copy
+			first if you need to keep it.
+		</ResponsiveDialog.Description>{#if deleteError}<Alert.Root variant="destructive" class="mt-4">
+				<Alert.Description>{deleteError}</Alert.Description>
+			</Alert.Root>{/if}
 		<div class="mt-4 flex justify-end gap-2">
 			<Button
 				variant="outline"
 				class="pointer-coarse:h-11"
 				disabled={loading || busy !== null}
-				onclick={() => (deleteTarget = null)}><X class="size-4" aria-hidden="true" />Cancel</Button
-			><Button
+				onclick={() => (deleteTarget = null)}
+			>
+				<X class="size-4" aria-hidden="true" />Cancel
+			</Button><Button
 				variant="destructive"
 				class="pointer-coarse:h-11"
 				disabled={loading || busy !== null}
 				onclick={remove}
-				>{#if busy === 'delete'}<Spinner
+			>
+				{#if busy === 'delete'}<Spinner
 						class="motion-reduce:animate-none"
 						aria-hidden="true"
 					/>{:else}<Trash2 class="size-4" aria-hidden="true" />{/if}{busy === 'delete'
 					? 'Deleting...'
-					: 'Delete backup'}</Button
-			>
-		</div></ResponsiveDialog.Content
-	>
+					: 'Delete backup'}
+			</Button>
+		</div>
+	</ResponsiveDialog.Content>
 </ResponsiveDialog.Root>
 
 <ResponsiveDialog.Root
@@ -488,16 +506,16 @@
 	onOpenChange={(open) => {
 		if (!busy) createOpen = open;
 	}}
-	><ResponsiveDialog.Content title="Create backup"
-		><ResponsiveDialog.Description
-			>Create a complete backup of this Menagerist. Add an optional label to help recognise it
-			later.</ResponsiveDialog.Description
-		>
+>
+	<ResponsiveDialog.Content title="Create backup">
+		<ResponsiveDialog.Description>
+			Create a complete backup of this Menagerist. Add an optional label to help recognise it later.
+		</ResponsiveDialog.Description>
 		<form onsubmit={create} class="mt-4 space-y-4">
 			<div class="space-y-2">
-				<Label for="backup-label"
-					>Backup label <span class="font-normal text-muted-foreground">(optional)</span></Label
-				><Input
+				<Label for="backup-label">
+					Backup label <span class="font-normal text-muted-foreground">(optional)</span>
+				</Label><Input
 					id="backup-label"
 					bind:value={label}
 					maxlength={120}
@@ -505,24 +523,26 @@
 					disabled={busy !== null}
 				/>
 			</div>
-			{#if createError}<Alert.Root variant="destructive"
-					><Alert.Description>{createError}</Alert.Description></Alert.Root
-				>{/if}
+			{#if createError}<Alert.Root variant="destructive">
+					<Alert.Description>{createError}</Alert.Description>
+				</Alert.Root>{/if}
 			<div class="flex justify-end gap-2">
 				<Button
 					variant="outline"
 					class="pointer-coarse:h-11"
 					disabled={busy !== null}
-					onclick={() => (createOpen = false)}><X class="size-4" aria-hidden="true" />Cancel</Button
-				><Button type="submit" class="pointer-coarse:h-11" disabled={busy !== null}
-					>{#if busy === 'create'}<Spinner
+					onclick={() => (createOpen = false)}
+				>
+					<X class="size-4" aria-hidden="true" />Cancel
+				</Button><Button type="submit" class="pointer-coarse:h-11" disabled={busy !== null}>
+					{#if busy === 'create'}<Spinner
 							class="motion-reduce:animate-none"
 							aria-hidden="true"
 						/>{:else}<Plus class="size-4" aria-hidden="true" />{/if}{busy === 'create'
 						? 'Creating backup...'
-						: 'Create backup'}</Button
-				>
+						: 'Create backup'}
+				</Button>
 			</div>
-		</form></ResponsiveDialog.Content
-	></ResponsiveDialog.Root
->
+		</form>
+	</ResponsiveDialog.Content>
+</ResponsiveDialog.Root>

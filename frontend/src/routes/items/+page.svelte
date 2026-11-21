@@ -546,8 +546,8 @@
 				{#if conditionCount > 0}
 					<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
 						{conditionCount}<span class="sr-only">
-							{conditionCount === 1 ? 'condition' : 'conditions'}</span
-						>
+							{conditionCount === 1 ? 'condition' : 'conditions'}
+						</span>
 					</Badge>
 				{/if}
 			</Button>
@@ -635,8 +635,10 @@
 						<Button
 							variant="link"
 							class="h-auto p-0"
-							onclick={() => openFilters(filterError?.path ?? null)}>Edit filters</Button
+							onclick={() => openFilters(filterError?.path ?? null)}
 						>
+							Edit filters
+						</Button>
 					</Alert.Description>
 				</Alert.Root>
 			{:else if tooMany}
@@ -748,8 +750,10 @@
 					<p class="text-sm text-muted-foreground">
 						Add one, or <button
 							class="underline underline-offset-2 hover:text-foreground"
-							onclick={() => selectType(null)}>clear this filter</button
-						> to see everything.
+							onclick={() => selectType(null)}
+						>
+							clear this filter
+						</button> to see everything.
 					</p>
 				</div>
 				<Button size="sm" onclick={() => goto(resolve('/items/new'))}>
