@@ -302,8 +302,10 @@
 			class="underline underline-offset-4"
 			href="/api/docs"
 			target="_blank"
-			rel="noopener">API documentation</a
+			rel="noopener"
 		>
+			API documentation
+		</a>
 		to find out how to use one.
 	</p>
 

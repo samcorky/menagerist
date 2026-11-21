@@ -864,9 +864,9 @@
 										</Button>
 									{/if}
 									<div class="ml-auto flex items-center gap-2 max-md:hidden">
-										<Button type="button" variant="outline" onclick={handleCancelEdit}
-											>Cancel</Button
-										>
+										<Button type="button" variant="outline" onclick={handleCancelEdit}>
+											Cancel
+										</Button>
 										<Button type="submit" disabled={saving || loading}>
 											{saving ? 'Saving…' : 'Save changes'}
 										</Button>
@@ -1108,8 +1108,9 @@
 													>
 														<span>{et.label}</span>
 														{#if et.reverse_label}
-															<span class="text-xs text-muted-foreground">↔ {et.reverse_label}</span
-															>
+															<span class="text-xs text-muted-foreground">
+																↔ {et.reverse_label}
+															</span>
 														{/if}
 													</button>
 												</li>
@@ -1178,9 +1179,9 @@
 																size="sm"
 															/>
 														</span>
-														<span class="ml-2 shrink-0 text-xs text-muted-foreground"
-															>{candidate.type ?? ''}</span
-														>
+														<span class="ml-2 shrink-0 text-xs text-muted-foreground">
+															{candidate.type ?? ''}
+														</span>
 													</button>
 												</li>
 											{/each}

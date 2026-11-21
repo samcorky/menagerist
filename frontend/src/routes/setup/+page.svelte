@@ -167,8 +167,10 @@
 			onclick={() => {
 				restoring = false;
 				error = null;
-			}}>Create an account instead</Button
+			}}
 		>
+			Create an account instead
+		</Button>
 	{:else}
 		<div>
 			<h1 class="font-heading text-3xl font-semibold tracking-tight">Welcome to Menagerist</h1>
@@ -262,7 +264,9 @@
 			onclick={() => {
 				restoring = true;
 				error = null;
-			}}>Restore from backup instead</Button
+			}}
 		>
+			Restore from backup instead
+		</Button>
 	{/if}
 </Page>

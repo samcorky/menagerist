@@ -295,9 +295,9 @@
 								{#each codeFields as field (field.key)}
 									<NativeSelectOption value={field.key}>{field.label}</NativeSelectOption>
 								{/each}
-								<NativeSelectOption value={NEW_BARCODE_DETAIL}
-									>A new Barcode detail</NativeSelectOption
-								>
+								<NativeSelectOption value={NEW_BARCODE_DETAIL}>
+									A new Barcode detail
+								</NativeSelectOption>
 							</NativeSelect>
 						</div>
 					{:else}
