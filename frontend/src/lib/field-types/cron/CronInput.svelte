@@ -85,16 +85,20 @@
 			size="sm"
 			class="pointer-coarse:min-h-11"
 			aria-pressed={cronMode.value === 'words'}
-			onclick={() => cronMode.set('words')}>In words</Button
+			onclick={() => cronMode.set('words')}
 		>
+			In words
+		</Button>
 		<Button
 			type="button"
 			variant={cronMode.value === 'cron' ? 'secondary' : 'outline'}
 			size="sm"
 			class="pointer-coarse:min-h-11"
 			aria-pressed={cronMode.value === 'cron'}
-			onclick={() => cronMode.set('cron')}>Cron</Button
+			onclick={() => cronMode.set('cron')}
 		>
+			Cron
+		</Button>
 	</div>
 
 	{#if cronMode.value === 'words'}
@@ -135,9 +139,9 @@
 						aria-label="{ariaLabel}: minute of the hour"
 					>
 						{#each MINUTES as n (n)}
-							<NativeSelectOption value={String(n)}
-								>{n === 0 ? 'On the hour' : `${n} minutes past the hour`}</NativeSelectOption
-							>
+							<NativeSelectOption value={String(n)}>
+								{n === 0 ? 'On the hour' : `${n} minutes past the hour`}
+							</NativeSelectOption>
 						{/each}
 					</NativeSelect>
 				{:else if sentence.kind === 'daily' || sentence.kind === 'weekdays'}
@@ -186,8 +190,10 @@
 					variant="outline"
 					size="sm"
 					class="pointer-coarse:min-h-11"
-					onclick={() => cronMode.set('cron')}>Edit as cron</Button
+					onclick={() => cronMode.set('cron')}
 				>
+					Edit as cron
+				</Button>
 			</div>
 		{/if}
 	{:else}

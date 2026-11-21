@@ -55,8 +55,10 @@
 												'truncate whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none',
 												rail && 'opacity-0'
 											)}
-											data-testid="sidebar-account-name">{name}</span
+											data-testid="sidebar-account-name"
 										>
+											{name}
+										</span>
 									</button>
 								{:else}
 									<Button
@@ -74,9 +76,9 @@
 					</span>
 				{/snippet}
 			</Tooltip.Trigger>
-			<Tooltip.Content side={inSidebar ? 'right' : undefined}
-				>Account menu for {name}</Tooltip.Content
-			>
+			<Tooltip.Content side={inSidebar ? 'right' : undefined}>
+				Account menu for {name}
+			</Tooltip.Content>
 		</Tooltip.Root>
 		<DropdownMenu.Content
 			side={inSidebar ? (rail ? 'right' : 'top') : 'bottom'}

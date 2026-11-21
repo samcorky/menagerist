@@ -596,9 +596,9 @@
 			Only start it when you need to.
 		</ResponsiveDialog.Description>
 		<div class="mt-4 flex justify-end gap-2">
-			<Button variant="outline" class="pointer-coarse:h-11" onclick={() => (confirming = null)}
-				>Cancel</Button
-			>
+			<Button variant="outline" class="pointer-coarse:h-11" onclick={() => (confirming = null)}>
+				Cancel
+			</Button>
 			<Button
 				class="pointer-coarse:h-11"
 				onclick={() => {
