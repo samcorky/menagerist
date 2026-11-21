@@ -240,9 +240,47 @@
       "dependencyDashboardCategory": "Language runtimes",
       "commitMessageTopic": "Python interpreter",
       "automerge": false,
+      "minimumReleaseAge": "14 days",
       "labels": [
         "python-version"
       ]
+    },
+    {
+      "description": "Wait three months before proposing a new Python feature release (3.x is a minor to Renovate, a major to us): the first point releases fix what early adopters hit, and the wheels for our dependencies catch up",
+      "matchManagers": [
+        "pyenv",
+        "custom.regex"
+      ],
+      "matchPackageNames": [
+        "python"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "minimumReleaseAge": "90 days"
+    },
+    {
+      "description": "Give a new base image digest of the Dockerfile (Debian and distroless) three days, so a bad rebuild is pulled before it reaches the shipped image",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "digest",
+        "pinDigest"
+      ],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Wait three months before moving the Dockerfile to a new release of a base image (distroless base-debian14, a new Debian), so it has had its first fixes and the Python and Node builds we copy into it are known to run on it",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "minimumReleaseAge": "90 days"
     },
     {
       "description": "Group Python runtime dependencies (project.dependencies)",
@@ -543,9 +581,21 @@
       "commitMessageTopic": "Node",
       "semanticCommitType": "build",
       "automerge": false,
+      "minimumReleaseAge": "14 days",
       "labels": [
         "node-version"
       ]
+    },
+    {
+      "description": "Wait three months before proposing a new Node major, so it has settled and the tools that read the Node version (the Dockerfile, CI, the typings) support it. Last, so it overrides the 14 days of the node version rule above",
+      "matchDepNames": [
+        "node",
+        "@types/node"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "minimumReleaseAge": "90 days"
     }
   ]
 }
