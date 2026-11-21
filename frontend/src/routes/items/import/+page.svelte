@@ -430,9 +430,9 @@
 
 				{#if keyChoices.length > 0}
 					<div class="space-y-1.5">
-						<label class="text-sm font-medium" for="csv-key"
-							>Recognise rows already imported by</label
-						>
+						<label class="text-sm font-medium" for="csv-key">
+							Recognise rows already imported by
+						</label>
 						<NativeSelect
 							id="csv-key"
 							class="w-full sm:w-80 pointer-coarse:[&_select]:min-h-11"
