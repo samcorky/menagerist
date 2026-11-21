@@ -443,8 +443,9 @@
 													{lookups.relationships ? 'Choose a connection type' : 'Loading…'}
 												</NativeSelectOption>
 												{#each lookups.relationships ?? [] as option (option.slug)}
-													<NativeSelectOption value={option.slug}>{option.label}</NativeSelectOption
-													>
+													<NativeSelectOption value={option.slug}>
+														{option.label}
+													</NativeSelectOption>
 												{/each}
 											</NativeSelect>
 											{#if lookups.relationshipsFailed}
@@ -489,9 +490,9 @@
 														}))}
 												>
 													{#each rowEndOptions(relationship) as option (option.value)}
-														<NativeSelectOption value={option.value}
-															>{option.label}</NativeSelectOption
-														>
+														<NativeSelectOption value={option.value}>
+															{option.label}
+														</NativeSelectOption>
 													{/each}
 												</NativeSelect>
 											</div>
@@ -513,9 +514,9 @@
 													}))}
 											>
 												{#each MISSING as option (option.value)}
-													<NativeSelectOption value={option.value}
-														>{option.label}</NativeSelectOption
-													>
+													<NativeSelectOption value={option.value}>
+														{option.label}
+													</NativeSelectOption>
 												{/each}
 											</NativeSelect>
 										</div>
