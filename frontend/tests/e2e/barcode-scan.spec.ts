@@ -79,6 +79,28 @@ async function filmBarcode(page: Page, digits: string) {
 	}, digits);
 }
 
+/** A camera with (or without) a light: its track reports `torch` and records the switching. */
+async function cameraWithLight(page: Page, hasLight: boolean) {
+	await page.addInitScript((light) => {
+		const lit: boolean[] = [];
+		(window as unknown as { lit: boolean[] }).lit = lit;
+		navigator.mediaDevices.getUserMedia = async () => {
+			const canvas = document.createElement('canvas');
+			canvas.width = 64;
+			canvas.height = 48;
+			const stream = canvas.captureStream(5);
+			const track = stream.getVideoTracks()[0];
+			Object.assign(track, {
+				getCapabilities: () => (light ? { torch: true } : {}),
+				applyConstraints: async (c: { advanced?: { torch?: boolean }[] }) => {
+					lit.push(Boolean(c.advanced?.[0]?.torch));
+				}
+			});
+			return stream;
+		};
+	}, hasLight);
+}
+
 async function saveAndOpen(page: Page, dialog: ReturnType<Page['getByRole']>, name: string) {
 	await dialog.getByPlaceholder('Name…').fill(name);
 	await dialog.getByRole('button', { name: /^Saving…$|^Save$/ }).click();
@@ -254,5 +276,40 @@ test.describe('a field that takes barcodes', () => {
 			'Shop code',
 			'A new Barcode detail'
 		]);
+	});
+});
+
+test.describe('the light', () => {
+	async function openScanner(page: Page) {
+		await page.goto('/');
+		const capture = await openQuickCapture(page);
+		await capture.getByRole('button', { name: 'Scan barcode' }).click();
+		return page.getByRole('dialog', { name: 'Scan barcode' });
+	}
+	const lit = (page: Page) => page.evaluate(() => (window as unknown as { lit: boolean[] }).lit);
+
+	test('is switched on and off from the scanner when the camera has one', async ({ page }) => {
+		await cameraWithLight(page, true);
+		const scanner = await openScanner(page);
+
+		const light = scanner.getByRole('button', { name: 'Turn the light on' });
+		await expect(light).toHaveAttribute('aria-pressed', 'false');
+		await light.click();
+		const off = scanner.getByRole('button', { name: 'Turn the light off' });
+		await expect(off).toHaveAttribute('aria-pressed', 'true');
+		await off.click();
+		await expect(scanner.getByRole('button', { name: 'Turn the light on' })).toBeVisible();
+		expect(await lit(page)).toEqual([true, false]);
+	});
+
+	test('is not offered when the camera has none', async ({ page }) => {
+		await cameraWithLight(page, false);
+		const scanner = await openScanner(page);
+
+		const preview = scanner.getByLabel('Camera preview');
+		await expect
+			.poll(() => preview.evaluate((video: HTMLVideoElement) => video.srcObject !== null))
+			.toBe(true);
+		await expect(scanner.getByRole('button', { name: /Turn the light/ })).toHaveCount(0);
 	});
 });

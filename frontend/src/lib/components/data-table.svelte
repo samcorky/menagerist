@@ -36,8 +36,10 @@
 						scope="col"
 						class="h-auto px-4 py-2 text-xs font-medium text-muted-foreground uppercase {column.end
 							? 'text-right'
-							: ''}">{column.label}</Table.Head
+							: ''}"
 					>
+						{column.label}
+					</Table.Head>
 				{/each}
 			</Table.Row>
 		</Table.Header>

@@ -1174,8 +1174,8 @@
 						{#if adhocCount > 0}
 							<Badge class="ml-0.5 h-5 min-w-5 px-1.5 tabular-nums">
 								{adhocCount}<span class="sr-only">
-									{adhocCount === 1 ? 'condition' : 'conditions'}</span
-								>
+									{adhocCount === 1 ? 'condition' : 'conditions'}
+								</span>
 							</Badge>
 						{/if}
 					</Button>
@@ -1275,8 +1275,10 @@
 							<Button
 								variant="link"
 								class="h-auto p-0"
-								onclick={() => openFilters(adhocError?.path ?? null)}>Edit filters</Button
+								onclick={() => openFilters(adhocError?.path ?? null)}
 							>
+								Edit filters
+							</Button>
 						</Alert.Description>
 					</Alert.Root>
 				{:else if tooLarge}

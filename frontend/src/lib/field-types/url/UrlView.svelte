@@ -9,9 +9,9 @@
 
 {#if href}
 	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link, not an app route -->
-	<a {href} target="_blank" rel="noopener noreferrer" class="break-all text-primary underline"
-		>{href}</a
-	>
+	<a {href} target="_blank" rel="noopener noreferrer" class="break-all text-primary underline">
+		{href}
+	</a>
 {:else if text}
 	<span class="break-all">{text}</span>
 {:else}
