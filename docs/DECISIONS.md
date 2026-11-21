@@ -1684,10 +1684,24 @@ Applying creates the link for each item it creates or matches, and re-points a l
 
 **Choices that are not obvious:**
 
-- An item deleted after it was imported stays deleted: its row is `unchanged`, "You deleted this after importing it.", and is created again only when its key is in `restore`, sent with both the plan and the import. Before this, a link whose item had gone fell through to the hand-made match and was created again; no production source relied on that.
-- A row with an empty key cell is `ambiguous`, "No key.", when the source sets `require_keys`; other sources keep "no key, so created".
+- An item deleted after it was imported stays deleted: its row is `skip` with `deleted` set, "You deleted this after importing it.", and is created again only when its key is in `restore`, sent with both the plan and the import. Before this, a link whose item had gone fell through to the hand-made match and was created again; no production source relied on that.
+- A row with an empty key cell is `skip`, "No key.", when the source sets `require_keys`; other sources keep "no key, so created". `skip` (#555) is what is left out with a reason; `unchanged` is only what the person already has, and `ambiguous` what names more than one entity.
 - A recognised row names the item it matched (`matched_id`, `matched_name`) and lists the fields whose value in the file differs from the last import (`changed`, as field-hash keys). Nothing is written to it; updating is #234. Its reason is "Already imported.": the source name is an identifier, not copy.
-- Every keyed plan entry carries its `source_key`, so the page can offer a deleted row back by its key without parsing the file or matching on reason text.
-- The graph targets commit each item in its own transaction, so links cannot share one with the items. If an import fails part-way, the next one finds the items it made by their key field's value and links them, so nothing is duplicated. Imports made before this recorded no links and are found the same way; there is no backfill.
+- Every keyed plan entry carries its `source_key`, and one left out because it was deleted carries `deleted`, so the page can offer it back by its key without parsing the file or matching on reason text.
+- The graph targets commit each item in its own transaction, so links cannot share one with the items. If an import fails part-way, the next one finds the items it made by their key field's value and links them, so nothing is duplicated; a key kept as a number finds an item holding that number or its text. Imports made before this recorded no links and are found the same way; there is no backfill.
 
 **Rationale:** A collector's sheet is imported more than once, after adding rows or in parts; the second run must add only the new rows and must not undo a deletion made in the app.
+
+## Connecting CSV rows to items by name (2026-11-21)
+
+**Decision:** A CSV import may connect up to five columns (#555), sent as `connections` (column, relationship type, the other item's type, which end the row is, and `create` or `skip` when no item has the name). Each name becomes a bundle item with `lookup` set, ref `named-{n}`, and each non-empty cell a `BundleConnection` to it; the planner finds the item by name within its type, ignoring case (`find_items_by_field(..., ignore_case=True)`), and creates it from the name alone only when none matches.
+
+**Choices that are not obvious:**
+
+- Names that differ only in case or spacing are one item, made once with the first spelling. Two items of yours with the name make it `ambiguous`, and its connections are left out (`skip`) rather than guessed.
+- A name is looked up only when a connection would join it to a row that is imported; a row left out (no key, deleted), or a connection you deleted, makes nothing for its own sake. A name whose connection an earlier import made finds the item at that connection's end, so renaming the item does not make a second one.
+- A connection is made once: it is `unchanged` when an earlier import made it, the file repeats it, or you already have the same type between the same items in the same direction (`connection_exists`), and `skip` with `deleted` when you removed one an earlier import made. Its source key is the row key, the column and the name as written, case-folded, joined with `\x1f`, so renaming the item does not bring a deleted connection back. Without a key column nothing is recorded, and `connection_exists` alone stops repeats.
+- A type's required fields are advisory in the graph, so an item made from its name alone is not refused; no blocker is needed for it. The rows and the items they name may not pass 5,000 created items together.
+- Relationship and item types the import builds on are never created and are left out of its preview.
+
+**Rationale:** A row often names other things, such as who signed it and where it was got; they become connections to real items rather than text, and importing again neither repeats them nor undoes a deletion.

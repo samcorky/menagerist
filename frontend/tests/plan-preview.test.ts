@@ -14,6 +14,7 @@ function item(label: string, over: Partial<Entity>): Entity {
 		action: 'unchanged',
 		reason: null,
 		changed: [],
+		deleted: false,
 		...over
 	};
 }
@@ -55,7 +56,7 @@ describe('PlanPreview', () => {
 	});
 
 	it('lists rows left out, with why', () => {
-		const body = html([item('Ada', { action: 'ambiguous', reason: 'No key.' })]);
+		const body = html([item('Ada', { action: 'skip', reason: 'No key.' })]);
 
 		expect(body).toContain('Left out');
 		expect(body).toContain('Ada · No key.');

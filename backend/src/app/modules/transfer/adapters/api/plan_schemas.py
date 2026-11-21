@@ -18,6 +18,7 @@ class PlanAction(StrEnum):
 
     CREATE = "create"
     UNCHANGED = "unchanged"
+    SKIP = "skip"
     CONFLICT = "conflict"
     AMBIGUOUS = "ambiguous"
 
@@ -38,6 +39,7 @@ class PlannedEntityResponse(BaseModel):
                     "matched_id": None,
                     "matched_name": None,
                     "changed": [],
+                    "deleted": False,
                 },
                 {
                     "kind": "item",
@@ -49,6 +51,7 @@ class PlannedEntityResponse(BaseModel):
                     "matched_name": "Alien #1",
                     "changed": ["attributes.signed_on"],
                     "source_key": "A14",
+                    "deleted": False,
                 },
             ]
         }
@@ -61,7 +64,8 @@ class PlannedEntityResponse(BaseModel):
     label: str = Field(description="Its name, as it would be shown.")
     action: PlanAction
     reason: str | None = Field(
-        default=None, description="Why it is unchanged, conflicts or is ambiguous."
+        default=None,
+        description="Why it is unchanged, left out, conflicts or is ambiguous.",
     )
     matched_id: uuid.UUID | None = Field(
         default=None,
@@ -77,7 +81,11 @@ class PlannedEntityResponse(BaseModel):
     source_key: str | None = Field(
         default=None,
         description="The key it has in its source, such as the row's key column; "
-        + "send it in `restore` to bring back an item deleted after importing.",
+        + "send it in `restore` to bring back one deleted after importing.",
+    )
+    deleted: bool = Field(
+        description="Whether it is left out because you deleted it after importing "
+        + "it; sending its `source_key` in `restore` brings it back."
     )
 
 
@@ -109,6 +117,7 @@ def entities_from_domain(plan: Plan) -> list[PlannedEntityResponse]:
             matched_name=e.matched_name,
             changed=list(e.changed),
             source_key=e.source_key,
+            deleted=e.deleted,
         )
         for e in plan.entities
     ]

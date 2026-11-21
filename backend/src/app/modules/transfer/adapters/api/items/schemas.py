@@ -2,8 +2,12 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.transfer.domain.bundle import NameLookup
+from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.tabular import (
     ColumnMapping,
+    ConnectionColumn,
+    ConnectionEnd,
     CsvEncoding,
     DayMonthOrder,
     ExtraField,
@@ -14,7 +18,6 @@ from app.platform.request_model import RequestModel
 if TYPE_CHECKING:
     from app.modules.transfer.application.item_import import ItemImportInspection
     from app.modules.transfer.application.pipeline import AppliedBundle
-    from app.modules.transfer.domain.entity_kind import EntityKind
 
 INSPECT_EXAMPLE: dict[str, Any] = {
     "headers": ["title", "signed_on", "authenticated"],
@@ -107,6 +110,52 @@ class ColumnMappingEntry(RequestModel):
         )
 
 
+class ConnectionColumnEntry(RequestModel):
+    """A column naming, on each row, another item the row's item connects to."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "column": "signer",
+                    "relationship_type": "signed",
+                    "item_type": "person",
+                    "row_end": "target",
+                    "on_missing": "create",
+                }
+            ]
+        },
+    )
+
+    column: str = Field(description="The column's name in the file's header row.")
+    relationship_type: str = Field(
+        description="The slug of the relationship type that joins them."
+    )
+    item_type: str = Field(
+        description="The slug of the other item's type. Its name is looked up "
+        + "within this type, ignoring case and spacing."
+    )
+    row_end: ConnectionEnd = Field(
+        description="Which end of the connection the row's own item is."
+    )
+    on_missing: NameLookup = Field(
+        default=NameLookup.CREATE,
+        description="What to do when you have no item of that name: `create` one "
+        + "with just the name, or `skip` the connection.",
+    )
+
+    def to_domain(self) -> ConnectionColumn:
+        """The connection column the import reads."""
+        return ConnectionColumn(
+            column=self.column,
+            relationship_type=self.relationship_type,
+            item_type=self.item_type,
+            row_end=self.row_end,
+            on_missing=self.on_missing,
+        )
+
+
 class ItemImportFieldResponse(BaseModel):
     """One field of the item type, as an import can fill it."""
 
@@ -195,13 +244,22 @@ class ItemImportInspectionResponse(BaseModel):
 class ItemImportResultResponse(BaseModel):
     """What running an import created."""
 
-    model_config = ConfigDict(json_schema_extra={"examples": [{"items_added": 1204}]})
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"items_added": 1204, "connections_added": 980}]
+        }
+    )
 
-    items_added: int = Field(description="How many items were added.")
+    items_added: int = Field(
+        description="How many items were added: the rows, and the items their "
+        + "connection columns named that you did not have."
+    )
+    connections_added: int = Field(description="How many connections were added.")
 
     @classmethod
-    def from_domain(
-        cls, applied: AppliedBundle, item: EntityKind
-    ) -> ItemImportResultResponse:
+    def from_domain(cls, applied: AppliedBundle) -> ItemImportResultResponse:
         """Build from what applying the import did."""
-        return cls(items_added=applied.created.get(item, 0))
+        return cls(
+            items_added=applied.created.get(EntityKind.ITEM, 0),
+            connections_added=applied.created.get(EntityKind.CONNECTION, 0),
+        )

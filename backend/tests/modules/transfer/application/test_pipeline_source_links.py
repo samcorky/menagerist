@@ -154,8 +154,9 @@ async def test_an_item_deleted_after_import_is_not_created_again(
 
     plan = await _import(t, bundle, _extras(links))
 
-    assert _item_actions(plan) == {"a": PlanAction.UNCHANGED}
+    assert _item_actions(plan) == {"a": PlanAction.SKIP}
     assert _reason(plan, "a") == "You deleted this after importing it."
+    assert [e.deleted for e in plan.entities if e.ref == "a"] == [True]
     nodes = await shared.graph_repos.nodes.list(
         after=None, limit=10, scope=ContentFilter.everyone()
     )
@@ -262,7 +263,7 @@ async def test_a_row_without_a_key_is_ambiguous_when_keys_are_required(
 
     plan = await _import(t, bundle, _extras(InMemorySourceLinkRepository()))
 
-    assert _item_actions(plan) == {"a": PlanAction.AMBIGUOUS}
+    assert _item_actions(plan) == {"a": PlanAction.SKIP}
     assert _reason(plan, "a") == "No key."
     nodes = await shared.graph_repos.nodes.list(
         after=None, limit=10, scope=ContentFilter.everyone()
@@ -578,7 +579,7 @@ async def test_a_connection_to_an_ambiguous_item_is_left_out(shared: Shared) -> 
 
     assert applied.created[EntityKind.CONNECTION] == 0
     assert [e.action for e in plan.entities if e.kind is EntityKind.CONNECTION] == [
-        PlanAction.UNCHANGED
+        PlanAction.SKIP
     ]
 
 
@@ -745,3 +746,26 @@ async def test_a_keyed_item_carries_its_source_key(shared: Shared) -> None:
 
 def _items_of(plan: Plan) -> list[PlannedEntity]:
     return [e for e in plan.entities if e.kind is EntityKind.ITEM]
+
+
+async def test_keys_without_a_link_store_import_without_links(shared: Shared) -> None:
+    """A keyed bundle applied with no link store still creates what it plans."""
+    t = shared.targets(ALICE)
+    bundle = Bundle(
+        id="b",
+        source=BundleSource(name="lddb"),
+        relationship_types=(WROTE,),
+        item_types=(FILM,),
+        items=(_film("a", "k1"), _film("c", "k2", name="Aliens")),
+        connections=(
+            BundleConnection(
+                source_ref="a", target_ref="c", type_ref="wrote", source_key="c1"
+            ),
+        ),
+    )
+
+    plan = await _plan(t, bundle, BundleExtras())
+    applied = await apply_bundle(plan, bundle, t.presets, t.graph)
+
+    assert applied.created[EntityKind.ITEM] == 2
+    assert applied.created[EntityKind.CONNECTION] == 1

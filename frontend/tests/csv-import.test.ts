@@ -5,6 +5,9 @@ import {
 	assignTarget,
 	choicesFrom,
 	confirmText,
+	connectColumn,
+	connectionsJson,
+	connectionsReady,
 	deletedRows,
 	fieldTitles,
 	hasName,
@@ -14,8 +17,11 @@ import {
 	keyColumns,
 	keyFieldFor,
 	mappingJson,
+	MAX_CONNECTED,
 	MAX_KEPT,
+	namedToCreate,
 	renameKept,
+	rowEndOptions,
 	setKeptKind,
 	rowsAndColumns,
 	targetOptions,
@@ -211,7 +217,8 @@ describe('itemsToAdd', () => {
 		label: 'x',
 		action,
 		reason: null,
-		changed: []
+		changed: [],
+		deleted: false
 	});
 
 	it('counts the items that would be created', () => {
@@ -288,25 +295,141 @@ describe('recognising rows by a key column', () => {
 describe('deletedRows', () => {
 	const row = (
 		label: string,
-		action: 'create' | 'unchanged',
+		action: 'create' | 'unchanged' | 'skip',
 		over: Partial<ImportPlan['entities'][number]> = {}
-	) => ({ kind: 'item', ref: label, label, action, reason: null, changed: [], ...over });
+	) => ({
+		kind: 'item',
+		ref: label,
+		label,
+		action,
+		reason: null,
+		changed: [],
+		deleted: false,
+		...over
+	});
 
-	it('lists rows deleted after importing, and keeps a restored one ticked', () => {
+	it('lists rows and connections deleted after importing, and keeps a restored one ticked', () => {
 		const plan: ImportPlan = {
 			ready: true,
 			blockers: [],
 			entities: [
-				row('Gone', 'unchanged', { source_key: '5' }),
+				row('Gone', 'skip', { source_key: '5', deleted: true }),
 				row('Back', 'create', { source_key: '6' }),
+				row('No key', 'skip', { reason: 'No key.' }),
 				row('Kept', 'unchanged', { source_key: '7', matched_id: 'x', matched_name: 'Kept' }),
-				row('New', 'create', { source_key: '8' })
+				row('New', 'create', { source_key: '8' }),
+				row('Photo to eBay', 'skip', { kind: 'connection', source_key: 'c1', deleted: true })
 			]
 		};
 
 		expect(deletedRows(plan, ['6'])).toEqual([
 			{ key: '5', label: 'Gone', restored: false },
-			{ key: '6', label: 'Back', restored: true }
+			{ key: '6', label: 'Back', restored: true },
+			{ key: 'c1', label: 'Photo to eBay', restored: false }
 		]);
+	});
+});
+
+describe('connecting a column to items by name', () => {
+	const base: ColumnChoice[] = [
+		{ column: 'title', target: 'name' },
+		{ column: 'where', target: null }
+	];
+	const ready = connectColumn(base, 'where', {
+		relationship_type: 'obtained-at',
+		item_type: 'event'
+	});
+
+	it('sends one entry for a connected column, creating missing items by default', () => {
+		expect(JSON.parse(connectionsJson(ready))).toEqual([
+			{
+				column: 'where',
+				relationship_type: 'obtained-at',
+				item_type: 'event',
+				row_end: 'source',
+				on_missing: 'create'
+			}
+		]);
+		expect(JSON.parse(mappingJson(ready, []))).toEqual([
+			{ column: 'title', target: 'name' },
+			{ column: 'where', target: null }
+		]);
+	});
+
+	it('keeps the settings chosen so far when one more changes', () => {
+		const next = connectColumn(ready, 'where', { on_missing: 'skip' });
+
+		expect(JSON.parse(connectionsJson(next))[0]).toMatchObject({
+			item_type: 'event',
+			on_missing: 'skip'
+		});
+	});
+
+	it('waits for a connection type and an item type before it is ready', () => {
+		const started = connectColumn(base, 'where');
+
+		expect(connectionsReady(started)).toBe(false);
+		expect(connectionsJson(started)).toBe('[]');
+		expect(connectionsReady(ready)).toBe(true);
+	});
+
+	it('stops connecting when the column is matched to a field instead', () => {
+		expect(connectionsJson(assignTarget(ready, 'where', 'description'))).toBe('[]');
+	});
+
+	it('refuses a sixth connected column', () => {
+		const many: ColumnChoice[] = Array.from({ length: MAX_CONNECTED + 1 }, (_, i) => ({
+			column: `c${i}`,
+			target: null
+		}));
+		const five = many
+			.slice(0, MAX_CONNECTED)
+			.reduce((acc, c) => connectColumn(acc, c.column), many);
+
+		const six = connectColumn(five, `c${MAX_CONNECTED}`);
+
+		expect(six).toBe(five);
+	});
+
+	it('words which end the row is from the connection type', () => {
+		expect(rowEndOptions({ label: 'Signed by', directional: true })).toEqual([
+			{ value: 'source', label: "This row's item signed by the other item" },
+			{ value: 'target', label: "The other item signed by this row's item" }
+		]);
+	});
+
+	it('names the items the connected columns would create', () => {
+		const plan: ImportPlan = {
+			ready: true,
+			blockers: [],
+			entities: [
+				{
+					kind: 'item',
+					ref: 'row-2',
+					label: 'Photo',
+					action: 'create',
+					changed: [],
+					deleted: false
+				},
+				{
+					kind: 'item',
+					ref: 'named-0',
+					label: 'eBay',
+					action: 'create',
+					changed: [],
+					deleted: false
+				},
+				{
+					kind: 'item',
+					ref: 'named-1',
+					label: 'Comic Con',
+					action: 'unchanged',
+					changed: [],
+					deleted: false
+				}
+			]
+		};
+
+		expect(namedToCreate(plan)).toEqual(['eBay']);
 	});
 });

@@ -1,10 +1,13 @@
 import type {
 	ColumnMappingEntry,
+	ConnectionColumnEntry,
+	ConnectionEnd,
 	CsvEncoding,
 	DayMonthOrder,
 	ExtraFieldKind,
 	ItemImportFieldResponse,
-	ItemImportInspectionResponse
+	ItemImportInspectionResponse,
+	NameLookup
 } from '$lib/api/client';
 import { generateFieldKey } from '$lib/field-key';
 import type { ImportPlan } from '$lib/import-plan';
@@ -20,15 +23,31 @@ export interface KeptDetail {
 	key?: string;
 }
 
+/** How a column connects each row's item to another item it names. */
+export interface ConnectSettings {
+	/** The connection type's slug; null until chosen. */
+	relationship_type: string | null;
+	/** The other item's type; null until chosen. */
+	item_type: string | null;
+	row_end: ConnectionEnd;
+	on_missing: NameLookup;
+}
+
 export interface ColumnChoice {
 	column: string;
 	target: Target;
 	/** Set when the column is kept as an extra detail; `target` is then null. */
 	extra?: KeptDetail;
+	/** Set when the column names another item each row connects to; `target` is then null. */
+	connect?: ConnectSettings;
 }
 
 /** The select value that keeps a column as an extra detail. */
 export const KEEP = '__keep__';
+/** The select value that connects each row to the item a column names. */
+export const CONNECT = '__connect__';
+/** An import connects at most this many columns, as the server allows. */
+export const MAX_CONNECTED = 5;
 /** An item can have at most this many extra details (design §16b). */
 export const MAX_KEPT = 50;
 /** The kinds a kept column can be, in the order they are offered. */
@@ -125,6 +144,74 @@ export function keptDetails(choices: ColumnChoice[]): KeptDetail[] {
 	);
 }
 
+const NEW_CONNECTION: ConnectSettings = {
+	relationship_type: null,
+	item_type: null,
+	row_end: 'source',
+	on_missing: 'create'
+};
+
+/**
+ * Connect each row to the item `column` names, or change how it connects. A column that is not
+ * connected yet is refused once `MAX_CONNECTED` are, and `choices` come back as they were.
+ */
+export function connectColumn(
+	choices: ColumnChoice[],
+	column: string,
+	settings: Partial<ConnectSettings> = {}
+): ColumnChoice[] {
+	const current = choices.find((c) => c.column === column)?.connect;
+	if (!current && choices.filter((c) => c.connect).length >= MAX_CONNECTED) return choices;
+	return choices.map((choice) =>
+		choice.column === column
+			? { column, target: null, connect: { ...NEW_CONNECTION, ...current, ...settings } }
+			: choice
+	);
+}
+
+/** Whether every connected column has its connection type and item type. */
+export function connectionsReady(choices: ColumnChoice[]): boolean {
+	return choices.every((c) => !c.connect || (c.connect.relationship_type && c.connect.item_type));
+}
+
+/** The JSON text the server takes for the connected columns that are ready. */
+export function connectionsJson(choices: ColumnChoice[]): string {
+	const entries: ConnectionColumnEntry[] = choices.flatMap(({ column, connect }) =>
+		connect?.relationship_type && connect.item_type
+			? [
+					{
+						column,
+						relationship_type: connect.relationship_type,
+						item_type: connect.item_type,
+						row_end: connect.row_end,
+						on_missing: connect.on_missing
+					}
+				]
+			: []
+	);
+	return JSON.stringify(entries);
+}
+
+/** "This row's item signed by the other item", and the other way round, from the type's label. */
+export function rowEndOptions(relationship: {
+	label: string;
+	directional: boolean;
+}): { value: ConnectionEnd; label: string }[] {
+	const verb = relationship.label.charAt(0).toLowerCase() + relationship.label.slice(1);
+	return [
+		{ value: 'source', label: `This row's item ${verb} the other item` },
+		{ value: 'target', label: `The other item ${verb} this row's item` }
+	];
+}
+
+/** The items the connected columns name that going ahead would create. */
+export function namedToCreate(plan: ImportPlan): string[] {
+	// The import gives the items a column names `named-` refs and the rows `row-` refs.
+	return plan.entities
+		.filter((e) => e.kind === 'item' && e.action === 'create' && e.ref.startsWith('named-'))
+		.map((e) => e.label);
+}
+
 /** An item cannot be made without a name. */
 export function hasName(choices: ColumnChoice[]): boolean {
 	return choices.some((choice) => choice.target === 'name');
@@ -197,16 +284,15 @@ export interface DeletedRow {
 }
 
 /**
- * Rows whose item was deleted after an earlier import, ticked when `restore` brings them back.
- * Left out, a row is unchanged with a key and no item it matched; brought back, it is created.
+ * Rows and connections deleted after an earlier import, ticked when `restore` brings them back:
+ * the plan marks one left out as `deleted`, and creates one brought back.
  */
 export function deletedRows(plan: ImportPlan, restore: string[]): DeletedRow[] {
 	return plan.entities.flatMap((e) => {
 		const key = e.source_key;
-		if (e.kind !== 'item' || !key) return [];
-		const left = e.action === 'unchanged' && !e.matched_id;
+		if (!key) return [];
 		const restored = e.action === 'create' && restore.includes(key);
-		return left || restored ? [{ key, label: e.label, restored }] : [];
+		return e.deleted || restored ? [{ key, label: e.label, restored }] : [];
 	});
 }
 

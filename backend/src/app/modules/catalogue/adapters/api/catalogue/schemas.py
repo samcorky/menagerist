@@ -123,6 +123,7 @@ PLAN_EXAMPLE: dict[str, Any] = {
             "label": "Person",
             "action": "unchanged",
             "changed": [],
+            "deleted": False,
             "reason": "You already have one with this name.",
         },
         {
@@ -131,6 +132,7 @@ PLAN_EXAMPLE: dict[str, Any] = {
             "label": "Place",
             "action": "create",
             "changed": [],
+            "deleted": False,
             "reason": None,
         },
     ],

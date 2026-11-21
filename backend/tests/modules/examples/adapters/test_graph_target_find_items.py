@@ -52,3 +52,16 @@ async def test_limit_caps_the_matches(make_world: MakeWorld) -> None:
         len(await world.graph.find_items_by_field("film", "name", "Alien", limit=3))
         == 3
     )
+
+
+async def test_a_name_can_be_matched_ignoring_case(make_world: MakeWorld) -> None:
+    """Ignoring case finds the item by name, but never relaxes an attribute."""
+    world = make_world()
+    alien = Node.create(
+        owner_id=world.actor.id, name="Alien", type="film", attributes={"upc": "AB"}
+    )
+    await world.graph_repos.nodes.add(alien)
+    find = world.graph.find_items_by_field
+
+    assert await find("film", "name", "alien", ignore_case=True) == [alien.id]
+    assert await find("film", "upc", "ab", ignore_case=True) == []

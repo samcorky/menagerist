@@ -128,12 +128,19 @@ class GraphTarget(Protocol):
         ...
 
     async def find_items_by_field(
-        self, type_slug: str, key: str, value: str, *, limit: int = 2
+        self,
+        type_slug: str,
+        key: str,
+        value: str | int | float,
+        *,
+        limit: int = 2,
+        ignore_case: bool = False,
     ) -> list[uuid.UUID]:
         """Return ids of the person's items of `type_slug` whose `key` equals `value`.
 
         `key` is an attribute key, or `name` for the item's name. Matching is exact
-        and case-sensitive. Two ids are enough to tell none, one and ambiguous.
+        and case-sensitive, and a number matches a number only; `ignore_case` relaxes
+        case for `name` only. Two ids are enough to tell none, one and ambiguous.
         """
         ...
 

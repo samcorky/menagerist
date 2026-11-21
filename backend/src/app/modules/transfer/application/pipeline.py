@@ -5,6 +5,7 @@ Planning reads only, so the same plan is a dry run and, applied, what the import
 does. What only some sources need travels in `BundleExtras`.
 """
 
+import uuid
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
@@ -16,7 +17,7 @@ from app.modules.transfer.application.extras import (
     Key,
     connection_ref,
 )
-from app.modules.transfer.domain.bundle import BundleSource, split_ref
+from app.modules.transfer.domain.bundle import BundleSource, NameLookup, split_ref
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.errors import BundleConflictError, InvalidBundleError
 from app.modules.transfer.domain.plan import (
@@ -29,12 +30,12 @@ from app.modules.transfer.domain.plan import (
 from app.modules.transfer.domain.source_link import SourceLink
 from app.modules.transfer.ports.source_link_repository import SourceLinkRepository
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
-    import uuid
     from collections.abc import Sequence
 
-    from app.modules.transfer.domain.bundle import Bundle, BundleItem
+    from app.modules.transfer.domain.bundle import Bundle, BundleConnection, BundleItem
     from app.modules.transfer.ports.targets import (
         Created,
         GraphTarget,
@@ -49,6 +50,11 @@ _TAKEN_BACK = "Kept from an earlier install, and taken back as it is."
 _ALREADY_IMPORTED = "Already imported."
 _DELETED = "You deleted this after importing it."
 _NO_KEY = "No key."
+_LEFT_OUT = "Left out: an item it joins is not being imported."
+_NAME_FOUND = "Matches your existing item."
+_NOT_FOUND = "Not found, and this column does not create items."
+_REPEATED = "Repeats a connection earlier in this file."
+_CONNECTED = "You already have this connection."
 _NOUNS = {
     EntityKind.ITEM_TYPE: "an item type",
     EntityKind.RELATIONSHIP_TYPE: "a relationship type",
@@ -106,7 +112,7 @@ async def plan_bundle(
     await planner.types(graph, clash)
     await planner.items(graph)
     await planner.items_fit(graph)
-    planner.connections()
+    await planner.connections(graph)
     planner.collections()
     await planner.covers()
     return Plan(
@@ -136,16 +142,28 @@ class _Keyed:
     counts: Counter[str | None]
 
 
-def _key_value(spec: BundleItem, key_field: str) -> str | None:
-    """The text of the item's `key_field` that finds a hand-made item, if it has one.
+def _key_values(spec: BundleItem, key_field: str) -> list[str | int | float]:
+    """The values of the item's `key_field` that find a hand-made item.
 
-    A number is read as its text. A blank or non-text value finds nothing.
+    A number finds an item holding that number or its text, as either may have been
+    typed. Blank text, a yes/no or any other value finds nothing.
     """
     value: object = spec.name if key_field == "name" else spec.attributes.get(key_field)
     if isinstance(value, bool) or not isinstance(value, str | int | float):
-        return None
-    text = str(value)
-    return text if text.strip() else None
+        return []
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    return [value, str(value)]
+
+
+def _edge_ends(
+    spec: BundleConnection, edge: Inspection
+) -> tuple[tuple[str, uuid.UUID], tuple[str, uuid.UUID]]:
+    """Each end's ref, with the item an earlier import's connection joins there."""
+    return (
+        (spec.source_ref, uuid.UUID(str(edge.content["source_id"]))),
+        (spec.target_ref, uuid.UUID(str(edge.content["target_id"]))),
+    )
 
 
 def _name_of(found: Inspection | None, fallback: str) -> str:
@@ -164,9 +182,10 @@ class _Planner:
         # Item types the file names whose slug the person already uses: ref to slug.
         self._reused_types: dict[str, str] = {}
         self._taken_back: set[Key] = set()
-        # Items applying leaves as they are, and the ones whose key is ambiguous.
+        # Items applying leaves as they are, or leaves out.
         self._not_created: set[str] = set()
-        self._ambiguous_refs: set[str] = set()
+        # By connection index: the link an earlier import recorded, and its edge now.
+        self._connection_links: dict[int, tuple[SourceLink, Inspection | None]] = {}
         # Item ids and names known before anything is created: adopted and external.
         self._item_ids: dict[str, uuid.UUID] = {}
         self._item_names: dict[str, str] = {}
@@ -186,6 +205,7 @@ class _Planner:
         matched: tuple[uuid.UUID, str] | None = None,
         changed: tuple[str, ...] = (),
         source_key: str | None = None,
+        deleted: bool = False,
     ) -> None:
         self.entities.append(
             PlannedEntity(
@@ -198,6 +218,7 @@ class _Planner:
                 matched_name=None if matched is None else matched[1],
                 changed=changed,
                 source_key=source_key,
+                deleted=deleted,
             )
         )
 
@@ -273,6 +294,9 @@ class _Planner:
         """
         keyed = self._keyed_items()
         for spec in self._bundle.items:
+            if spec.lookup is not None:
+                self._item_names[spec.ref] = spec.name
+                continue
             adoption = self._take_back(EntityKind.ITEM, spec.ref, spec.name)
             if adoption is not None:
                 self._item_ids[spec.ref] = adoption.record.entity_id
@@ -281,11 +305,119 @@ class _Planner:
             self._item_names[spec.ref] = spec.name
             if keyed is None or spec.source_key is None:
                 if keyed is not None and keyed.source.require_keys:
-                    self._ambiguous(spec.ref, spec.name, _NO_KEY)
+                    self._leave_out(spec.ref, spec.name, _NO_KEY)
                     continue
                 self._add(EntityKind.ITEM, spec.ref, spec.name, PlanAction.CREATE)
             else:
                 await self._keyed_item(spec, keyed, graph)
+        await self._read_connection_links(keyed, graph)
+        await self._named_items(graph)
+
+    async def _read_connection_links(
+        self, keyed: _Keyed | None, graph: GraphTarget
+    ) -> None:
+        """Find the connections an earlier import made, and whether each remains."""
+        if keyed is None:
+            return
+        for n, spec in enumerate(self._bundle.connections):
+            if spec.source_key is None:
+                continue
+            link = await keyed.links.get_by_key(
+                keyed.source.name,
+                EntityKind.CONNECTION,
+                spec.source_key,
+                scope=keyed.scope,
+            )
+            if link is not None:
+                edge = await graph.inspect(EntityKind.CONNECTION, link.entity_id)
+                self._connection_links[n] = (link, edge)
+
+    def _live(self, ref: str) -> bool:
+        """Whether the item `ref` will be there after applying: made, or known."""
+        return ref in self._item_ids or ref not in self._not_created
+
+    async def _named_items(self, graph: GraphTarget) -> None:
+        """Find each item named by a connection end, once the rows are planned.
+
+        A connection an earlier import made names the item at its end, however it is
+        called now. Otherwise only a name a connection would join to a live row is
+        looked up; the rest are left out, so neither a row that is not imported nor a
+        connection you deleted creates anything for its own sake.
+        """
+        made, needed = self._names_made_or_needed()
+        for spec in self._bundle.items:
+            if spec.lookup is None:
+                continue
+            if spec.ref in made:
+                await self._name_found(spec, made[spec.ref], graph)
+            elif spec.ref in needed:
+                await self._named_item(spec, graph)
+            else:
+                self._leave_out(spec.ref, spec.name, _LEFT_OUT)
+
+    def _names_made_or_needed(self) -> tuple[dict[str, uuid.UUID], set[str]]:
+        """The names an earlier import's live connections found, and those to find.
+
+        A name is to be found when a connection would join it to a live row: one
+        never imported, or deleted and restored.
+        """
+        lookups = {s.ref for s in self._bundle.items if s.lookup is not None}
+        made: dict[str, uuid.UUID] = {}
+        needed: set[str] = set()
+        for n, joined in enumerate(self._bundle.connections):
+            edge = self._made_edge(n)
+            if edge is not None:
+                for end, item_id in _edge_ends(joined, edge):
+                    if end in lookups:
+                        made.setdefault(end, item_id)
+            elif self._may_make(n):
+                needed.update(
+                    end
+                    for end, other in (
+                        (joined.source_ref, joined.target_ref),
+                        (joined.target_ref, joined.source_ref),
+                    )
+                    if other not in lookups and self._live(other)
+                )
+        return made, needed
+
+    def _made_edge(self, n: int) -> Inspection | None:
+        """The connection an earlier import made for the `n`th one, if still there."""
+        known = self._connection_links.get(n)
+        return None if known is None else known[1]
+
+    def _may_make(self, n: int) -> bool:
+        """Whether the `n`th connection may be made: never imported, or restored."""
+        known = self._connection_links.get(n)
+        return known is None or known[0].key in self._extras.restore
+
+    async def _name_found(
+        self, spec: BundleItem, item_id: uuid.UUID, graph: GraphTarget
+    ) -> None:
+        """Use the person's item `item_id` for the name, as it is now."""
+        self._extras.named[spec.ref] = self._item_ids[spec.ref] = item_id
+        mine = await graph.inspect(EntityKind.ITEM, item_id)
+        self._skip(
+            spec.ref,
+            spec.name,
+            _NAME_FOUND,
+            matched=(item_id, _name_of(mine, spec.name)),
+        )
+
+    async def _named_item(self, spec: BundleItem, graph: GraphTarget) -> None:
+        ref, name = spec.ref, spec.name
+        slug = cast("str", self._item_type_slug(spec.type_ref))
+        found = await graph.find_items_by_field(slug, "name", name, ignore_case=True)
+        if len(found) > 1:
+            self._ambiguous(
+                ref, name, f"More than one of your {slug} items is called '{name}'."
+            )
+        elif found:
+            await self._name_found(spec, found[0], graph)
+        elif spec.lookup is NameLookup.CREATE:
+            self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE)
+        else:
+            self._leave_out(ref, name, _NOT_FOUND)
 
     def _keyed_items(self) -> _Keyed | None:
         """Return what planning needs to link items, or `None` if it cannot."""
@@ -323,11 +455,14 @@ class _Planner:
         # Never imported: look for an item the person made.
         field = keyed.source.key_field
         slug = self._item_type_slug(spec.type_ref)
-        value = _key_value(spec, field) if field is not None else None
-        if field is None or slug is None or value is None:
+        values = _key_values(spec, field) if field is not None else []
+        if field is None or slug is None or not values:
             self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE, source_key=key)
             return
-        found = await graph.find_items_by_field(slug, field, value)
+        found: list[uuid.UUID] = []
+        for value in values:
+            found.extend(await graph.find_items_by_field(slug, field, value))
+        value = values[-1]
         if len(found) > 1:
             self._ambiguous(
                 ref,
@@ -362,7 +497,7 @@ class _Planner:
             if key in self._extras.restore:
                 self._add(EntityKind.ITEM, ref, name, PlanAction.CREATE, source_key=key)
             else:
-                self._skip(ref, name, _DELETED, source_key=key)
+                self._leave_out(ref, name, _DELETED, source_key=key, deleted=True)
             return
         self._extras.linked[ref] = self._item_ids[ref] = link.entity_id
         self._skip(
@@ -400,7 +535,6 @@ class _Planner:
         self, ref: str, name: str, reason: str, *, source_key: str | None = None
     ) -> None:
         self._not_created.add(ref)
-        self._ambiguous_refs.add(ref)
         self._add(
             EntityKind.ITEM,
             ref,
@@ -408,6 +542,26 @@ class _Planner:
             PlanAction.AMBIGUOUS,
             reason,
             source_key=source_key,
+        )
+
+    def _leave_out(
+        self,
+        ref: str,
+        name: str,
+        reason: str,
+        *,
+        source_key: str | None = None,
+        deleted: bool = False,
+    ) -> None:
+        self._not_created.add(ref)
+        self._add(
+            EntityKind.ITEM,
+            ref,
+            name,
+            PlanAction.SKIP,
+            reason,
+            source_key=source_key,
+            deleted=deleted,
         )
 
     def _item_type_slug(self, type_ref: str | None) -> str | None:
@@ -445,31 +599,100 @@ class _Planner:
                     )
                 )
 
-    def connections(self) -> None:
-        """A kept connection is taken back only if it still joins the same items."""
+    async def connections(self, graph: GraphTarget) -> None:
+        """Plan each connection: left out, taken back, already made, or created.
+
+        A connection is made once: not when an end is not imported, when an earlier
+        import made it (unless deleted and restored), when the file repeats it, or
+        when the person already has it.
+        """
+        seen: set[tuple[object, object, str]] = set()
         for n, spec in enumerate(self._bundle.connections):
             ref = connection_ref(n)
             # A required pack's item has no name here when that pack is missing.
             source = self._item_names.get(spec.source_ref, spec.source_ref)
             target = self._item_names.get(spec.target_ref, spec.target_ref)
             label = f"{source} to {target}"
-            if {spec.source_ref, spec.target_ref} & self._ambiguous_refs:
-                reason = "Left out: an item it joins has an ambiguous key."
+            key = spec.source_key
+            known = self._connection_links.get(n)
+            if (
+                known is not None
+                and known[1] is None
+                and known[0].key not in self._extras.restore
+            ):
                 self._add(
-                    EntityKind.CONNECTION, ref, label, PlanAction.UNCHANGED, reason
+                    EntityKind.CONNECTION,
+                    ref,
+                    label,
+                    PlanAction.SKIP,
+                    _DELETED,
+                    source_key=key,
+                    deleted=True,
                 )
                 continue
-            kept = self._extras.adoptions.get((EntityKind.CONNECTION, ref))
+            if not (self._live(spec.source_ref) and self._live(spec.target_ref)):
+                self._add(
+                    EntityKind.CONNECTION,
+                    ref,
+                    label,
+                    PlanAction.SKIP,
+                    _LEFT_OUT,
+                    source_key=key,
+                )
+                continue
             source_id = self._item_ids.get(spec.source_ref)
             target_id = self._item_ids.get(spec.target_ref)
+            kept = self._extras.adoptions.get((EntityKind.CONNECTION, ref))
             if (
                 kept is not None
                 and kept.content["source_id"] == str(source_id)
                 and kept.content["target_id"] == str(target_id)
             ):
                 self._take_back(EntityKind.CONNECTION, ref, label)
-            else:
-                self._add(EntityKind.CONNECTION, ref, label, PlanAction.CREATE)
+                continue
+            joins = (source_id or spec.source_ref, target_id or spec.target_ref)
+            reason = await self._connection_reason(known, spec, graph, seen, joins)
+            seen.add((*joins, spec.type_ref))
+            action = PlanAction.CREATE if reason is None else PlanAction.UNCHANGED
+            self._add(EntityKind.CONNECTION, ref, label, action, reason, source_key=key)
+
+    async def _connection_reason(
+        self,
+        known: tuple[SourceLink, Inspection | None] | None,
+        spec: BundleConnection,
+        graph: GraphTarget,
+        seen: set[tuple[object, object, str]],
+        joins: tuple[object, object],
+    ) -> str | None:
+        """Why a connection between live items is not made, or `None` to make it.
+
+        One an earlier import made is already there; one it made that you deleted was
+        planned before this, unless restored.
+        """
+        if known is not None and known[1] is not None:
+            return _ALREADY_IMPORTED
+        if (*joins, spec.type_ref) in seen:
+            return _REPEATED
+        source_id, target_id = joins
+        slug = self._relationship_slug(spec.type_ref)
+        if (
+            isinstance(source_id, uuid.UUID)
+            and isinstance(target_id, uuid.UUID)
+            and slug is not None
+            and await graph.connection_exists(source_id, target_id, slug)
+        ):
+            return _CONNECTED
+        return None
+
+    def _relationship_slug(self, type_ref: str) -> str | None:
+        """The slug of the relationship type `type_ref`, here or in a required pack."""
+        for spec in self._bundle.relationship_types:
+            if spec.ref == type_ref:
+                return slugify(spec.slug)
+        pack_id, local = split_ref(type_ref)
+        key = (EntityKind.RELATIONSHIP_TYPE, pack_id or "", local)
+        found = self._extras.external.get(key)
+        return None if found is None else found.slug
 
     def collections(self) -> None:
         """Plan each collection, taking back one an earlier install kept."""
@@ -545,10 +768,15 @@ class _Applier:
         self._graph = graph
         self._extras = extras
         self._created: Counter[EntityKind] = Counter()
-        self._ambiguous = {
+        self._actions: dict[tuple[EntityKind, str], PlanAction] = {}
+        for e in plan.entities:
+            self._actions.setdefault((e.kind, e.ref), e.action)
+        # Items the plan leaves out, which nothing else may then name.
+        self._left_out = {
             e.ref
             for e in plan.entities
-            if e.kind is EntityKind.ITEM and e.action is PlanAction.AMBIGUOUS
+            if e.kind is EntityKind.ITEM
+            and e.action in (PlanAction.SKIP, PlanAction.AMBIGUOUS)
         }
         self._preset_ids: dict[str, uuid.UUID] = {}
         self._type_slugs: dict[str, str] = {}
@@ -566,10 +794,7 @@ class _Applier:
                 self._item_names[key] = cast("str", found.name)
 
     def _action(self, kind: EntityKind, ref: str) -> PlanAction | None:
-        return next(
-            (e.action for e in self._plan.entities if (e.kind, e.ref) == (kind, ref)),
-            None,
-        )
+        return self._actions.get((kind, ref))
 
     def _adoption(self, kind: EntityKind, ref: str) -> Adoption | None:
         """The kept entity the plan takes back for `kind` and `ref`, if any."""
@@ -632,9 +857,11 @@ class _Applier:
                 self._item_names[spec.ref] = adoption.content["name"]
                 await self._took_back(adoption, spec.ref, spec.name)
                 continue
-            if spec.ref in self._ambiguous:
+            if spec.ref in self._left_out:
                 continue
-            existing = self._extras.linked.get(spec.ref)
+            existing = self._extras.linked.get(spec.ref) or self._extras.named.get(
+                spec.ref
+            )
             matched = self._extras.matched.get(spec.ref)
             if existing is not None or matched is not None:
                 # Made by an earlier import, or by the person: as they have it.
@@ -655,25 +882,29 @@ class _Applier:
 
     async def _link(self, spec: BundleItem, entity_id: uuid.UUID) -> None:
         """Link the item to its source key, re-pointing a link whose item had gone."""
+        if spec.source_key is not None:
+            await self._record_link(
+                EntityKind.ITEM, spec.source_key, entity_id, item_field_hashes(spec)
+            )
+
+    async def _record_link(
+        self, kind: EntityKind, key: str, entity_id: uuid.UUID, fields: dict[str, str]
+    ) -> None:
+        """Link `entity_id` to `key` in the bundle's source, if it has one."""
         source = self._bundle.source
         links = self._extras.links
         owner_id = self._extras.owner_id
         if source is None or links is None or owner_id is None:
             return
-        if spec.source_key is None:
-            return
-        fields = item_field_hashes(spec)
         scope = ContentFilter.of(owner_id)
-        link = await links.get_by_key(
-            source.name, EntityKind.ITEM, spec.source_key, scope=scope
-        )
+        link = await links.get_by_key(source.name, kind, key, scope=scope)
         if link is None:
             await links.add(
                 SourceLink.create(
                     owner_id=owner_id,
                     source=source.name,
-                    kind=EntityKind.ITEM,
-                    key=spec.source_key,
+                    kind=kind,
+                    key=key,
                     entity_id=entity_id,
                     fields=fields,
                 )
@@ -685,14 +916,15 @@ class _Applier:
     async def connections(self) -> None:
         """Create the connections, or take back the ones that still join the same."""
         for n, spec in enumerate(self._bundle.connections):
-            if {spec.source_ref, spec.target_ref} & self._ambiguous:
-                continue
+            ref = connection_ref(n)
+            adoption = self._adoption(EntityKind.CONNECTION, ref)
+            if adoption is None and not self._creating(EntityKind.CONNECTION, ref):
+                continue  # left out, or already made
             source = self._item_names[spec.source_ref]
             target = self._item_names[spec.target_ref]
-            ref = connection_ref(n)
             label = f"{source} to {target}"
             # The plan takes it back only if it still joins the same items.
-            if (adoption := self._adoption(EntityKind.CONNECTION, ref)) is not None:
+            if adoption is not None:
                 await self._took_back(adoption, ref, label)
                 continue
             created = await self._graph.create_connection(
@@ -702,11 +934,15 @@ class _Applier:
                 type_slug=self._relationship_slugs[spec.type_ref],
             )
             await self._made(EntityKind.CONNECTION, ref, label, created)
+            if spec.source_key is not None:
+                await self._record_link(
+                    EntityKind.CONNECTION, spec.source_key, created.entity_id, {}
+                )
 
     async def collections(self) -> None:
         """Create the collections, or take back the ones an earlier install kept."""
         for spec in self._bundle.collections:
-            refs = [r for r in spec.item_refs if r not in self._ambiguous]
+            refs = [r for r in spec.item_refs if r not in self._left_out]
             if spec.item_refs and not refs:
                 continue
             missing = [ref for ref in refs if ref not in self._item_ids]

@@ -18971,7 +18971,8 @@
                       "ref": "album",
                       "label": "Album",
                       "action": "create",
-                      "changed": []
+                      "changed": [],
+                      "deleted": false
                     },
                     {
                       "kind": "item",
@@ -18979,6 +18980,7 @@
                       "label": "Blue",
                       "action": "unchanged",
                       "changed": [],
+                      "deleted": false,
                       "reason": "Kept from an earlier install, and taken back as it is."
                     }
                   ]
@@ -20005,6 +20007,7 @@
                       "label": "Person",
                       "action": "unchanged",
                       "changed": [],
+                      "deleted": false,
                       "reason": "You already have one with this name."
                     },
                     {
@@ -20012,7 +20015,8 @@
                       "ref": "place",
                       "label": "Place",
                       "action": "create",
-                      "changed": []
+                      "changed": [],
+                      "deleted": false
                     }
                   ]
                 }
@@ -20199,6 +20203,7 @@
                       "label": "Condition grades",
                       "action": "unchanged",
                       "changed": [],
+                      "deleted": false,
                       "reason": "You already have one the same."
                     }
                   ]
@@ -21268,7 +21273,7 @@
           "Imports"
         ],
         "summary": "Plan Item Import",
-        "description": "See what importing a CSV file would do, without importing anything.\n\nEach row is an item to `create`. A value that cannot be imported, such as a date\nwritten as \"19th Aug\", is a blocker that names its row (the header is row 1) and\nfield; while there are any, the plan is not `ready`.\n\n**Requires permission:** `transfer:bundle:import`",
+        "description": "See what importing a CSV file would do, without importing anything.\n\nEach row is an item to `create`, and each connection column adds the items it\nnames and a connection to each. A value that cannot be imported, such as a date\nwritten as \"19th Aug\", is a blocker that names its row (the header is row 1) and\nfield; while there are any, the plan is not `ready`.\n\n**Requires permission:** `transfer:bundle:import`",
         "operationId": "plan_item_import",
         "requestBody": {
           "content": {
@@ -21294,6 +21299,7 @@
                     {
                       "action": "unchanged",
                       "changed": [],
+                      "deleted": false,
                       "kind": "preset",
                       "label": "Condition grades",
                       "reason": "You already have one the same.",
@@ -21519,6 +21525,7 @@
                   "$ref": "#/components/schemas/ItemImportResultResponse"
                 },
                 "example": {
+                  "connections_added": 980,
                   "items_added": 1204
                 }
               }
@@ -32320,6 +32327,7 @@
               {
                 "action": "unchanged",
                 "changed": [],
+                "deleted": false,
                 "kind": "item_type",
                 "label": "Person",
                 "reason": "You already have one with this name.",
@@ -32328,6 +32336,7 @@
               {
                 "action": "create",
                 "changed": [],
+                "deleted": false,
                 "kind": "item_type",
                 "label": "Place",
                 "ref": "place"
@@ -32661,6 +32670,62 @@
             "target": "signed_on"
           }
         ]
+      },
+      "ConnectionColumnEntry": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "title": "Column",
+            "description": "The column's name in the file's header row."
+          },
+          "relationship_type": {
+            "type": "string",
+            "title": "Relationship Type",
+            "description": "The slug of the relationship type that joins them."
+          },
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "description": "The slug of the other item's type. Its name is looked up within this type, ignoring case and spacing."
+          },
+          "row_end": {
+            "$ref": "#/components/schemas/ConnectionEnd",
+            "description": "Which end of the connection the row's own item is."
+          },
+          "on_missing": {
+            "$ref": "#/components/schemas/NameLookup",
+            "description": "What to do when you have no item of that name: `create` one with just the name, or `skip` the connection.",
+            "default": "create"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "column",
+          "relationship_type",
+          "item_type",
+          "row_end"
+        ],
+        "title": "ConnectionColumnEntry",
+        "description": "A column naming, on each row, another item the row's item connects to.",
+        "examples": [
+          {
+            "column": "signer",
+            "item_type": "person",
+            "on_missing": "create",
+            "relationship_type": "signed",
+            "row_end": "target"
+          }
+        ]
+      },
+      "ConnectionEnd": {
+        "type": "string",
+        "enum": [
+          "source",
+          "target"
+        ],
+        "title": "ConnectionEnd",
+        "description": "Which end of a connection the row's own item is."
       },
       "CoverRequest": {
         "properties": {
@@ -34428,9 +34493,24 @@
               "type": "array"
             },
             "title": "Restore",
-            "description": "Keys of rows whose item was deleted after an earlier import that are to be created again, as a JSON list.",
+            "description": "Keys of rows and connections deleted after an earlier import that are to be created again, as a JSON list.",
             "examples": [
               "[\"A14\", \"A15\"]"
+            ]
+          },
+          "connections": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": {
+              "items": {
+                "$ref": "#/components/schemas/ConnectionColumnEntry"
+              },
+              "type": "array"
+            },
+            "title": "Connections",
+            "description": "Columns that connect each row to another item, found by its name, as a JSON list; at most 5.",
+            "examples": [
+              "[{\"column\": \"signer\", \"relationship_type\": \"signed\", \"item_type\": \"person\", \"row_end\": \"target\"}]"
             ]
           },
           "list_separator": {
@@ -34505,6 +34585,7 @@
               {
                 "action": "unchanged",
                 "changed": [],
+                "deleted": false,
                 "kind": "preset",
                 "label": "Condition grades",
                 "reason": "You already have one the same.",
@@ -34685,6 +34766,7 @@
               {
                 "action": "create",
                 "changed": [],
+                "deleted": false,
                 "kind": "item_type",
                 "label": "Album",
                 "ref": "album"
@@ -34692,6 +34774,7 @@
               {
                 "action": "unchanged",
                 "changed": [],
+                "deleted": false,
                 "kind": "item",
                 "label": "Blue",
                 "reason": "Kept from an earlier install, and taken back as it is.",
@@ -35067,17 +35150,24 @@
           "items_added": {
             "type": "integer",
             "title": "Items Added",
-            "description": "How many items were added."
+            "description": "How many items were added: the rows, and the items their connection columns named that you did not have."
+          },
+          "connections_added": {
+            "type": "integer",
+            "title": "Connections Added",
+            "description": "How many connections were added."
           }
         },
         "type": "object",
         "required": [
-          "items_added"
+          "items_added",
+          "connections_added"
         ],
         "title": "ItemImportResultResponse",
         "description": "What running an import created.",
         "examples": [
           {
+            "connections_added": 980,
             "items_added": 1204
           }
         ]
@@ -35773,6 +35863,15 @@
         ],
         "title": "MissedRun",
         "description": "Whether to catch up the latest missed occurrence."
+      },
+      "NameLookup": {
+        "type": "string",
+        "enum": [
+          "create",
+          "skip"
+        ],
+        "title": "NameLookup",
+        "description": "What happens to an item found by name when the person has none called that."
       },
       "NodeContentsEntryResponse": {
         "properties": {
@@ -36860,6 +36959,7 @@
         "enum": [
           "create",
           "unchanged",
+          "skip",
           "conflict",
           "ambiguous"
         ],
@@ -36931,9 +37031,24 @@
               "type": "array"
             },
             "title": "Restore",
-            "description": "Keys of rows whose item was deleted after an earlier import that are to be created again, as a JSON list.",
+            "description": "Keys of rows and connections deleted after an earlier import that are to be created again, as a JSON list.",
             "examples": [
               "[\"A14\", \"A15\"]"
+            ]
+          },
+          "connections": {
+            "type": "string",
+            "contentMediaType": "application/json",
+            "contentSchema": {
+              "items": {
+                "$ref": "#/components/schemas/ConnectionColumnEntry"
+              },
+              "type": "array"
+            },
+            "title": "Connections",
+            "description": "Columns that connect each row to another item, found by its name, as a JSON list; at most 5.",
+            "examples": [
+              "[{\"column\": \"signer\", \"relationship_type\": \"signed\", \"item_type\": \"person\", \"row_end\": \"target\"}]"
             ]
           },
           "list_separator": {
@@ -36999,7 +37114,7 @@
               }
             ],
             "title": "Reason",
-            "description": "Why it is unchanged, conflicts or is ambiguous."
+            "description": "Why it is unchanged, left out, conflicts or is ambiguous."
           },
           "matched_id": {
             "anyOf": [
@@ -37044,7 +37159,12 @@
               }
             ],
             "title": "Source Key",
-            "description": "The key it has in its source, such as the row's key column; send it in `restore` to bring back an item deleted after importing."
+            "description": "The key it has in its source, such as the row's key column; send it in `restore` to bring back one deleted after importing."
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "description": "Whether it is left out because you deleted it after importing it; sending its `source_key` in `restore` brings it back."
           }
         },
         "type": "object",
@@ -37053,7 +37173,8 @@
           "ref",
           "label",
           "action",
-          "changed"
+          "changed",
+          "deleted"
         ],
         "title": "PlannedEntityResponse",
         "description": "One entity of what is being installed, and what installing would do with it.",
@@ -37061,6 +37182,7 @@
           {
             "action": "conflict",
             "changed": [],
+            "deleted": false,
             "kind": "item_type",
             "label": "Album",
             "reason": "You already have an item type called 'album'. Rename or remove it, then try again.",
@@ -37071,6 +37193,7 @@
             "changed": [
               "attributes.signed_on"
             ],
+            "deleted": false,
             "kind": "item",
             "label": "Alien #1",
             "matched_id": "0192f4a8-5c3e-7d21-9a6b-3e8f1c2d4b5a",

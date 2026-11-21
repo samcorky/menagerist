@@ -44,6 +44,13 @@ def _label(key: str, titles: Mapping[str, int]) -> str:
     return named[0][1] if named else key
 
 
+def _same_value(stored: object, value: str | int | float) -> bool:
+    """Whether `stored` is `value` and of its kind, as JSON containment compares."""
+    if isinstance(stored, bool) or isinstance(stored, str) != isinstance(value, str):
+        return False
+    return isinstance(stored, str | int | float) and stored == value
+
+
 class InMemoryNodeRepository:
     """Dict-backed `NodeRepository` for tests and the in-memory adapter."""
 
@@ -402,7 +409,7 @@ class InMemoryNodeRepository:
         self,
         type_slug: str,
         key: str,
-        value: str,
+        value: str | int | float,
         *,
         scope: ContentFilter,
         limit: int,
@@ -411,20 +418,28 @@ class InMemoryNodeRepository:
         found = sorted(
             node.id
             for node in self._visible(scope)
-            if node.type == type_slug
-            and isinstance(node.attributes.get(key), str)
-            and node.attributes[key] == value
+            if node.type == type_slug and _same_value(node.attributes.get(key), value)
         )
         return found[:limit]
 
     async def ids_with_name(
-        self, type_slug: str, name: str, *, scope: ContentFilter, limit: int
+        self,
+        type_slug: str,
+        name: str,
+        *,
+        scope: ContentFilter,
+        limit: int,
+        ignore_case: bool = False,
     ) -> builtins.list[uuid.UUID]:
         """Return ids of non-deleted nodes of `type_slug` named exactly `name`."""
+
+        def same(other: str) -> bool:
+            return other.lower() == name.lower() if ignore_case else other == name
+
         found = sorted(
             node.id
             for node in self._visible(scope)
-            if node.type == type_slug and node.name == name
+            if node.type == type_slug and same(node.name)
         )
         return found[:limit]
 
