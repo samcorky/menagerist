@@ -6,7 +6,7 @@ from fastapi.dependencies.utils import get_dependant
 from fastapi.routing import APIRoute
 from fastapi.security import APIKeyCookie, HTTPBearer
 
-from app.entrypoints.api.shared import signature_cache
+from app.entrypoints.api.shared import route_analysis_cache
 from app.entrypoints.api.shared.authorisation import TOKEN_GRANTABLE_PERMISSIONS
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.platform.config import get_identity_settings
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 # Every router is built with this module's route class, so this runs before any of
 # their routes are constructed.
-signature_cache.install()
+route_analysis_cache.install()
 
 # The session cookie identity issues at sign-in. auto_error=False deliberately:
 # this exists for OpenAPI documentation only; `get_current_actor` rejects the
