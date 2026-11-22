@@ -8,134 +8,32 @@ from typing import TYPE_CHECKING, Literal
 import pytest
 import time_machine
 from starlette.requests import Request
-from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
 from app.entrypoints.api import create_app
-from app.modules.identity.adapters.api.dependencies import (
-    get_client_device,
-    get_decoy_hash,
-    get_existing_data_claim,
-    get_identity_repos,
-    get_identity_settings_dep,
-    get_identity_uow,
-    get_password_hasher,
-    get_setup_identity_uow,
-)
-from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
-    NoOpExistingDataClaim,
-)
-from app.modules.identity.adapters.security.in_memory_password_hasher import (
-    InMemoryPasswordHasher,
-)
+from app.modules.identity.adapters.api.dependencies import get_client_device
 from app.modules.identity.application.client_device import ClientDevice
 from app.modules.identity.domain.session import DisplayMode
-from app.modules.identity.domain.user import Role
-from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.platform.config import IdentitySettings
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from httpx2 import Response
 
-    from tests.modules.identity.conftest import MakeUser, World
+    from tests.modules.identity.conftest import IdentityApi, MakeUser, World
 
 AUTH = "/api/v1/auth"
-ME = "/api/v1/me"
-USERS = "/api/v1/users"
 FOREIGN_ORIGIN = "https://evil.example"
-SESSION_COOKIE = "menagerist-session"
-PREFIXED_COOKIE = "__Host-Http-menagerist-session"
-DEVICE_COOKIE = "menagerist-device"
-PREFIXED_DEVICE_COOKIE = "__Host-Http-menagerist-device"
 SETUP_BODY = {
     "username": "Admin",
     "display_name": "Admin",
     "password": "password-123",
 }
-
-
-class Api:
-    """A client sending its own origin, plus helpers to send a foreign one."""
-
-    def __init__(
-        self,
-        world: World,
-        *,
-        base_url: str = "http://testserver",
-        settings: IdentitySettings | None = None,
-    ) -> None:
-        self.world = world
-        self.app = create_app()
-        hasher = InMemoryPasswordHasher()
-        repos = IdentityRepos(
-            users=world.users,
-            sessions=world.sessions,
-            attempts=world.attempts,
-            tokens=world.tokens,
-            devices=world.devices,
-        )
-        self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
-        self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
-        self.app.dependency_overrides[get_existing_data_claim] = NoOpExistingDataClaim
-        self.app.dependency_overrides[get_identity_repos] = lambda: repos
-        self.app.dependency_overrides[get_password_hasher] = lambda: hasher
-        self.app.dependency_overrides[get_decoy_hash] = lambda: hasher.hash("decoy")
-        if settings is not None:
-            self.app.dependency_overrides[get_identity_settings_dep] = lambda: settings
-        self.client = self.new_client(base_url)
-
-    def new_client(self, base_url: str = "http://testserver") -> TestClient:
-        """Return a client with no cookies that sends its own `Origin`."""
-        client = TestClient(self.app, base_url=base_url)
-        client.cookies.clear()
-        return client
-
-    @staticmethod
-    def post(
-        client: TestClient,
-        url: str,
-        json: Mapping[str, object] | None = None,
-        *,
-        csrf: bool = True,
-    ) -> Response:
-        """POST from the client's own origin; a foreign one if `csrf` is off."""
-        headers = {} if csrf else {"Origin": FOREIGN_ORIGIN}
-        return client.post(url, json=json, headers=headers)
-
-    @staticmethod
-    def patch(client: TestClient, url: str, json: Mapping[str, object]) -> Response:
-        """PATCH from the client's own origin."""
-        return client.patch(url, json=json)
-
-    def setup(self, client: TestClient | None = None) -> Response:
-        """Run first-run setup, leaving `client` signed in as an admin."""
-        response = self.post(client or self.client, f"{AUTH}/setup", SETUP_BODY)
-        assert response.status_code == 201
-        return response
-
-    async def add_user(
-        self, make_user: MakeUser, username: str, role: Role = Role.MEMBER
-    ) -> None:
-        """Store a user whose password is `password-123`."""
-        await self.world.users.add(make_user(username, role=role))
-
-    def sign_in(
-        self, username: str = "alice", password: str = "password-123"
-    ) -> tuple[TestClient, Response]:
-        """Sign in with a fresh client, returning it and the response."""
-        client = self.new_client()
-        response = self.post(
-            client, f"{AUTH}/login", {"username": username, "password": password}
-        )
-        return client, response
-
-
-@pytest.fixture
-def api(world: World) -> Api:
-    """An app wired to the in-memory identity world."""
-    return Api(world)
+ME = "/api/v1/me"
+USERS = "/api/v1/users"
+SESSION_COOKIE = "menagerist-session"
+PREFIXED_COOKIE = "__Host-Http-menagerist-session"
+DEVICE_COOKIE = "menagerist-device"
+PREFIXED_DEVICE_COOKIE = "__Host-Http-menagerist-device"
 
 
 def _cookie_headers(response: Response) -> dict[str, str]:
@@ -149,7 +47,9 @@ def _cookie_headers(response: Response) -> dict[str, str]:
 # --- status and setup ------------------------------------------------------
 
 
-def test_status_reports_setup_required_until_the_first_account(api: Api) -> None:
+def test_status_reports_setup_required_until_the_first_account(
+    api: IdentityApi,
+) -> None:
     """The status flips from required to done after setup."""
     assert api.client.get(f"{AUTH}/status").json() == {"setup_required": True}
 
@@ -158,7 +58,7 @@ def test_status_reports_setup_required_until_the_first_account(api: Api) -> None
     assert api.client.get(f"{AUTH}/status").json() == {"setup_required": False}
 
 
-def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
+def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: IdentityApi) -> None:
     """Setup answers 201, signs in, and needs no origin check."""
     response = api.setup()
 
@@ -185,7 +85,7 @@ def test_setup_creates_a_signed_in_admin_and_sets_cookies(api: Api) -> None:
     assert me.json() == body["user"]
 
 
-def test_setup_sets_secure_cookie_attributes(api: Api) -> None:
+def test_setup_sets_secure_cookie_attributes(api: IdentityApi) -> None:
     """Session and device cookies are HttpOnly and SameSite=Strict; no CSRF cookie."""
     cookies = _cookie_headers(api.setup())
 
@@ -201,7 +101,7 @@ def test_setup_sets_secure_cookie_attributes(api: Api) -> None:
 
 def test_cookie_is_host_prefixed_over_https(world: World) -> None:
     """Over HTTPS the name gets the `__Host-Http-` prefix and its attributes."""
-    api = Api(world, base_url="https://testserver")
+    api = world.build_api(base_url="https://testserver")
 
     cookies = _cookie_headers(api.setup())
 
@@ -218,7 +118,7 @@ def test_cookie_secure_setting_overrides_the_scheme(
     world: World, mode: Literal["always", "never"], secure: bool
 ) -> None:
     """MENAGERIST_IDENTITY_COOKIE_SECURE wins over the request scheme and prefix."""
-    api = Api(world, settings=IdentitySettings(cookie_secure=mode))
+    api = world.build_api(settings=IdentitySettings(cookie_secure=mode))
 
     cookies = _cookie_headers(api.setup())
 
@@ -232,14 +132,14 @@ def test_cookie_secure_setting_overrides_the_scheme(
         assert ("secure" in cookies[name].lower()) is secure
 
 
-def _https_session(world: World) -> tuple[Api, str]:
+def _https_session(world: World) -> tuple[IdentityApi, str]:
     """An HTTPS app with a signed-in admin, and that session's token."""
-    api = Api(world, base_url="https://testserver")
+    api = world.build_api(base_url="https://testserver")
     api.setup()
     return api, api.client.cookies[PREFIXED_COOKIE]
 
 
-def _me(api: Api, cookie: str) -> int:
+def _me(api: IdentityApi, cookie: str) -> int:
     """Status of `GET /me` sending `cookie` as the Cookie header."""
     client = api.new_client("https://testserver")
     return client.get(f"{ME}", headers={"Cookie": cookie}).status_code
@@ -279,7 +179,7 @@ def test_logout_clears_the_prefixed_cookie_over_https(world: World) -> None:
 
 def test_idle_session_is_a_401_like_an_expired_one(world: World) -> None:
     """With an idle limit, a session unused for longer is refused; use keeps it."""
-    api = Api(world, settings=IdentitySettings(session_idle_hours=1))
+    api = world.build_api(settings=IdentitySettings(session_idle_hours=1))
     api.setup()
     now = datetime.now(UTC)
 
@@ -295,7 +195,7 @@ def test_idle_session_is_a_401_like_an_expired_one(world: World) -> None:
     assert world.sessions._sessions == {}
 
 
-def test_setup_twice_is_a_conflict(api: Api) -> None:
+def test_setup_twice_is_a_conflict(api: IdentityApi) -> None:
     """A second setup answers 409 and creates nothing."""
     api.setup()
 
@@ -305,7 +205,7 @@ def test_setup_twice_is_a_conflict(api: Api) -> None:
     assert response.json()["title"] == "SetupAlreadyDoneError"
 
 
-def test_setup_rejects_a_weak_password_and_unknown_fields(api: Api) -> None:
+def test_setup_rejects_a_weak_password_and_unknown_fields(api: IdentityApi) -> None:
     """Domain rules answer 400; unknown fields answer 422."""
     weak = api.post(api.client, f"{AUTH}/setup", SETUP_BODY | {"password": "short"})
     extra = api.post(api.client, f"{AUTH}/setup", SETUP_BODY | {"admin": True})
@@ -318,7 +218,7 @@ def test_setup_rejects_a_weak_password_and_unknown_fields(api: Api) -> None:
 
 
 async def test_login_sets_cookies_and_me_returns_the_user(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """A good login needs no origin check and starts a session."""
     await api.add_user(make_user, "alice")
@@ -333,7 +233,7 @@ async def test_login_sets_cookies_and_me_returns_the_user(
 
 
 async def test_login_logs_only_allowlisted_device_headers(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Sign-in logs diagnostic headers without logging cookie secrets."""
     await api.add_user(make_user, "alice")
@@ -381,7 +281,7 @@ async def test_login_logs_only_allowlisted_device_headers(
 
 
 async def test_login_device_headers_are_silent_at_default_log_level(
-    api: Api, make_user: MakeUser, caplog: pytest.LogCaptureFixture
+    api: IdentityApi, make_user: MakeUser, caplog: pytest.LogCaptureFixture
 ) -> None:
     """The diagnostic event is debug-only under the normal INFO log level."""
     await api.add_user(make_user, "alice")
@@ -393,7 +293,7 @@ async def test_login_device_headers_are_silent_at_default_log_level(
 
 
 async def test_every_login_failure_looks_the_same(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Unknown, wrong-password and wrong-password-on-disabled are identical 401s."""
     await api.add_user(make_user, "alice")
@@ -418,7 +318,7 @@ async def test_every_login_failure_looks_the_same(
 
 
 async def test_repeated_failures_throttle_with_retry_after(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """The sixth attempt within the window answers 429 with Retry-After."""
     await api.add_user(make_user, "alice")
@@ -433,7 +333,7 @@ async def test_repeated_failures_throttle_with_retry_after(
     assert throttled.json()["title"] == "SignInThrottledError"
 
 
-def test_me_without_a_session_is_unauthenticated(api: Api) -> None:
+def test_me_without_a_session_is_unauthenticated(api: IdentityApi) -> None:
     """No cookie answers 401 with the `unauthenticated` problem type."""
     response = api.client.get(f"{ME}")
 
@@ -441,14 +341,14 @@ def test_me_without_a_session_is_unauthenticated(api: Api) -> None:
     assert response.json()["type"] == "unauthenticated"
 
 
-def test_me_with_an_unknown_token_is_unauthenticated(api: Api) -> None:
+def test_me_with_an_unknown_token_is_unauthenticated(api: IdentityApi) -> None:
     """A forged cookie is not a session."""
     api.client.cookies.set(SESSION_COOKIE, "forged", domain="testserver.local")
 
     assert api.client.get(f"{ME}").status_code == 401
 
 
-def test_logout_ends_the_session_and_clears_cookies(api: Api) -> None:
+def test_logout_ends_the_session_and_clears_cookies(api: IdentityApi) -> None:
     """After logout the cookies are expired and the session is gone."""
     api.setup()
     token = api.client.cookies.get(SESSION_COOKIE)
@@ -465,7 +365,7 @@ def test_logout_ends_the_session_and_clears_cookies(api: Api) -> None:
     assert api.client.get(f"{ME}").status_code == 401
 
 
-def test_logout_without_a_session_changes_nothing(api: Api) -> None:
+def test_logout_without_a_session_changes_nothing(api: IdentityApi) -> None:
     """No session: 204, no cookies touched, no Clear-Site-Data."""
     response = api.post(api.client, f"{AUTH}/logout")
 
@@ -474,7 +374,7 @@ def test_logout_without_a_session_changes_nothing(api: Api) -> None:
     assert "Clear-Site-Data" not in response.headers
 
 
-def test_cross_site_style_logout_cannot_clear_cookies(api: Api) -> None:
+def test_cross_site_style_logout_cannot_clear_cookies(api: IdentityApi) -> None:
     """A foreign-origin POST with no session ends nothing."""
     response = api.client.post(f"{AUTH}/logout", headers={"Origin": FOREIGN_ORIGIN})
 
@@ -483,7 +383,7 @@ def test_cross_site_style_logout_cannot_clear_cookies(api: Api) -> None:
     assert "Clear-Site-Data" not in response.headers
 
 
-def test_logout_clears_the_browser_cache(api: Api) -> None:
+def test_logout_clears_the_browser_cache(api: IdentityApi) -> None:
     """A successful logout asks the browser to drop its HTTP cache."""
     api.setup()
 
@@ -492,7 +392,7 @@ def test_logout_clears_the_browser_cache(api: Api) -> None:
     assert response.headers["Clear-Site-Data"] == '"cache"'
 
 
-def test_other_auth_routes_do_not_clear_site_data(api: Api) -> None:
+def test_other_auth_routes_do_not_clear_site_data(api: IdentityApi) -> None:
     """Only logout sends Clear-Site-Data: not login, me, or error responses."""
     api.setup()
     me = api.client.get(f"{ME}")
@@ -506,7 +406,7 @@ def test_other_auth_routes_do_not_clear_site_data(api: Api) -> None:
 # --- CSRF ------------------------------------------------------------------
 
 
-def test_unsafe_requests_from_another_origin_are_refused(api: Api) -> None:
+def test_unsafe_requests_from_another_origin_are_refused(api: IdentityApi) -> None:
     """With a session cookie, a foreign, missing or `null` origin answers 403."""
     api.setup()
     url = f"{AUTH}/logout"
@@ -522,14 +422,18 @@ def test_unsafe_requests_from_another_origin_are_refused(api: Api) -> None:
         assert response.json()["type"] == "csrf_failed"
 
 
-def test_same_origin_unsafe_request_with_a_session_cookie_is_accepted(api: Api) -> None:
+def test_same_origin_unsafe_request_with_a_session_cookie_is_accepted(
+    api: IdentityApi,
+) -> None:
     """The app's own origin passes alongside the session cookie."""
     api.setup()
 
     assert api.post(api.client, f"{AUTH}/logout").status_code < 300
 
 
-def test_csrf_applies_to_other_v1_routes_and_never_to_safe_methods(api: Api) -> None:
+def test_csrf_applies_to_other_v1_routes_and_never_to_safe_methods(
+    api: IdentityApi,
+) -> None:
     """The rule covers every /api/v1 route, not just identity ones."""
     api.setup()
 
@@ -543,7 +447,7 @@ def test_csrf_applies_to_other_v1_routes_and_never_to_safe_methods(api: Api) -> 
     assert safe.status_code == 200
 
 
-def test_login_and_setup_are_exempt_from_csrf(api: Api) -> None:
+def test_login_and_setup_are_exempt_from_csrf(api: IdentityApi) -> None:
     """No session cookie exists yet when these are called."""
     setup = api.client.post(f"{AUTH}/setup", json=SETUP_BODY)
     login = api.client.post(
@@ -554,7 +458,7 @@ def test_login_and_setup_are_exempt_from_csrf(api: Api) -> None:
     assert login.status_code == 200
 
 
-def test_cors_never_allows_credentials(api: Api) -> None:
+def test_cors_never_allows_credentials(api: IdentityApi) -> None:
     """A cross-origin preflight is answered without credentials support."""
     response = api.client.options(
         f"{AUTH}/login",
@@ -567,7 +471,7 @@ def test_cors_never_allows_credentials(api: Api) -> None:
     assert "access-control-allow-credentials" not in response.headers
 
 
-def test_cors_is_same_origin_only_by_default(api: Api) -> None:
+def test_cors_is_same_origin_only_by_default(api: IdentityApi) -> None:
     """With no origins listed, another site gets no CORS permission at all."""
     simple = api.client.get(
         f"{AUTH}/status", headers={"Origin": "https://evil.example"}
@@ -590,7 +494,7 @@ def test_cors_is_same_origin_only_by_default(api: Api) -> None:
 
 
 async def test_change_password_ends_other_sessions_and_keeps_this_one(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """The other browser is signed out; this one gets fresh cookies."""
     await api.add_user(make_user, "alice")
@@ -614,7 +518,7 @@ async def test_change_password_ends_other_sessions_and_keeps_this_one(
 
 
 async def test_change_password_rejects_a_wrong_current_password(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """A wrong current password answers 400, not 401, so the UI keeps the session."""
     await api.add_user(make_user, "alice")
@@ -630,7 +534,7 @@ async def test_change_password_rejects_a_wrong_current_password(
     assert client.get(f"{ME}").status_code == 200
 
 
-def test_change_password_requires_a_session(api: Api) -> None:
+def test_change_password_requires_a_session(api: IdentityApi) -> None:
     """No session, no password change."""
     response = api.post(
         api.client,
@@ -645,7 +549,7 @@ def test_change_password_requires_a_session(api: Api) -> None:
 
 
 async def test_admin_creates_lists_updates_and_resets_users(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """The admin routes work end to end for an administrator."""
     api.setup()
@@ -685,7 +589,7 @@ async def test_admin_creates_lists_updates_and_resets_users(
     assert api.sign_in("bob", "second-pass-22")[1].json()["password_expired"]
 
 
-async def test_duplicate_username_is_a_conflict(api: Api) -> None:
+async def test_duplicate_username_is_a_conflict(api: IdentityApi) -> None:
     """Usernames are unique ignoring case."""
     api.setup()
 
@@ -698,7 +602,7 @@ async def test_duplicate_username_is_a_conflict(api: Api) -> None:
     assert response.status_code == 409
 
 
-async def test_last_admin_cannot_be_disabled_or_demoted(api: Api) -> None:
+async def test_last_admin_cannot_be_disabled_or_demoted(api: IdentityApi) -> None:
     """Both changes answer 409 for the only active administrator."""
     admin_id = api.setup().json()["user"]["id"]
 
@@ -710,7 +614,7 @@ async def test_last_admin_cannot_be_disabled_or_demoted(api: Api) -> None:
     assert api.client.get(f"{ME}").json()["role"] == "admin"
 
 
-async def test_unknown_user_is_not_found(api: Api) -> None:
+async def test_unknown_user_is_not_found(api: IdentityApi) -> None:
     """Updating or resetting an unknown id answers 404."""
     api.setup()
     unknown = uuid.uuid7()
@@ -725,7 +629,9 @@ async def test_unknown_user_is_not_found(api: Api) -> None:
     assert reset.status_code == 404
 
 
-async def test_members_cannot_use_admin_routes(api: Api, make_user: MakeUser) -> None:
+async def test_members_cannot_use_admin_routes(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """Members get 403 on every admin route; anonymous callers get 401."""
     await api.add_user(make_user, "alice")
     member, _ = api.sign_in()
@@ -754,7 +660,9 @@ async def test_members_cannot_use_admin_routes(api: Api, make_user: MakeUser) ->
 # --- accounts: last sign-in, disabled, throttling, display name, unlock ----
 
 
-async def test_login_reports_last_sign_in(api: Api, make_user: MakeUser) -> None:
+async def test_login_reports_last_sign_in(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """The user body carries `last_login_at`; `/me` shows the same value."""
     await api.add_user(make_user, "alice")
 
@@ -768,7 +676,7 @@ async def test_login_reports_last_sign_in(api: Api, make_user: MakeUser) -> None
 
 
 async def test_a_failed_login_does_not_set_last_sign_in(
-    api: Api, make_user: MakeUser, world: World
+    api: IdentityApi, make_user: MakeUser, world: World
 ) -> None:
     """Only success stamps the time."""
     await api.add_user(make_user, "alice")
@@ -781,7 +689,7 @@ async def test_a_failed_login_does_not_set_last_sign_in(
 
 
 async def test_correct_password_on_a_disabled_account_answers_403(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """403 `account_disabled`; a wrong password for it is the generic 401."""
     disabled = make_user("dora")
@@ -803,7 +711,7 @@ async def test_correct_password_on_a_disabled_account_answers_403(
 
 
 async def test_disabled_account_answers_do_not_count_toward_the_throttle(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Ten right-password refusals never lock the account."""
     disabled = make_user("dora")
@@ -816,7 +724,7 @@ async def test_disabled_account_answers_do_not_count_toward_the_throttle(
 
 
 async def test_unknown_names_throttle_like_known_ones(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """The sixth try for a name that does not exist gets the same 429."""
     await api.add_user(make_user, "alice")
@@ -834,7 +742,7 @@ async def test_unknown_names_throttle_like_known_ones(
     assert ghost.json()["detail"] == alice.json()["detail"]
 
 
-async def test_one_address_is_throttled_across_usernames(api: Api) -> None:
+async def test_one_address_is_throttled_across_usernames(api: IdentityApi) -> None:
     """Twenty failures for different names lock the client address."""
     for i in range(20):
         assert api.sign_in(f"ghost{i}", "wrong-password")[1].status_code == 401
@@ -845,7 +753,9 @@ async def test_one_address_is_throttled_across_usernames(api: Api) -> None:
     assert int(response.headers["retry-after"]) > 0
 
 
-async def test_patch_me_changes_the_display_name(api: Api, make_user: MakeUser) -> None:
+async def test_patch_me_changes_the_display_name(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """The name is trimmed and the updated user comes back like `/me`."""
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
@@ -857,7 +767,9 @@ async def test_patch_me_changes_the_display_name(api: Api, make_user: MakeUser) 
     assert client.get(f"{ME}").json() == response.json()
 
 
-async def test_patch_me_validates_the_name(api: Api, make_user: MakeUser) -> None:
+async def test_patch_me_validates_the_name(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """Blank is a domain 400; over the cap or unknown fields is a 422."""
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
@@ -873,7 +785,7 @@ async def test_patch_me_validates_the_name(api: Api, make_user: MakeUser) -> Non
 
 
 async def test_patch_me_needs_a_session_and_origin(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """No session is refused; a foreign origin answers 403."""
     await api.add_user(make_user, "alice")
@@ -889,7 +801,7 @@ async def test_patch_me_needs_a_session_and_origin(
 
 
 async def test_change_password_rejects_the_same_password(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """A clear validation problem; the session survives."""
     await api.add_user(make_user, "alice")
@@ -911,7 +823,7 @@ async def test_change_password_rejects_the_same_password(
 
 
 async def test_change_password_wrong_current_is_throttled(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Five wrong current passwords, then 429 with Retry-After."""
     await api.add_user(make_user, "alice")
@@ -926,7 +838,9 @@ async def test_change_password_wrong_current_is_throttled(
     assert int(response.headers["retry-after"]) > 0
 
 
-async def test_admin_unlocks_a_locked_user(api: Api, make_user: MakeUser) -> None:
+async def test_admin_unlocks_a_locked_user(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """The list shows `locked_until`; unlock clears it, repeatably."""
     api.setup()
     await api.add_user(make_user, "alice")
@@ -951,7 +865,7 @@ async def test_admin_unlocks_a_locked_user(api: Api, make_user: MakeUser) -> Non
     assert api.sign_in("alice", "password-123")[1].status_code == 200
 
 
-async def test_unlock_unknown_user_is_not_found(api: Api) -> None:
+async def test_unlock_unknown_user_is_not_found(api: IdentityApi) -> None:
     """An unknown id answers 404."""
     api.setup()
 
@@ -961,7 +875,7 @@ async def test_unlock_unknown_user_is_not_found(api: Api) -> None:
 
 
 async def test_update_response_carries_the_lock_state(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """PATCH /user/{id} answers with `locked_until` too."""
     api.setup()
@@ -1006,7 +920,7 @@ def test_openapi_documents_the_new_responses_and_permissions() -> None:
     ],
 )
 async def test_public_posts_refuse_cross_site_requests(
-    api: Api, url: str, body: dict[str, str]
+    api: IdentityApi, url: str, body: dict[str, str]
 ) -> None:
     """A page on another site cannot reach setup or login, even with CORS `*`."""
     for headers in (
@@ -1020,7 +934,7 @@ async def test_public_posts_refuse_cross_site_requests(
     assert not api.client.cookies.get(SESSION_COOKIE)
 
 
-def test_same_origin_setup_and_login_still_work(api: Api) -> None:
+def test_same_origin_setup_and_login_still_work(api: IdentityApi) -> None:
     """The SPA's own requests carry its origin and pass."""
     origin = {"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"}
     response = api.client.post(f"{AUTH}/setup", json=SETUP_BODY, headers=origin)
@@ -1030,7 +944,7 @@ def test_same_origin_setup_and_login_still_work(api: Api) -> None:
     assert client.post(f"{AUTH}/login", json=login, headers=origin).status_code == 200
 
 
-def test_the_openapi_documents_the_cross_site_refusal(api: Api) -> None:
+def test_the_openapi_documents_the_cross_site_refusal(api: IdentityApi) -> None:
     """Both public POSTs list a 403 for it."""
     paths = api.app.openapi()["paths"]
     setup = paths[f"{AUTH}/setup"]["post"]["responses"]
@@ -1123,7 +1037,7 @@ def test_get_client_device_reads_the_display_mode(
 
 
 async def test_sign_in_stores_client_device_and_ip(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Login stores User-Agent, platform, mobile flag, and client IP on session."""
     api.setup()
@@ -1151,7 +1065,7 @@ async def test_sign_in_stores_client_device_and_ip(
     assert user_session.client_ip == "testclient"
 
 
-async def test_setup_first_admin_stores_client_device_and_ip(api: Api) -> None:
+async def test_setup_first_admin_stores_client_device_and_ip(api: IdentityApi) -> None:
     """First-run setup stores device details on the initial admin session."""
     headers = {
         "User-Agent": "SetupBrowser/1.0",
@@ -1170,7 +1084,7 @@ async def test_setup_first_admin_stores_client_device_and_ip(api: Api) -> None:
     assert session.client_ip == "testclient"
 
 
-async def test_change_password_stores_client_device_and_ip(api: Api) -> None:
+async def test_change_password_stores_client_device_and_ip(api: IdentityApi) -> None:
     """Password change replaces sessions with one storing new device details."""
     api.setup()
     headers = {
@@ -1194,7 +1108,7 @@ async def test_change_password_stores_client_device_and_ip(api: Api) -> None:
     assert session.client_ip == "testclient"
 
 
-async def test_absent_device_headers_store_none(api: Api) -> None:
+async def test_absent_device_headers_store_none(api: IdentityApi) -> None:
     """Requests with absent/empty device headers store None for device columns."""
     resp = api.client.post(f"{AUTH}/setup", json=SETUP_BODY, headers={"User-Agent": ""})
     assert resp.status_code == 201
@@ -1209,7 +1123,7 @@ async def test_absent_device_headers_store_none(api: Api) -> None:
 
 
 async def test_sign_in_does_not_log_raw_user_agent_on_success(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """The 'signed in' info log line does not contain the raw user-agent or token."""
     api.setup()
@@ -1235,7 +1149,7 @@ async def test_sign_in_does_not_log_raw_user_agent_on_success(
 # --- documented Set-Cookie -------------------------------------------------
 
 
-def _documented_set_cookie(api: Api) -> set[tuple[str, str, str]]:
+def _documented_set_cookie(api: IdentityApi) -> set[tuple[str, str, str]]:
     schema = api.app.openapi()
     return {
         (method, path, status)
@@ -1248,7 +1162,7 @@ def _documented_set_cookie(api: Api) -> set[tuple[str, str, str]]:
 
 
 async def test_set_cookie_is_documented_exactly_where_it_is_sent(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Each documented route sends the cookie on the documented status."""
     sent: set[tuple[str, str, str]] = set()

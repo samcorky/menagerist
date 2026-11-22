@@ -13,109 +13,44 @@ from fastapi import Depends
 from starlette.testclient import TestClient
 from structlog.testing import capture_logs
 
-from app.entrypoints.api import create_app
 from app.entrypoints.api.shared import dependencies as shared_dependencies
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http import request_context_middleware
 from app.modules.identity.adapters.api import dependencies as identity_dependencies
-from app.modules.identity.adapters.api.dependencies import (
-    get_decoy_hash,
-    get_existing_data_claim,
-    get_identity_repos,
-    get_identity_uow,
-    get_password_hasher,
-    get_setup_identity_uow,
-)
-from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
-    NoOpExistingDataClaim,
-)
-from app.modules.identity.adapters.security.in_memory_password_hasher import (
-    InMemoryPasswordHasher,
-)
 from app.modules.identity.adapters.security.secrets_api_token_generator import (
     SecretsApiTokenGenerator,
 )
 from app.modules.identity.domain.api_token import ApiToken
-from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.platform.config import LoggingSettings
 from app.shared_kernel.actor import Actor  # noqa: TC001
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from httpx2 import Response
     from starlette.requests import Request
     from structlog.types import EventDict
 
     from app.modules.identity.application.get_current_user import ResolvedSession
-    from tests.modules.identity.conftest import MakeUser, World
+    from tests.modules.identity.conftest import IdentityApi, MakeUser, World
 
 pytestmark = pytest.mark.real_actor
 
 AUTH = "/api/v1/auth"
+SETUP_BODY = {
+    "username": "Admin",
+    "display_name": "Admin",
+    "password": "password-123",
+}
 ME = "/api/v1/me"
 PROBE = "/api/v1/_probe"
 COOKIE = "menagerist-session"
-SETUP_BODY = {"username": "Admin", "display_name": "Admin", "password": "password-123"}
 logger = structlog.get_logger()
 
 
-class Api:
-    """An in-memory app over the identity world, with same-origin helpers."""
-
-    def __init__(self, world: World) -> None:
-        self.world = world
-        self.app = create_app()
-        hasher = InMemoryPasswordHasher()
-        repos = IdentityRepos(
-            users=world.users,
-            sessions=world.sessions,
-            attempts=world.attempts,
-            tokens=world.tokens,
-            devices=world.devices,
-        )
-        self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
-        self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
-        self.app.dependency_overrides[get_existing_data_claim] = NoOpExistingDataClaim
-        self.app.dependency_overrides[get_identity_repos] = lambda: repos
-        self.app.dependency_overrides[get_password_hasher] = lambda: hasher
-        self.app.dependency_overrides[get_decoy_hash] = lambda: hasher.hash("decoy")
-        self.client = self.new_client()
-
-    def new_client(self) -> TestClient:
-        """Return a client with no cookies that sends its own `Origin`."""
-        client = TestClient(self.app)
-        client.cookies.clear()
-        return client
-
-    @staticmethod
-    def post(
-        client: TestClient, url: str, json: dict[str, str] | None = None
-    ) -> Response:
-        """POST from the client's own origin."""
-        return client.post(url, json=json)
-
-    def setup(self) -> Response:
-        """Run first-run setup, leaving `client` signed in as an admin."""
-        response = self.post(self.client, f"{AUTH}/setup", SETUP_BODY)
-        assert response.status_code == 201
-        return response
-
-    async def add_user(self, make_user: MakeUser, username: str) -> None:
-        """Store a user whose password is `password-123`."""
-        await self.world.users.add(make_user(username))
-
-    def sign_in(self, username: str) -> tuple[TestClient, Response]:
-        """Sign in with a fresh client, returning it and the response."""
-        client = self.new_client()
-        body = {"username": username, "password": "password-123"}
-        return client, self.post(client, f"{AUTH}/login", body)
-
-
 @pytest.fixture
-def api(world: World) -> Api:
+def api(world: World) -> IdentityApi:
     """An in-memory app with a probe endpoint that logs from inside the request."""
-    api = Api(world)
+    api = world.build_api()
 
     @api.app.get(PROBE)
     async def probe(
@@ -151,7 +86,7 @@ def _named(events: list[EventDict], name: str) -> list[EventDict]:
     return [e for e in events if e["event"] == name]
 
 
-def _add(api: Api, make_user: MakeUser, username: str) -> None:
+def _add(api: IdentityApi, make_user: MakeUser, username: str) -> None:
     asyncio.run(api.add_user(make_user, username))
 
 
@@ -164,7 +99,7 @@ def _session_id(world: World, token: str) -> str:
 
 
 def test_authenticated_request_logs_carry_user_and_session_ids(
-    api: Api, world: World, make_user: MakeUser, events: list[EventDict]
+    api: IdentityApi, world: World, make_user: MakeUser, events: list[EventDict]
 ) -> None:
     """Endpoint log lines see both ids for the whole request."""
     _add(api, make_user, "alice")
@@ -181,7 +116,7 @@ def test_authenticated_request_logs_carry_user_and_session_ids(
 
 
 def test_unauthenticated_request_carries_neither_id(
-    api: Api, events: list[EventDict]
+    api: IdentityApi, events: list[EventDict]
 ) -> None:
     """A request with no session binds nothing."""
     api.client.get("/api/v1/_open")
@@ -199,7 +134,7 @@ async def _session_row_id(world: World, token: str) -> str:
     return str(stored.id)
 
 
-def _async_client(api: Api, token: str | None = None) -> httpx2.AsyncClient:
+def _async_client(api: IdentityApi, token: str | None = None) -> httpx2.AsyncClient:
     cookies = {COOKIE: token} if token else None
     return httpx2.AsyncClient(
         transport=httpx2.ASGITransport(app=api.app),
@@ -225,7 +160,7 @@ def _leaky_bind_and_merge(
 
 
 async def _interleave(
-    api: Api,
+    api: IdentityApi,
     world: World,
     make_user: MakeUser,
     extra: list[structlog.types.Processor] | None = None,
@@ -277,14 +212,14 @@ async def _interleave(
 
 
 async def test_concurrent_requests_do_not_cross_contaminate(
-    api: Api, world: World, make_user: MakeUser
+    api: IdentityApi, world: World, make_user: MakeUser
 ) -> None:
     """Interleaved requests on one loop for two users keep their own ids."""
     await _interleave(api, world, make_user)
 
 
 async def test_the_interleaving_test_detects_a_process_wide_binding(
-    api: Api, world: World, make_user: MakeUser, monkeypatch: pytest.MonkeyPatch
+    api: IdentityApi, world: World, make_user: MakeUser, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Sensitivity check: a binder shared across requests fails the same scenario."""
     bind, merge = _leaky_bind_and_merge({})
@@ -301,7 +236,7 @@ async def test_the_interleaving_test_detects_a_process_wide_binding(
 
 
 async def test_ids_do_not_leak_into_the_next_request(
-    api: Api, make_user: MakeUser, events: list[EventDict]
+    api: IdentityApi, make_user: MakeUser, events: list[EventDict]
 ) -> None:
     """A signed-in request followed by an anonymous one on the same loop."""
     await api.add_user(make_user, "alice")
@@ -317,7 +252,7 @@ async def test_ids_do_not_leak_into_the_next_request(
 
 
 def test_sign_in_sign_out_and_setup_events_carry_the_ids(
-    api: Api, world: World, events: list[EventDict]
+    api: IdentityApi, world: World, events: list[EventDict]
 ) -> None:
     """Auth events name the user and the session row, never the token."""
     setup = api.setup()
@@ -341,7 +276,7 @@ def test_sign_in_sign_out_and_setup_events_carry_the_ids(
 
 
 def test_signing_out_an_unknown_session_logs_nothing(
-    api: Api, events: list[EventDict]
+    api: IdentityApi, events: list[EventDict]
 ) -> None:
     """No session row, nothing to say."""
     client = api.new_client()
@@ -352,7 +287,7 @@ def test_signing_out_an_unknown_session_logs_nothing(
 
 
 def test_no_secret_reaches_any_log_event(
-    api: Api, world: World, events: list[EventDict]
+    api: IdentityApi, world: World, events: list[EventDict]
 ) -> None:
     """Setup, logins, a password change and logout leak no secret."""
     api.setup()
@@ -401,7 +336,7 @@ def _access(events: list[EventDict], path: str) -> list[EventDict]:
 
 
 def test_a_request_writes_exactly_one_access_line_without_query_or_headers(
-    api: Api, events: list[EventDict]
+    api: IdentityApi, events: list[EventDict]
 ) -> None:
     """Granian-style fields, the request id, and nothing from the query or headers."""
     response = api.new_client().get(
@@ -428,7 +363,7 @@ def test_a_request_writes_exactly_one_access_line_without_query_or_headers(
 
 
 def test_an_authenticated_access_line_carries_the_ids(
-    api: Api, world: World, make_user: MakeUser, events: list[EventDict]
+    api: IdentityApi, world: World, make_user: MakeUser, events: list[EventDict]
 ) -> None:
     """The line is written outside the endpoint task, so it reads `request.state`."""
     _add(api, make_user, "alice")
@@ -444,7 +379,7 @@ def test_an_authenticated_access_line_carries_the_ids(
 
 @pytest.mark.parametrize("path", ["/api/health", "/api/health/ready", "/favicon.svg"])
 def test_probe_and_static_paths_are_not_logged(
-    api: Api, events: list[EventDict], path: str
+    api: IdentityApi, events: list[EventDict], path: str
 ) -> None:
     """Health polling and the SPA's files write no access line."""
     api.new_client().get(path)
@@ -453,7 +388,7 @@ def test_probe_and_static_paths_are_not_logged(
 
 
 def test_an_unhandled_error_is_logged_as_500_and_still_raised(
-    api: Api, events: list[EventDict]
+    api: IdentityApi, events: list[EventDict]
 ) -> None:
     """A failing request still gets its line, at warning level."""
     client = TestClient(api.app, raise_server_exceptions=False)
@@ -465,7 +400,9 @@ def test_an_unhandled_error_is_logged_as_500_and_still_raised(
     assert line["log_level"] == "warning"
 
 
-def test_a_client_error_is_logged_at_info(api: Api, events: list[EventDict]) -> None:
+def test_a_client_error_is_logged_at_info(
+    api: IdentityApi, events: list[EventDict]
+) -> None:
     """4xx responses are ordinary traffic, not warnings."""
     api.new_client().get(PROBE)
 
@@ -475,7 +412,7 @@ def test_a_client_error_is_logged_at_info(api: Api, events: list[EventDict]) -> 
 
 
 def test_the_access_line_can_be_switched_off(
-    api: Api, events: list[EventDict], monkeypatch: pytest.MonkeyPatch
+    api: IdentityApi, events: list[EventDict], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`MENAGERIST_LOG_ACCESS=false` silences it."""
     monkeypatch.setattr(
@@ -493,7 +430,7 @@ def test_the_access_line_can_be_switched_off(
     "tail", ["x%0aFORGED", "x%1b[31m", "x%0d%0aFORGED", "x%00y", "x%c2%85y"]
 )
 def test_control_characters_in_the_path_cannot_forge_log_lines(
-    api: Api, events: list[EventDict], tail: str
+    api: IdentityApi, events: list[EventDict], tail: str
 ) -> None:
     """Unauthenticated 404s with encoded control bytes log one clean line."""
     response = api.new_client().get(f"/api/v1/{tail}?q=secret-query")
@@ -513,7 +450,9 @@ def test_control_characters_in_the_path_cannot_forge_log_lines(
     assert line["path"] == f"/api/v1/{tail}"
 
 
-def test_an_unsafe_request_id_is_replaced(api: Api, events: list[EventDict]) -> None:
+def test_an_unsafe_request_id_is_replaced(
+    api: IdentityApi, events: list[EventDict]
+) -> None:
     """Only a conservative `Request-Id` is echoed and logged."""
     client = api.new_client()
     for bad in ("a b", "x" * 129, "a;b"):
@@ -525,7 +464,7 @@ def test_an_unsafe_request_id_is_replaced(api: Api, events: list[EventDict]) -> 
 
 
 def test_a_password_expired_response_still_logs_the_ids(
-    api: Api, world: World, make_user: MakeUser, events: list[EventDict]
+    api: IdentityApi, world: World, make_user: MakeUser, events: list[EventDict]
 ) -> None:
     """The ids are bound before the expiry check refuses the request."""
     user = make_user("alice")
@@ -543,7 +482,7 @@ def test_a_password_expired_response_still_logs_the_ids(
 
 
 def test_token_request_logs_carry_the_token_id_and_never_a_secret(
-    api: Api, world: World, make_user: MakeUser, events: list[EventDict]
+    api: IdentityApi, world: World, make_user: MakeUser, events: list[EventDict]
 ) -> None:
     """The token's row id is bound; its value and the header are not logged."""
     _add(api, make_user, "alice")
