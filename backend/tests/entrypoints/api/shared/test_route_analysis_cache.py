@@ -1,3 +1,7 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import pytest
@@ -22,6 +26,9 @@ route_analysis_cache.install()
 # FastAPI does not export `TypeAdapter` from this module; it is the name its fields
 # look up, which is what the cache replaces.
 fields: Any = v2
+
+_PROBE = Path(__file__).with_name("test_route_analysis_probe.py")
+_SRC = Path(__file__).parents[4] / "src"
 
 
 def _dependency(value: int = 1) -> int:
@@ -228,3 +235,25 @@ def test_install_refuses_fields_that_no_longer_use_type_adapter(
 
     with pytest.raises(RuntimeError, match="TypeAdapter"):
         route_analysis_cache._share_type_adapters()
+
+
+def _probe(mode: str) -> str:
+    result = subprocess.run(
+        [sys.executable, str(_PROBE), mode],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": str(_SRC)},
+    )
+    return result.stdout
+
+
+def test_caches_build_exactly_what_fastapi_builds_without_them() -> None:
+    """Pins FastAPI's behaviour: the caches assume what route construction reads.
+
+    The probe app covers shared dependencies, path and query parameters, constraints
+    that compare equal but differ (`gt=0` and `gt=0.0`), OAuth scopes and a dependency
+    override. If a FastAPI upgrade makes construction depend on something the cache
+    keys leave out, the cached and plain output differ and this fails.
+    """
+    assert _probe("cached") == _probe("plain")
