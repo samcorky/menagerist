@@ -17,6 +17,7 @@ from app.entrypoints.cli import scheduling
 from app.modules.scheduling.adapters.cli import job_app as commands
 from app.modules.scheduling.application.list_jobs import JobStatus
 from app.modules.scheduling.domain.job_run import JobRun
+from app.platform import alembic_runner
 from app.platform.app_info import load_app_info
 from app.shared_kernel.jobs import JobDefinition, Lane
 
@@ -79,8 +80,8 @@ async def test_schema_gate_waits_until_packaged_heads_match(
     """The worker retries schema mismatches and never runs migrations itself."""
     factory = AsyncMock()
     revisions = AsyncMock(side_effect=[(), ("old",), ("head",)])
-    monkeypatch.setattr(scheduling, "db_current_revisions", revisions)
-    monkeypatch.setattr(scheduling, "code_head_revisions", lambda: ("head",))
+    monkeypatch.setattr(alembic_runner, "db_current_revisions", revisions)
+    monkeypatch.setattr(alembic_runner, "code_head_revisions", lambda: ("head",))
     assert await scheduling.wait_for_schema(
         factory, asyncio.Event(), retry_interval=0.001
     )
@@ -97,8 +98,8 @@ async def test_schema_gate_can_stop_during_connection_failure(
         stop.set()
         raise OSError("database unavailable")
 
-    monkeypatch.setattr(scheduling, "db_current_revisions", unavailable)
-    monkeypatch.setattr(scheduling, "code_head_revisions", lambda: ("head",))
+    monkeypatch.setattr(alembic_runner, "db_current_revisions", unavailable)
+    monkeypatch.setattr(alembic_runner, "code_head_revisions", lambda: ("head",))
     assert not await asyncio.wait_for(
         scheduling.wait_for_schema(AsyncMock(), stop), timeout=1
     )

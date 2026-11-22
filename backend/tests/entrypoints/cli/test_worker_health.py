@@ -1,6 +1,8 @@
 """A container health probe checks the current worker process only."""
 
 import logging
+import subprocess
+import sys
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -16,6 +18,24 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 NOW = datetime(2026, 10, 27, tzinfo=UTC)
+
+
+def test_the_probe_does_not_import_what_only_the_worker_uses() -> None:
+    """The probe runs every 30 s on a small device, so it starts without them."""
+    worker_only = ("alembic", "app.modules.identity.adapters.persistence.models")
+    code = "\n".join(
+        (
+            "import sys",
+            "import app.entrypoints.cli.scheduling",
+            f"print([m for m in {worker_only!r} if m in sys.modules])",
+        )
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", code], check=True, capture_output=True, text=True
+    )
+
+    assert result.stdout.strip() == "[]"
 
 
 @pytest.mark.parametrize("healthy", [True, False])
