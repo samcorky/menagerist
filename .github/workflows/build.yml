@@ -88,7 +88,15 @@ jobs:
             local.cache-to=type=gha,mode=max,scope=image-linux-amd64
 
       - name: Smoke test the image
-        run: uv run --script scripts/smoke_test.py
+        run: uv run --script scripts/smoke_test.py --report "${RUNNER_TEMP}/smoke-test.md"
+
+      # The smoke-test-comment job in ci.yml posts this on the pull request.
+      - name: Upload the smoke test report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: smoke-test
+          path: ${{ runner.temp }}/smoke-test.md
+          retention-days: 1
 
       - name: Measure the image size
         run: python3 scripts/measure_image_size.py menagerist:local | tee "${RUNNER_TEMP}/image-size.json"
