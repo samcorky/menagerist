@@ -76,6 +76,29 @@ class SmokeTestError(RuntimeError):
     """A smoke test check failed."""
 
 
+# What the run measured, in order, for the job summary on GitHub.
+_TIMINGS: list[tuple[str, str]] = []
+
+
+def record(name: str, value: str) -> None:
+    """Remember a measurement for the job summary."""
+    _TIMINGS.append((name, value))
+
+
+def write_summary(failure: str | None) -> None:
+    """Write the run's measurements to the GitHub job summary, when there is one."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    lines = ["## Smoke test", ""]
+    lines += ["**Failed**", "", "```", failure, "```"] if failure else ["**Passed**"]
+    if _TIMINGS:
+        lines += ["", "| Measurement | Value |", "|---|---|"]
+        lines += [f"| {name} | {value} |" for name, value in _TIMINGS]
+    with open(path, "a", encoding="utf-8") as summary:
+        summary.write("\n".join(lines) + "\n")
+
+
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     """Run a `docker compose` subcommand against compose.yaml.
 
@@ -158,6 +181,9 @@ def wait_healthy(
         container.reload()
         status = container.attrs["State"]["Health"]["Status"]
         if status == "healthy":
+            started = datetime.fromisoformat(container.attrs["State"]["StartedAt"])
+            seconds = (datetime.now(UTC) - started).total_seconds()
+            record(f"{service}: container start to healthy", f"{seconds:.1f}s")
             return
         if status == "unhealthy":
             raise SmokeTestError(f"{service} reported unhealthy")
@@ -261,6 +287,7 @@ def check_startup_time(client: docker.DockerClient) -> None:
         if "Started worker-1" in clean and in_startup:
             break
 
+    record("granian worker boot (import and app construction)", f"{duration:.2f}s")
     print(f"  worker started in {duration:.2f}s")
     if startup_lines:
         print("  startup logs:")
@@ -312,6 +339,8 @@ def check_cli_probe_time(client: docker.DockerClient) -> None:
         container, ["menagerist", "worker-health"]
     )
 
+    record("CLI import (`--version`)", f"{import_seconds:.2f}s")
+    record("`worker-health` probe", f"{probe_seconds:.2f}s (limit {budget:.1f}s)")
     print(f"  CLI import (--version): {import_seconds:.2f}s")
     print(f"  worker-health probe:    {probe_seconds:.2f}s")
     print(f"  healthcheck timeout:    {timeout:.0f}s (limit {budget:.1f}s)")
@@ -545,6 +574,7 @@ def main() -> int:
     args = parser.parse_args()
 
     client: docker.DockerClient | None = None
+    failure: str | None = None
 
     try:
         client = get_client()
@@ -564,11 +594,13 @@ def main() -> int:
         check_spa_and_api()
         check_migrate_upgrade_standalone()
     except SmokeTestError as exc:
+        failure = str(exc)
         print(f"\nSMOKE TEST FAILED: {exc}", file=sys.stderr)
         print("\n--- menagerist logs ---", file=sys.stderr)
         print(compose("logs", SERVICE, check=False).stdout, file=sys.stderr)
         return 1
     finally:
+        write_summary(failure)
         if not args.keep:
             compose("down", "-v", check=False)
         if client is not None:
