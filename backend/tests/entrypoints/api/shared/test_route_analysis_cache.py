@@ -213,6 +213,16 @@ def test_an_adapter_with_its_own_config_or_plain_type_is_not_shared() -> None:
     )
 
 
+def test_an_annotation_that_does_not_end_in_field_info_is_not_shared() -> None:
+    """An annotation of a shape FastAPI does not build today gets its own adapter."""
+    annotated = Annotated[int, "not a field"]
+
+    first = fields.TypeAdapter(annotated)
+
+    assert first is not fields.TypeAdapter(annotated)
+    assert first.validate_python(1) == 1
+
+
 def test_install_refuses_a_get_dependant_it_does_not_understand(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
