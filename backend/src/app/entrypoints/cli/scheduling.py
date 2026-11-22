@@ -13,11 +13,6 @@ from uuid import uuid7
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.modules.identity.adapters.persistence.unit_of_work import build_identity_repos
-from app.modules.identity.application.get_setup_status import (
-    GetSetupStatus,
-    GetSetupStatusQuery,
-)
 from app.modules.scheduling.adapters.cli.execution import JobExecutor
 from app.modules.scheduling.adapters.cli.worker import (
     DEFAULT_ABANDON_AFTER,
@@ -60,7 +55,6 @@ from app.modules.scheduling.application.record_job_run_progress import (
 from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
 from app.modules.scheduling.application.tick_schedules import TickSchedules
 from app.modules.scheduling.domain.job_run import RunStatus
-from app.platform.alembic_runner import code_head_revisions, db_current_revisions
 from app.platform.app_info import load_app_info
 from app.platform.config.scheduler import get_scheduler_settings
 from app.platform.config.server import get_server_settings
@@ -82,6 +76,10 @@ if TYPE_CHECKING:
     from app.shared_kernel.jobs import JobDefinition
 
 logger = structlog.get_logger(__name__)
+
+# `worker-health` runs every 30 s on a small device and imports this module, so what
+# only the worker uses (the identity repositories, Alembic) is imported where it is
+# used, keeping them off the probe's start-up.
 
 
 def default_worker_identity_file() -> Path:
@@ -155,6 +153,14 @@ class SchedulingSetupState:
 
     async def is_complete(self) -> bool:
         """Use a short read-only session for each eligibility check."""
+        from app.modules.identity.adapters.persistence.unit_of_work import (
+            build_identity_repos,
+        )
+        from app.modules.identity.application.get_setup_status import (
+            GetSetupStatus,
+            GetSetupStatusQuery,
+        )
+
         async with self._factory() as session:
             status = GetSetupStatus(build_identity_repos(session), self._guard)
             return not await status.handle(GetSetupStatusQuery(), SYSTEM_ACTOR)
@@ -235,6 +241,8 @@ async def wait_for_schema(
     retry_interval: float = 5,
 ) -> bool:
     """Wait for the API's migration to reach the packaged head without migrating."""
+    from app.platform.alembic_runner import code_head_revisions, db_current_revisions
+
     expected = set(code_head_revisions())
     while not stop.is_set():
         try:
