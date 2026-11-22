@@ -1,10 +1,11 @@
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
 from app.modules.graph.application.permissions import GraphPermission
+from app.modules.graph.application.purged_attributes import purged_attributes
 from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.ports.unit_of_work import GraphUnitOfWork
@@ -26,22 +27,6 @@ class PurgeNodeTypeAttributeCommand:
     node_type_id: uuid.UUID
     key: str
     sub_key: str | None = None
-
-
-def _purged_attributes(
-    attributes: dict[str, Any], key: str, sub_key: str | None
-) -> dict[str, Any]:
-    """`attributes` with `key`, or `sub_key` from each row of `key`, removed."""
-    if sub_key is None:
-        return {k: v for k, v in attributes.items() if k != key}
-    # `list_with_attribute(..., sub_key=...)` only returns nodes/edges where `key`
-    # is already an array holding a matching dict row, so `rows` is always a list here.
-    rows = attributes[key]
-    purged_rows = [
-        {k: v for k, v in row.items() if k != sub_key} if isinstance(row, dict) else row
-        for row in rows
-    ]
-    return {**attributes, key: purged_rows}
 
 
 class PurgeNodeTypeAttribute(
@@ -87,7 +72,7 @@ class PurgeNodeTypeAttribute(
             ):
                 for node in page:
                     node.update(
-                        attributes=_purged_attributes(
+                        attributes=purged_attributes(
                             node.attributes, command.key, command.sub_key
                         )
                     )
