@@ -4,14 +4,16 @@ services:
   postgres:
     container_name: db
 
+  # SMOKE_IMAGE tests another image, such as a published one; scripts/smoke_test.py reads
+  # it too.
   worker:
     container_name: worker
     hostname: menagerist-smoke-worker
-    image: menagerist:local
+    image: ${SMOKE_IMAGE:-menagerist:local}
 
   menagerist:
     container_name: app
-    image: menagerist:local
+    image: ${SMOKE_IMAGE:-menagerist:local}
     environment:
       # A fresh database skips the pre-migration backup anyway; opting out keeps the
       # smoke run independent of the host ./backups bind mount's ownership.
