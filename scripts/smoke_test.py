@@ -39,7 +39,9 @@ Checks:
 
 Assumes `menagerist:local` already exists (`poe docker-build` /
 `docker buildx bake -f docker-bake.hcl local`) - this script never builds
-it, only exercises it.
+it, only exercises it. To test a different image, such as a published one, set
+SMOKE_IMAGE (for example `SMOKE_IMAGE=ghcr.io/samcorky/menagerist:edge`); it is
+pulled if it isn't already here.
 """
 
 import argparse
@@ -69,7 +71,10 @@ PROJECT_NAME = "menagerist-smoke"
 BASE_URL = "http://localhost:18080"
 SERVICE = "menagerist"
 WORKER_SERVICE = "worker"
-IMAGE = "menagerist:local"
+DEFAULT_IMAGE = "menagerist:local"
+# Set SMOKE_IMAGE to test another image, such as a published one. The compose override
+# reads it too.
+IMAGE = os.environ.get("SMOKE_IMAGE") or DEFAULT_IMAGE
 
 
 class SmokeTestError(RuntimeError):
@@ -170,14 +175,24 @@ def get_container(client: docker.DockerClient, service: str = SERVICE) -> Contai
 
 
 def require_image_built(client: docker.DockerClient) -> None:
-    """Fail fast with a clear message if `menagerist:local` hasn't been built."""
+    """Fail fast with a clear message if the image to test isn't available.
+
+    The default image is only ever built locally. Another image, named by
+    SMOKE_IMAGE, is pulled when it isn't already here.
+    """
     try:
         client.images.get(IMAGE)
     except NotFound as exc:
-        raise SmokeTestError(
-            f"{IMAGE!r} isn't built - run `poe docker-build` "
-            + "(docker buildx bake -f docker-bake.hcl local) first"
-        ) from exc
+        if IMAGE == DEFAULT_IMAGE:
+            raise SmokeTestError(
+                f"{IMAGE!r} isn't built - run `poe docker-build` "
+                + "(docker buildx bake -f docker-bake.hcl local) first"
+            ) from exc
+        print(f"pulling {IMAGE} ...")
+        try:
+            client.images.pull(IMAGE)
+        except DockerException as pull_error:
+            raise SmokeTestError(f"could not pull {IMAGE!r}: {pull_error}") from exc
 
 
 def wait_healthy(
