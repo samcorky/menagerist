@@ -8,6 +8,7 @@ import { ownedData, uniqueName } from './helpers';
 const { makeItemType, cleanUp } = ownedData();
 
 let prefix = '';
+const edgeTypeIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
 	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
@@ -17,6 +18,7 @@ test.afterEach(async ({ request }) => {
 	for (const node of nodes.filter((n) => n.name.startsWith(prefix))) {
 		await request.delete(`/api/v1/nodes/${node.id}`);
 	}
+	for (const id of edgeTypeIds.splice(0)) await request.delete(`/api/v1/edge-types/${id}`);
 	await cleanUp(request);
 });
 
@@ -290,4 +292,78 @@ test('a re-import keyed by ID adds only new rows and keeps deletions', async ({
 	await page.getByRole('button', { name: 'Add 1 item' }).click();
 	await expect(page).toHaveURL(/\/items$/);
 	await expect(page.getByText(`${prefix} Prowse`).first()).toBeVisible();
+});
+
+type Edge = { id: string; source_id: string; target_id: string };
+
+test('a column connects rows to items by name, once, and deletions stay deleted', async ({
+	page,
+	request
+}) => {
+	const type = await makeType(request);
+	const event = await makeItemType(request, uniqueName('Event'));
+	prefix = uniqueName('Got').replace(/\W+/g, '');
+	const label = `Got at ${prefix}`;
+	const made = await request.post('/api/v1/edge-types', {
+		data: { slug: label.toLowerCase().replace(/[^a-z0-9]+/g, '-'), label, directional: true }
+	});
+	expect(made.status(), await made.text()).toBe(201);
+	edgeTypeIds.push(((await made.json()) as { id: string }).id);
+	const sheet = (rows: string[]) => ({
+		name: 'autographs.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from(['ID,Title,Position,Where', ...rows].join('\n') + '\n')
+	});
+	const first = [
+		`5,${prefix} Prowse,cover,${prefix} eBay`,
+		`30,${prefix} Astley,back,${prefix} eBay `
+	];
+	const connectWhere = async () => {
+		await page.getByLabel('ID', { exact: true }).selectOption({ label: 'Keep as an extra detail' });
+		await page
+			.getByLabel('Where', { exact: true })
+			.selectOption({ label: 'Connect to an item by name' });
+		await page.getByLabel('Connection type').selectOption({ label });
+		await page.getByRole('combobox', { name: "The other item's type for Where" }).click();
+		await page.getByPlaceholder('Search item types…').fill(event.label);
+		await page.getByRole('option', { name: new RegExp(event.label) }).click();
+		await page.getByLabel('Recognise rows already imported by').selectOption({ label: 'ID' });
+		await page.getByRole('button', { name: 'Preview' }).click();
+	};
+	const nodes = async () =>
+		(await (await request.get('/api/v1/nodes?limit=500')).json()) as { id: string; name: string }[];
+	const edgesOf = async (id: string) =>
+		(await (await request.get(`/api/v1/edges?node_id=${id}`)).json()) as Edge[];
+
+	// Two rows name the same place, one with a trailing space: one event is made.
+	await chooseFileAndType(page, sheet(first), type.label);
+	await connectWhere();
+	await expect(
+		page.getByText(`New items from connected columns, with just their names: ${prefix} eBay.`)
+	).toBeVisible();
+	await page.getByRole('button', { name: 'Add 3 items' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+	const all = await nodes();
+	const ebay = all.filter((n) => n.name.toLowerCase() === `${prefix} ebay`.toLowerCase());
+	expect(ebay.map((n) => n.name)).toEqual([`${prefix} eBay`]);
+	expect(await edgesOf(ebay[0].id)).toHaveLength(2);
+
+	// One connection deleted stays deleted; the new row's connection is made.
+	const prowse = all.find((n) => n.name === `${prefix} Prowse`)!;
+	const gone = (await edgesOf(ebay[0].id)).find((e) => e.source_id === prowse.id)!;
+	expect((await request.delete(`/api/v1/edges/${gone.id}`)).ok()).toBeTruthy();
+
+	await chooseFileAndType(
+		page,
+		sheet([...first, `31,${prefix} Astley again,back,${prefix} ebay`]),
+		type.label
+	);
+	await connectWhere();
+	const deleted = page.getByRole('region', { name: 'Deleted after importing' });
+	await expect(deleted.getByText(`${prefix} Prowse to ${prefix} eBay`)).toBeVisible();
+	await page.getByRole('button', { name: 'Add 1 item' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+	const after = await edgesOf(ebay[0].id);
+	expect(after).toHaveLength(2);
+	expect(after.some((e) => e.source_id === prowse.id)).toBe(false);
 });

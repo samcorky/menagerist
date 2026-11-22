@@ -166,7 +166,7 @@ async def test_run_creates_items_and_returns_counts(shared: Shared) -> None:
     response = _post(client, "")
 
     assert response.status_code == 200
-    assert response.json() == {"items_added": 2}
+    assert response.json() == {"items_added": 2, "connections_added": 0}
     nodes = await shared.graph_repos.nodes.list(
         after=None, limit=10, scope=ContentFilter.everyone()
     )
@@ -341,3 +341,67 @@ async def test_restore_is_read_as_json(shared: Shared) -> None:
 
     assert kept["entities"][0]["reason"] == "You deleted this after importing it."
     assert restored["entities"][0]["action"] == "create"
+
+
+CONNECT_FILE: dict[str, Any] = {
+    **TYPE_FILE,
+    "relationship_types": [{"ref": "signed", "slug": "signed", "label": "Signed"}],
+    "item_types": [
+        *TYPE_FILE["item_types"],
+        {"ref": "person", "slug": "person", "label": "Person"},
+    ],
+}
+SIGNED = b"title,signer\nAlien #1,Sigourney Weaver\nAliens,sigourney weaver\n"
+
+
+async def test_an_import_with_a_connection_column_reports_connections_added(
+    shared: Shared,
+) -> None:
+    """A connection column joins each row to the person it names, made once."""
+    client = _client(shared)
+    assert client.post("/api/v1/bundles/import", json=CONNECT_FILE).status_code == 200
+    connections = [
+        {
+            "column": "signer",
+            "relationship_type": "signed",
+            "item_type": "person",
+            "row_end": "target",
+        }
+    ]
+
+    plan = _post(
+        client,
+        "/plan",
+        data=SIGNED,
+        mapping=[{"column": "title", "target": "name"}],
+        connections=json.dumps(connections),
+    )
+    response = _post(
+        client,
+        "",
+        data=SIGNED,
+        mapping=[{"column": "title", "target": "name"}],
+        connections=json.dumps(connections),
+    )
+
+    kinds = [e["kind"] for e in plan.json()["entities"]]
+    assert kinds.count("connection") == 2
+    assert "relationship_type" not in kinds
+    assert response.json() == {"items_added": 3, "connections_added": 2}
+
+
+def test_an_unknown_row_end_is_a_422(shared: Shared) -> None:
+    """A connection column must say which end the row is."""
+    client = _with_type(shared)
+    connections = [
+        {
+            "column": "title",
+            "relationship_type": "signed",
+            "item_type": "person",
+            "row_end": "middle",
+        }
+    ]
+
+    response = _post(client, "/plan", connections=json.dumps(connections))
+
+    assert response.status_code == 422

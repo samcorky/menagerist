@@ -201,24 +201,32 @@ class NodeRepository(Protocol):
         self,
         type_slug: str,
         key: str,
-        value: str,
+        value: str | int | float,
         *,
         scope: ContentFilter,
         limit: int,
     ) -> builtins.list[uuid.UUID]:
         """Return ids of non-deleted nodes of `type_slug` whose `key` equals `value`.
 
-        Only a string attribute equal to `value` matches, not a list holding it.
+        Only an attribute equal to `value` and of its kind matches: text finds text
+        and a number a number, never a yes/no or a list holding it.
         Ordered by id, at most `limit`.
         """
         ...
 
     async def ids_with_name(
-        self, type_slug: str, name: str, *, scope: ContentFilter, limit: int
+        self,
+        type_slug: str,
+        name: str,
+        *,
+        scope: ContentFilter,
+        limit: int,
+        ignore_case: bool = False,
     ) -> builtins.list[uuid.UUID]:
         """Return ids of non-deleted nodes of `type_slug` named exactly `name`.
 
-        Case-sensitive. Ordered by id, at most `limit`.
+        Case-sensitive unless `ignore_case`, which lowercases both sides. Ordered by
+        id, at most `limit`.
         """
         ...
 

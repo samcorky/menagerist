@@ -229,7 +229,7 @@ async def test_an_empty_key_cell_skips_the_row(shared: Shared) -> None:
     plan = await world.plan(_request(" ,Alien,1\nA2,Aliens,2\n"))
 
     assert [(e.label, e.action, e.reason) for e in _items(plan)] == [
-        ("Alien", PlanAction.AMBIGUOUS, "No key."),
+        ("Alien", PlanAction.SKIP, "No key."),
         ("Aliens", PlanAction.CREATE, None),
     ]
 
@@ -310,3 +310,25 @@ async def test_links_are_committed_with_the_import(shared: Shared) -> None:
     uow = await world.run(_request("A1,Alien,1\n"))
 
     assert uow.committed
+
+
+async def test_a_number_key_finds_items_imported_without_links(shared: Shared) -> None:
+    """An ID kept as a number finds the items an import without links made."""
+    world = await _world(shared)
+    mapping = (
+        ColumnMapping(
+            column="code",
+            target=None,
+            extra=ExtraField(key="ident", title="ID", kind=ExtraFieldKind.NUMBER),
+        ),
+        ColumnMapping(column="title", target="name"),
+    )
+    await world.run(_request("5,Alien,1\n", key_field=None, mapping=mapping))
+
+    (entity,) = _items(
+        await world.plan(_request("5,Alien,1\n", key_field="ident", mapping=mapping))
+    )
+    await world.run(_request("5,Alien,1\n", key_field="ident", mapping=mapping))
+
+    assert entity.action is PlanAction.UNCHANGED
+    assert await _names(shared) == ["Alien"]

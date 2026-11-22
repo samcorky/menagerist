@@ -6,9 +6,11 @@
 		importItems,
 		inspectItemImport,
 		planItemImport,
+		type ConnectionEnd,
 		type DayMonthOrder,
 		type ExtraFieldKind,
-		type ItemImportInspectionResponse
+		type ItemImportInspectionResponse,
+		type NameLookup
 	} from '$lib/api/client';
 	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
@@ -29,6 +31,10 @@
 		assignTarget,
 		choicesFrom,
 		confirmText,
+		CONNECT,
+		connectColumn,
+		connectionsJson,
+		connectionsReady,
 		DATE_ORDERS,
 		deletedRows,
 		encodingName,
@@ -42,14 +48,18 @@
 		keyColumns,
 		keyFieldFor,
 		mappingJson,
+		MAX_CONNECTED,
 		MAX_KEPT,
+		namedToCreate,
 		renameKept,
+		rowEndOptions,
 		rowsAndColumns,
 		setKeptKind,
 		targetOptions,
 		type ColumnChoice
 	} from '$lib/csv-import';
-	import type { ImportPlan } from '$lib/import-plan';
+	import { LISTED, type ImportPlan } from '$lib/import-plan';
+	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
 
 	// Three steps on one page: choose the file and the item type, match columns to fields, then
 	// preview what would be added. The server keeps nothing between calls, so each one sends the
@@ -64,6 +74,10 @@
 	const SAMPLES = 3;
 	// Rows deleted after importing, listed one by one before "and N more".
 	const DELETED_SHOWN = 20;
+	const MISSING: { value: NameLookup; label: string }[] = [
+		{ value: 'create', label: 'Add one with just the name' },
+		{ value: 'skip', label: 'Leave the connection out' }
+	];
 	const STEPS = ['Choose file', 'Match columns', 'Preview'];
 	const STEP_ORDER: Step[] = ['choose', 'match', 'preview'];
 
@@ -84,11 +98,16 @@
 	// The column that recognises rows imported before, and the keys of deleted rows to bring back.
 	let keyColumn = $state<string | null>(null);
 	let restore = $state<string[]>([]);
+	// The person's connection types, loaded once a column is connected.
+	const lookups = new ConnectionLookups();
 
 	const options = $derived(inspection ? targetOptions(inspection.fields) : []);
 	const kept = $derived(keptDetails(choices));
 	// Every kept detail needs a name, as every item does.
 	const named = $derived(hasName(choices) && kept.every((detail) => detail.title.trim() !== ''));
+	const connected = $derived(choices.filter((choice) => choice.connect).length);
+	// Every connected column needs its connection type and the other item's type, too.
+	const ready = $derived(named && connectionsReady(choices));
 	// A blocked run adds nothing, so it lists no items as about to be added.
 	const shown = $derived(plan && !plan.ready ? { ...plan, entities: [] } : plan);
 	const keyChoices = $derived(keyColumns(choices));
@@ -98,6 +117,7 @@
 	);
 	const titles = $derived(inspection ? fieldTitles(choices, inspection.fields) : {});
 	const deleted = $derived(plan ? deletedRows(plan, restore) : []);
+	const toCreate = $derived(plan?.ready ? namedToCreate(plan) : []);
 
 	/** A different file or item type means the old matching no longer applies. */
 	function startAgain() {
@@ -146,10 +166,16 @@
 	}
 
 	function targetOf(choice: ColumnChoice): string {
+		if (choice.connect) return CONNECT;
 		return choice.extra ? KEEP : (choice.target ?? '');
 	}
 
 	function choose(column: string, value: string) {
+		if (value === CONNECT) {
+			choices = connectColumn(choices, column);
+			void lookups.loadRelationships();
+			return;
+		}
 		if (value !== KEEP) {
 			choices = assignTarget(choices, column, value || null);
 			return;
@@ -176,6 +202,9 @@
 	const joined = (key: string | undefined) =>
 		key === undefined ? undefined : itemFields.find((field) => field.key === key);
 
+	const relationshipOf = (slug: string | null) =>
+		lookups.relationships?.find((relationship) => relationship.slug === slug);
+
 	function body() {
 		const fieldKeys = (inspection?.fields ?? []).map((f) => f.key);
 		return {
@@ -185,12 +214,13 @@
 			list_separator: separator,
 			day_month_order: dateOrder,
 			key_field: keyFieldFor(choices, fieldKeys, activeKey),
-			restore: JSON.stringify(restore)
+			restore: JSON.stringify(restore),
+			connections: connectionsJson(choices)
 		};
 	}
 
 	async function showPreview() {
-		if (!file || !itemType || !named) return;
+		if (!file || !itemType || !ready) return;
 		step = 'preview';
 		plan = null;
 		restore = [];
@@ -230,7 +260,13 @@
 			return;
 		}
 		const added = result.data.items_added;
-		toast.success(`Added ${added.toLocaleString('en-GB')} ${added === 1 ? 'item' : 'items'}`);
+		const joins = result.data.connections_added;
+		const items = `${added.toLocaleString('en-GB')} ${added === 1 ? 'item' : 'items'}`;
+		toast.success(
+			joins > 0
+				? `Added ${items} and ${joins.toLocaleString('en-GB')} ${joins === 1 ? 'connection' : 'connections'}`
+				: `Added ${items}`
+		);
 		await goto(resolve('/items'));
 	}
 </script>
@@ -375,7 +411,121 @@
 									>
 										Keep as an extra detail
 									</NativeSelectOption>
+									<NativeSelectOption
+										value={CONNECT}
+										disabled={!choice.connect && connected >= MAX_CONNECTED}
+									>
+										Connect to an item by name
+									</NativeSelectOption>
 								</NativeSelect>
+								{#if choice.connect}
+									{@const connect = choice.connect}
+									{@const relationship = relationshipOf(connect.relationship_type)}
+									<div class="grid gap-2 sm:col-span-3 sm:grid-cols-2 sm:pl-4">
+										<div class="space-y-1">
+											<label
+												class="text-xs text-muted-foreground"
+												for={`csv-connect-type-${index}`}
+											>
+												Connection type
+											</label>
+											<NativeSelect
+												id={`csv-connect-type-${index}`}
+												class="w-full pointer-coarse:[&_select]:min-h-11"
+												value={connect.relationship_type ?? ''}
+												disabled={!lookups.relationships}
+												onchange={(e) =>
+													(choices = connectColumn(choices, choice.column, {
+														relationship_type: e.currentTarget.value || null
+													}))}
+											>
+												<NativeSelectOption value="">
+													{lookups.relationships ? 'Choose a connection type' : 'Loading…'}
+												</NativeSelectOption>
+												{#each lookups.relationships ?? [] as option (option.slug)}
+													<NativeSelectOption value={option.slug}>
+														{option.label}
+													</NativeSelectOption>
+												{/each}
+											</NativeSelect>
+											{#if lookups.relationshipsFailed}
+												<p class="text-xs text-destructive" role="alert">
+													Couldn't load your connection types.
+													<button
+														type="button"
+														class="underline underline-offset-2"
+														onclick={() => lookups.retryRelationships()}
+													>
+														Try again
+													</button>
+												</p>
+											{/if}
+										</div>
+										<div class="space-y-1">
+											<p class="text-xs text-muted-foreground">The other item's type</p>
+											<TypePicker
+												value={connect.item_type}
+												allowClear={false}
+												allowCreate={false}
+												aria-label={`The other item's type for ${choice.column}`}
+												onchange={(slug) =>
+													(choices = connectColumn(choices, choice.column, { item_type: slug }))}
+											/>
+										</div>
+										{#if relationship?.directional}
+											<div class="space-y-1 sm:col-span-2">
+												<label
+													class="text-xs text-muted-foreground"
+													for={`csv-connect-end-${index}`}
+												>
+													Which way
+												</label>
+												<NativeSelect
+													id={`csv-connect-end-${index}`}
+													class="w-full pointer-coarse:[&_select]:min-h-11"
+													value={connect.row_end}
+													onchange={(e) =>
+														(choices = connectColumn(choices, choice.column, {
+															row_end: e.currentTarget.value as ConnectionEnd
+														}))}
+												>
+													{#each rowEndOptions(relationship) as option (option.value)}
+														<NativeSelectOption value={option.value}>
+															{option.label}
+														</NativeSelectOption>
+													{/each}
+												</NativeSelect>
+											</div>
+										{/if}
+										<div class="space-y-1 sm:col-span-2">
+											<label
+												class="text-xs text-muted-foreground"
+												for={`csv-connect-missing-${index}`}
+											>
+												If you have no item with that name
+											</label>
+											<NativeSelect
+												id={`csv-connect-missing-${index}`}
+												class="w-full pointer-coarse:[&_select]:min-h-11"
+												value={connect.on_missing}
+												onchange={(e) =>
+													(choices = connectColumn(choices, choice.column, {
+														on_missing: e.currentTarget.value as NameLookup
+													}))}
+											>
+												{#each MISSING as option (option.value)}
+													<NativeSelectOption value={option.value}>
+														{option.label}
+													</NativeSelectOption>
+												{/each}
+											</NativeSelect>
+										</div>
+										<p class="text-xs text-muted-foreground sm:col-span-2">
+											Each row connects to the item its cell names. Names are matched whatever their
+											capitals and spacing, and each name is added once.
+										</p>
+									</div>
+								{/if}
 								{#if choice.extra}
 									{@const extra = choice.extra}
 									<div class="grid gap-2 sm:col-span-3 sm:grid-cols-[minmax(0,1fr)_14rem] sm:pl-4">
@@ -485,13 +635,17 @@
 					<p class="text-sm text-muted-foreground">Choose a column for Name.</p>
 				{:else if !named}
 					<p class="text-sm text-muted-foreground">Give each extra detail a name.</p>
+				{:else if !ready}
+					<p class="text-sm text-muted-foreground">
+						Choose a connection type and the other item's type for each connected column.
+					</p>
 				{/if}
 
 				<div class="flex justify-end gap-2">
 					<Button variant="outline" class="pointer-coarse:h-11" onclick={() => (step = 'choose')}>
 						Back
 					</Button>
-					<Button class="pointer-coarse:h-11" disabled={!named} onclick={showPreview}>
+					<Button class="pointer-coarse:h-11" disabled={!ready} onclick={showPreview}>
 						Preview
 					</Button>
 				</div>
@@ -502,6 +656,15 @@
 						its cell has a value: {kept
 							.map((detail) => `${detail.title.trim()} (${kindLabel(detail.kind)})`)
 							.join(', ')}.
+					</p>
+				{/if}
+				{#if toCreate.length > 0}
+					<p class="text-sm text-muted-foreground">
+						New items from connected columns, with just their names: {toCreate
+							.slice(0, LISTED)
+							.join(', ')}{toCreate.length > LISTED
+							? ` and ${(toCreate.length - LISTED).toLocaleString('en-GB')} more`
+							: ''}.
 					</p>
 				{/if}
 				{#if deleted.length > 0}

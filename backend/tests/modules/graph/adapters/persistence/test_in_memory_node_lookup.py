@@ -103,3 +103,35 @@ async def test_ids_with_name_skips_deleted_and_other_owners() -> None:
         "film", "Alien", scope=ContentFilter.of(OWNER), limit=5
     )
     assert found == []
+
+
+async def test_ids_with_name_can_ignore_case() -> None:
+    """A name differing only in case is found only when case is ignored."""
+    rick = _node("Rick Astley", type_="person")
+    repo = await _repo(rick, _node("Rick Astley Jr", type_="person"))
+    scope = ContentFilter.of(OWNER)
+
+    exact = await repo.ids_with_name("person", "rick astley", scope=scope, limit=5)
+    loose = await repo.ids_with_name(
+        "person", "rick astley", scope=scope, limit=5, ignore_case=True
+    )
+
+    assert exact == []
+    assert loose == [rick.id]
+
+
+async def test_ids_with_attribute_value_matches_a_number_as_a_number() -> None:
+    """A number finds a number, never its text or a yes/no."""
+    five = _node(attributes={"ident": 5})
+    repo = await _repo(
+        five, _node(attributes={"ident": "5"}), _node(attributes={"ident": True})
+    )
+    scope = ContentFilter.of(OWNER)
+
+    assert await repo.ids_with_attribute_value(
+        "film", "ident", 5, scope=scope, limit=5
+    ) == [five.id]
+    assert (
+        await repo.ids_with_attribute_value("film", "ident", 1, scope=scope, limit=5)
+        == []
+    )

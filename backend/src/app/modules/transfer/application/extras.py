@@ -87,8 +87,10 @@ class BundleExtras:
     as it is made. `links` and `owner_id` let a bundle with a `source` find the items
     an earlier import made, and link the ones it makes. Planning fills `linked` (item
     ref to the item an earlier import made) and `matched` (item ref to a hand-made
-    item its key found), which applying reads. `restore` lists the source keys of
-    items deleted after an earlier import that are to be created again.
+    item its key found) and `named` (ref of an item found by name to the person's
+    item of that name), which applying reads. `restore` lists the source keys of
+    items and connections deleted after an earlier import that are to be created
+    again.
     """
 
     adoptions: Mapping[Key, Adoption] = field(default_factory=dict)
@@ -102,6 +104,7 @@ class BundleExtras:
     owner_id: uuid.UUID | None = None
     linked: dict[str, uuid.UUID] = field(default_factory=dict)
     matched: dict[str, uuid.UUID] = field(default_factory=dict)
+    named: dict[str, uuid.UUID] = field(default_factory=dict)
     restore: frozenset[str] = frozenset()
 
 

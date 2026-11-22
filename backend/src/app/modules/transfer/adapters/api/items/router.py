@@ -20,6 +20,7 @@ from app.modules.transfer.adapters.api.dependencies import (
 from app.modules.transfer.adapters.api.items.schemas import (
     INSPECT_EXAMPLE,
     ColumnMappingEntry,
+    ConnectionColumnEntry,
     ItemImportInspectionResponse,
     ItemImportResultResponse,
 )
@@ -29,7 +30,6 @@ from app.modules.transfer.application.item_import import (
     ItemImportRequest,
     PlanItemImport,
 )
-from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.errors import (
     BundleConflictError,
     InvalidImportFileError,
@@ -85,9 +85,21 @@ _RESTORE = Annotated[
     Json[list[str]],
     Form(
         default_factory=list,
-        description="Keys of rows whose item was deleted after an earlier import "
+        description="Keys of rows and connections deleted after an earlier import "
         + "that are to be created again, as a JSON list.",
         examples=['["A14", "A15"]'],
+    ),
+]
+_CONNECTIONS = Annotated[
+    Json[list[ConnectionColumnEntry]],
+    Form(
+        default_factory=list,
+        description="Columns that connect each row to another item, found by its "
+        + "name, as a JSON list; at most 5.",
+        examples=[
+            '[{"column": "signer", "relationship_type": "signed", '
+            + '"item_type": "person", "row_end": "target"}]'
+        ],
     ),
 ]
 _SEPARATOR = Annotated[
@@ -159,13 +171,15 @@ async def plan_item_import(
     use_case: Annotated[PlanItemImport, Depends(get_plan_item_import_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     restore: _RESTORE,
+    connections: _CONNECTIONS,
     list_separator: _SEPARATOR = ",",
     day_month_order: _DAY_MONTH_ORDER = DayMonthOrder.DAY_FIRST,
     key_field: _KEY_FIELD = None,
 ) -> ImportPlanResponse:
     """See what importing a CSV file would do, without importing anything.
 
-    Each row is an item to `create`. A value that cannot be imported, such as a date
+    Each row is an item to `create`, and each connection column adds the items it
+    names and a connection to each. A value that cannot be imported, such as a date
     written as "19th Aug", is a blocker that names its row (the header is row 1) and
     field; while there are any, the plan is not `ready`.
     """
@@ -177,6 +191,7 @@ async def plan_item_import(
         day_month_order=day_month_order,
         key_field=key_field,
         restore=tuple(restore),
+        connections=tuple(c.to_domain() for c in connections),
     )
     return ImportPlanResponse.from_domain(await use_case.handle(request, actor))
 
@@ -195,6 +210,7 @@ async def import_items(
     use_case: Annotated[ImportItems, Depends(get_import_items_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
     restore: _RESTORE,
+    connections: _CONNECTIONS,
     list_separator: _SEPARATOR = ",",
     day_month_order: _DAY_MONTH_ORDER = DayMonthOrder.DAY_FIRST,
     key_field: _KEY_FIELD = None,
@@ -212,6 +228,7 @@ async def import_items(
         day_month_order=day_month_order,
         key_field=key_field,
         restore=tuple(restore),
+        connections=tuple(c.to_domain() for c in connections),
     )
     applied = await use_case.handle(request, actor)
-    return ItemImportResultResponse.from_domain(applied, EntityKind.ITEM)
+    return ItemImportResultResponse.from_domain(applied)

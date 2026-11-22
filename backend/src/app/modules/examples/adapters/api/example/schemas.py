@@ -240,6 +240,7 @@ PLAN_EXAMPLE: dict[str, Any] = {
             "label": "Album",
             "action": "create",
             "changed": [],
+            "deleted": False,
             "reason": None,
         },
         {
@@ -248,6 +249,7 @@ PLAN_EXAMPLE: dict[str, Any] = {
             "label": "Blue",
             "action": "unchanged",
             "changed": [],
+            "deleted": False,
             "reason": "Kept from an earlier install, and taken back as it is.",
         },
     ],

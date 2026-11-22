@@ -92,3 +92,24 @@ def test_a_keyed_item_carries_its_source_key_to_the_response() -> None:
     )
 
     assert entities_from_domain(plan)[0].source_key == "A14"
+
+
+def test_a_deleted_entity_says_so_in_the_response() -> None:
+    """Something deleted after importing is marked, so it can be offered back."""
+    plan = Plan(
+        bundle_id="b",
+        entities=(
+            PlannedEntity(
+                kind=EntityKind.CONNECTION,
+                ref="connection-0",
+                label="Photo to eBay",
+                action=DomainPlanAction.SKIP,
+                source_key="A1\x1fwhere\x1febay",
+                deleted=True,
+            ),
+        ),
+    )
+
+    (entity,) = entities_from_domain(plan)
+
+    assert (entity.action, entity.deleted) == (PlanAction.SKIP, True)
