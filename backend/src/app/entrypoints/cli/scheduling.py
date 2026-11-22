@@ -13,10 +13,6 @@ from uuid import uuid7
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.entrypoints.api.shared.job_catalogue import (
-    build_catalogue,
-    build_schedule_source,
-)
 from app.modules.identity.adapters.persistence.unit_of_work import build_identity_repos
 from app.modules.identity.application.get_setup_status import (
     GetSetupStatus,
@@ -273,6 +269,10 @@ def stop_on_signals(stop: asyncio.Event) -> Iterator[None]:
 async def run_worker_cli(*, identity_file: Path | None = None) -> None:
     """Wait for schema readiness, run until termination and close pooled connections."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.entrypoints.api.shared.job_catalogue import (
+        build_catalogue,
+        build_schedule_source,
+    )
 
     stop = asyncio.Event()
     try:
@@ -353,6 +353,8 @@ async def _drive_run(
     worker_id: str,
     poll_interval: float,
 ) -> JobRun:
+    from app.entrypoints.api.shared.job_catalogue import build_schedule_source
+
     while True:
         async with factory() as session:
             current = await GetJobRun(SqlAlchemyJobRunReader(session), guard).handle(
@@ -388,6 +390,10 @@ async def _drive_run(
 async def list_jobs_cli() -> list[JobStatus]:
     """List jobs and release the process-wide engine before its event loop closes."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.entrypoints.api.shared.job_catalogue import (
+        build_catalogue,
+        build_schedule_source,
+    )
 
     try:
         return await list_registered_jobs(
@@ -403,6 +409,7 @@ async def list_jobs_cli() -> list[JobStatus]:
 async def run_job_cli(job_key: str) -> JobRun:
     """Run a job and release the process-wide engine on success or failure."""
     from app.entrypoints.api.shared.access_guard import get_access_guard
+    from app.entrypoints.api.shared.job_catalogue import build_catalogue
 
     try:
         return await run_registered_job(
