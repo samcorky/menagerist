@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 
@@ -13,6 +13,10 @@ from app.entrypoints.api.shared.bridges.transfer_targets import (
     get_preset_pack_target,
 )
 from app.modules.transfer.adapters.codecs.menagerist_bundle import MenageristBundleCodec
+from app.modules.transfer.adapters.persistence.unit_of_work import (
+    build_transfer_repos,
+    create_transfer_uow,
+)
 from app.modules.transfer.application.bundle_files import (
     ExportBundle,
     ImportBundle,
@@ -24,7 +28,33 @@ from app.modules.transfer.application.item_import import (
     InspectItemImport,
     PlanItemImport,
 )
+from app.modules.transfer.ports.unit_of_work import TransferRepos, TransferUnitOfWork
+from app.platform.database import get_session_factory
 from app.shared_kernel.access_guard import AccessGuard
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+
+def get_transfer_uow(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+) -> TransferUnitOfWork:
+    """Return a unit of work over the source links table, for commands."""
+    return create_transfer_uow(session_factory)
+
+
+async def get_transfer_repos(
+    session_factory: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_session_factory)
+    ],
+) -> AsyncIterator[TransferRepos]:
+    """Return a read-only repository bundle, for queries."""
+    async with session_factory() as session:
+        yield build_transfer_repos(session)
 
 
 def get_inspect_item_import_use_case(
@@ -36,19 +66,21 @@ def get_inspect_item_import_use_case(
 
 
 def get_plan_item_import_use_case(
+    repos: Annotated[TransferRepos, Depends(get_transfer_repos)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
 ) -> PlanItemImport:
-    return PlanItemImport(guard, presets, graph)
+    return PlanItemImport(repos, guard, presets, graph)
 
 
 def get_import_items_use_case(
+    uow: Annotated[TransferUnitOfWork, Depends(get_transfer_uow)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
     presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
 ) -> ImportItems:
-    return ImportItems(guard, presets, graph)
+    return ImportItems(uow, guard, presets, graph)
 
 
 @lru_cache(maxsize=1)

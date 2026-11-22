@@ -5,6 +5,12 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.modules.transfer.adapters.persistence.in_memory_source_link_repository import (
+    InMemorySourceLinkRepository,
+)
+from app.modules.transfer.adapters.persistence.unit_of_work import (
+    create_in_memory_transfer_uow,
+)
 from app.modules.transfer.application.item_import import (
     ImportItems,
     InspectItemImport,
@@ -19,6 +25,7 @@ from app.modules.transfer.domain.errors import (
 )
 from app.modules.transfer.domain.plan import PlanAction
 from app.modules.transfer.domain.tabular import ColumnMapping, CsvEncoding
+from app.modules.transfer.ports.unit_of_work import TransferRepos, TransferUnitOfWork
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
@@ -27,6 +34,16 @@ if TYPE_CHECKING:
     from tests.modules.conftest import Shared, Targets
 
 ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
+
+
+def _repos() -> TransferRepos:
+    return TransferRepos(links=InMemorySourceLinkRepository())
+
+
+def _uow() -> TransferUnitOfWork:
+    return create_in_memory_transfer_uow(_repos())
+
+
 SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -94,11 +111,11 @@ def _request(
 
 
 def _plan(t: Targets) -> PlanItemImport:
-    return PlanItemImport(InMemoryAccessGuard(), t.presets, t.graph)
+    return PlanItemImport(_repos(), InMemoryAccessGuard(), t.presets, t.graph)
 
 
 def _run(t: Targets) -> ImportItems:
-    return ImportItems(InMemoryAccessGuard(), t.presets, t.graph)
+    return ImportItems(_uow(), InMemoryAccessGuard(), t.presets, t.graph)
 
 
 async def _nodes(shared: Shared) -> list[Any]:

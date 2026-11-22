@@ -49,6 +49,8 @@ export interface PlanSummary {
 	adding: PlanGroup[];
 	/** What you already have, with why. */
 	have: PlannedEntityResponse[];
+	/** What is left out, with why: a row whose key is missing or names more than one item. */
+	skipped: PlannedEntityResponse[];
 	/** What is in the way. */
 	conflicts: PlannedEntityResponse[];
 	blockers: PlanBlockerResponse[];
@@ -80,7 +82,9 @@ export function summarisePlan(plan: ImportPlan): PlanSummary {
 		});
 	return {
 		adding,
-		have: plan.entities.filter((e) => e.action === 'unchanged'),
+		// One deleted after importing is not something you have; the page that can restore it says so.
+		have: plan.entities.filter((e) => e.action === 'unchanged' && !(e.source_key && !e.matched_id)),
+		skipped: plan.entities.filter((e) => e.action === 'ambiguous'),
 		conflicts: plan.entities.filter((e) => e.action === 'conflict'),
 		blockers: plan.blockers,
 		canAdd: plan.ready && adding.length > 0

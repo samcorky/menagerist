@@ -237,3 +237,57 @@ ${prefix}A,no
 	const fields = await (await request.get(`/api/v1/nodes/fields?type=${type.slug}`)).json();
 	expect(fields).toEqual([expect.objectContaining({ key: 'signed', count: 2 })]);
 });
+
+function keyed(rows: string[]): { name: string; mimeType: string; buffer: Buffer } {
+	return {
+		name: 'autographs.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from(['ID,Title,Position', ...rows].join('\n') + '\n')
+	};
+}
+
+async function matchKeyedByID(page: Page) {
+	await page.getByLabel('ID', { exact: true }).selectOption({ label: 'Keep as an extra detail' });
+	await page.getByLabel('Recognise rows already imported by').selectOption({ label: 'ID' });
+	await page.getByRole('button', { name: 'Preview' }).click();
+}
+
+test('a re-import keyed by ID adds only new rows and keeps deletions', async ({
+	page,
+	request
+}) => {
+	const type = await makeType(request);
+	prefix = uniqueName('Auto').replace(/\W+/g, '');
+	const first = [`5,${prefix} Prowse,cover`, `30,${prefix} Astley,back`];
+
+	await chooseFileAndType(page, keyed(first), type.label);
+	await matchKeyedByID(page);
+	await page.getByRole('button', { name: 'Add 2 items' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+
+	// The sheet grows by a row: only that one is new.
+	await chooseFileAndType(page, keyed([...first, `31,${prefix} Astley again,back`]), type.label);
+	await matchKeyedByID(page);
+	await expect(page.getByText(`${prefix} Prowse · Already imported.`)).toBeVisible();
+	await page.getByRole('button', { name: 'Add 1 item' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+
+	// A row deleted after importing stays out until it is brought back.
+	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
+		id: string;
+		name: string;
+	}[];
+	const prowse = nodes.find((n) => n.name === `${prefix} Prowse`)!;
+	expect((await request.delete(`/api/v1/nodes/${prowse.id}`)).ok()).toBeTruthy();
+
+	await chooseFileAndType(page, keyed([...first, `31,${prefix} Astley again,back`]), type.label);
+	await matchKeyedByID(page);
+	const deleted = page.getByRole('region', { name: 'Deleted after importing' });
+	await expect(deleted.getByText(`${prefix} Prowse`)).toBeVisible();
+	await expect(page.getByText('You already have everything here.')).toBeVisible();
+
+	await deleted.getByRole('checkbox', { name: `${prefix} Prowse` }).click();
+	await page.getByRole('button', { name: 'Add 1 item' }).click();
+	await expect(page).toHaveURL(/\/items$/);
+	await expect(page.getByText(`${prefix} Prowse`).first()).toBeVisible();
+});

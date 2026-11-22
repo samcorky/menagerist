@@ -1,5 +1,6 @@
 """The API shape of a `Plan`, shared by every install that offers a dry run."""
 
+import uuid
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -34,7 +35,21 @@ class PlannedEntityResponse(BaseModel):
                     "action": "conflict",
                     "reason": "You already have an item type called 'album'. "
                     + "Rename or remove it, then try again.",
-                }
+                    "matched_id": None,
+                    "matched_name": None,
+                    "changed": [],
+                },
+                {
+                    "kind": "item",
+                    "ref": "row-14",
+                    "label": "Alien #1",
+                    "action": "unchanged",
+                    "reason": "Already imported.",
+                    "matched_id": "0192f4a8-5c3e-7d21-9a6b-3e8f1c2d4b5a",
+                    "matched_name": "Alien #1",
+                    "changed": ["attributes.signed_on"],
+                    "source_key": "A14",
+                },
             ]
         }
     )
@@ -47,6 +62,22 @@ class PlannedEntityResponse(BaseModel):
     action: PlanAction
     reason: str | None = Field(
         default=None, description="Why it is unchanged, conflicts or is ambiguous."
+    )
+    matched_id: uuid.UUID | None = Field(
+        default=None,
+        description="The id of the item you have that this one was recognised as.",
+    )
+    matched_name: str | None = Field(
+        default=None, description="That item's name, as it is now."
+    )
+    changed: list[str] = Field(
+        description="Fields whose value in the file differs from what was last "
+        + "imported: `name`, `description`, `tags` or `attributes.<key>`.",
+    )
+    source_key: str | None = Field(
+        default=None,
+        description="The key it has in its source, such as the row's key column; "
+        + "send it in `restore` to bring back an item deleted after importing.",
     )
 
 
@@ -74,6 +105,10 @@ def entities_from_domain(plan: Plan) -> list[PlannedEntityResponse]:
             label=e.label,
             action=PlanAction(e.action.value),
             reason=e.reason,
+            matched_id=e.matched_id,
+            matched_name=e.matched_name,
+            changed=list(e.changed),
+            source_key=e.source_key,
         )
         for e in plan.entities
     ]

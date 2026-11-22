@@ -16,6 +16,7 @@ from app.modules.transfer.application.cell_values import (
 )
 from app.modules.transfer.application.csv_rows import (
     CsvTable,
+    normalise_text,
     read_csv,
     suggest_mapping,
 )
@@ -33,7 +34,12 @@ from app.modules.transfer.application.pipeline import (
     apply_bundle,
     plan_bundle,
 )
-from app.modules.transfer.domain.bundle import Bundle, BundleItem, BundleItemType
+from app.modules.transfer.domain.bundle import (
+    Bundle,
+    BundleItem,
+    BundleItemType,
+    BundleSource,
+)
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.errors import CellValueError, InvalidImportFileError
 from app.modules.transfer.domain.plan import ClashPolicy, Plan, PlanBlocker
@@ -51,12 +57,14 @@ from app.modules.transfer.domain.tabular import (
     ExtraFieldKind,
     FieldSpec,
 )
+from app.modules.transfer.ports.unit_of_work import TransferRepos, TransferUnitOfWork
 from app.shared_kernel.access import Access, Requires
-from app.shared_kernel.cqrs import UseCase
+from app.shared_kernel.cqrs import CommandHandler, QueryHandler, UseCase
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from app.modules.transfer.ports.source_link_repository import SourceLinkRepository
     from app.modules.transfer.ports.targets import GraphTarget, PresetTarget
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
@@ -69,13 +77,20 @@ _SAMPLE_ROWS = 5
 
 @dataclass(frozen=True, kw_only=True, eq=False)
 class ItemImportRequest:
-    """A CSV file, the item type it becomes, and how its columns map to fields."""
+    """A CSV file, the item type it becomes, and how its columns map to fields.
+
+    `key_field` is the field or kept detail that recognises rows imported before,
+    and `restore` holds the keys of rows whose item was deleted that are to be
+    created again.
+    """
 
     data: bytes
     item_type: str
     mapping: tuple[ColumnMapping, ...] = ()
     list_separator: str = ","
     day_month_order: DayMonthOrder = DayMonthOrder.DAY_FIRST
+    key_field: str | None = None
+    restore: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
@@ -101,15 +116,20 @@ def build_item_bundle(
     item_type: str,
     list_separator: str,
     day_month_order: DayMonthOrder = DayMonthOrder.DAY_FIRST,
+    key_field: str | None = None,
 ) -> tuple[Bundle, list[CellProblem]]:
     """Turn the rows into a bundle of items of `item_type`, with what is wrong.
 
-    A row with a problem is left out of the bundle and reported.
+    A row with a problem is left out of the bundle and reported. With `key_field`,
+    the bundle's source is the type and that field, and each item's source key is
+    its cell in that column as written, normalised.
 
     Raises:
-        InvalidImportFileError: the mapping cannot be used for this file and type.
+        InvalidImportFileError: the mapping cannot be used for this file and type,
+            or `key_field` is not a column it maps or keeps.
     """
     columns, kept = _columns(table.headers, mapping, fields)
+    key_index = None if key_field is None else _key_index(key_field, columns, kept)
     by_key = {field.key: field for field in fields}
     # Each filled column: its index, how to read it, and the item's own definition
     # when the column is kept as an extra field rather than one of the type's.
@@ -158,10 +178,24 @@ def build_item_bundle(
                 attributes=attributes,
                 tags=_tags(cells, columns, list_separator),
                 extra_schema={"type": "object", "properties": own} if own else None,
+                source_key=(
+                    None
+                    if key_index is None
+                    else normalise_text(cells[key_index]) or None
+                ),
             )
         )
     bundle = Bundle(
         id=f"csv-{item_type}",
+        source=(
+            None
+            if key_field is None
+            else BundleSource(
+                name=f"csv:{item_type}:{key_field}",
+                key_field=key_field,
+                require_keys=True,
+            )
+        ),
         item_types=(BundleItemType(ref=item_type, slug=item_type, label=item_type),),
         items=tuple(items),
         item_limit=MAX_IMPORT_ROWS,
@@ -192,6 +226,26 @@ def _columns(
         raise InvalidImportFileError("Map a column to name: every item needs one.")
     _check_kept(kept, by_key)
     return columns, kept
+
+
+def _key_index(
+    key_field: str,
+    columns: dict[str, int],
+    kept: Sequence[tuple[int, ExtraField]],
+) -> int:
+    """The column holding each row's key: the name, a mapped field or a kept one.
+
+    Raises:
+        InvalidImportFileError: no such column is mapped or kept.
+    """
+    if key_field in columns and key_field not in ("description", "tags"):
+        return columns[key_field]
+    for index, extra in kept:
+        if extra.key == key_field:
+            return index
+    raise InvalidImportFileError(
+        "Recognise rows by a column you map to a field or keep."
+    )
 
 
 def _kept(
@@ -284,24 +338,24 @@ def _tags(
     return tuple(part.strip() for part in text.split(separator) if part.strip())
 
 
-class _ItemImport:
-    def __init__(
-        self, guard: AccessGuard, presets: PresetTarget, graph: GraphTarget
-    ) -> None:
-        """Initialise with the access guard and the targets."""
-        self._guard = guard
-        self._presets = presets
-        self._graph = graph
+class _Importer:
+    """Reads the file and plans it into the type, for each of the use cases."""
 
-    async def _fields(self, slug: str) -> list[FieldSpec]:
-        fields = await self._graph.item_type_fields(slug)
+    def __init__(self, presets: PresetTarget, graph: GraphTarget) -> None:
+        self.presets = presets
+        self.graph = graph
+
+    async def fields(self, slug: str) -> list[FieldSpec]:
+        fields = await self.graph.item_type_fields(slug)
         if fields is None:
             raise InvalidImportFileError(f"You have no item type called '{slug}'.")
         return fields
 
-    async def _plan(self, request: ItemImportRequest) -> tuple[Bundle, Plan]:
+    async def plan(
+        self, request: ItemImportRequest, extras: BundleExtras
+    ) -> tuple[Bundle, Plan]:
         """Plan the file; every problem in it becomes a blocker on the plan."""
-        fields = await self._fields(request.item_type)
+        fields = await self.fields(request.item_type)
         bundle, problems = build_item_bundle(
             read_csv(request.data),
             request.mapping,
@@ -309,22 +363,19 @@ class _ItemImport:
             request.item_type,
             request.list_separator,
             request.day_month_order,
+            request.key_field,
         )
         listed = [(p.row, f"Row {p.row}, {p.field}: {p.message}.") for p in problems]
         for item in bundle.items:
             number = int(item.ref.removeprefix("row-"))
             own = (item.extra_schema or {}).get("properties", {})
-            found = await self._graph.check_item_attributes(
+            found = await self.graph.check_item_attributes(
                 request.item_type,
                 {k: v for k, v in item.attributes.items() if k not in own},
             )
             listed.extend((number, f"Row {number}, {text}.") for text in found)
         plan = await plan_bundle(
-            bundle,
-            self._presets,
-            self._graph,
-            clash=ClashPolicy.SKIP,
-            extras=BundleExtras(),
+            bundle, self.presets, self.graph, clash=ClashPolicy.SKIP, extras=extras
         )
         blockers = _blockers([text for _, text in sorted(listed, key=lambda e: e[0])])
         return bundle, Plan(
@@ -332,6 +383,15 @@ class _ItemImport:
             entities=plan.entities,
             blockers=(*plan.blockers, *blockers),
         )
+
+
+def _link_extras(
+    request: ItemImportRequest, links: SourceLinkRepository, actor: Actor
+) -> BundleExtras:
+    """What planning and applying need to recognise and link the actor's rows."""
+    return BundleExtras(
+        links=links, owner_id=actor.id, restore=frozenset(request.restore)
+    )
 
 
 def _blockers(texts: Sequence[str]) -> list[PlanBlocker]:
@@ -348,7 +408,7 @@ def _blockers(texts: Sequence[str]) -> list[PlanBlocker]:
     return blockers
 
 
-class InspectItemImport(_ItemImport, UseCase[ItemImportRequest, ItemImportInspection]):
+class InspectItemImport(UseCase[ItemImportRequest, ItemImportInspection]):
     """Read a CSV and describe it, with the type's fields and a suggested mapping.
 
     Raises:
@@ -357,11 +417,18 @@ class InspectItemImport(_ItemImport, UseCase[ItemImportRequest, ItemImportInspec
 
     access: ClassVar[Access] = Requires(TransferPermission.BUNDLE_IMPORT)
 
+    def __init__(
+        self, guard: AccessGuard, presets: PresetTarget, graph: GraphTarget
+    ) -> None:
+        """Initialise with the access guard and the targets."""
+        self._guard = guard
+        self._importer = _Importer(presets, graph)
+
     async def _handle(
         self, request: ItemImportRequest, actor: Actor
     ) -> ItemImportInspection:
         """Return the headers, a few rows and a first guess at the mapping."""
-        fields = await self._fields(request.item_type)
+        fields = await self._importer.fields(request.item_type)
         table = read_csv(request.data)
         order = suggest_day_month_order(cell for row in table.rows for cell in row)
         reading = DayMonthOrder.DAY_FIRST if order is None else order.order
@@ -383,10 +450,12 @@ class InspectItemImport(_ItemImport, UseCase[ItemImportRequest, ItemImportInspec
         )
 
 
-class PlanItemImport(_ItemImport, UseCase[ItemImportRequest, Plan]):
+class PlanItemImport(QueryHandler[TransferRepos, ItemImportRequest, Plan]):
     """Return what importing the file would do; nothing is written.
 
-    Every value that cannot be imported is a blocker naming its row and field.
+    Every value that cannot be imported is a blocker naming its row and field. With
+    a key column, rows imported before are recognised and named, and a row whose
+    item was deleted is left out unless the request restores it.
 
     Raises:
         ValidationError: the file or the mapping cannot be used, or the type does
@@ -395,9 +464,22 @@ class PlanItemImport(_ItemImport, UseCase[ItemImportRequest, Plan]):
 
     access: ClassVar[Access] = Requires(TransferPermission.BUNDLE_IMPORT)
 
+    def __init__(
+        self,
+        repos: TransferRepos,
+        guard: AccessGuard,
+        presets: PresetTarget,
+        graph: GraphTarget,
+    ) -> None:
+        """Initialise with the link store, the access guard and the targets."""
+        super().__init__(repos, guard)
+        self._importer = _Importer(presets, graph)
+
     async def _handle(self, request: ItemImportRequest, actor: Actor) -> Plan:
         """Plan the items, leaving out the type they go under."""
-        _, plan = await self._plan(request)
+        _, plan = await self._importer.plan(
+            request, _link_extras(request, self._repos.links, actor)
+        )
         return Plan(
             bundle_id=plan.bundle_id,
             entities=tuple(
@@ -407,8 +489,11 @@ class PlanItemImport(_ItemImport, UseCase[ItemImportRequest, Plan]):
         )
 
 
-class ImportItems(_ItemImport, UseCase[ItemImportRequest, AppliedBundle]):
+class ImportItems(CommandHandler[TransferUnitOfWork, ItemImportRequest, AppliedBundle]):
     """Import the file: plan it as `PlanItemImport` does, then create the items.
+
+    The links that recognise the rows next time are committed once the items are
+    made; should that fail, the next import finds the items by their key instead.
 
     Raises:
         ValidationError: the file or the mapping cannot be used, or the type does
@@ -418,11 +503,30 @@ class ImportItems(_ItemImport, UseCase[ItemImportRequest, AppliedBundle]):
 
     access: ClassVar[Access] = Requires(TransferPermission.BUNDLE_IMPORT)
 
+    def __init__(
+        self,
+        uow: TransferUnitOfWork,
+        guard: AccessGuard,
+        presets: PresetTarget,
+        graph: GraphTarget,
+    ) -> None:
+        """Initialise with the unit of work, the access guard and the targets."""
+        super().__init__(uow, guard)
+        self._importer = _Importer(presets, graph)
+
     async def _handle(self, request: ItemImportRequest, actor: Actor) -> AppliedBundle:
         """Plan again, and apply only a plan with nothing wrong."""
-        bundle, plan = await self._plan(request)
-        applied = await apply_bundle(
-            plan, bundle, self._presets, self._graph, extras=BundleExtras()
-        )
+        async with self._uow as repos:
+            # Planning fills the extras with what applying reads, so both share them.
+            extras = _link_extras(request, repos.links, actor)
+            bundle, plan = await self._importer.plan(request, extras)
+            applied = await apply_bundle(
+                plan,
+                bundle,
+                self._importer.presets,
+                self._importer.graph,
+                extras=extras,
+            )
+            await self._uow.commit()
         logger.info("items imported", created=applied.total_created)
         return applied

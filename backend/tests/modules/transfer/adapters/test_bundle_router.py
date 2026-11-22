@@ -78,6 +78,10 @@ def test_plan_import_and_export_round_trip(shared: Shared) -> None:
                 "label": "Condition grades",
                 "action": "create",
                 "reason": None,
+                "matched_id": None,
+                "matched_name": None,
+                "changed": [],
+                "source_key": None,
             }
         ],
     }

@@ -1,3 +1,5 @@
+import uuid
+
 from app.modules.transfer.adapters.api.plan_schemas import (
     PlanAction,
     blockers_from_domain,
@@ -45,3 +47,48 @@ def test_a_plan_converts_entity_by_entity_in_order() -> None:
     assert [(b.code, b.reason) for b in blockers_from_domain(plan)] == [
         ("SomeError", "No.")
     ]
+
+
+def test_a_recognised_item_carries_what_it_matched_and_what_changed() -> None:
+    """A recognised item's match and changed fields reach the response."""
+    matched = uuid.UUID(int=7)
+    plan = Plan(
+        bundle_id="b",
+        entities=(
+            PlannedEntity(
+                kind=EntityKind.ITEM,
+                ref="row-2",
+                label="Alien",
+                action=DomainPlanAction.UNCHANGED,
+                matched_id=matched,
+                matched_name="Alien (signed)",
+                changed=("attributes.price", "name"),
+            ),
+        ),
+    )
+
+    (entity,) = entities_from_domain(plan)
+
+    assert (entity.matched_id, entity.matched_name, entity.changed) == (
+        matched,
+        "Alien (signed)",
+        ["attributes.price", "name"],
+    )
+
+
+def test_a_keyed_item_carries_its_source_key_to_the_response() -> None:
+    """The key a row was imported under reaches the response."""
+    plan = Plan(
+        bundle_id="b",
+        entities=(
+            PlannedEntity(
+                kind=EntityKind.ITEM,
+                ref="row-2",
+                label="Alien",
+                action=DomainPlanAction.UNCHANGED,
+                source_key="A14",
+            ),
+        ),
+    )
+
+    assert entities_from_domain(plan)[0].source_key == "A14"
