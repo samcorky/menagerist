@@ -646,6 +646,40 @@ jobs:
           pr-number: ${{ github.event.pull_request.number }}
           token: ${{ github.token }}
 
+  smoke-test-comment:
+    name: Comment the smoke test timings on the pull request
+    # The timings the smoke test measured, so a slow start-up shows on the pull request.
+    # One comment, updated by later pushes. A fork pull request has a read-only token,
+    # so it gets the job summary the smoke test already wrote. Not part of ci-passed: a
+    # missing comment should not fail a pull request.
+    needs: build
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.build.result == 'success' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout the comment action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/actions/pr-comment
+          sparse-checkout-cone-mode: false
+
+      - name: Download the smoke test report
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: smoke-test
+          path: smoke-test
+
+      - name: Post or update the comment
+        uses: ./.github/actions/pr-comment
+        with:
+          marker: "<!-- smoke-test -->"
+          body-file: smoke-test/smoke-test.md
+          pr-number: ${{ github.event.pull_request.number }}
+          token: ${{ github.token }}
+
   ci-passed:
     name: CI passed
     # One stable check to require in branch protection however the jobs above change.

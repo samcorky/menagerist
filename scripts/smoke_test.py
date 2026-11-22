@@ -85,18 +85,28 @@ def record(name: str, value: str) -> None:
     _TIMINGS.append((name, value))
 
 
-def write_summary(failure: str | None) -> None:
-    """Write the run's measurements to the GitHub job summary, when there is one."""
-    path = os.environ.get("GITHUB_STEP_SUMMARY")
-    if not path:
-        return
-    lines = ["## Smoke test", ""]
+# The pull request comment is found by this marker, so it must start the report.
+REPORT_MARKER = "<!-- smoke-test -->"
+
+
+def render_report(failure: str | None) -> str:
+    """Render the run's measurements as Markdown, starting with the comment marker."""
+    lines = [REPORT_MARKER, "### Smoke test", ""]
     lines += ["**Failed**", "", "```", failure, "```"] if failure else ["**Passed**"]
     if _TIMINGS:
         lines += ["", "| Measurement | Value |", "|---|---|"]
         lines += [f"| {name} | {value} |" for name, value in _TIMINGS]
-    with open(path, "a", encoding="utf-8") as summary:
-        summary.write("\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+def write_reports(failure: str | None, report_file: Path | None) -> None:
+    """Write the report to the GitHub job summary and to `report_file`, if given."""
+    report = render_report(failure)
+    if summary_path := os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(summary_path, "a", encoding="utf-8") as summary:
+            summary.write(report)
+    if report_file:
+        report_file.write_text(report, encoding="utf-8")
 
 
 def compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -571,6 +581,11 @@ def main() -> int:
         action="store_true",
         help="Leave the stack running after the checks (for debugging).",
     )
+    parser.add_argument(
+        "--report",
+        type=Path,
+        help="Also write the Markdown report here, for a pull request comment.",
+    )
     args = parser.parse_args()
 
     client: docker.DockerClient | None = None
@@ -600,7 +615,7 @@ def main() -> int:
         print(compose("logs", SERVICE, check=False).stdout, file=sys.stderr)
         return 1
     finally:
-        write_summary(failure)
+        write_reports(failure, args.report)
         if not args.keep:
             compose("down", "-v", check=False)
         if client is not None:
