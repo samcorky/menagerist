@@ -100,10 +100,22 @@ jobs:
           # workflows should not write to the cache.
           save-cache: false
 
-      # Fails on a broken CalVer config; warns about a shallow clone or no tag yet.
+      # Fails on a broken CalVer config, and on any warning: the clone is full and the
+      # tags are there, so a shallow-clone or no-tag warning is a real problem here.
+      # The check table goes to the job summary. The Action runs the calver-scm from the
+      # lockfile, so Renovate keeps the one version current.
+      - name: Install the release tools
+        run: |
+          uv sync --locked --only-group release
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
       - name: Check the CalVer setup
-        working-directory: backend
-        run: uv run --locked --only-group release calver-scm doctor
+        uses: samcorky/calver-scm@9fd54112a4043625f83c590d5ddb0af018d96ecb # v1.12.0
+        with:
+          command: doctor
+          root: backend
+          strict: true
+          calver-scm-version: installed
 
       # Writes tag, version, is_prerelease and reason to GITHUB_OUTPUT. Planning exits 3
       # when no safe tag can be proposed, for example promote with no pre-release or a

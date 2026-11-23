@@ -545,6 +545,16 @@
       "groupName": "python build system"
     },
     {
+      "description": "The calver-scm Action runs the calver-scm from the lockfile, so move its pin with the package",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "samcorky/calver-scm"
+      ],
+      "groupName": "python build system"
+    },
+    {
       "description": "Workflow and composite action updates are CI changes",
       "matchManagers": [
         "github-actions"
