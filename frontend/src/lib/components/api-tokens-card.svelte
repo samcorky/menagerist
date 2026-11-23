@@ -534,7 +534,7 @@
 						class="size-4 transition-transform duration-150 group-data-[state=open]:rotate-180"
 					/>
 				</Collapsible.Trigger>
-				<Collapsible.Content class="space-y-2 pt-1">
+				<Collapsible.Content class="-m-1 space-y-2 p-1 pt-2">
 					{#each visibleAreas as area (area.id)}
 						<div class="flex items-center justify-between gap-3">
 							<Label for={`token-area-${area.id}`}>{area.label}</Label>
