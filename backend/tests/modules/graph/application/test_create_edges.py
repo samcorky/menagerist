@@ -23,6 +23,7 @@ from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -209,4 +210,74 @@ async def test_create_edges_auto_creates_an_unknown_edge_type() -> None:
             "pictured-with", scope=ContentFilter.everyone()
         )
         is not None
+    )
+
+
+async def test_create_edges_reverse_connects_each_target_to_the_shared_item() -> None:
+    """With reverse, every target is the start of its own edge into the source."""
+    repos, box, items = await _repos_with_source_and_targets(3)
+
+    result = await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+        CreateEdgesCommand(
+            source_id=box.id,
+            target_ids=[i.id for i in items],
+            type="stored-in",
+            reverse=True,
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert {(e.source_id, e.target_id) for e in result.created} == {
+        (i.id, box.id) for i in items
+    }
+    assert result.skipped == []
+
+
+async def test_create_edges_reverse_skips_an_existing_connection() -> None:
+    """An existing edge of the same type, in either direction, is skipped."""
+    repos, box, items = await _repos_with_source_and_targets(2)
+    await repos.edges.add(
+        Edge.create(
+            owner_id=uuid.UUID(int=1),
+            source_id=items[0].id,
+            target_id=box.id,
+            type="stored-in",
+        )
+    )
+
+    result = await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+        CreateEdgesCommand(
+            source_id=box.id,
+            target_ids=[i.id for i in items],
+            type="stored-in",
+            reverse=True,
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert result.skipped == [items[0].id]
+    assert [e.source_id for e in result.created] == [items[1].id]
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+async def test_create_edges_refuses_to_connect_an_item_to_itself(reverse: bool) -> None:
+    """The source appearing among the targets is refused and nothing is created."""
+    repos, box, items = await _repos_with_source_and_targets(1)
+
+    with pytest.raises(ValidationError):
+        await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+            CreateEdgesCommand(
+                source_id=box.id,
+                target_ids=[items[0].id, box.id],
+                type="stored-in",
+                reverse=reverse,
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    assert (
+        await repos.edges.list_for_node(
+            box.id, after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
     )

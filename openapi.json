@@ -6145,6 +6145,384 @@
         "x-required-permission": "graph:type:write"
       }
     },
+    "/api/v1/nodes/delete": {
+      "post": {
+        "tags": [
+          "v1",
+          "Nodes"
+        ],
+        "summary": "Delete Nodes",
+        "description": "Soft-delete several items at once, all or none.\n\nAt most 200 ids. If any id is unknown, already deleted or not yours to delete,\nnothing is deleted and the response names them.\n\n**Requires permission:** `graph:item:write`",
+        "operationId": "delete_nodes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteNodesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "A value is not acceptable; the detail says which.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ValidationError",
+                  "status": 400,
+                  "detail": "Unknown or deleted items: 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "instance": "https://menagerist.example/api/v1/nodes/delete"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/delete"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/delete"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/nodes/delete"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/nodes/delete"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/nodes/delete"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/delete"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/delete"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/nodes/delete"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "graph:item:write"
+      }
+    },
+    "/api/v1/nodes/tags": {
+      "post": {
+        "tags": [
+          "v1",
+          "Nodes"
+        ],
+        "summary": "Tag Nodes",
+        "description": "Add and remove tags on several items at once, all or none.\n\nAt most 200 ids. Tags are trimmed and lowercased like any other tag. If any\nid is unknown or deleted, nothing changes.\n\n**Requires permission:** `graph:item:write`",
+        "operationId": "tag_nodes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagNodesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagNodesResponse"
+                },
+                "example": {
+                  "changed": 3
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A value is not acceptable; the detail says which.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ValidationError",
+                  "status": 400,
+                  "detail": "Unknown or deleted items: 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                  "instance": "https://menagerist.example/api/v1/nodes/tags"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/tags"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/tags"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/nodes/tags"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/nodes/tags"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/nodes/tags"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/tags"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/tags"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/nodes/tags"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-required-permission": "graph:item:write"
+      }
+    },
     "/api/v1/nodes/{node_id}/restore": {
       "post": {
         "tags": [
@@ -7267,7 +7645,7 @@
           "Edges"
         ],
         "summary": "Create Edges",
-        "description": "Connect one source to several targets at once, skipping existing connections.\n\n**Requires permission:** `graph:item:write`",
+        "description": "Connect one source to several targets at once, skipping existing connections.\n\nWith `reverse`, each target connects to the source instead, so many items can\nbe connected to one. The source appearing among the targets is a 400.\n\n**Requires permission:** `graph:item:write`",
         "operationId": "create_edges",
         "requestBody": {
           "content": {
@@ -21839,6 +22217,13 @@
                   "collection_id": "$response.body#/id"
                 },
                 "description": "Add items to collection with the id from this response."
+              },
+              "RemoveItemsFromCollection": {
+                "operationId": "remove_items_from_collection",
+                "parameters": {
+                  "collection_id": "$response.body#/id"
+                },
+                "description": "Remove items from collection with the id from this response."
               }
             }
           },
@@ -22209,6 +22594,13 @@
                   "collection_id": "$response.body#/0/id"
                 },
                 "description": "Add items to collection with the id from this response."
+              },
+              "RemoveItemsFromCollection": {
+                "operationId": "remove_items_from_collection",
+                "parameters": {
+                  "collection_id": "$response.body#/0/id"
+                },
+                "description": "Remove items from collection with the id from this response."
               }
             }
           },
@@ -22710,6 +23102,13 @@
                   "collection_id": "$response.body#/id"
                 },
                 "description": "Add items to collection with the id from this response."
+              },
+              "RemoveItemsFromCollection": {
+                "operationId": "remove_items_from_collection",
+                "parameters": {
+                  "collection_id": "$response.body#/id"
+                },
+                "description": "Remove items from collection with the id from this response."
               }
             }
           },
@@ -22988,6 +23387,13 @@
                   "collection_id": "$response.body#/id"
                 },
                 "description": "Add items to collection with the id from this response."
+              },
+              "RemoveItemsFromCollection": {
+                "operationId": "remove_items_from_collection",
+                "parameters": {
+                  "collection_id": "$response.body#/id"
+                },
+                "description": "Remove items from collection with the id from this response."
               }
             }
           },
@@ -23854,6 +24260,224 @@
                       "status": 500,
                       "detail": "An unexpected error occurred.",
                       "instance": "https://menagerist.example/api/v1/collections/collection_id/items"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "collections:collection:write"
+      }
+    },
+    "/api/v1/collections/{collection_id}/items/remove": {
+      "post": {
+        "tags": [
+          "v1",
+          "Collections"
+        ],
+        "summary": "Remove Items From Collection",
+        "description": "Take several items off a collection at once. Absent items are skipped.\n\n**Requires permission:** `collections:collection:write`",
+        "operationId": "remove_items_from_collection",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections.",
+              "examples": [
+                "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                "weekend-watchlist"
+              ],
+              "title": "Collection Id"
+            },
+            "description": "The collection's id (a UUID) or its slug. A slug is looked up among your own collections."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveItemsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested collection does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "CollectionNotFoundError",
+                  "status": 404,
+                  "detail": "Collection 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+                  "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Returned when an operation does not suit the collection's kind.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "CollectionKindError",
+                  "status": 409,
+                  "detail": "Items cannot be added to or removed from a smart collection.",
+                  "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/collections/collection_id/items/remove"
                     }
                   }
                 }
@@ -33079,6 +33703,12 @@
             "type": "object",
             "title": "Attributes",
             "description": "Field values given to every new connection."
+          },
+          "reverse": {
+            "type": "boolean",
+            "title": "Reverse",
+            "description": "Run each connection from its target to `source_id`, not from it.",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -33536,6 +34166,34 @@
           {
             "message": "The field 'rating' of 'film' no longer exists.",
             "path": "where.children[1]"
+          }
+        ]
+      },
+      "DeleteNodesRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Ids",
+            "description": "The items to delete."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "DeleteNodesRequest",
+        "description": "Request body for deleting several items at once (at most 200).",
+        "examples": [
+          {
+            "ids": [
+              "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+              "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11"
+            ]
           }
         ]
       },
@@ -37850,6 +38508,34 @@
           }
         ]
       },
+      "RemoveItemsRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Item Ids",
+            "description": "The items to take off the collection."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_ids"
+        ],
+        "title": "RemoveItemsRequest",
+        "description": "Request body for taking items off a collection.",
+        "examples": [
+          {
+            "item_ids": [
+              "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+            ]
+          }
+        ]
+      },
       "RenameDeviceRequest": {
         "properties": {
           "name": {
@@ -38655,6 +39341,75 @@
         ],
         "title": "SystemPermission",
         "description": "Permissions for operational detail the public probes leave out.\n\nValues read `<module>:<resource>:<action>`."
+      },
+      "TagNodesRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Ids",
+            "description": "The items to change."
+          },
+          "add": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Add",
+            "description": "Tags to add."
+          },
+          "remove": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Remove",
+            "description": "Tags to remove."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "TagNodesRequest",
+        "description": "Request body for adding and removing tags on several items at once.",
+        "examples": [
+          {
+            "add": [
+              "to-watch"
+            ],
+            "ids": [
+              "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+            ],
+            "remove": [
+              "watched"
+            ]
+          }
+        ]
+      },
+      "TagNodesResponse": {
+        "properties": {
+          "changed": {
+            "type": "integer",
+            "title": "Changed",
+            "description": "Items whose tags changed; the rest matched."
+          }
+        },
+        "type": "object",
+        "required": [
+          "changed"
+        ],
+        "title": "TagNodesResponse",
+        "description": "How many of the items the tag change altered.",
+        "examples": [
+          {
+            "changed": 3
+          }
+        ]
       },
       "TransferPermission": {
         "type": "string",

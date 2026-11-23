@@ -56,6 +56,11 @@ class CreateEdgeRequest(RequestModel):
         )
 
 
+_REVERSE_DESCRIPTION = (
+    "Run each connection from its target to `source_id`, not from it."
+)
+
+
 class CreateEdgesRequest(RequestModel):
     """Request body for connecting one source to several targets at once.
 
@@ -85,6 +90,10 @@ class CreateEdgesRequest(RequestModel):
     attributes: dict[str, Any] = Field(
         description="Field values given to every new connection.", default_factory=dict
     )
+    reverse: bool = Field(
+        default=False,
+        description=_REVERSE_DESCRIPTION,
+    )
 
     def to_command(self) -> CreateEdgesCommand:
         """Convert this request into a `CreateEdgesCommand`."""
@@ -93,6 +102,7 @@ class CreateEdgesRequest(RequestModel):
             target_ids=self.target_ids,
             type=self.type,
             attributes=self.attributes,
+            reverse=self.reverse,
         )
 
 

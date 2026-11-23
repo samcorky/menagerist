@@ -157,6 +157,21 @@ class AddItemsRequest(RequestModel):
     )
 
 
+class RemoveItemsRequest(RequestModel):
+    """Request body for taking items off a collection."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"item_ids": ["01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"]}]
+        }
+    )
+
+    item_ids: list[uuid.UUID] = Field(
+        description="The items to take off the collection.",
+        max_length=MAX_ITEMS_PER_REQUEST,
+    )
+
+
 class AddItemsResponse(BaseModel):
     """Outcome of adding items to a collection."""
 

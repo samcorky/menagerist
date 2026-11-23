@@ -9,7 +9,9 @@ from app.modules.graph.adapters.api.node_type.schemas import (
     NodeTypeResponse,
 )
 from app.modules.graph.application.create_node import CreateNodeCommand
+from app.modules.graph.application.delete_nodes import DeleteNodesCommand
 from app.modules.graph.application.duplicate_node import DuplicateNodeCommand
+from app.modules.graph.application.tag_nodes import TagNodesCommand
 from app.modules.graph.application.update_node import UpdateNodeCommand
 from app.modules.graph.domain.query import ItemFieldUse, TypeCount  # noqa: TC001
 from app.platform.request_model import RequestModel
@@ -44,6 +46,61 @@ _NODE_MINIMAL_EXAMPLE: dict[str, Any] = {
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
+
+
+class DeleteNodesRequest(RequestModel):
+    """Request body for deleting several items at once (at most 200)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "ids": [
+                        "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+                        "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e11",
+                    ]
+                }
+            ]
+        }
+    )
+
+    ids: list[uuid.UUID] = Field(description="The items to delete.")
+
+    def to_command(self) -> DeleteNodesCommand:
+        """Convert this request into a `DeleteNodesCommand`."""
+        return DeleteNodesCommand(node_ids=self.ids)
+
+
+class TagNodesRequest(RequestModel):
+    """Request body for adding and removing tags on several items at once."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "ids": ["01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"],
+                    "add": ["to-watch"],
+                    "remove": ["watched"],
+                }
+            ]
+        }
+    )
+
+    ids: list[uuid.UUID] = Field(description="The items to change.")
+    add: list[str] = Field(default_factory=list, description="Tags to add.")
+    remove: list[str] = Field(default_factory=list, description="Tags to remove.")
+
+    def to_command(self) -> TagNodesCommand:
+        """Convert this request into a `TagNodesCommand`."""
+        return TagNodesCommand(node_ids=self.ids, add=self.add, remove=self.remove)
+
+
+class TagNodesResponse(BaseModel):
+    """How many of the items the tag change altered."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [{"changed": 3}]})
+
+    changed: int = Field(description="Items whose tags changed; the rest matched.")
 
 
 class DuplicateNodeRequest(RequestModel):

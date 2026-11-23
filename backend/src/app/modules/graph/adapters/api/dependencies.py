@@ -45,6 +45,7 @@ from app.modules.graph.application.delete_edge import DeleteEdge
 from app.modules.graph.application.delete_edge_type import DeleteEdgeType
 from app.modules.graph.application.delete_node import DeleteNode
 from app.modules.graph.application.delete_node_type import DeleteNodeType
+from app.modules.graph.application.delete_nodes import DeleteNodes
 from app.modules.graph.application.duplicate_node import DuplicateNode
 from app.modules.graph.application.get_edge import GetEdge
 from app.modules.graph.application.get_edge_type import GetEdgeType
@@ -73,6 +74,7 @@ from app.modules.graph.application.random_node import RandomNode
 from app.modules.graph.application.restore_node import RestoreNode
 from app.modules.graph.application.search_node_counts import SearchNodeCounts
 from app.modules.graph.application.search_nodes import SearchNodes
+from app.modules.graph.application.tag_nodes import TagNodes
 from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.application.update_edge_type import UpdateEdgeType
 from app.modules.graph.application.update_node import UpdateNode
@@ -217,6 +219,20 @@ def get_delete_node_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> DeleteNode:
     return DeleteNode(uow, guard)
+
+
+def get_delete_nodes_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> DeleteNodes:
+    return DeleteNodes(uow, guard)
+
+
+def get_tag_nodes_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> TagNodes:
+    return TagNodes(uow, guard)
 
 
 def get_list_deleted_nodes_use_case(

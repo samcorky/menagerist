@@ -35,6 +35,7 @@ from app.modules.graph.adapters.api.dependencies import (
     get_count_nodes_use_case,
     get_create_node_use_case,
     get_delete_node_use_case,
+    get_delete_nodes_use_case,
     get_duplicate_node_use_case,
     get_get_item_path_use_case,
     get_get_node_use_case,
@@ -48,11 +49,13 @@ from app.modules.graph.adapters.api.dependencies import (
     get_restore_node_use_case,
     get_search_node_counts_use_case,
     get_search_nodes_use_case,
+    get_tag_nodes_use_case,
     get_update_node_use_case,
 )
 from app.modules.graph.adapters.api.node.schemas import (
     CreateNodeRequest,
     DeletedNodeResponse,
+    DeleteNodesRequest,
     DuplicateNodeRequest,
     ItemFieldResponse,
     NodeContentsEntryResponse,
@@ -65,6 +68,8 @@ from app.modules.graph.adapters.api.node.schemas import (
     NodeTypeCountResponse,
     PromotedItemFieldResponse,
     PromoteExtraSchemaFieldRequest,
+    TagNodesRequest,
+    TagNodesResponse,
     UpdateNodeRequest,
 )
 from app.modules.graph.adapters.api.node_type.schemas import NodeTypeResponse
@@ -75,6 +80,7 @@ from app.modules.graph.application.count_node_types import (
 from app.modules.graph.application.count_nodes import CountNodes
 from app.modules.graph.application.create_node import CreateNode
 from app.modules.graph.application.delete_node import DeleteNode, DeleteNodeCommand
+from app.modules.graph.application.delete_nodes import DeleteNodes
 from app.modules.graph.application.duplicate_node import DuplicateNode
 from app.modules.graph.application.get_item_path import GetItemPath, GetItemPathQuery
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
@@ -106,6 +112,7 @@ from app.modules.graph.application.search_node_counts import (
     SearchNodeCountsQuery,
 )
 from app.modules.graph.application.search_nodes import SearchNodes, SearchNodesQuery
+from app.modules.graph.application.tag_nodes import TagNodes
 from app.modules.graph.application.update_node import UpdateNode
 from app.modules.graph.domain.errors import (
     CollectionNotFoundError,
@@ -759,6 +766,51 @@ async def promote_extra_schema_field(
     if promoted.node is None:
         raise NodeNotFoundError(f"Node {node_id} not found")
     return NodeResponse.from_domain(promoted.node)
+
+
+@router.post(
+    "/delete",
+    status_code=204,
+    operation_id="delete_nodes",
+    responses=error_response(
+        ValidationError,
+        detail="Unknown or deleted items: 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+    ),
+)
+async def delete_nodes(
+    payload: DeleteNodesRequest,
+    use_case: Annotated[DeleteNodes, Depends(get_delete_nodes_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> None:
+    """Soft-delete several items at once, all or none.
+
+    At most 200 ids. If any id is unknown, already deleted or not yours to delete,
+    nothing is deleted and the response names them.
+    """
+    await use_case.handle(payload.to_command(), actor)
+
+
+@router.post(
+    "/tags",
+    response_model=TagNodesResponse,
+    operation_id="tag_nodes",
+    responses=error_response(
+        ValidationError,
+        detail="Unknown or deleted items: 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
+    ),
+)
+async def tag_nodes(
+    payload: TagNodesRequest,
+    use_case: Annotated[TagNodes, Depends(get_tag_nodes_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> TagNodesResponse:
+    """Add and remove tags on several items at once, all or none.
+
+    At most 200 ids. Tags are trimmed and lowercased like any other tag. If any
+    id is unknown or deleted, nothing changes.
+    """
+    changed = await use_case.handle(payload.to_command(), actor)
+    return TagNodesResponse(changed=changed)
 
 
 @router.delete(

@@ -32,6 +32,7 @@ from app.modules.collections.adapters.api.collection.schemas import (
     CollectionResponse,
     CreateCollectionRequest,
     DeletedCollectionResponse,
+    RemoveItemsRequest,
     UpdateCollectionRequest,
 )
 from app.modules.collections.adapters.api.dependencies import (
@@ -45,6 +46,7 @@ from app.modules.collections.adapters.api.dependencies import (
     get_list_deleted_collections_use_case,
     get_purge_deleted_collection_use_case,
     get_remove_item_from_collection_use_case,
+    get_remove_items_from_collection_use_case,
     get_restore_collection_use_case,
     get_update_collection_use_case,
 )
@@ -81,6 +83,10 @@ from app.modules.collections.application.purge_deleted_collection import (
 from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
     RemoveItemFromCollectionCommand,
+)
+from app.modules.collections.application.remove_items_from_collection import (
+    RemoveItemsFromCollection,
+    RemoveItemsFromCollectionCommand,
 )
 from app.modules.collections.application.restore_collection import (
     RestoreCollection,
@@ -428,6 +434,29 @@ async def add_items_to_collection(
         actor,
     )
     return AddItemsResponse(added=added)
+
+
+@router.post(
+    "/{collection_id}/items/remove",
+    status_code=204,
+    operation_id="remove_items_from_collection",
+    responses={**_NOT_FOUND, **_SMART},
+)
+async def remove_items_from_collection(
+    collection_id: CollectionIdPath,
+    payload: RemoveItemsRequest,
+    use_case: Annotated[
+        RemoveItemsFromCollection, Depends(get_remove_items_from_collection_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> None:
+    """Take several items off a collection at once. Absent items are skipped."""
+    await use_case.handle(
+        RemoveItemsFromCollectionCommand(
+            collection_id=collection_id, item_ids=payload.item_ids
+        ),
+        actor,
+    )
 
 
 @router.delete(

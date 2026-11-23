@@ -36,6 +36,9 @@ from app.modules.collections.application.purge_deleted_collection import (
 from app.modules.collections.application.remove_item_from_collection import (
     RemoveItemFromCollection,
 )
+from app.modules.collections.application.remove_items_from_collection import (
+    RemoveItemsFromCollection,
+)
 from app.modules.collections.application.resolve_collection import (
     ResolveCollection,
     ResolveCollectionQuery,
@@ -157,6 +160,13 @@ def get_remove_item_from_collection_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> RemoveItemFromCollection:
     return RemoveItemFromCollection(uow, guard)
+
+
+def get_remove_items_from_collection_use_case(
+    uow: Annotated[CollectionsUnitOfWork, Depends(get_collections_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> RemoveItemsFromCollection:
+    return RemoveItemsFromCollection(uow, guard)
 
 
 def get_resolve_collection_use_case(

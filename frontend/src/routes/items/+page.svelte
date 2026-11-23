@@ -16,6 +16,7 @@
 		BookmarkPlus,
 		EyeOff,
 		List,
+		ListChecks,
 		Plus,
 		SearchX,
 		LayoutGrid,
@@ -71,6 +72,10 @@
 	import * as Item from '$lib/components/ui/item/index.js';
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
+	import BulkToolbar from '$lib/components/bulk-toolbar.svelte';
+	import { auth } from '$lib/auth.svelte.js';
+	import { PendingDeletes } from '$lib/pending-deletes.svelte';
+	import { Selection } from '$lib/selection.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import {
 		EXAMPLE_FILTER_LABELS,
@@ -138,6 +143,25 @@
 	let exampleFilter = $state<ExampleFilter>(readExampleFilter());
 	const showExampleFilter = $derived(exampleItemIds.size > 0 || exampleFilter !== 'all');
 	const shownItems = $derived(visibleItems(items, exampleItemIds, exampleFilter));
+
+	// Bulk selection: kept across searches and filters, ended with the page.
+	const selection = new Selection();
+	const pendingDeletes = new PendingDeletes();
+	const canSelect = $derived(auth.can('graph:item:write'));
+	const rows = $derived(shownItems.filter((item) => !pendingDeletes.hidden.has(item.id)));
+	const rowIds = $derived(rows.map((item) => item.id));
+
+	function pick(id: string) {
+		selection.enter();
+		selection.toggle(id);
+	}
+
+	async function reloadList() {
+		items = [];
+		hasMore = true;
+		cursor = null;
+		await fetchPage();
+	}
 	const exampleFilters = Object.keys(EXAMPLE_FILTER_LABELS) as ExampleFilter[];
 
 	function setExampleFilter(filter: ExampleFilter) {
@@ -490,6 +514,8 @@
 
 	// Scroll preservation: save before navigating into an item, restore on return
 	beforeNavigate(({ to }) => {
+		// Leaving commits a delete still inside its Undo window (§14).
+		void pendingDeletes.flushAll();
 		if (to?.url?.pathname.startsWith(resolve('/items/'))) {
 			savedScrollTop = document.getElementById('main-scroll')?.scrollTop ?? 0;
 		}
@@ -565,6 +591,17 @@
 						</NativeSelect.Option>
 					{/each}
 				</NativeSelect.Root>
+			{/if}
+			{#if canSelect && rows.length > 0}
+				<Button
+					variant={selection.active ? 'secondary' : 'outline'}
+					class="max-sm:h-11"
+					aria-pressed={selection.active}
+					onclick={() => (selection.active ? selection.exit() : selection.enter())}
+				>
+					<ListChecks />
+					Select
+				</Button>
 			{/if}
 			<div class="flex items-center gap-1">
 				<button
@@ -675,13 +712,21 @@
 	{/if}
 	<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
+	{#if selection.active}
+		<BulkToolbar {selection} pending={pendingDeletes} visibleIds={rowIds} onreload={reloadList} />
+	{/if}
+
 	{#if loadingDisplay.show && shownItems.length === 0}
 		<NodeSkeleton view={viewMode} count={8} />
 	{:else if viewMode === 'grid'}
 		<div data-slot="node-grid" class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
-			{#each shownItems as item (item.id)}
+			{#each rows as item (item.id)}
 				<NodeGridCard
 					{item}
+					selectable={selection.active}
+					selected={selection.has(item.id)}
+					onselect={() => selection.toggle(item.id)}
+					onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 					schema={schemaOf(item.type)}
 					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
 					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
@@ -693,9 +738,13 @@
 		</div>
 	{:else}
 		<Item.Group class="max-w-5xl">
-			{#each shownItems as item (item.id)}
+			{#each rows as item (item.id)}
 				<NodeCard
 					{item}
+					selectable={selection.active}
+					selected={selection.has(item.id)}
+					onselect={() => selection.toggle(item.id)}
+					onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 					schema={schemaOf(item.type)}
 					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
 					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
