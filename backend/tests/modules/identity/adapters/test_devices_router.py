@@ -4,149 +4,33 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-import pytest
 import time_machine
-from starlette.testclient import TestClient
-
-from app.entrypoints.api import create_app
-from app.modules.identity.adapters.api.dependencies import (
-    get_decoy_hash,
-    get_existing_data_claim,
-    get_identity_repos,
-    get_identity_settings_dep,
-    get_identity_uow,
-    get_password_hasher,
-    get_setup_identity_uow,
-)
-from app.modules.identity.adapters.claim.no_op_existing_data_claim import (
-    NoOpExistingDataClaim,
-)
-from app.modules.identity.adapters.security.in_memory_password_hasher import (
-    InMemoryPasswordHasher,
-)
-from app.modules.identity.domain.user import Role
-from app.modules.identity.ports.unit_of_work import IdentityRepos
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from httpx2 import Response
+    from starlette.testclient import TestClient
 
-    from app.platform.config import IdentitySettings
-    from tests.modules.identity.conftest import MakeUser, World
+    from tests.modules.identity.conftest import IdentityApi, MakeUser
 
 AUTH = "/api/v1/auth"
-ME = "/api/v1/me"
-SESSIONS = "/api/v1/sessions"
 FOREIGN_ORIGIN = "https://evil.example"
-SESSION_COOKIE = "menagerist-session"
 SETUP_BODY = {
     "username": "Admin",
     "display_name": "Admin",
     "password": "password-123",
 }
-
-
-class Api:
-    """A client sending its own origin, plus helpers to send a foreign one."""
-
-    def __init__(
-        self,
-        world: World,
-        *,
-        base_url: str = "http://testserver",
-        settings: IdentitySettings | None = None,
-    ) -> None:
-        self.world = world
-        self.app = create_app()
-        hasher = InMemoryPasswordHasher()
-        repos = IdentityRepos(
-            users=world.users,
-            sessions=world.sessions,
-            attempts=world.attempts,
-            tokens=world.tokens,
-            devices=world.devices,
-        )
-        self.app.dependency_overrides[get_identity_uow] = lambda: world.uow
-        self.app.dependency_overrides[get_setup_identity_uow] = lambda: world.uow
-        self.app.dependency_overrides[get_existing_data_claim] = NoOpExistingDataClaim
-        self.app.dependency_overrides[get_identity_repos] = lambda: repos
-        self.app.dependency_overrides[get_password_hasher] = lambda: hasher
-        self.app.dependency_overrides[get_decoy_hash] = lambda: hasher.hash("decoy")
-        if settings is not None:
-            self.app.dependency_overrides[get_identity_settings_dep] = lambda: settings
-        self.client = self.new_client(base_url)
-
-    def new_client(self, base_url: str = "http://testserver") -> TestClient:
-        """Return a client with no cookies that sends its own `Origin`."""
-        client = TestClient(self.app, base_url=base_url)
-        client.cookies.clear()
-        return client
-
-    @staticmethod
-    def post(
-        client: TestClient,
-        url: str,
-        json: Mapping[str, object] | None = None,
-        *,
-        csrf: bool = True,
-    ) -> Response:
-        """POST from the client's own origin; a foreign one if `csrf` is off."""
-        headers = {} if csrf else {"Origin": FOREIGN_ORIGIN}
-        return client.post(url, json=json, headers=headers)
-
-    @staticmethod
-    def delete(
-        client: TestClient,
-        url: str,
-        *,
-        csrf: bool = True,
-    ) -> Response:
-        """DELETE from the client's own origin; a foreign one if `csrf` is off."""
-        headers = {} if csrf else {"Origin": FOREIGN_ORIGIN}
-        return client.delete(url, headers=headers)
-
-    def setup(self, client: TestClient | None = None) -> Response:
-        """Run first-run setup, leaving `client` signed in as an admin."""
-        response = self.post(client or self.client, f"{AUTH}/setup", SETUP_BODY)
-        assert response.status_code == 201
-        return response
-
-    async def add_user(
-        self, make_user: MakeUser, username: str, role: Role = Role.MEMBER
-    ) -> None:
-        """Store a user whose password is `password-123`."""
-        await self.world.users.add(make_user(username, role=role))
-
-    def sign_in(
-        self,
-        username: str = "alice",
-        password: str = "password-123",
-        *,
-        headers: Mapping[str, str] | None = None,
-    ) -> tuple[TestClient, Response]:
-        """Sign in with a fresh client, returning it and the response."""
-        client = self.new_client()
-        request_headers = dict(headers or {})
-        response = client.post(
-            f"{AUTH}/login",
-            json={"username": username, "password": password},
-            headers=request_headers,
-        )
-        return client, response
-
-
-@pytest.fixture
-def api(world: World) -> Api:
-    """An app wired to the in-memory identity world."""
-    return Api(world)
+ME = "/api/v1/me"
+SESSIONS = "/api/v1/sessions"
+SESSION_COOKIE = "menagerist-session"
 
 
 # --- Own device routes -----------------------------------------------------
 
 
 async def test_list_own_sessions_returns_active_devices_with_current_flag(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """List own active sessions, identifying the calling device and no secrets."""
     await api.add_user(make_user, "alice")
@@ -195,13 +79,15 @@ async def test_list_own_sessions_returns_active_devices_with_current_flag(
         assert "cookie" not in s
 
 
-def test_list_own_sessions_unauthenticated_returns_401(api: Api) -> None:
+def test_list_own_sessions_unauthenticated_returns_401(api: IdentityApi) -> None:
     """Unauthenticated request to list own sessions returns 401."""
     resp = api.client.get(f"{ME}/sessions")
     assert resp.status_code == 401
 
 
-async def test_revoke_own_session_success(api: Api, make_user: MakeUser) -> None:
+async def test_revoke_own_session_success(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """A user can revoke one of their other active sessions."""
     await api.add_user(make_user, "alice")
     c1, _ = api.sign_in("alice", headers={"User-Agent": "Device 1"})
@@ -219,7 +105,7 @@ async def test_revoke_own_session_success(api: Api, make_user: MakeUser) -> None
 
 
 async def test_revoke_own_session_refuses_current_session(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Revoking the caller's own current session returns 409 (Review Focus #2)."""
     await api.add_user(make_user, "alice")
@@ -234,7 +120,7 @@ async def test_revoke_own_session_refuses_current_session(
 
 
 async def test_revoke_own_session_foreign_and_unknown_ids_return_404(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Foreign session ID and unknown ID both return 404 (Review Focus #1)."""
     await api.add_user(make_user, "alice")
@@ -260,7 +146,9 @@ async def test_revoke_own_session_foreign_and_unknown_ids_return_404(
     assert del_unknown.json()["title"] == "SessionNotFoundError"
 
 
-async def test_revoke_own_session_requires_csrf(api: Api, make_user: MakeUser) -> None:
+async def test_revoke_own_session_requires_csrf(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """DELETE /me/sessions/{id} requires a same-origin request."""
     await api.add_user(make_user, "alice")
     c1, _ = api.sign_in("alice")
@@ -273,7 +161,9 @@ async def test_revoke_own_session_requires_csrf(api: Api, make_user: MakeUser) -
     assert del_resp.status_code == 403
 
 
-async def test_revoke_other_sessions_success(api: Api, make_user: MakeUser) -> None:
+async def test_revoke_other_sessions_success(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """Revoking all other sessions ends them and returns count."""
     await api.add_user(make_user, "alice")
     await api.add_user(make_user, "bob")
@@ -295,7 +185,7 @@ async def test_revoke_other_sessions_success(api: Api, make_user: MakeUser) -> N
 
 
 async def test_revoke_other_sessions_requires_csrf(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """DELETE /me/sessions requires a same-origin request."""
     await api.add_user(make_user, "alice")
@@ -308,7 +198,9 @@ async def test_revoke_other_sessions_requires_csrf(
 # --- Admin session routes --------------------------------------------------
 
 
-async def test_list_sessions_admin_success(api: Api, make_user: MakeUser) -> None:
+async def test_list_sessions_admin_success(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """Administrator sees all active sessions across users with user details."""
     api.setup()
     await api.add_user(make_user, "alice")
@@ -337,7 +229,9 @@ async def test_list_sessions_admin_success(api: Api, make_user: MakeUser) -> Non
         assert "username" in s
 
 
-async def test_list_sessions_filter_by_user_id(api: Api, make_user: MakeUser) -> None:
+async def test_list_sessions_filter_by_user_id(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """Filter by user_id; unknown returns empty list (Review Focus #5)."""
     api.setup()
     alice = make_user("alice")
@@ -359,7 +253,7 @@ async def test_list_sessions_filter_by_user_id(api: Api, make_user: MakeUser) ->
 
 
 async def test_list_sessions_forbidden_for_members(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Regular members get 403 when trying to access GET /session."""
     await api.add_user(make_user, "alice")
@@ -369,7 +263,9 @@ async def test_list_sessions_forbidden_for_members(
     assert resp.status_code == 403
 
 
-async def test_revoke_session_admin_success(api: Api, make_user: MakeUser) -> None:
+async def test_revoke_session_admin_success(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """Administrator can revoke another user's session."""
     api.setup()
     await api.add_user(make_user, "alice")
@@ -389,7 +285,7 @@ async def test_revoke_session_admin_success(api: Api, make_user: MakeUser) -> No
 
 
 async def test_revoke_session_admin_refuses_current_session(
-    api: Api,
+    api: IdentityApi,
 ) -> None:
     """Administrator cannot revoke own current session (Review Focus #2)."""
     api.setup()
@@ -405,7 +301,7 @@ async def test_revoke_session_admin_refuses_current_session(
 
 
 async def test_revoke_session_unknown_id_returns_404(
-    api: Api,
+    api: IdentityApi,
 ) -> None:
     """Administrator revoking a non-existent session gets 404."""
     api.setup()
@@ -417,7 +313,7 @@ async def test_revoke_session_unknown_id_returns_404(
 
 
 async def test_revoke_session_forbidden_for_members(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Regular members get 403 when trying to access DELETE /session/{id}."""
     await api.add_user(make_user, "alice")
@@ -428,7 +324,7 @@ async def test_revoke_session_forbidden_for_members(
 
 
 async def test_revoke_session_requires_csrf(
-    api: Api,
+    api: IdentityApi,
 ) -> None:
     """DELETE /session/{id} requires a same-origin request."""
     api.setup()
@@ -445,7 +341,7 @@ DEVICES = f"{ME}/devices"
 
 
 async def test_list_own_devices_groups_by_browser_and_marks_this_one(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Each browser is one entry with its display mode; this one is marked."""
     await api.add_user(make_user, "alice")
@@ -472,7 +368,9 @@ async def test_list_own_devices_groups_by_browser_and_marks_this_one(
     ]
 
 
-async def test_signing_in_again_keeps_one_device(api: Api, make_user: MakeUser) -> None:
+async def test_signing_in_again_keeps_one_device(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """The browser sends its device cookie back and stays one entry."""
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
@@ -488,7 +386,7 @@ async def test_signing_in_again_keeps_one_device(api: Api, make_user: MakeUser) 
 
 
 async def test_signing_out_keeps_the_device_cookie(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Sign-out clears only the session cookie."""
     await api.add_user(make_user, "alice")
@@ -504,7 +402,7 @@ async def test_signing_out_keeps_the_device_cookie(
 
 
 async def test_a_remembered_browser_signs_in_while_the_username_is_locked(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """Someone else's failures lock the username, not the browser with the cookie."""
     await api.add_user(make_user, "alice")
@@ -522,7 +420,9 @@ async def test_a_remembered_browser_signs_in_while_the_username_is_locked(
     assert response.status_code == 200
 
 
-async def test_revoke_own_device_signs_it_out(api: Api, make_user: MakeUser) -> None:
+async def test_revoke_own_device_signs_it_out(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """Revoking another browser ends its sessions; it then needs to sign in."""
     await api.add_user(make_user, "alice")
     other, _ = api.sign_in(headers={"User-Agent": "Other"})
@@ -538,7 +438,7 @@ async def test_revoke_own_device_signs_it_out(api: Api, make_user: MakeUser) -> 
 
 
 async def test_revoke_own_device_refuses_this_one_and_unknown_ones(
-    api: Api, make_user: MakeUser
+    api: IdentityApi, make_user: MakeUser
 ) -> None:
     """This browser is a 409; an unknown or foreign device is a 404."""
     await api.add_user(make_user, "alice")
@@ -560,7 +460,9 @@ async def test_revoke_own_device_refuses_this_one_and_unknown_ones(
     assert bob.get(ME).status_code == 200
 
 
-async def test_revoke_own_device_requires_csrf(api: Api, make_user: MakeUser) -> None:
+async def test_revoke_own_device_requires_csrf(
+    api: IdentityApi, make_user: MakeUser
+) -> None:
     """DELETE /me/devices/{id} requires a same-origin request."""
     await api.add_user(make_user, "alice")
     client, _ = api.sign_in()
@@ -570,7 +472,7 @@ async def test_revoke_own_device_requires_csrf(api: Api, make_user: MakeUser) ->
     assert response.status_code == 403
 
 
-async def test_admin_session_list_shows_the_display_mode(api: Api) -> None:
+async def test_admin_session_list_shows_the_display_mode(api: IdentityApi) -> None:
     """Administrators see whether a session runs in the installed app."""
     api.post(
         api.client,
@@ -613,7 +515,7 @@ def _patch(
 
 
 async def test_owner_names_their_device_and_the_name_survives_signing_in_again(
-    api: Api,
+    api: IdentityApi,
     make_user: MakeUser,
 ) -> None:
     """A name is stored, listed, kept across sign-out and in, and can be cleared."""
@@ -643,7 +545,7 @@ async def test_owner_names_their_device_and_the_name_survives_signing_in_again(
 
 
 async def test_a_device_cannot_be_named_by_another_user_or_from_another_site(
-    api: Api,
+    api: IdentityApi,
     make_user: MakeUser,
 ) -> None:
     """Someone else's device is not found, and a cross-site request is refused."""
@@ -664,7 +566,7 @@ async def test_a_device_cannot_be_named_by_another_user_or_from_another_site(
 
 
 async def test_a_name_that_is_too_long_is_refused(
-    api: Api,
+    api: IdentityApi,
     make_user: MakeUser,
 ) -> None:
     """The limit is reported as a problem, and the name is unchanged."""
@@ -678,7 +580,7 @@ async def test_a_name_that_is_too_long_is_refused(
     assert _current_device(client)["name"] is None
 
 
-def test_naming_needs_a_session(api: Api) -> None:
+def test_naming_needs_a_session(api: IdentityApi) -> None:
     """Signed-out requests are unauthenticated."""
     response = _patch(api.client, f"{ME}/devices/{uuid.uuid7()}", {"name": "x"})
     assert response.status_code == 401
@@ -686,7 +588,7 @@ def test_naming_needs_a_session(api: Api) -> None:
 
 
 async def test_administrator_renames_a_users_device_and_the_listing_shows_it(
-    api: Api,
+    api: IdentityApi,
     make_user: MakeUser,
 ) -> None:
     """An administrator can name or clear a device; members cannot."""
@@ -713,7 +615,7 @@ async def test_administrator_renames_a_users_device_and_the_listing_shows_it(
 
 
 async def test_a_new_browser_can_take_the_name_of_an_unused_matching_device(
-    api: Api,
+    api: IdentityApi,
     make_user: MakeUser,
 ) -> None:
     """Suggestions list matching unused devices; taking one moves the name."""
@@ -747,7 +649,7 @@ async def test_a_new_browser_can_take_the_name_of_an_unused_matching_device(
 
 
 async def test_only_a_suggested_name_can_be_taken(
-    api: Api,
+    api: IdentityApi,
     make_user: MakeUser,
 ) -> None:
     """A device that was not offered is reported as not found and kept."""
