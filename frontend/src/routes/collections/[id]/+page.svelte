@@ -1,7 +1,7 @@
 <script lang="ts">
 	import IconButton from '$lib/components/icon-button.svelte';
 	import Page from '$lib/components/page.svelte';
-	import { goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { staysOnPage } from '$lib/back-layers';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
@@ -15,6 +15,7 @@
 		LayoutGrid,
 		Library,
 		List,
+		ListChecks,
 		Pencil,
 		Plus,
 		Share,
@@ -35,6 +36,7 @@
 		getCollection,
 		listNodes,
 		removeItemFromCollection,
+		removeItemsFromCollection,
 		updateCollection,
 		type CollectionResponse,
 		type NodeResponse,
@@ -107,6 +109,11 @@
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import NodeCard from '$lib/components/node-card.svelte';
 	import NodeGridCard from '$lib/components/node-grid-card.svelte';
+	import BulkToolbar from '$lib/components/bulk-toolbar.svelte';
+	import { auth } from '$lib/auth.svelte.js';
+	import { itemCount } from '$lib/bulk-actions';
+	import { PendingDeletes } from '$lib/pending-deletes.svelte';
+	import { Selection } from '$lib/selection.svelte';
 	import SurpriseButton from '$lib/components/surprise-button.svelte';
 	import {
 		homeCollectionIds,
@@ -183,6 +190,24 @@
 	let exampleFilter = $state<ExampleFilter>(readExampleFilter());
 	const showExampleFilter = $derived(exampleItemIds.size > 0 || exampleFilter !== 'all');
 	const shownItems = $derived(visibleItems(items, exampleItemIds, exampleFilter));
+
+	// Bulk selection: kept across searches and filters, ended on leaving or switching collection.
+	const selection = new Selection();
+	const pendingDeletes = new PendingDeletes();
+	const canSelect = $derived(auth.can('graph:item:write'));
+	const rows = $derived(shownItems.filter((item) => !pendingDeletes.hidden.has(item.id)));
+	const rowIds = $derived(rows.map((item) => item.id));
+	let bulkRemoving = $state(false);
+
+	function pick(id: string) {
+		selection.enter();
+		selection.toggle(id);
+	}
+
+	beforeNavigate(() => {
+		// Leaving commits a delete still inside its Undo window (§14).
+		void pendingDeletes.flushAll();
+	});
 	const exampleFilters = Object.keys(EXAMPLE_FILTER_LABELS) as ExampleFilter[];
 
 	// Smart collections: the kind decides how results load, so nothing loads until it is known.
@@ -674,6 +699,7 @@
 		const loaded = untrack(() => collection);
 		if (loaded && (loaded.slug === id || loaded.id === id)) return;
 		untrack(() => {
+			selection.exit();
 			collection = null;
 			items = [];
 			hasMore = false;
@@ -865,6 +891,35 @@
 		void loadCollection(canonicalId, true);
 		void fetchPage(canonicalId, q, selectedType);
 		void loadTypeCounts(canonicalId);
+	}
+
+	async function reloadList() {
+		items = [];
+		hasMore = false;
+		retryItems();
+		void loadCollection(canonicalId, true);
+		void loadTypeCounts(canonicalId);
+	}
+
+	async function removeSelected() {
+		if (bulkRemoving || !collection) return;
+		const id = collection.id;
+		const name = collection.name;
+		const ids = [...selection.ids];
+		bulkRemoving = true;
+		const result = await removeItemsFromCollection({
+			path: { collection_id: id },
+			body: { item_ids: ids }
+		});
+		bulkRemoving = false;
+		if (result.error) {
+			const { title, description } = networkAwareError(result);
+			toast.error(title, { description });
+			return;
+		}
+		selection.clear();
+		toast.success(`Removed ${itemCount(ids.length)} from ${name}`);
+		await reloadList();
 	}
 
 	async function handleRemove(item: NodeResponse) {
@@ -1213,6 +1268,18 @@
 						{/each}
 					</NativeSelect.Root>
 				{/if}
+				{#if canSelect && rows.length > 0}
+					<Button
+						variant={selection.active ? 'secondary' : 'outline'}
+						size="sm"
+						class="max-sm:h-11"
+						aria-pressed={selection.active}
+						onclick={() => (selection.active ? selection.exit() : selection.enter())}
+					>
+						<ListChecks />
+						Select
+					</Button>
+				{/if}
 				<div class="flex items-center gap-1">
 					<button
 						onclick={() => (viewMode = 'list')}
@@ -1300,14 +1367,37 @@
 		{/if}
 		<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
+		{#if selection.active}
+			<BulkToolbar {selection} pending={pendingDeletes} visibleIds={rowIds} onreload={reloadList}>
+				{#snippet extra({ disabled })}
+					{#if !smart && auth.can('collections:collection:write')}
+						<Button
+							variant="outline"
+							size="sm"
+							class="pointer-coarse:h-11"
+							disabled={disabled || bulkRemoving}
+							onclick={() => void removeSelected()}
+						>
+							<X />
+							Remove from {collection?.name ?? 'collection'}
+						</Button>
+					{/if}
+				{/snippet}
+			</BulkToolbar>
+		{/if}
+
 		{#if loadingDisplay.show && shownItems.length === 0}
 			<NodeSkeleton view={viewMode} count={8} />
 		{:else if viewMode === 'grid'}
 			<div data-slot="node-grid" class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
-				{#each shownItems as item (item.id)}
+				{#each rows as item (item.id)}
 					<div class="relative">
 						<NodeGridCard
 							{item}
+							selectable={selection.active}
+							selected={selection.has(item.id)}
+							onselect={() => selection.toggle(item.id)}
+							onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 							schema={schemaOf(item.type)}
 							categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
 							typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
@@ -1315,7 +1405,7 @@
 							match={q ? matchContext(item, schemaOf(item.type), q) : null}
 							isExample={exampleItemIds.has(item.id)}
 						/>
-						{#if !smart}
+						{#if !smart && !selection.active}
 							<button
 								type="button"
 								onclick={() => void handleRemove(item)}
@@ -1333,11 +1423,15 @@
 			</div>
 		{:else}
 			<Item.Group class="max-w-5xl">
-				{#each shownItems as item (item.id)}
+				{#each rows as item (item.id)}
 					<div role="listitem" class="flex items-stretch gap-2">
 						<div class="min-w-0 flex-1">
 							<NodeCard
 								{item}
+								selectable={selection.active}
+								selected={selection.has(item.id)}
+								onselect={() => selection.toggle(item.id)}
+								onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 								schema={schemaOf(item.type)}
 								categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
 								typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
@@ -1346,7 +1440,7 @@
 								isExample={exampleItemIds.has(item.id)}
 							/>
 						</div>
-						{#if !smart}
+						{#if !smart && !selection.active}
 							<button
 								type="button"
 								onclick={() => void handleRemove(item)}

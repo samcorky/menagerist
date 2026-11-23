@@ -88,7 +88,11 @@ async def create_edges(
     use_case: Annotated[CreateEdges, Depends(get_create_edges_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
 ) -> CreateEdgesResponse:
-    """Connect one source to several targets at once, skipping existing connections."""
+    """Connect one source to several targets at once, skipping existing connections.
+
+    With `reverse`, each target connects to the source instead, so many items can
+    be connected to one. The source appearing among the targets is a 400.
+    """
     result = await use_case.handle(payload.to_command(), actor)
     return CreateEdgesResponse(
         created=[EdgeResponse.from_domain(edge) for edge in result.created],

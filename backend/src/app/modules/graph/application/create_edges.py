@@ -19,6 +19,7 @@ from app.shared_kernel.access import Access, Content
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.shared_kernel.content_filter import ContentFilter  # noqa: TC001
 from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -35,13 +36,16 @@ class CreateEdgesCommand:
     """Request to connect one source node to several targets with the same type.
 
     Attributes apply to every created edge. A target already connected to the
-    source by an edge of the same type is skipped, not duplicated.
+    source by an edge of the same type is skipped, not duplicated. With `reverse`,
+    `source_id` is the shared node and each target starts its own edge into it
+    ("these twelve, each stored in Box 3").
     """
 
     source_id: uuid.UUID
     target_ids: list[uuid.UUID]
     type: str
     attributes: dict[str, Any] = field(default_factory=dict)
+    reverse: bool = False
 
 
 @dataclass(kw_only=True)
@@ -50,6 +54,30 @@ class CreateEdgesResult:
 
     created: list[Edge]
     skipped: list[uuid.UUID]
+
+
+def _endpoints(
+    command: CreateEdgesCommand, target_id: uuid.UUID
+) -> tuple[uuid.UUID, uuid.UUID]:
+    """The (start, end) of the edge between the command's source and `target_id`."""
+    if command.reverse:
+        return target_id, command.source_id
+    return command.source_id, target_id
+
+
+async def _check_targets_exist(
+    repos: GraphRepos,
+    target_ids: list[uuid.UUID],
+    existing: set[uuid.UUID],
+    scope: ContentFilter,
+) -> None:
+    """Raise `NodeNotFoundError` for the first target that is not connected or live."""
+    for target_id in target_ids:
+        if (
+            target_id not in existing
+            and await repos.nodes.get(target_id, scope=scope) is None
+        ):
+            raise NodeNotFoundError(f"Node {target_id} not found")
 
 
 async def _existing_targets(
@@ -90,6 +118,8 @@ class CreateEdges(
         self, command: CreateEdgesCommand, actor: Actor
     ) -> CreateEdgesResult:
         """Create the edges in `command`, skipping targets already connected."""
+        if command.source_id in command.target_ids:
+            raise ValidationError("An item cannot be connected to itself")
         scope = self.scope(actor)
         async with self._uow as repos:
             if await repos.nodes.get(command.source_id, scope=scope) is None:
@@ -100,12 +130,7 @@ class CreateEdges(
             )
 
             # Check every endpoint before writing, so a bad one creates nothing.
-            for target_id in command.target_ids:
-                if (
-                    target_id not in existing
-                    and await repos.nodes.get(target_id, scope=scope) is None
-                ):
-                    raise NodeNotFoundError(f"Node {target_id} not found")
+            await _check_targets_exist(repos, command.target_ids, existing, scope)
 
             slug = slugify(command.type)
             edge_type = await repos.edge_types.get_by_slug(slug, scope=scope)
@@ -129,10 +154,11 @@ class CreateEdges(
                 if target_id in existing:
                     skipped.append(target_id)
                     continue
+                start, end = _endpoints(command, target_id)
                 edge = Edge.create(
                     owner_id=actor.id,
-                    source_id=command.source_id,
-                    target_id=target_id,
+                    source_id=start,
+                    target_id=end,
                     type=command.type,
                     attributes=command.attributes,
                 )

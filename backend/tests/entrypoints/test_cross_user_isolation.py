@@ -504,6 +504,9 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
     "ImportItemsBody": lambda s: _CSV_IMPORT,
     "UpdateCollectionRequest": lambda s: {"json": {"name": "Mine"}},
     "AddItemsRequest": lambda s: {"json": {"item_ids": [s.item2]}},
+    "RemoveItemsRequest": lambda s: {"json": {"item_ids": [s.item2]}},
+    "DeleteNodesRequest": lambda s: {"json": {"ids": [s.item2]}},
+    "TagNodesRequest": lambda s: {"json": {"ids": [s.item2], "add": ["stolen"]}},
     "CreateUserRequest": lambda s: {
         "json": {"username": "mallory", "display_name": "M", "password": PASSWORD}
     },
@@ -514,6 +517,17 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
 # Routes whose B-side answer is legitimately a success (B acts on B's own data).
 # Each check returns an error message or None; A's data is checked unchanged too.
 SPECIAL: dict[Route, Callable[[Response], str | None]] = {}
+
+
+def _unknown_items(response: Response) -> str | None:
+    """A batch naming A's items fails like one naming items that never existed."""
+    if response.status_code == 400 and "Unknown or deleted items" in response.text:
+        return None
+    return f"expected 400 Unknown or deleted items, got {response.status_code}"
+
+
+SPECIAL[("POST", "/api/v1/nodes/delete")] = _unknown_items
+SPECIAL[("POST", "/api/v1/nodes/tags")] = _unknown_items
 
 
 def _installed_for_b(response: Response) -> str | None:

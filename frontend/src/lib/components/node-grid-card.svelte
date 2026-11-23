@@ -10,6 +10,8 @@
 	import NodeSummary from './node-summary.svelte';
 	import TagList from './tag-list.svelte';
 	import { nextCardIndex } from './card-grid-nav';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+	import { createLongPress } from '$lib/long-press';
 
 	let {
 		item,
@@ -18,7 +20,11 @@
 		typeIcon,
 		typeColour,
 		match,
-		isExample = false
+		isExample = false,
+		selectable = false,
+		selected = false,
+		onselect,
+		onlongpress
 	}: {
 		item: NodeResponse;
 		schema: AttributesSchema | null;
@@ -28,7 +34,15 @@
 		typeColour?: string | null;
 		match?: MatchContext | null;
 		isExample?: boolean;
+		/** Selection mode: the tile becomes a checkbox instead of a link to the item. */
+		selectable?: boolean;
+		selected?: boolean;
+		onselect?: () => void;
+		/** A touch hold on the link, which the page uses to enter selection mode. */
+		onlongpress?: () => void;
 	} = $props();
+
+	const press = $derived(onlongpress ? createLongPress(onlongpress) : null);
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (
@@ -38,10 +52,12 @@
 			e.key !== 'ArrowRight'
 		)
 			return;
-		const link = e.currentTarget as HTMLAnchorElement;
+		const link = e.currentTarget as HTMLElement;
 		const container = link.closest<HTMLElement>('[data-slot="node-grid"]');
 		if (!container) return;
-		const links = Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href]'));
+		const links = Array.from(
+			container.querySelectorAll<HTMLElement>('a[href], [data-selectable-card]')
+		);
 		const currentIndex = links.indexOf(link);
 		if (currentIndex === -1) return;
 		const rects = links.map((el) => {
@@ -51,18 +67,26 @@
 		const nextIndex = nextCardIndex(e.key, currentIndex, rects, 'grid');
 		if (nextIndex === null) return;
 		e.preventDefault();
-		links[nextIndex]?.focus();
+		const next = links[nextIndex];
+		(next?.matches('a')
+			? next
+			: next?.querySelector<HTMLElement>('[data-slot="checkbox"]')
+		)?.focus();
+	}
+
+	function handleCardClick(e: MouseEvent) {
+		// The checkbox reports its own change; a click anywhere else on the tile toggles it too.
+		if ((e.target as HTMLElement).closest('[data-slot="checkbox"]')) return;
+		onselect?.();
 	}
 </script>
 
-<a
-	href={resolve('/items/[id]', { id: item.id })}
-	class="group block"
-	onclick={() => rememberItemPreview(item)}
-	onkeydown={handleKeydown}
->
+{#snippet tile()}
 	<div
-		class="flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60"
+		class={[
+			'flex aspect-[3/4] flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors group-hover:bg-muted/60',
+			selected && 'border-primary ring-2 ring-primary'
+		]}
 	>
 		<!-- Cover image, or the item type's icon and colour (§7b) -->
 		<div class="min-h-0 flex-1 overflow-hidden">
@@ -111,4 +135,49 @@
 			{/if}
 		</div>
 	</div>
-</a>
+{/snippet}
+
+{#if selectable}
+	<!-- The checkbox is the keyboard control; a click anywhere on the tile is a convenience. -->
+	<div
+		role="presentation"
+		data-selectable-card
+		class="group relative block cursor-pointer"
+		onclick={handleCardClick}
+		onkeydown={handleKeydown}
+	>
+		{@render tile()}
+		<div
+			class="absolute top-0 left-0 flex size-8 items-center justify-center pointer-coarse:size-11"
+		>
+			<Checkbox
+				checked={selected}
+				onCheckedChange={() => onselect?.()}
+				aria-label="Select {item.name}"
+				class="size-5 bg-background shadow"
+			/>
+		</div>
+	</div>
+{:else}
+	<a
+		href={resolve('/items/[id]', { id: item.id })}
+		class={['group block', onlongpress && 'select-none [-webkit-touch-callout:none]']}
+		onclick={() => rememberItemPreview(item)}
+		onclickcapture={(e) => {
+			if (press?.swallowClick()) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
+		}}
+		onpointerdown={press?.onpointerdown}
+		onpointermove={press?.onpointermove}
+		onpointerup={press?.onpointerup}
+		onpointercancel={press?.onpointercancel}
+		oncontextmenu={(e) => {
+			if (press?.suppressContextMenu(e)) e.preventDefault();
+		}}
+		onkeydown={handleKeydown}
+	>
+		{@render tile()}
+	</a>
+{/if}
