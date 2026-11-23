@@ -47,6 +47,7 @@ jobs:
       # The check table goes to the job summary. The Action runs the calver-scm from the
       # lockfile, so Renovate keeps the one version current.
       - name: Install the release tools
+        working-directory: backend
         run: |
           uv sync --locked --only-group release
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
