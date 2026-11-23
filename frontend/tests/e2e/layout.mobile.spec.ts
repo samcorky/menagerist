@@ -256,8 +256,23 @@ for (const size of SIZES) {
 			async function checkDialog(trigger: Locator, name: string, primary: string | RegExp) {
 				await trigger.tap();
 				const dialog = page.getByRole('dialog', { name });
-				// A phone sheet slides up on open, so measure it once it has settled.
-				await dialog.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+				// A phone sheet slides up on open, so measure it once it has stopped moving. Watching
+				// its position is sturdier than getAnimations(), which can run before the slide starts.
+				await dialog.evaluate(
+					(el) =>
+						new Promise<void>((resolve) => {
+							let last = Number.NaN;
+							let still = 0;
+							const tick = () => {
+								const y = el.getBoundingClientRect().y;
+								still = y === last ? still + 1 : 0;
+								last = y;
+								if (still >= 5) resolve();
+								else requestAnimationFrame(tick);
+							};
+							tick();
+						})
+				);
 				const d = await box(dialog);
 				test.info().annotations.push({
 					type: `dialog ${size.width} ${name}`,
