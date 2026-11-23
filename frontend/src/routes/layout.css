@@ -121,24 +121,44 @@
 	--font-heading: 'Manrope Variable', sans-serif;
 }
 
-@keyframes page-fade-in {
+/* Pages slide the way the user travelled (data-nav-direction, set in +layout.svelte): forward
+   brings the new page in from the right, Back from the left. 280 ms is design §22's page time. */
+@keyframes page-in-forward {
 	from {
 		opacity: 0;
-		transform: translateY(6px);
+		transform: translateX(32px);
 	}
 }
-@keyframes page-fade-out {
+@keyframes page-out-forward {
 	to {
 		opacity: 0;
-		transform: translateY(-6px);
+		transform: translateX(-32px);
+	}
+}
+@keyframes page-in-back {
+	from {
+		opacity: 0;
+		transform: translateX(-32px);
+	}
+}
+@keyframes page-out-back {
+	to {
+		opacity: 0;
+		transform: translateX(32px);
 	}
 }
 
 ::view-transition-old(root) {
-	animation: 120ms ease page-fade-out;
+	animation: 280ms ease both page-out-forward;
 }
 ::view-transition-new(root) {
-	animation: 180ms ease page-fade-in;
+	animation: 280ms ease both page-in-forward;
+}
+:root[data-nav-direction='back']::view-transition-old(root) {
+	animation-name: page-out-back;
+}
+:root[data-nav-direction='back']::view-transition-new(root) {
+	animation-name: page-in-back;
 }
 
 ::view-transition-old(site-header),

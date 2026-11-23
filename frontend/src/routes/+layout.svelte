@@ -38,7 +38,7 @@
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { auth } from '$lib/auth.svelte.js';
 	import { guardDecision } from '$lib/auth';
-	import { animatesNavigation } from '$lib/view-transition';
+	import { animatesNavigation, navigationDirection } from '$lib/view-transition';
 	import {
 		changesPage,
 		jumpsToFragment,
@@ -118,12 +118,15 @@
 
 	onNavigate((navigation) => {
 		if (!document.startViewTransition || !animatesNavigation(navigation)) return;
+		// The CSS reads the direction to slide the pages the way the user travelled.
+		const root = document.documentElement;
+		root.dataset.navDirection = navigationDirection(navigation);
 		return new Promise((done) => {
 			const transition = document.startViewTransition(async () => {
 				done();
 				await navigation.complete.catch(() => {});
 			});
-			transition.finished.catch(() => {});
+			void transition.finished.catch(() => {}).finally(() => delete root.dataset.navDirection);
 		});
 	});
 
