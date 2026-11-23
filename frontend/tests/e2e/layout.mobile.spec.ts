@@ -32,8 +32,28 @@ test.afterEach(async ({ request }) => {
 
 type Box = { x: number; y: number; width: number; height: number };
 
+/**
+ * An element's box once it has stopped moving. A phone sheet slides up on open, so measuring
+ * straight away would catch it part way. Watching its position is sturdier than
+ * `getAnimations()`, which can run before the slide has started.
+ */
 async function box(locator: Locator): Promise<Box> {
 	await expect(locator).toBeVisible();
+	await locator.evaluate(
+		(el) =>
+			new Promise<void>((resolve) => {
+				let last = Number.NaN;
+				let still = 0;
+				const tick = () => {
+					const y = el.getBoundingClientRect().y;
+					still = y === last ? still + 1 : 0;
+					last = y;
+					if (still >= 5) resolve();
+					else requestAnimationFrame(tick);
+				};
+				tick();
+			})
+	);
 	const b = await locator.boundingBox();
 	expect(b, 'element has a bounding box').not.toBeNull();
 	return b!;
@@ -256,23 +276,6 @@ for (const size of SIZES) {
 			async function checkDialog(trigger: Locator, name: string, primary: string | RegExp) {
 				await trigger.tap();
 				const dialog = page.getByRole('dialog', { name });
-				// A phone sheet slides up on open, so measure it once it has stopped moving. Watching
-				// its position is sturdier than getAnimations(), which can run before the slide starts.
-				await dialog.evaluate(
-					(el) =>
-						new Promise<void>((resolve) => {
-							let last = Number.NaN;
-							let still = 0;
-							const tick = () => {
-								const y = el.getBoundingClientRect().y;
-								still = y === last ? still + 1 : 0;
-								last = y;
-								if (still >= 5) resolve();
-								else requestAnimationFrame(tick);
-							};
-							tick();
-						})
-				);
 				const d = await box(dialog);
 				test.info().annotations.push({
 					type: `dialog ${size.width} ${name}`,
