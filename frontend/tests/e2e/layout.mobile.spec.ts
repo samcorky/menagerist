@@ -256,6 +256,8 @@ for (const size of SIZES) {
 			async function checkDialog(trigger: Locator, name: string, primary: string | RegExp) {
 				await trigger.tap();
 				const dialog = page.getByRole('dialog', { name });
+				// A phone sheet slides up on open, so measure it once it has settled.
+				await dialog.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 				const d = await box(dialog);
 				test.info().annotations.push({
 					type: `dialog ${size.width} ${name}`,
