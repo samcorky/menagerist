@@ -85,13 +85,7 @@
 			{@render actions?.()}
 		</div>
 	</div>
-	<Collapsible.Content
-		class={cn(
-			'-m-1 min-w-0 overflow-hidden p-1',
-			animated &&
-				'data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none'
-		)}
-	>
+	<Collapsible.Content {animated} class="-m-1 min-w-0 overflow-hidden p-1">
 		{@render children?.()}
 	</Collapsible.Content>
 </Collapsible.Root>
