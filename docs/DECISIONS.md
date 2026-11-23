@@ -110,6 +110,8 @@ _(The base classes changed on 2026-10-22: see "Declared access stances behind on
 
 **Rationale:** CalVer communicates the release date naturally for a personal app without semantic versioning overhead. The `0.` prefix signals pre-stable - breaking migrations and API changes are expected - without requiring a formal major-version bump. Dropping the `0.` is the public signal that the schema and API are stable.
 
+**When it is dropped:** removing `stable = false` from `[tool.calver-scm]` in `backend/pyproject.toml` makes every `v0.2026.*` tag invalid, and `calver-scm tags` and `next-tag` ignore them. To find the newest release across that change, run `git tag -l 'v*' | calver-scm sort --tag --reverse --skip-other-stability | head -1` in `backend/`. It leaves out the tags that only fail on the `0.` prefix, and those always sort below the stable ones. The `v*` filter matters because `sort` fails on any other invalid tag, such as `archive/initial-implementation`.
+
 ---
 
 ## Unrecognised schema properties round-trip as an `opaque` field kind (frontend)
