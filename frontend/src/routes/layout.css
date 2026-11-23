@@ -122,7 +122,8 @@
 }
 
 /* Pages slide the way the user travelled (data-nav-direction, set in +layout.svelte): forward
-   brings the new page in from the right, Back from the left. 280 ms is design §22's page time. */
+   brings the new page in from the right, Back from the left, and a switch between top-level
+   destinations (fade) only fades. 280 ms is design §22's page time. */
 @keyframes page-in-forward {
 	from {
 		opacity: 0;
@@ -148,6 +149,17 @@
 	}
 }
 
+@keyframes page-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+@keyframes page-fade-out {
+	to {
+		opacity: 0;
+	}
+}
+
 ::view-transition-old(root) {
 	animation: 280ms ease both page-out-forward;
 }
@@ -159,6 +171,12 @@
 }
 :root[data-nav-direction='back']::view-transition-new(root) {
 	animation-name: page-in-back;
+}
+:root[data-nav-direction='fade']::view-transition-old(root) {
+	animation-name: page-fade-out;
+}
+:root[data-nav-direction='fade']::view-transition-new(root) {
+	animation-name: page-fade-in;
 }
 
 ::view-transition-old(site-header),

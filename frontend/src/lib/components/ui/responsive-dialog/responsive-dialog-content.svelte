@@ -6,7 +6,7 @@
 	 * centered dialog at the `sm` breakpoint - the app's one modal shape, per DESIGN_GUIDELINES §23.
 	 */
 	export const responsiveDialogContentVariants = tv({
-		base: 'fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border',
+		base: 'fixed right-0 bottom-0 left-0 z-50 max-h-[90dvh] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-2xl border-t bg-background p-6 shadow-xl sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border max-sm:duration-250 max-sm:data-[state=closed]:animate-out max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:animate-in max-sm:data-[state=open]:slide-in-from-bottom',
 		variants: {
 			size: {
 				sm: 'sm:max-w-sm',
@@ -84,6 +84,7 @@
 		// Reduced motion shortens this to an instant snap via the global rule in layout.css.
 		ref.style.transition = 'transform 200ms ease-out';
 		ref.style.transform = '';
+		ref.style.animation = '';
 	}
 
 	function dragEnd(e: PointerEvent) {
@@ -97,6 +98,8 @@
 		// still runs; if the dialog stays open, the sheet returns to where it was.
 		const sheet = ref;
 		const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+		// The drag already carries the sheet off screen; the close animation would replay it.
+		sheet.style.animation = 'none';
 		sheet.style.transition = reduced ? 'none' : `transform ${SLIDE_OUT_MS}ms ease-in`;
 		sheet.style.transform = `translateY(${sheet.offsetHeight}px)`;
 		setTimeout(

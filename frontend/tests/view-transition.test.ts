@@ -77,8 +77,22 @@ describe('navigationDirection', () => {
 	});
 
 	it('moves forward for links, goto and the Forward button', () => {
-		expect(navigationDirection({ type: 'link' })).toBe('forward');
+		expect(navigationDirection({ type: 'link', to: at('/items/[id]', '/items/1') })).toBe(
+			'forward'
+		);
 		expect(navigationDirection({ type: 'goto' })).toBe('forward');
 		expect(navigationDirection({ type: 'popstate', delta: 1 })).toBe('forward');
+	});
+
+	it('only fades when a link opens a top-level destination', () => {
+		for (const path of ['/', '/items', '/collections', '/settings']) {
+			expect(navigationDirection({ type: 'link', to: at(null, path) })).toBe('fade');
+		}
+	});
+
+	it('still slides Back to a top-level destination', () => {
+		expect(navigationDirection({ type: 'popstate', delta: -1, to: at(null, '/items') })).toBe(
+			'back'
+		);
 	});
 });
