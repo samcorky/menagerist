@@ -22,3 +22,14 @@ export function animatesNavigation(navigation: {
 		return navigation.from?.url.pathname !== navigation.to?.url.pathname;
 	return true;
 }
+
+/**
+ * Which way a navigation travelled, so the page can slide the way the user went. Back moves
+ * through history towards earlier pages; every other navigation, Forward included, is a step on.
+ */
+export function navigationDirection(navigation: {
+	type: OnNavigate['type'];
+	delta?: number;
+}): 'forward' | 'back' {
+	return navigation.type === 'popstate' && (navigation.delta ?? 0) < 0 ? 'back' : 'forward';
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { animatesNavigation } from '$lib/view-transition';
+import { animatesNavigation, navigationDirection } from '$lib/view-transition';
 
 const at = (id: string | null, path = '/x') => ({ route: { id }, url: new URL(`http://x${path}`) });
 
@@ -68,5 +68,17 @@ describe('animatesNavigation', () => {
 	it('animates when either end is unknown', () => {
 		expect(animatesNavigation({ type: 'goto', from: null, to: at('/items') })).toBe(true);
 		expect(animatesNavigation({ type: 'goto', from: at(null), to: at(null) })).toBe(true);
+	});
+});
+
+describe('navigationDirection', () => {
+	it('moves back when history goes to an earlier entry', () => {
+		expect(navigationDirection({ type: 'popstate', delta: -1 })).toBe('back');
+	});
+
+	it('moves forward for links, goto and the Forward button', () => {
+		expect(navigationDirection({ type: 'link' })).toBe('forward');
+		expect(navigationDirection({ type: 'goto' })).toBe('forward');
+		expect(navigationDirection({ type: 'popstate', delta: 1 })).toBe('forward');
 	});
 });
