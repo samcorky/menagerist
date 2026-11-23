@@ -23,13 +23,20 @@ export function animatesNavigation(navigation: {
 	return true;
 }
 
+/** The destinations the nav bar and sidebar switch between: peers, not steps in a journey. */
+const TOP_LEVEL_PATHS = new Set(['/', '/items', '/collections', '/settings']);
+
 /**
- * Which way a navigation travelled, so the page can slide the way the user went. Back moves
- * through history towards earlier pages; every other navigation, Forward included, is a step on.
+ * How the page change should move. Back through history slides the way the user went; opening a
+ * top-level destination from the nav is a switch between peers, so it only fades, as left and
+ * right would imply an order they do not have. Every other navigation, Forward included, is a
+ * step on.
  */
 export function navigationDirection(navigation: {
 	type: OnNavigate['type'];
 	delta?: number;
-}): 'forward' | 'back' {
-	return navigation.type === 'popstate' && (navigation.delta ?? 0) < 0 ? 'back' : 'forward';
+	to?: { url: { pathname: string } } | null;
+}): 'forward' | 'back' | 'fade' {
+	if (navigation.type === 'popstate') return (navigation.delta ?? 0) < 0 ? 'back' : 'forward';
+	return TOP_LEVEL_PATHS.has(navigation.to?.url.pathname ?? '') ? 'fade' : 'forward';
 }
