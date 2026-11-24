@@ -1,13 +1,24 @@
 import { test, expect, type Page } from './fixtures';
 
-/** Scrollbars are thin and take the theme's colour, except where a list hides them on purpose. */
+/**
+ * Scrollbars are thin and take the theme's colour, except where a list hides them on purpose.
+ * Chromium would draw arrow buttons on a standard thin bar, so there the bar is drawn with the
+ * ::-webkit-scrollbar pseudo-elements instead (the standard properties go back to auto).
+ */
 const sidebarList = (page: Page) =>
 	page.getByRole('navigation', { name: 'Main', exact: true }).locator('.overflow-y-auto').first();
 
 const scrollbar = (page: Page, el: ReturnType<typeof sidebarList>) =>
 	el.evaluate((node) => {
 		const style = getComputedStyle(node);
-		return { width: style.scrollbarWidth, colour: style.scrollbarColor };
+		const thumb = getComputedStyle(node, '::-webkit-scrollbar-thumb');
+		return {
+			standardWidth: style.scrollbarWidth,
+			barWidth: getComputedStyle(node, '::-webkit-scrollbar').width,
+			buttons: getComputedStyle(node, '::-webkit-scrollbar-button').display,
+			thumbColour: thumb.backgroundColor,
+			thumbRadius: thumb.borderTopLeftRadius
+		};
 	});
 
 /** The thumb colour the page's theme defines, resolved the way the browser reports it. */
@@ -31,8 +42,11 @@ for (const scheme of ['light', 'dark'] as const) {
 
 		const thumb = await themeThumb(page);
 		expect(await scrollbar(page, list)).toEqual({
-			width: 'thin',
-			colour: `${thumb} rgba(0, 0, 0, 0)`
+			standardWidth: 'auto',
+			barWidth: '10px',
+			buttons: 'none',
+			thumbColour: thumb,
+			thumbRadius: expect.stringMatching(/^[1-9]/)
 		});
 	});
 }
