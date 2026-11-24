@@ -12,6 +12,8 @@ register({
 	// UI label only (WI-19a); the code name stays 'group' so stored definitions don't change.
 	label: 'Table',
 	canBeSubField: false,
+	// Shows one column's latest value; `highlightColumns` limits it to tables with a usable column.
+	highlightable: true,
 	toSchema: (f: EditorField): JsonSchemaProperty => {
 		const subFields = resolvePendingKeys(f.subFields);
 		// JSONB does not preserve nested object key order, so the column order is

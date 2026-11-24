@@ -11,7 +11,8 @@ export type { PropertyMeta } from '$lib/prop-meta';
  */
 export const META_VERSION = 1;
 
-export type HighlightEntry = { key: string };
+/** A highlighted field. A table's entry also names the column whose latest value is shown. */
+export type HighlightEntry = { key: string; column?: string };
 
 /** Which highlight list: an item type's cards, or a relationship type's connection rows. */
 export type HighlightList = 'card' | 'connection';
@@ -49,7 +50,11 @@ export function readHighlights(
 	if (!Array.isArray(entries)) return [];
 	return entries.flatMap((e) =>
 		typeof e === 'object' && e !== null && typeof (e as HighlightEntry).key === 'string'
-			? [{ key: (e as HighlightEntry).key }]
+			? [
+					typeof (e as HighlightEntry).column === 'string'
+						? { key: (e as HighlightEntry).key, column: (e as HighlightEntry).column }
+						: { key: (e as HighlightEntry).key }
+				]
 			: []
 	);
 }

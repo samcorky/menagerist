@@ -58,6 +58,18 @@ const props = {
 	old: { title: 'Old', type: 'string', 'x-menagerist': { kind: 'text', archived: true } }
 } as unknown as Record<string, JsonSchemaProperty>;
 
+const tableOf = (columns: Record<string, JsonSchemaProperty>) =>
+	({
+		title: 'Table',
+		type: 'array',
+		items: { type: 'object', properties: columns }
+	}) as unknown as JsonSchemaProperty;
+
+const acquisitions = tableOf({
+	price: { title: 'Price', type: 'number' },
+	shop: { title: 'Shop', type: 'string' }
+});
+
 function schemaWith(card: { key: string }[]): AttributesSchema {
 	return {
 		$schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -69,10 +81,11 @@ function schemaWith(card: { key: string }[]): AttributesSchema {
 
 describe('isHighlightable', () => {
 	it('is true for scalar kinds and false for long text, tables and unknown shapes', () => {
-		for (const key of ['director', 'year', 'seen', 'released', 'genre', 'stars']) {
+		for (const key of ['director', 'year', 'seen', 'released', 'genre', 'stars', 'cast']) {
 			expect(isHighlightable(props[key]), key).toBe(true);
 		}
-		for (const key of ['notes', 'cast']) expect(isHighlightable(props[key]), key).toBe(false);
+		expect(isHighlightable(props.notes)).toBe(false);
+		expect(isHighlightable(tableOf({ notes: props.notes }))).toBe(false);
 		expect(isHighlightable(props.packing)).toBe(true);
 		expect(isHighlightable({ title: 'x', type: 'string', 'x-menagerist': { kind: 'zzz' } })).toBe(
 			false
@@ -94,12 +107,13 @@ describe('normaliseHighlights', () => {
 			{ key: 'missing' },
 			{ key: 'old' },
 			{ key: 'notes' },
-			{ key: 'cast' },
+			{ key: 'longnotes' },
 			{ key: 'director' },
 			{ key: 'director' },
 			{ key: 'constructor' }
 		];
-		expect(normaliseHighlights(list, props)).toEqual([{ key: 'director' }]);
+		const withTable = { ...props, longnotes: tableOf({ notes: props.notes }) };
+		expect(normaliseHighlights(list, withTable)).toEqual([{ key: 'director' }]);
 	});
 
 	it('keeps only the first three', () => {
@@ -340,5 +354,59 @@ describe('connection highlights', () => {
 		const written = itemsToSchema(items, readSchemaMeta(edgeSchema), [], 'connection');
 		expect(readHighlights(written, 'connection').map((e) => e.key)).toEqual(['date', 'signed_by']);
 		expect(readHighlights(written, 'card')).toEqual([{ key: 'place' }]);
+	});
+});
+
+describe('table highlights', () => {
+	const schema = {
+		$schema: 'https://json-schema.org/draft/2020-12/schema',
+		type: 'object',
+		properties: { director: props.director, buys: acquisitions },
+		'x-menagerist': {
+			version: 1,
+			highlights: { card: [{ key: 'buys', column: 'shop' }] }
+		}
+	} as AttributesSchema;
+
+	it('keeps the chosen column and falls back to the first usable one', () => {
+		const list = (column?: string) =>
+			normaliseHighlights([{ key: 'buys', column }], schema.properties);
+		expect(list('shop')).toEqual([{ key: 'buys', column: 'shop' }]);
+		expect(list('gone')).toEqual([{ key: 'buys', column: 'price' }]);
+		expect(list()).toEqual([{ key: 'buys', column: 'price' }]);
+	});
+
+	it('drops a column given for a field that is not a table', () => {
+		expect(normaliseHighlights([{ key: 'director', column: 'x' }], schema.properties)).toEqual([
+			{ key: 'director' }
+		]);
+	});
+
+	it('shows the column of the last row, labelled with both names', () => {
+		const items = summaryItems(
+			{
+				buys: [
+					{ price: 5, shop: 'First' },
+					{ price: 9, shop: 'Latest' }
+				]
+			},
+			schema,
+			'list'
+		);
+		expect(items).toHaveLength(1);
+		expect(items[0].label).toBe('Table · Shop');
+		expect(items[0].text).toBe('Latest');
+	});
+
+	it('shows nothing for no rows or an empty cell in the last row', () => {
+		expect(summaryItems({ buys: [] }, schema, 'list')).toEqual([]);
+		expect(summaryItems({ buys: [{ shop: 'First' }, { price: 9 }] }, schema, 'list')).toEqual([]);
+	});
+
+	it('round-trips the column through the editor', () => {
+		const items = schemaToItems(schema) as EditorField[];
+		expect(items.find((f) => f.key === 'buys')?.highlightColumn).toBe('shop');
+		const written = itemsToSchema(items, readSchemaMeta(schema));
+		expect(readHighlights(written)).toEqual([{ key: 'buys', column: 'shop' }]);
 	});
 });

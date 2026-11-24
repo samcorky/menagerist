@@ -1,4 +1,5 @@
 import { descriptorForProp } from '$lib/field-types';
+import { orderedColumns } from '$lib/field-types/group/columns';
 import {
 	archivedKeys,
 	readHighlights,
@@ -26,8 +27,22 @@ export const SURFACE_LIMITS: Record<Surface, number> = {
 	connection: 2
 };
 
+function isTable(prop: JsonSchemaProperty): boolean {
+	return descriptorForProp(prop)?.kind === 'group';
+}
+
+/** The columns of a table whose latest value may be shown on a card, in column order. */
+export function highlightColumns(
+	prop: JsonSchemaProperty | undefined
+): [string, JsonSchemaProperty][] {
+	if (!prop || !isTable(prop)) return [];
+	return orderedColumns(prop).filter(([, column]) => descriptorForProp(column)?.highlightable);
+}
+
 export function isHighlightable(prop: JsonSchemaProperty | undefined): boolean {
-	return prop !== undefined && descriptorForProp(prop)?.highlightable === true;
+	if (prop === undefined) return false;
+	if (isTable(prop)) return highlightColumns(prop).length > 0;
+	return descriptorForProp(prop)?.highlightable === true;
 }
 
 /**
@@ -42,12 +57,18 @@ export function normaliseHighlights(
 	const archived = archivedKeys({ properties });
 	const seen = new Set<string>();
 	const result: HighlightEntry[] = [];
-	for (const { key } of list ?? []) {
+	for (const { key, column } of list ?? []) {
 		if (result.length >= max) break;
 		if (seen.has(key) || !Object.hasOwn(properties, key) || archived.has(key)) continue;
 		if (!isHighlightable(properties[key])) continue;
 		seen.add(key);
-		result.push({ key });
+		const columns = highlightColumns(properties[key]);
+		if (columns.length === 0) {
+			result.push({ key });
+			continue;
+		}
+		// A table shows one column; a missing or stale one falls back to the first usable column.
+		result.push({ key, column: columns.some(([k]) => k === column) ? column : columns[0][0] });
 	}
 	return result;
 }
@@ -62,6 +83,21 @@ export function highlightRanks(
 		normaliseHighlights(readHighlights(schema, list), schema.properties, maxHighlights(list)).map(
 			(e, i) => [e.key, i + 1]
 		)
+	);
+}
+
+/** The column each highlighted table shows, by the table's key. */
+export function highlightColumnChoices(
+	schema: AttributesSchema | null,
+	list: HighlightList = 'card'
+): Map<string, string> {
+	if (!schema) return new Map();
+	return new Map(
+		normaliseHighlights(
+			readHighlights(schema, list),
+			schema.properties,
+			maxHighlights(list)
+		).flatMap((e) => (e.column === undefined ? [] : [[e.key, e.column] as [string, string]]))
 	);
 }
 
@@ -144,14 +180,25 @@ export function summaryItems(
 		schema.properties,
 		maxHighlights(list)
 	);
-	for (const { key } of entries) {
+	for (const { key, column } of entries) {
 		if (items.length >= SURFACE_LIMITS[surface]) break;
-		const prop = schema.properties[key];
-		const value = attributes[key];
+		let prop = schema.properties[key];
+		let value = attributes[key];
+		let label = prop.title || key;
+		if (column !== undefined) {
+			// A table shows its latest (last) row's value in the chosen column.
+			const rows = Array.isArray(value) ? value : [];
+			const last = rows[rows.length - 1] as Record<string, unknown> | undefined;
+			const columnProp = highlightColumns(prop).find(([k]) => k === column)?.[1];
+			if (!last || !columnProp) continue;
+			label = `${label} · ${columnProp.title || column}`;
+			prop = columnProp;
+			value = last[column];
+		}
 		if (isEmpty(value, prop)) continue;
 		const text = descriptorForProp(prop)?.formatSummary?.(value, prop) ?? String(value);
 		if (text === '') continue;
-		items.push({ key, label: prop.title || key, prop, value, text });
+		items.push({ key, label, prop, value, text });
 	}
 	return items;
 }

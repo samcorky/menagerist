@@ -201,7 +201,9 @@ def _check_highlight_entry(
     name: str, entry: object, props: dict[str, Any], seen: set[str]
 ) -> None:
     where = f"{NAMESPACE}/highlights/{name}"
-    key = entry.get("key") if isinstance(entry, dict) else None
+    if not isinstance(entry, dict):
+        raise InvalidSchemaError(f"{where} entries need a string key")
+    key = entry.get("key")
     if not isinstance(key, str):
         raise InvalidSchemaError(f"{where} entries need a string key")
     if key in seen:
@@ -211,6 +213,38 @@ def _check_highlight_entry(
         raise InvalidSchemaError(f"{where} refers to unknown field {key!r}")
     if _meta(props[key]).get("archived") is True:
         raise InvalidSchemaError(f"{where} refers to archived field {key!r}")
+    _check_highlight_column(where, key, entry.get("column"), props[key])
+
+
+def _table_columns(prop: object) -> dict[str, Any] | None:
+    """The sub-properties of a table (an array of objects), else `None`.
+
+    A checklist is also an array of objects, but it carries its own `kind`.
+    """
+    if not isinstance(prop, dict) or _meta(prop).get("kind") not in (None, "group"):
+        return None
+    items = prop.get("items")
+    if not isinstance(items, dict) or items.get("type") != "object":
+        return None
+    columns = items.get("properties")
+    return columns if isinstance(columns, dict) else {}
+
+
+def _check_highlight_column(where: str, key: str, column: object, prop: object) -> None:
+    """A table is highlighted by one of its columns; no other field takes a column."""
+    columns = _table_columns(prop)
+    if columns is None:
+        if column is not None:
+            raise InvalidSchemaError(
+                f"{where} gives a column for {key!r}, which is not a table"
+            )
+        return
+    if not isinstance(column, str):
+        raise InvalidSchemaError(f"{where} needs a column for the table {key!r}")
+    if column not in columns:
+        raise InvalidSchemaError(
+            f"{where} refers to unknown column {column!r} of {key!r}"
+        )
 
 
 def _check_highlight_list(name: str, entries: object, properties: object) -> None:
@@ -230,7 +264,8 @@ def _check_highlight_list(name: str, entries: object, properties: object) -> Non
 def _check_highlights(root: object, properties: object) -> None:
     """Check `highlights.card` (max 3) and `highlights.connection` (max 2).
 
-    Each is a list of unique keys of existing, live properties. Other lists
+    Each is a list of unique keys of existing, live properties; a table's entry
+    also names one of its columns. Other lists
     are left alone.
     """
     highlights = root.get("highlights") if isinstance(root, dict) else None

@@ -31,6 +31,7 @@
 	import { usageLabel, purgeWarning } from '$lib/field-usage';
 	import { getDescriptor } from '$lib/field-types';
 	import { SCHEMA_TYPE_CONTEXT, type SchemaTypeContext } from '$lib/schema-type-context';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import { readSchemaMeta, type HighlightList } from '$lib/schema-meta';
 	import {
 		isSection,
@@ -138,8 +139,24 @@
 			.sort((a, b) => a.rank! - b.rank!)
 	);
 
+	/** The columns of a table that can show their latest value; keys still pending cannot be named. */
+	function columnChoices(field: EditorField) {
+		return field.subFields.filter(
+			(sub) => !sub.keyPending && sub.kind !== 'opaque' && getDescriptor(sub.kind)?.highlightable
+		);
+	}
+
 	function isHighlightableField(field: EditorField): boolean {
-		return field.kind !== 'opaque' && getDescriptor(field.kind)?.highlightable === true;
+		if (field.kind === 'opaque' || getDescriptor(field.kind)?.highlightable !== true) return false;
+		return field.kind !== 'group' || columnChoices(field).length > 0;
+	}
+
+	function setHighlightColumn(key: string, column: string) {
+		const set = (f: EditorField): EditorField =>
+			f.key === key ? { ...f, highlightColumn: column } : f;
+		items = items.map((item) =>
+			isSection(item) ? { ...item, fields: item.fields.map(set) } : set(item)
+		);
 	}
 
 	function applyRanks(next: (number | undefined)[]) {
@@ -619,6 +636,21 @@
 						<li class="flex items-center gap-1 text-sm">
 							<span class="w-4 text-xs text-muted-foreground">{position + 1}.</span>
 							<span class="min-w-0 flex-1 truncate">{label}</span>
+							{#if entry.field.kind === 'group'}
+								{@const columns = columnChoices(entry.field)}
+								<NativeSelect.Root
+									class="h-8 w-40"
+									aria-label="Column of {label} to show"
+									value={entry.field.highlightColumn ?? columns[0]?.key}
+									onchange={(e) => setHighlightColumn(entry.field.key, e.currentTarget.value)}
+								>
+									{#each columns as column (column.key)}
+										<NativeSelect.Option value={column.key}>
+											{column.label || column.key}
+										</NativeSelect.Option>
+									{/each}
+								</NativeSelect.Root>
+							{/if}
 							<Button
 								type="button"
 								variant="ghost"

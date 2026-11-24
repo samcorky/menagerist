@@ -217,6 +217,61 @@ def test_check_meta_shape_limits_connection_highlights_to_two() -> None:
             check_meta_shape(_with_highlights(bad))
 
 
+def _with_table(entry: object) -> dict[str, Any]:
+    return {
+        "properties": {
+            "a": {"type": "string"},
+            "buys": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"price": {"type": "number"}, "shop": {}},
+                },
+            },
+        },
+        "x-menagerist": {"highlights": {"card": [entry]}},
+    }
+
+
+def test_check_meta_shape_accepts_a_table_with_a_column() -> None:
+    """A highlighted table names one of its columns."""
+    check_meta_shape(_with_table({"key": "buys", "column": "price"}))
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"key": "buys"},
+        {"key": "buys", "column": 1},
+        {"key": "buys", "column": "missing"},
+        {"key": "a", "column": "price"},
+    ],
+)
+def test_check_meta_shape_rejects_bad_table_columns(entry: object) -> None:
+    """A table needs a real column, and a plain field takes none."""
+    with pytest.raises(InvalidSchemaError):
+        check_meta_shape(_with_table(entry))
+
+
+def test_check_meta_shape_leaves_a_checklist_without_a_column() -> None:
+    """A checklist is an array of objects but not a table, so it takes no column."""
+    schema = _with_table({"key": "steps"})
+    schema["properties"]["steps"] = {
+        "type": "array",
+        "items": {"type": "object", "properties": {"text": {}, "done": {}}},
+        "x-menagerist": {"kind": "checklist"},
+    }
+    check_meta_shape(schema)
+
+
+def test_check_meta_shape_rejects_a_table_without_columns() -> None:
+    """A table whose items have no properties has no column to name."""
+    schema = _with_table({"key": "buys", "column": "price"})
+    schema["properties"]["buys"]["items"] = {"type": "object"}
+    with pytest.raises(InvalidSchemaError):
+        check_meta_shape(schema)
+
+
 def test_check_schema_definition_accepts_a_well_shaped_schema() -> None:
     """A valid JSON Schema with a valid `x-menagerist` passes both checks."""
     check_schema_definition({"type": "object", "properties": {"a": {"type": "string"}}})
