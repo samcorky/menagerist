@@ -18,6 +18,9 @@ async function openTypeEditor(page: Page) {
 	await page.getByRole('button', { name: 'New item type', exact: true }).click();
 	const dialog = page.getByRole('dialog', { name: 'New item type' });
 	await expect(dialog).toBeVisible();
+	// The sheet slides in over 250 ms. Grabbing the bar mid-slide aims at where it was, not where
+	// it is, so the drag misses it on a slow runner.
+	await dialog.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 	return dialog;
 }
 

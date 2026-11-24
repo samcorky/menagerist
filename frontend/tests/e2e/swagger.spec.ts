@@ -278,10 +278,11 @@ test('locks follow the real session without changing requests', async ({ browser
 		name: `Lock check ${Date.now()}`
 	});
 	await expect(created).toHaveText(/201/);
-	// SvelteKit's own sessionStorage keys (from the app's sign-in page) are not ours.
+	// The app's own keys are not ours: SvelteKit's sessionStorage and the signed-in account's
+	// cached preferences, which the app writes once the sign-in lands.
 	const storage = await page.evaluate(() =>
 		[...Object.keys(localStorage), ...Object.keys(sessionStorage)].filter(
-			(key) => !key.startsWith('sveltekit:')
+			(key) => !key.startsWith('sveltekit:') && !key.startsWith('menagerist:preferences:')
 		)
 	);
 	expect(storage).toEqual([]);

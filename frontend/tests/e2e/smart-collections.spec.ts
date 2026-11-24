@@ -392,6 +392,9 @@ test('the item page shows the smart collections it matches, never offers them, a
 	await expect(picker.getByRole('button', { name: manual.name })).toBeVisible();
 	await expect(picker.getByRole('button', { name: smart.name })).toHaveCount(0);
 	await page.keyboard.press('Escape');
+	// Leave the item page only once the picker has closed: a late navigation from the page
+	// would otherwise cancel the goto below with ERR_ABORTED.
+	await expect(picker).toHaveCount(0);
 
 	// The search popup opens it by slug.
 	await page.goto('/');

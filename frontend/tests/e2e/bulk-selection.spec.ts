@@ -106,6 +106,8 @@ test('delete shows Undo, Undo keeps the items, and letting it lapse removes them
 	// Still selecting, so the rows are checkboxes rather than links.
 	await expect(page.getByRole('checkbox', { name: `Select ${prefix} 1` })).toBeVisible();
 	expect((await request.get(`/api/v1/nodes/${items[0].id}`)).status()).toBe(200);
+	// The first toast must be gone, or the second delete shows two with the same text.
+	await expect(page.getByText('3 items deleted')).toHaveCount(0);
 
 	await bar(page).getByRole('checkbox', { name: 'Select all' }).click();
 	await bar(page).getByRole('button', { name: 'Delete' }).click();
