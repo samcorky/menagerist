@@ -68,10 +68,12 @@ If `npm` in `frontend/` fails with `EBADENGINE` ("Not compatible with your versi
 Start the full stack (Docker required):
 
 ```sh
-poe db-up && poe migrate && poe serve  # Postgres in Docker + backend at :8000 + frontend at :5173
+poe db-up && poe migrate && poe serve  # Postgres in Docker + backend at :8000 + worker + frontend at :5173
 # or
 docker compose up  # full stack including Postgres, all containerized
 ```
+
+`poe serve` also starts the scheduler worker, which runs scheduled tasks and on-demand work such as a large import. `poe serve-backend` alone has no worker, so that work waits in its queue until you start one with `poe serve-worker`.
 
 The `media-data` named volume is initialised with the application's uid `1000`
 from the image. If you replace it with a bind mount, set ownership on the host

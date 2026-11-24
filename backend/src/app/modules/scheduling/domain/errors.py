@@ -25,3 +25,7 @@ class DuplicateJobError(ConflictError):
 
 class RunNowNotAllowedError(ConflictError):
     """The registered job cannot be requested manually."""
+
+
+class OnDemandNotAllowedError(ConflictError):
+    """The registered job cannot be queued for work someone started."""

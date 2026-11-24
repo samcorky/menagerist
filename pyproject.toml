@@ -542,8 +542,13 @@ help = "Editable install of the backend package (Windows-friendly alternative to
 script = "scripts.poe_run:npm('run', 'dev', '--', '--host', '0.0.0.0')"
 help = "Run the frontend dev server with hot reload"
 
+# No editable-install dep: under `serve` it would race serve-backend's own.
+[tool.poe.groups.run.tasks.serve-worker]
+cmd = "menagerist worker"
+help = "Run the scheduler worker, which runs scheduled tasks and on-demand work such as large imports"
+
 [tool.poe.groups.run.tasks.serve]
-parallel = ["serve-backend ${workers:+--workers ${workers}}", "serve-frontend"]
+parallel = ["serve-backend ${workers:+--workers ${workers}}", "serve-worker", "serve-frontend"]
 args = [
   { name = "workers", options = ["-w", "--workers", "--worker"], help = "Backend server worker processes: 1 to 16, or auto; defaults to the server setting" },
 ]
