@@ -11,7 +11,12 @@ import {
 	type HighlightList,
 	type SchemaMeta
 } from '$lib/schema-meta';
-import { highlightRanks, maxHighlights, normaliseHighlights } from '$lib/highlights';
+import {
+	highlightColumnChoices,
+	highlightRanks,
+	maxHighlights,
+	normaliseHighlights
+} from '$lib/highlights';
 
 export type EditorSection = {
 	_section: true;
@@ -34,10 +39,15 @@ export function schemaToItems(
 	const required = new Set(readSchemaMeta(schema).required ?? []);
 	const layout = normalise(readSchemaMeta(schema).layout, schema.properties);
 	const ranks = highlightRanks(schema, list);
+	const columns = highlightColumnChoices(schema, list);
 	const load = (key: string): EditorField => {
 		const field = fieldFromProperty(key, schema.properties[key], required.has(key));
 		const rank = ranks.get(key);
-		return rank === undefined ? field : { ...field, highlight: rank };
+		if (rank === undefined) return field;
+		const column = columns.get(key);
+		return column === undefined
+			? { ...field, highlight: rank }
+			: { ...field, highlight: rank, highlightColumn: column };
 	};
 	return layout.flatMap((layoutItem): EditorItem[] => {
 		if (isSectionItem(layoutItem)) {
@@ -120,7 +130,10 @@ export function itemsToSchema(
 	const card = visible
 		.filter((f) => f.highlight !== undefined)
 		.sort((a, b) => a.highlight! - b.highlight!)
-		.map((f) => ({ key: resolved.get(f)!.key }));
+		.map((f) => ({
+			key: resolved.get(f)!.key,
+			...(f.highlightColumn !== undefined && { column: f.highlightColumn })
+		}));
 	const withMeta = withSchemaMeta(base, {
 		...baseMeta,
 		version: META_VERSION,

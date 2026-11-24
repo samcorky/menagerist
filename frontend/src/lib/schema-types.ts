@@ -41,6 +41,8 @@ export type EditorField = {
 	originalKind?: string;
 	/** 1-based position among the fields shown on cards; unset when not highlighted. */
 	highlight?: number;
+	/** For a highlighted table: the column whose latest value shows. Unset means the first usable one. */
+	highlightColumn?: string;
 	/** Editor-only settings a descriptor maps to and from validation keywords (e.g. star count). */
 	config?: Record<string, unknown>;
 	/** Metadata members carried through unchanged (display, archived, unknown members). */

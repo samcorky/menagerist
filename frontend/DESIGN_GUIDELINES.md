@@ -77,7 +77,7 @@ Core destinations are **Collection**, **Search** and **Explore**. Keep “Add it
 
 Support grid/list views, search, filtering, sorting, infinite scrolling and responsive layouts. Default to a visual grid. Cards show enough to identify an item; avoid excessive metadata, badges, controls or decoration.
 
-An item type may choose up to **three highlighted fields**, excluding long text. Show at most **two on grid cards**, **three on list cards**; omit empty values. Cover and title retain priority. Highlights use single-line truncation (§7c).
+An item type may choose up to **three highlighted fields**, excluding long text. Show at most **two on grid cards**, **three on list cards**; omit empty values. A table field can be highlighted through one of its columns, which shows that column's value from the table's last row, labelled "Table · Column". Cover and title retain priority. Highlights use single-line truncation (§7c).
 
 ### 7a. Filtering
 
