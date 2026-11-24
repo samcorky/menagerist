@@ -240,6 +240,42 @@
 	html.dark {
 		color-scheme: dark;
 	}
+	/* Chromium and Safari draw a thin standard scrollbar with an arrow button at each end,
+	   which in a narrow scroll area such as the sidebar rail takes room and looks out of
+	   place. They ignore ::-webkit-scrollbar wherever scrollbar-width or scrollbar-color is
+	   set, so here those go back to auto and the bar is drawn with the pseudo-elements: a
+	   rounded thumb in the theme's colour, on no track, and no buttons. Firefox does not
+	   match this query and keeps the standard properties. The scrollbar-none and
+	   no-scrollbar utilities set scrollbar-width: none, which still hides the bar. */
+	@supports selector(::-webkit-scrollbar) {
+		* {
+			scrollbar-width: auto;
+		}
+		html {
+			scrollbar-color: auto;
+		}
+		::-webkit-scrollbar {
+			width: 10px;
+			height: 10px;
+		}
+		::-webkit-scrollbar-button {
+			display: none;
+		}
+		::-webkit-scrollbar-track,
+		::-webkit-scrollbar-corner {
+			background: transparent;
+		}
+		::-webkit-scrollbar-thumb {
+			background-color: var(--scrollbar-thumb);
+			/* The transparent border leaves a 6px thumb inside the 10px bar; the minimum keeps
+			   it big enough to grab in a long list. */
+			background-clip: padding-box;
+			border: 2px solid transparent;
+			border-radius: 9999px;
+			min-height: 32px;
+			min-width: 32px;
+		}
+	}
 	#main-scroll {
 		overscroll-behavior-y: contain;
 	}
