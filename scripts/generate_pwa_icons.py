@@ -1,4 +1,4 @@
-"""Render the install icons, shortcut icons and link-preview image in frontend/static.
+"""Render the install icons, shortcut icons and link-preview images.
 
     poe generate-pwa-icons
 
@@ -11,10 +11,17 @@ handles only those shapes, and fails if the SVG gains any other.
 The launcher shortcut icons are different: they are Lucide glyphs, drawn from the path
 data in `@lucide/svelte` and rasterised with resvg (`resvg-py`), since Pillow cannot
 draw SVG paths. So `poe sync` must have run, as it must for the share image's font.
+
+Two link-preview cards come out: frontend/static/app-share-image.png, which a hosted
+instance serves as its `og:image`, and .github/repo-share-image.png, the same lockup
+with the project description (from backend/pyproject.toml) for the repository. GitHub
+has no API for its social preview, so upload the repository's by hand under Settings
+-> Social preview when it changes.
 """
 
 import json
 import re
+import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -59,7 +66,7 @@ LUCIDE_ICONS = STATIC.parent / "node_modules" / "@lucide" / "svelte" / "dist" / 
 # centre-crops the image to a squarer thumbnail, so everything must sit inside the
 # middle SHARE_SAFE_WIDTH pixels. Sizes below are in em, so SHARE_FONT is the only
 # thing that scales it.
-SHARE_IMAGE = "share-image.png"
+APP_SHARE_IMAGE = "app-share-image.png"
 SHARE_SIZE = (1200, 630)
 SHARE_NAME = "Menagerist"
 SHARE_FONT = 104
@@ -69,6 +76,20 @@ SHARE_GAP_EM = 0.25
 SHARE_SAFE_WIDTH = 600
 SHARE_TRACKING_EM = -0.025
 SHARE_LOGO = STATIC / "logo.svg"
+
+# The repository's card, for Settings -> Social preview on GitHub (1280x640, under
+# 1 MB). It is the same lockup with the project description under the name. It lives
+# in .github, not frontend/static, so a hosted instance never serves it. GitHub has no
+# API for the setting, so the file is uploaded by hand when it changes.
+REPO_SHARE_IMAGE = STATIC.parent.parent / ".github" / "repo-share-image.png"
+REPO_SHARE_SIZE = (1280, 640)
+REPO_DESCRIPTION_FONT = 40
+REPO_DESCRIPTION_WEIGHT = 400
+REPO_DESCRIPTION_MAX_WIDTH = 900
+REPO_DESCRIPTION_GAP_EM = 1.0
+REPO_DESCRIPTION_LINE_EM = 1.35
+REPO_DESCRIPTION_INK = 0.8  # share of white in the text colour, the rest is the tile
+PYPROJECT = STATIC.parent.parent / "backend" / "pyproject.toml"
 # Inter is the app's body font, read from the variable font file the frontend
 # installs, so `poe sync` must have run.
 SHARE_FONT_FILE = (
@@ -150,10 +171,35 @@ def render_shortcut_icon(name: str, tile: str) -> bytes:
     return bytes(resvg_py.svg_to_bytes(svg_string=svg, width=size, height=size))
 
 
-def render_share_image(icon: ET.Element) -> Image.Image:
-    """Draw the link-preview card: the mark above the name, centred on the tile."""
+def read_description() -> str:
+    """The project description, written once in ``backend/pyproject.toml``."""
+    data = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    return str(data["project"]["description"])
+
+
+def wrap(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
+    """Break ``text`` into lines no wider than ``max_width``, on spaces."""
+    lines: list[str] = []
+    for word in text.split():
+        if lines and font.getlength(f"{lines[-1]} {word}") <= max_width:
+            lines[-1] = f"{lines[-1]} {word}"
+        else:
+            lines.append(word)
+    return lines
+
+
+def render_share_image(
+    icon: ET.Element,
+    size: tuple[int, int] = SHARE_SIZE,
+    description: str | None = None,
+) -> Image.Image:
+    """Draw a link-preview card: the mark above the name, centred on the tile.
+
+    With ``description``, it goes under the name, wrapped and centred, and the whole
+    block is centred. The name keeps to the Teams crop width either way.
+    """
     tile = next(shape for shape in icon if shape.tag.rpartition("}")[2] == "rect")
-    image = Image.new("RGB", SHARE_SIZE, tile.attrib["fill"])
+    image = Image.new("RGB", size, tile.attrib["fill"])
     font = ImageFont.truetype(str(SHARE_FONT_FILE), SHARE_FONT)
     font.set_variation_by_axes([SHARE_FONT_WEIGHT])
 
@@ -175,12 +221,24 @@ def render_share_image(icon: ET.Element) -> Image.Image:
     name_width = name_ink_right - name_ink_left
     assert name_width <= SHARE_SAFE_WIDTH, "the name must fit the Teams crop"
 
+    lines: list[str] = []
+    small = ImageFont.truetype(str(SHARE_FONT_FILE), REPO_DESCRIPTION_FONT)
+    small.set_variation_by_axes([REPO_DESCRIPTION_WEIGHT])
+    line_height = round(REPO_DESCRIPTION_FONT * REPO_DESCRIPTION_LINE_EM)
+    below = 0
+    if description:
+        lines = wrap(description, small, REPO_DESCRIPTION_MAX_WIDTH)
+        below = round(
+            REPO_DESCRIPTION_FONT * REPO_DESCRIPTION_GAP_EM
+        ) + line_height * len(lines)
+
     # The name's drawn height is its capitals (no descender in the name), so stack
-    # the mark's drawn height, the gap and the cap height, and centre that block.
-    width, height = SHARE_SIZE
+    # the mark's drawn height, the gap and the cap height (and the description under
+    # them), and centre that block.
+    width, height = size
     cap_top = font.getbbox("M", anchor="ls")[1]  # negative: above the baseline
     cap_height = -cap_top
-    block = mark_ink_height + gap + cap_height
+    block = mark_ink_height + gap + cap_height + below
     top = round((height - block) / 2)
     mark_x = round((width - box) / 2)
     image.paste(mark, (mark_x, top - ink_box[1]), mark)
@@ -191,17 +249,30 @@ def render_share_image(icon: ET.Element) -> Image.Image:
         draw.text(
             (text_x + start, baseline), letter, font=font, fill="#FFFFFF", anchor="ls"
         )
+    if lines:
+        ink = tuple(
+            round(255 * REPO_DESCRIPTION_INK + c * (1 - REPO_DESCRIPTION_INK))
+            for c in ImageColor.getrgb(tile.attrib["fill"])
+        )
+        y = baseline + round(REPO_DESCRIPTION_FONT * REPO_DESCRIPTION_GAP_EM)
+        for line in lines:
+            y += line_height
+            draw.text((width / 2, y), line, font=small, fill=ink, anchor="ms")
     return image
 
 
 def main() -> None:
-    """Write every icon and the share image."""
+    """Write every icon, the app's share image and the repository's."""
     svg = ET.parse(SVG).getroot()
     for name, size, rounded in ICONS:
         render(svg, size, rounded=rounded).save(STATIC / name)
         print(f"{name} {size}x{size}")
-    render_share_image(svg).save(STATIC / SHARE_IMAGE, optimize=True)
-    print(f"{SHARE_IMAGE} {SHARE_SIZE[0]}x{SHARE_SIZE[1]}")
+    render_share_image(svg).save(STATIC / APP_SHARE_IMAGE, optimize=True)
+    print(f"{APP_SHARE_IMAGE} {SHARE_SIZE[0]}x{SHARE_SIZE[1]}")
+    render_share_image(svg, REPO_SHARE_SIZE, read_description()).save(
+        REPO_SHARE_IMAGE, optimize=True
+    )
+    print(f"{REPO_SHARE_IMAGE.name} {REPO_SHARE_SIZE[0]}x{REPO_SHARE_SIZE[1]}")
     tile = next(s for s in svg if s.tag.rpartition("}")[2] == "rect").attrib["fill"]
     for name, glyph in SHORTCUT_ICONS:
         (STATIC / name).write_bytes(render_shortcut_icon(glyph, tile))

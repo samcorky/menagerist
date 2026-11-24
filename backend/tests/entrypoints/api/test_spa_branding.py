@@ -31,7 +31,7 @@ SHELL = """<!doctype html>
 		<meta property="og:type" content="website" />
 		<meta
 			property="og:image"
-			content="/share-image.png"
+			content="/app-share-image.png"
 			data-branding="versioned-url" />
 		<meta property="og:image:alt" content="The Menagerist mark beside its name." />
 		<meta name="apple-mobile-web-app-title" content="Menagerist" />
@@ -91,7 +91,7 @@ def test_without_a_public_origin_urls_stay_relative() -> None:
     """The image keeps its relative path and the page's own address is left out."""
     html = render(path="/items/1")
 
-    assert '<meta property="og:image" content="/share-image.png" />' in html
+    assert '<meta property="og:image" content="/app-share-image.png" />' in html
     assert "og:url" not in html
 
 
@@ -99,7 +99,7 @@ def test_with_a_public_origin_urls_are_absolute() -> None:
     """Link previews that need a full address (WhatsApp, Facebook, X) get one."""
     html = render(origin="https://hoard.example.com/", path="/items/1")
 
-    image = "https://hoard.example.com/share-image.png"
+    image = "https://hoard.example.com/app-share-image.png"
     assert f'<meta property="og:image" content="{image}" />' in html
     page = "https://hoard.example.com/items/1"
     assert f'<meta property="og:url" content="{page}" />' in html
@@ -109,7 +109,7 @@ def test_the_image_address_carries_the_build_version() -> None:
     """A crawler that caches the image by address fetches it again per release."""
     html = render(origin="https://hoard.example.com", version="0.2026.11.5")
 
-    image = "https://hoard.example.com/share-image.png?v=0.2026.11.5"
+    image = "https://hoard.example.com/app-share-image.png?v=0.2026.11.5"
     assert f'<meta property="og:image" content="{image}" />' in html
 
 
@@ -117,7 +117,7 @@ def test_the_version_in_the_image_address_is_escaped() -> None:
     """A version with a plus or a space cannot break the address."""
     html = render(version="1.0+build 7")
 
-    assert 'content="/share-image.png?v=1.0%2Bbuild%207"' in html
+    assert 'content="/app-share-image.png?v=1.0%2Bbuild%207"' in html
 
 
 def test_an_unknown_marker_fails_loudly() -> None:
@@ -133,7 +133,7 @@ def test_the_real_app_html_marks_every_preview_tag() -> None:
     html = template.render(HOARD, origin="https://hoard.example.com", path="/items/1")
 
     assert template.fields == {"name", "description", "versioned-url", "page-url"}
-    image = "https://hoard.example.com/share-image.png"
+    image = "https://hoard.example.com/app-share-image.png"
     for tag in (
         '<meta property="og:site_name" content="The Hoard" />',
         '<meta property="og:title" content="The Hoard" />',
@@ -184,7 +184,7 @@ def test_the_served_shell_names_the_image_by_build_version(dist: Path) -> None:
     """The version the server was started with reaches the served page's image tag."""
     response = _client(dist, HOARD, version="0.2026.11.5").get("/items/1")
 
-    assert 'content="/share-image.png?v=0.2026.11.5"' in response.text
+    assert 'content="/app-share-image.png?v=0.2026.11.5"' in response.text
 
 
 def test_the_build_s_compressed_shell_is_not_served_stale(dist: Path) -> None:
