@@ -1,20 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { deleteNodes, toastSuccess } = vi.hoisted(() => ({
+const { deleteNodes, toastSuccess, toastDismiss } = vi.hoisted(() => ({
 	deleteNodes: vi.fn(),
-	toastSuccess: vi.fn()
+	toastSuccess: vi.fn(),
+	toastDismiss: vi.fn()
 }));
 vi.mock('$lib/api/client', () => ({ deleteNodes }));
-vi.mock('svelte-sonner', () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
+vi.mock('svelte-sonner', () => ({
+	toast: { success: toastSuccess, error: vi.fn(), dismiss: toastDismiss }
+}));
 
 import { PendingDeletes } from '../src/lib/pending-deletes.svelte';
 
-const hooks = () => ({ onsent: vi.fn().mockResolvedValue(undefined), onmissing: vi.fn() });
+const hooks = () => ({
+	onsent: vi.fn().mockResolvedValue(undefined),
+	onmissing: vi.fn(),
+	onrestore: vi.fn()
+});
 
 beforeEach(() => {
 	vi.useFakeTimers();
 	deleteNodes.mockReset().mockResolvedValue({ data: undefined, error: undefined });
-	toastSuccess.mockReset();
+	toastSuccess.mockReset().mockReturnValue('toast-1');
+	toastDismiss.mockReset();
 });
 afterEach(() => vi.useRealTimers());
 
@@ -32,11 +40,20 @@ describe('PendingDeletes', () => {
 
 	it('Undo sends nothing and shows the items again', async () => {
 		const pending = new PendingDeletes();
-		pending.start(['a'], hooks());
+		const h = hooks();
+		pending.start(['a'], h);
 		toastSuccess.mock.calls[0][1].action.onClick();
 		await vi.advanceTimersByTimeAsync(10_000);
 		expect(deleteNodes).not.toHaveBeenCalled();
 		expect(pending.hidden.has('a')).toBe(false);
+		expect(h.onrestore).toHaveBeenCalledTimes(1);
+	});
+
+	it('closes the Undo toast when leaving the page sends the delete', async () => {
+		const pending = new PendingDeletes();
+		pending.start(['a'], hooks());
+		await pending.flushAll();
+		expect(toastDismiss).toHaveBeenCalledWith('toast-1');
 	});
 
 	it('leaving the page sends a pending delete once', async () => {
@@ -62,6 +79,7 @@ describe('PendingDeletes', () => {
 		await pending.flushAll();
 		expect(h.onmissing).toHaveBeenCalledWith([gone]);
 		expect(h.onsent).not.toHaveBeenCalled();
+		expect(h.onrestore).toHaveBeenCalledTimes(1);
 		expect(pending.hidden.size).toBe(0);
 	});
 });

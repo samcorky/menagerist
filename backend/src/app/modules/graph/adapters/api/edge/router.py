@@ -91,7 +91,8 @@ async def create_edges(
     """Connect one source to several targets at once, skipping existing connections.
 
     With `reverse`, each target connects to the source instead, so many items can
-    be connected to one. The source appearing among the targets is a 400.
+    be connected to one. Either way, the source appearing among the targets is a
+    400: an item cannot be connected to itself.
     """
     result = await use_case.handle(payload.to_command(), actor)
     return CreateEdgesResponse(

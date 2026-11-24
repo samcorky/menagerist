@@ -1,5 +1,5 @@
 import { toast } from 'svelte-sonner';
-import { SvelteSet } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { deleteNodes } from '$lib/api/client';
 import { errorMessage, networkAwareError } from '$lib/api/errors';
 import { itemCount, unknownItemIds } from '$lib/bulk-actions';
@@ -12,7 +12,8 @@ import { deferDelete, UNDO_WINDOW_MS, type DeferredDelete } from '$lib/deferred-
 export class PendingDeletes {
 	/** Items to leave out of the list while their delete is pending. */
 	readonly hidden = new SvelteSet<string>();
-	readonly #pending = new SvelteSet<DeferredDelete>();
+	/** Each pending delete with the id of the toast that offers its Undo. */
+	readonly #pending = new SvelteMap<DeferredDelete, string | number>();
 
 	start(
 		ids: string[],
@@ -21,6 +22,8 @@ export class PendingDeletes {
 			onsent: () => Promise<void> | void;
 			/** The server named items that no longer exist. */
 			onmissing: (ids: string[]) => void;
+			/** The delete did not happen (Undo, or the server refused): pick the items again. */
+			onrestore: () => void;
 		}
 	): void {
 		for (const id of ids) this.hidden.add(id);
@@ -32,6 +35,7 @@ export class PendingDeletes {
 			const result = await deleteNodes({ body: { ids } });
 			if (result.error) {
 				show();
+				hooks.onrestore();
 				if (!result.response) {
 					const { title, description } = networkAwareError(result);
 					toast.error(title, { description });
@@ -46,23 +50,30 @@ export class PendingDeletes {
 			await hooks.onsent();
 			show();
 		});
-		this.#pending.add(pending);
 		void pending.settled.finally(() => this.#pending.delete(pending));
 
-		toast.success(`${itemCount(ids.length)} deleted`, {
+		const toastId = toast.success(`${itemCount(ids.length)} deleted`, {
 			duration: UNDO_WINDOW_MS,
 			action: {
 				label: 'Undo',
 				onClick: () => {
 					pending.undo();
 					show();
+					hooks.onrestore();
 				}
 			}
 		});
+		this.#pending.set(pending, toastId);
 	}
 
 	/** Send every pending delete now, as leaving the page does (§14: navigation commits at once). */
 	async flushAll(): Promise<void> {
-		await Promise.all([...this.#pending].map((p) => p.flush().catch(() => {})));
+		await Promise.all(
+			[...this.#pending].map(([pending, toastId]) => {
+				// Undo is over once the request is sent, so the toast must not still offer it.
+				toast.dismiss(toastId);
+				return pending.flush().catch(() => {});
+			})
+		);
 	}
 }

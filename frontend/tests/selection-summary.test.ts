@@ -7,7 +7,7 @@ describe('selectionSummary', () => {
 	});
 
 	it('says how many selected items the current view hides', () => {
-		expect(selectionSummary(3, 2, 200)).toBe('3 selected, 2 not shown by this search');
+		expect(selectionSummary(3, 2, 200)).toBe('3 selected, 2 not in view');
 	});
 
 	it('names the limit when it is reached', () => {

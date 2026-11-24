@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { itemCount, parseTagInput, unknownItemIds } from '../src/lib/bulk-actions';
+import { itemCount, leavesPage, parseTagInput, unknownItemIds } from '../src/lib/bulk-actions';
 
 describe('unknownItemIds', () => {
 	it('reads the ids out of the server message', () => {
@@ -25,5 +25,21 @@ describe('parseTagInput', () => {
 	it('splits on commas and drops blanks and repeats', () => {
 		expect(parseTagInput(' sci-fi, horror,, sci-fi ,')).toEqual(['sci-fi', 'horror']);
 		expect(parseTagInput('')).toEqual([]);
+	});
+});
+
+describe('leavesPage', () => {
+	const at = (path: string) => ({ url: new URL(`http://x${path}`) });
+
+	it('is false for a search or filter change on the same page', () => {
+		expect(leavesPage({ from: at('/items'), to: at('/items?q=a'), willUnload: false })).toBe(false);
+	});
+
+	it('is true for another page, another collection, or closing the tab', () => {
+		expect(leavesPage({ from: at('/items'), to: at('/home'), willUnload: false })).toBe(true);
+		expect(
+			leavesPage({ from: at('/collections/a'), to: at('/collections/b'), willUnload: false })
+		).toBe(true);
+		expect(leavesPage({ from: at('/items'), to: null, willUnload: true })).toBe(true);
 	});
 });

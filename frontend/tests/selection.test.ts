@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SELECTION_LIMIT, Selection } from '../src/lib/selection.svelte';
 
 const ids = (n: number, from = 0) => Array.from({ length: n }, (_, i) => `id-${from + i}`);
@@ -58,5 +58,33 @@ describe('Selection', () => {
 		s.clear();
 		expect(s.count).toBe(0);
 		expect(s.active).toBe(true);
+	});
+
+	it('says so when a pick is refused at the limit', () => {
+		const onlimit = vi.fn();
+		const s = new Selection({ onlimit });
+		s.selectAll(ids(SELECTION_LIMIT));
+		expect(onlimit).not.toHaveBeenCalled();
+		s.toggle('one-more');
+		expect(onlimit).toHaveBeenCalledTimes(1);
+		s.selectAll(['another']);
+		expect(onlimit).toHaveBeenCalledTimes(2);
+	});
+
+	it('says so once when Select all only fits some of the rows', () => {
+		const onlimit = vi.fn();
+		const s = new Selection({ onlimit });
+		s.selectAll(ids(SELECTION_LIMIT - 1));
+		s.selectAll(['x', 'y', 'z']);
+		expect(s.count).toBe(SELECTION_LIMIT);
+		expect(onlimit).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not complain when Select all adds nothing new', () => {
+		const onlimit = vi.fn();
+		const s = new Selection({ onlimit });
+		s.selectAll(ids(SELECTION_LIMIT));
+		s.selectAll(ids(5));
+		expect(onlimit).not.toHaveBeenCalled();
 	});
 });
