@@ -1,4 +1,5 @@
 import type { AttributeRow } from '$lib/attribute-rows';
+import type { RememberedConnection } from '$lib/capture-connection';
 import type { AttributesSchema } from '$lib/schema-types';
 
 export type StagedPhoto = {
@@ -19,6 +20,8 @@ class CaptureController {
 	open = $state(false);
 	nodeCreationCount = $state(0);
 	pendingHandoff = $state<PendingCapture | null>(null);
+	/** The last connection made while capturing, offered again until the page is reloaded. */
+	lastConnection = $state<RememberedConnection | null>(null);
 
 	show() {
 		this.open = true;

@@ -5,8 +5,20 @@
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
-	import { createNode, stageMedia, attachMedia, type NodeTypeResponse } from '$lib/api/client';
-	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
+	import {
+		createEdges,
+		createNode,
+		listEdgeTypes,
+		listNodes,
+		stageMedia,
+		attachMedia,
+		type EdgeTypeResponse,
+		type NodeTypeResponse
+	} from '$lib/api/client';
+	import { errorMessage, networkAwareError, uploadErrorMessage } from '$lib/api/errors';
+	import { connectionBody, connectionChoices } from '$lib/capture-connection';
+	import * as Combobox from '$lib/components/ui/combobox/index.js';
+	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import BarcodeScanner from '$lib/components/barcode-scanner.svelte';
 	import {
@@ -38,6 +50,51 @@
 	let code = $state<string | null>(null);
 	let types = $state<NodeTypeResponse[]>([]);
 	let rows = $state<AttributeRow[]>([]);
+	let edgeTypes = $state<EdgeTypeResponse[]>([]);
+	let connectionKey = $state('');
+	let connectTo = $state<{ id: string; name: string } | null>(null);
+	let found = $state<{ id: string; name: string }[]>([]);
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+	let searchSeq = 0;
+
+	const choices = $derived(connectionChoices(edgeTypes));
+	const choice = $derived(choices.find((c) => c.key === connectionKey) ?? null);
+	const targetItems = $derived.by((): ComboboxItem[] => {
+		const out: ComboboxItem[] = connectTo ? [{ value: connectTo.id, label: connectTo.name }] : [];
+		for (const item of found)
+			if (item.id !== connectTo?.id) out.push({ value: item.id, label: item.name });
+		return out;
+	});
+
+	// Connection types are read when the sheet opens, and the last connection made is offered again.
+	$effect(() => {
+		if (!captureController.open) return;
+		void listEdgeTypes({ query: { limit: 100 } }).then((r) => {
+			edgeTypes = r.data ?? [];
+			const last = captureController.lastConnection;
+			if (last && connectionChoices(edgeTypes).some((c) => c.key === last.key)) {
+				connectionKey = last.key;
+				connectTo = last.target;
+			}
+		});
+	});
+
+	function searchTargets(text: string) {
+		clearTimeout(searchTimer);
+		const mine = ++searchSeq;
+		searchTimer = setTimeout(
+			async () => {
+				const r = await listNodes({ query: { limit: 20, q: text || undefined } });
+				if (mine === searchSeq && r.data) found = r.data.map((n) => ({ id: n.id, name: n.name }));
+			},
+			text ? 250 : 0
+		);
+	}
+
+	function pickTarget(id: string) {
+		const item = [...found, ...(connectTo ? [connectTo] : [])].find((n) => n.id === id);
+		if (item) connectTo = item;
+	}
 
 	// Types are read once a type is chosen or a code is scanned, to offer the type's fields.
 	$effect(() => {
@@ -153,6 +210,20 @@
 				body: { target_type: 'node', target_id: result.data.id, attribute_key: 'cover' }
 			});
 		}
+		if (choice && connectTo) {
+			// The item is already saved; a failed connection leaves it there and says so.
+			const linked = await createEdges({
+				body: connectionBody(choice, result.data.id, connectTo.id)
+			});
+			if (linked.error || !linked.data) {
+				const { title, description } = linked.response
+					? { title: "Saved, but couldn't connect it", description: errorMessage(linked.error) }
+					: networkAwareError(linked);
+				toast.error(title, { description });
+			} else {
+				captureController.lastConnection = { key: choice.key, target: connectTo };
+			}
+		}
 		captureController.notifyNodeCreated();
 		saving = false;
 		close();
@@ -185,6 +256,9 @@
 		stagedAsset = null;
 		code = null;
 		rows = [];
+		connectionKey = '';
+		connectTo = null;
+		found = [];
 	}
 </script>
 
@@ -247,6 +321,31 @@
 
 			{#if captureKeys.length > 0}
 				<AttributesEditor bind:rows schema={typeSchema} only={captureKeys} />
+			{/if}
+
+			<!-- Connect to -->
+			{#if choices.length > 0}
+				<div class="space-y-1.5">
+					<Label for="capture-connection" class="text-xs text-muted-foreground">Connect to</Label>
+					<NativeSelect id="capture-connection" bind:value={connectionKey}>
+						<NativeSelectOption value="">Nothing</NativeSelectOption>
+						{#each choices as option (option.key)}
+							<NativeSelectOption value={option.key}>{option.label}…</NativeSelectOption>
+						{/each}
+					</NativeSelect>
+					{#if choice}
+						<Combobox.Root
+							aria-label="{choice.label} which item"
+							items={targetItems}
+							value={connectTo?.id ?? ''}
+							placeholder="Choose an item"
+							searchPlaceholder="Search items…"
+							emptyText="No matching items"
+							onsearch={searchTargets}
+							onValueChange={pickTarget}
+						/>
+					{/if}
+				</div>
 			{/if}
 
 			<!-- Barcode -->
