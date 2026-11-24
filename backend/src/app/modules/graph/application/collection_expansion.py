@@ -72,9 +72,18 @@ class _Expander:
             if isinstance(child, Group):
                 children.append(await self.group(child, child_path, trail))
             elif isinstance(child, CollectionCondition):
+                ids = child.ids
+                if not ids and self.definitions is not None:
+                    # No ids names every collection of the caller's, except the ones
+                    # this search is part of: it cannot be a member of itself.
+                    ids = tuple(
+                        cid
+                        for cid in await self.definitions.list_ids(self.scope)
+                        if cid != self.self_id and cid not in trail
+                    )
                 targets = [
                     await self.target(cid, f"{child_path}.in[{n}]", trail)
-                    for n, cid in enumerate(child.ids)
+                    for n, cid in enumerate(ids)
                 ]
                 children.append(replace(child, targets=tuple(targets)))
             elif isinstance(child, ConnectionCondition) and child.where is not None:

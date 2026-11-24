@@ -260,8 +260,55 @@ export const MEDIA_TYPES = [
 
 export const COLLECTION_MODES = [
 	{ value: 'any', label: 'is in any of' },
-	{ value: 'none', label: 'is in none of' }
+	{ value: 'none', label: 'is in none of' },
+	{ value: 'anywhere', label: 'is in a collection' },
+	{ value: 'nowhere', label: 'is in no collection' }
 ] as const;
+
+export const TYPE_MODES = [
+	{ value: 'any', label: 'is one of' },
+	{ value: 'none', label: 'is not one of' },
+	{ value: 'typed', label: 'has an item type' },
+	{ value: 'untyped', label: 'has no item type' }
+] as const;
+
+/** Whether a type or collection condition names no list, so means every type or collection. */
+export function namesEvery(c: Condition): boolean {
+	return (c.kind === 'type' || c.kind === 'collection') && c.in === undefined;
+}
+
+/** The operator select's value for a collection row: its mode, or `anywhere` / `nowhere`. */
+export function collectionOperator(c: Extract<Condition, { kind: 'collection' }>): string {
+	if (c.in !== undefined) return c.mode;
+	return c.mode === 'none' ? 'nowhere' : 'anywhere';
+}
+
+/** A collection row after choosing one of `COLLECTION_MODES`; a list is kept when there is one. */
+export function withCollectionOperator(c: Condition, operator: string): Condition {
+	if (c.kind !== 'collection') return c;
+	if (operator === 'anywhere' || operator === 'nowhere') {
+		return { kind: 'collection', mode: operator === 'nowhere' ? 'none' : 'any' };
+	}
+	return { kind: 'collection', mode: operator === 'none' ? 'none' : 'any', in: c.in ?? [] };
+}
+
+/** The operator select's value for a type row. */
+export function typeOperator(c: Extract<Condition, { kind: 'type' }>): string {
+	const none = c.mode === 'none';
+	if (c.in !== undefined) return none ? 'none' : 'any';
+	return none ? 'untyped' : 'typed';
+}
+
+/** A type row after choosing one of `TYPE_MODES`; a list is kept when there is one. */
+export function withTypeOperator(c: Condition, operator: string): Condition {
+	if (c.kind !== 'type') return c;
+	if (operator === 'typed') return { kind: 'type' };
+	if (operator === 'untyped') return { kind: 'type', mode: 'none' };
+	const list = c.in ?? [];
+	return operator === 'none'
+		? { kind: 'type', mode: 'none', in: list }
+		: { kind: 'type', in: list };
+}
 
 export function withMediaMode(c: Condition, mode: 'has' | 'none'): Condition {
 	return c.kind === 'media' ? { ...c, mode } : c;
@@ -625,6 +672,7 @@ export function conditionProblem(c: Condition, catalogue: Catalogue): string | n
 			case 'connection':
 				return c.mode === 'to' && !c.item ? 'Choose an item.' : null;
 			case 'collection': {
+				if (c.in === undefined) return null;
 				const count = Array.isArray(c.in) ? c.in.length : 0;
 				if (count === 0) return 'Choose at least one collection.';
 				return count > MAX_COLLECTION_IDS
@@ -632,6 +680,7 @@ export function conditionProblem(c: Condition, catalogue: Catalogue): string | n
 					: null;
 			}
 			case 'type':
+				if (c.in === undefined) return null;
 				return Array.isArray(c.in) && c.in.length > 0 ? null : 'Choose at least one type.';
 			case 'tag':
 				return Array.isArray(c.tags) && c.tags.length > 0 ? null : 'Add at least one tag.';

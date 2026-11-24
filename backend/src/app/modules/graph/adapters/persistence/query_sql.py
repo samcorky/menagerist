@@ -429,7 +429,7 @@ def _collection(
     """
     live = [t for t in condition.targets if not isinstance(t, StaleTarget)]
     if not live:
-        return false()
+        return true() if condition.without_targets() else false()
     parts: list[_Bool] = []
     manual = [t.id for t in live if isinstance(t, ManualTarget)]
     if manual and env.external is not None:
@@ -550,10 +550,27 @@ def _connection(
     return or_(*found)
 
 
+def _type(condition: TypeCondition) -> _Bool:
+    """Any of the types (any type at all with none named), or none of them.
+
+    An untyped item is in none of the types, so `none` with some named matches it.
+    """
+    has_type = NodeModel.type.is_not(None)
+    if condition.mode == "any":
+        return _never_null(
+            NodeModel.type.in_(condition.slugs) if condition.slugs else has_type
+        )
+    if not condition.slugs:
+        return _never_null(NodeModel.type.is_(None))
+    return _never_null(
+        or_(NodeModel.type.is_(None), NodeModel.type.not_in(condition.slugs))
+    )
+
+
 def _item_condition(condition: Condition, ctx: ResolvedQuery, env: QueryEnv) -> _Bool:
     """Type, favourite, and the conditions that need other modules' data."""
     if isinstance(condition, TypeCondition):
-        return _never_null(NodeModel.type.in_(condition.slugs))
+        return _type(condition)
     if isinstance(condition, FavouriteCondition):
         return favourite_clause(env.scope.user_id, condition.value)
     if isinstance(condition, MediaCondition):

@@ -16,6 +16,12 @@
 		operatorLabel,
 		ARCHIVED_FIELD_MESSAGE,
 		COLLECTION_MODES,
+		collectionOperator,
+		namesEvery,
+		TYPE_MODES,
+		typeOperator,
+		withCollectionOperator,
+		withTypeOperator,
 		CONNECTION_MODES,
 		withConnectionMode,
 		fieldStatus,
@@ -27,7 +33,6 @@
 		strayValueText,
 		subjectOf,
 		TAG_MODES,
-		withCollectionMode,
 		withMediaMode,
 		withOperator,
 		withSubject,
@@ -116,7 +121,7 @@
 	const goneCollection = $derived(
 		condition.kind === 'collection' &&
 			view.collections !== null &&
-			condition.in.some((id) => !view.collections?.some((c) => c.id === id))
+			(condition.in ?? []).some((id) => !view.collections?.some((c) => c.id === id))
 	);
 	// A relationship that is not among the loaded ones: known as soon as they are in.
 	const goneRelationship = $derived(
@@ -157,6 +162,7 @@
 		if (condition.kind === 'tag') return TAG_MODES.map((m) => ({ ...m }));
 		if (condition.kind === 'media') return MEDIA_MODES.map((m) => ({ ...m }));
 		if (condition.kind === 'collection') return COLLECTION_MODES.map((m) => ({ ...m }));
+		if (condition.kind === 'type') return TYPE_MODES.map((m) => ({ ...m }));
 		if (condition.kind === 'connection') return CONNECTION_MODES.map((m) => ({ ...m }));
 		if (condition.kind === 'description' || condition.kind === 'name') {
 			return operatorsForCondition(condition.kind).map((op) => ({
@@ -179,23 +185,18 @@
 		return [{ value: condition.op, label: unsuitable }, ...options];
 	});
 	const operatorValue = $derived(
-		condition.kind === 'tag' ||
-			condition.kind === 'media' ||
-			condition.kind === 'collection' ||
-			condition.kind === 'connection'
-			? condition.mode
-			: 'op' in condition
-				? condition.op
-				: ''
+		condition.kind === 'collection'
+			? collectionOperator(condition)
+			: condition.kind === 'type'
+				? typeOperator(condition)
+				: condition.kind === 'tag' || condition.kind === 'media' || condition.kind === 'connection'
+					? condition.mode
+					: 'op' in condition
+						? condition.op
+						: ''
 	);
 	const fixedOperator = $derived(
-		condition.kind === 'text'
-			? 'contains'
-			: condition.kind === 'type'
-				? 'is one of'
-				: condition.kind === 'favourite'
-					? 'is'
-					: null
+		condition.kind === 'text' ? 'contains' : condition.kind === 'favourite' ? 'is' : null
 	);
 
 	function onSubject(value: string) {
@@ -209,7 +210,9 @@
 		} else if (condition.kind === 'media') {
 			view.update(path, withMediaMode(condition, value === 'none' ? 'none' : 'has'));
 		} else if (condition.kind === 'collection') {
-			view.update(path, withCollectionMode(condition, value === 'none' ? 'none' : 'any'));
+			view.update(path, withCollectionOperator(condition, value));
+		} else if (condition.kind === 'type') {
+			view.update(path, withTypeOperator(condition, value));
 		} else if (condition.kind === 'connection') {
 			view.update(
 				path,
@@ -268,7 +271,7 @@
 
 	{#if status === 'loading'}
 		<p class="mt-2 text-sm text-muted-foreground sm:pl-8">Loading fields…</p>
-	{:else if !isBlank(condition)}
+	{:else if !isBlank(condition) && !namesEvery(condition)}
 		<div class="mt-2 sm:pl-8">
 			{#if condition.kind === 'connection'}
 				<QueryConnectionInput

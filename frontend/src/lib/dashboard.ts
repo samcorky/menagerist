@@ -1,9 +1,6 @@
 import { pickEmptyLine } from '$lib/empty-lines';
 import { withFilter } from '$lib/query/items-page';
-import type { Condition, Group, Node, Query } from '$lib/query/types';
-
-/** The query language lists at most this many ids in one condition (backend graph/domain/query.py). */
-export const TIDY_LIST_LIMIT = 50;
+import type { Group, Node, Query } from '$lib/query/types';
 
 const all = (...children: Node[]): Group => ({ op: 'and', children });
 const where = (...children: Node[]): Query => ({ v: 1, where: all(...children), sort: [] });
@@ -34,38 +31,22 @@ export const photoQuery = (): Query => where({ kind: 'media', mode: 'has' });
 export const noPhotoQuery = (): Query => where({ kind: 'media', mode: 'none' });
 export const noDescriptionQuery = (): Query => where({ kind: 'description', op: 'empty' });
 
-const fits = (list: string[]) => list.length > 0 && list.length <= TIDY_LIST_LIMIT;
+/** Items in no collection of the person's own, however many collections there are. */
+export const notInCollectionQuery = (): Query => where({ kind: 'collection', mode: 'none' });
 
-/**
- * Items on none of the collections. The language names collections by id, so this is only
- * askable while they all fit in one condition; otherwise null and the row is left out.
- */
-export function notInCollectionQuery(collectionIds: string[]): Query | null {
-	if (!fits(collectionIds)) return null;
-	return where({ kind: 'collection', mode: 'none', in: collectionIds } satisfies Condition);
-}
-
-/** Items whose type is none of the item types (no type at all); null as above. */
-export function noTypeQuery(typeSlugs: string[]): Query | null {
-	if (!fits(typeSlugs)) return null;
-	return where({ op: 'not', children: [{ kind: 'type', in: typeSlugs }] });
-}
+/** Items with no item type at all. */
+export const noTypeQuery = (): Query => where({ kind: 'type', mode: 'none' });
 
 export type TidyRow = { id: string; label: string; query: Query };
 
-/** The tidy-up rows that can be counted accurately for this library. */
-export function tidyRows(args: { collectionIds: string[]; typeSlugs: string[] }): TidyRow[] {
-	const rows: (TidyRow | null)[] = [
+/** The tidy-up rows, each one counted by a single condition that needs no list. */
+export function tidyRows(): TidyRow[] {
+	return [
 		{ id: 'no-photo', label: 'No photo', query: noPhotoQuery() },
-		{ id: 'no-description', label: 'No description', query: noDescriptionQuery() }
+		{ id: 'no-description', label: 'No description', query: noDescriptionQuery() },
+		{ id: 'no-collection', label: 'Not in any collection', query: notInCollectionQuery() },
+		{ id: 'no-type', label: 'No item type', query: noTypeQuery() }
 	];
-	const noCollection = notInCollectionQuery(args.collectionIds);
-	rows.push(
-		noCollection && { id: 'no-collection', label: 'Not in any collection', query: noCollection }
-	);
-	const noType = noTypeQuery(args.typeSlugs);
-	rows.push(noType && { id: 'no-type', label: 'No item type', query: noType });
-	return rows.filter((row): row is TidyRow => row !== null);
 }
 
 /** The Items page opened on exactly this filter, so its list matches the dashboard count. */

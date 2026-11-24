@@ -63,7 +63,7 @@ def test_valid_forms_parse(condition: dict[str, Any], expected: object) -> None:
         {"kind": "media", "mode": "has", "type": "video"},
         {"kind": "media", "mode": "has", "type": 3},
         {"kind": "media", "mode": "has", "extra": 1},
-        {"kind": "collection", "mode": "any"},
+        {"kind": "collection"},
         {"kind": "collection", "mode": "all", "in": [str(_ID)]},
         {"kind": "collection", "mode": "any", "in": []},
         {"kind": "collection", "mode": "any", "in": str(_ID)},
@@ -82,6 +82,23 @@ def test_invalid_forms_are_refused_with_their_path(condition: dict[str, Any]) ->
     with pytest.raises(InvalidQueryError) as caught:
         parse_query(_where(condition))
     assert caught.value.path == _C
+
+
+def test_a_collection_condition_without_a_list_means_every_collection() -> None:
+    """Leaving `in` out names no collection, and `every` says so."""
+    for mode in ("any", "none"):
+        parsed = _parsed({"kind": "collection", "mode": mode})
+        assert isinstance(parsed, CollectionCondition)
+        assert parsed.mode == mode
+        assert parsed.ids == ()
+        assert parsed.every
+
+
+def test_without_live_targets_only_every_none_matches() -> None:
+    """A named collection that is gone matches nothing, even for `none`."""
+    assert CollectionCondition(mode="none").without_targets() is True
+    assert CollectionCondition(mode="any").without_targets() is False
+    assert CollectionCondition(mode="none", ids=(_ID,)).without_targets() is False
 
 
 def test_fifty_collections_are_allowed() -> None:

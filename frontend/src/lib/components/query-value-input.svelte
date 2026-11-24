@@ -146,7 +146,7 @@
 	}
 
 	let pendingCollection = $state('');
-	const chosenCollections = $derived(condition.kind === 'collection' ? condition.in : []);
+	const chosenCollections = $derived(condition.kind === 'collection' ? (condition.in ?? []) : []);
 	const collectionItems = $derived.by((): ComboboxItem[] => {
 		if (!view.collections) return [];
 		return view.collections
@@ -309,7 +309,14 @@
 				const next = current.includes(slug)
 					? current.filter((s) => s !== slug)
 					: [...current, slug];
-				onchange({ kind: 'type', in: next }, false);
+				onchange(
+					{
+						kind: 'type',
+						...(condition.kind === 'type' && condition.mode && { mode: condition.mode }),
+						in: next
+					},
+					false
+				);
 			},
 			(slug) => typeLabel(view.catalogue, slug)
 		)}

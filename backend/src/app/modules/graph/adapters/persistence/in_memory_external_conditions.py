@@ -133,3 +133,11 @@ class InMemoryExternalConditions:
         if found is None or found.deleted or not scope.covers(found.owner_id):
             return None
         return CollectionDefinition(definition=found.definition)
+
+    async def list_ids(self, scope: ContentFilter) -> list[uuid.UUID]:
+        """Return the id of every live collection in `scope`, ordered by id."""
+        return sorted(
+            collection_id
+            for collection_id, found in self._collections.items()
+            if not found.deleted and scope.covers(found.owner_id)
+        )

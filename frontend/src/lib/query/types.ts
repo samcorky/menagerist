@@ -10,7 +10,7 @@ export type Value = Operand | Operand[];
 
 export type Condition =
 	| { kind: 'text'; q: string }
-	| { kind: 'type'; in: string[] }
+	| TypeCondition
 	| { kind: 'favourite'; value: boolean }
 	| { kind: 'tag'; mode: 'any' | 'all' | 'none'; tags: string[] }
 	| { kind: 'date'; on: 'created' | 'updated'; op: string; value: Value }
@@ -31,8 +31,17 @@ export type DescriptionCondition = {
 export type NameCondition = { kind: 'name'; op: '~' | '='; value: string };
 /** Whether the item has media; `type` narrows it to images or documents. */
 export type MediaCondition = { kind: 'media'; mode: 'has' | 'none'; type?: MediaType };
-/** In (`any`) or in none of (`none`) 1 to 50 collections, by id. */
-export type CollectionCondition = { kind: 'collection'; mode: 'any' | 'none'; in: string[] };
+/**
+ * One of (`any`, the default) or none of (`none`) the types in `in`, 1 to 50 slugs. With no
+ * `in` it means every type: `any` has an item type and `none` has no item type. With some,
+ * `none` also takes an item that has no type.
+ */
+export type TypeCondition = { kind: 'type'; mode?: 'any' | 'none'; in?: string[] };
+/**
+ * In (`any`) or in none of (`none`) 1 to 50 collections, by id. With no `in` it means every
+ * collection of the person's own: `any` is in a collection and `none` is in no collection.
+ */
+export type CollectionCondition = { kind: 'collection'; mode: 'any' | 'none'; in?: string[] };
 /**
  * Has (`exists`), lacks (`none`) or is linked to a given item (`to`). `direction` is `any`
  * when absent; `out` means this item is the source. `exists` and `none` take no `item`,
