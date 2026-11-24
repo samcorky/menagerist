@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.modules.transfer.adapters.persistence.in_memory_import_repository import (
+    InMemoryItemImportRepository,
+)
 from app.modules.transfer.adapters.persistence.in_memory_source_link_repository import (
     InMemorySourceLinkRepository,
 )
@@ -81,7 +84,9 @@ class World:
 
     def __init__(self, t: Targets) -> None:
         self.t = t
-        self.repos = TransferRepos(links=InMemorySourceLinkRepository())
+        self.repos = TransferRepos(
+            links=InMemorySourceLinkRepository(), imports=InMemoryItemImportRepository()
+        )
 
     async def plan(self, request: ItemImportRequest) -> Plan:
         """Plan `request` as Alice."""

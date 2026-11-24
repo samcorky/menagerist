@@ -98,13 +98,13 @@ def test_each_row_keeps_its_spreadsheet_number_past_blank_lines() -> None:
 def test_more_rows_than_the_limit_are_refused() -> None:
     """The message names the limit."""
     data = ("title\n" + "x\n" * (MAX_IMPORT_ROWS + 1)).encode()
-    with pytest.raises(InvalidImportFileError, match="5,000"):
+    with pytest.raises(InvalidImportFileError, match="50,000"):
         read_csv(data)
 
 
 def test_a_file_over_the_byte_limit_is_refused() -> None:
     """The message names the limit in megabytes."""
-    with pytest.raises(InvalidImportFileError, match="10 MB"):
+    with pytest.raises(InvalidImportFileError, match="50 MB"):
         read_csv(b"t" * (MAX_IMPORT_BYTES + 1))
 
 

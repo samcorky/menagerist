@@ -223,6 +223,7 @@ CANARIES = (
 
 # ---- the explicit allow-list: routes that are not per-person content ----
 
+_IMPORT_FILES = "private owner namespace; router test checks foreign files return 404"
 PUBLIC = "public: no content, no session"
 OWN_SESSION = "acts on the caller's own session or account"
 VOCABULARY = "shared vocabulary: every member reads and edits item/relationship types"
@@ -307,6 +308,34 @@ ALLOWED: dict[Route, str] = {
         "POST",
         "/api/v1/me/import",
     ): "two-user API and Postgres tests cover owner stamping and isolation",
+    (
+        "POST",
+        "/api/v1/imports/items/files",
+    ): _IMPORT_FILES,
+    (
+        "GET",
+        "/api/v1/imports/items/files",
+    ): _IMPORT_FILES,
+    (
+        "GET",
+        "/api/v1/imports/items/files/{file_id}",
+    ): _IMPORT_FILES,
+    (
+        "DELETE",
+        "/api/v1/imports/items/files/{file_id}",
+    ): _IMPORT_FILES,
+    (
+        "POST",
+        "/api/v1/imports/items/files/{file_id}/inspect",
+    ): _IMPORT_FILES,
+    (
+        "POST",
+        "/api/v1/imports/items/files/{file_id}/plan",
+    ): _IMPORT_FILES,
+    (
+        "POST",
+        "/api/v1/imports/items/files/{file_id}/import",
+    ): _IMPORT_FILES,
     ("GET", "/api/health"): PUBLIC,
     ("GET", "/api/health/ready"): PUBLIC,
     ("GET", "/api/v1/system/version"): PUBLIC,

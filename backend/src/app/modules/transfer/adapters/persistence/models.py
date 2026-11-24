@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Index, text
+from sqlalchemy import BigInteger, DateTime, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -60,3 +60,27 @@ class SourceLinkModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
     entity_id: Mapped[uuid.UUID]
     fields: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ItemImportModel(IdentifiableMixin, OwnedMixin, TimestampedMixin, Base):
+    """ORM row for an uploaded import file and what became of it."""
+
+    __tablename__ = "item_imports"
+    __table_args__ = (
+        Index("ix_item_imports_owner_id_id", "owner_id", "id"),
+        Index("ix_item_imports_status_queued_at", "status", "queued_at"),
+        Index("ix_item_imports_expires_at", "expires_at"),
+    )
+
+    filename: Mapped[str]
+    size: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[str]
+    options: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    grants: Mapped[list[str] | None] = mapped_column(JSONB)
+    progress: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    outcome: Mapped[dict[str, int] | None] = mapped_column(JSONB)
+    failure: Mapped[str | None]
+    queued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

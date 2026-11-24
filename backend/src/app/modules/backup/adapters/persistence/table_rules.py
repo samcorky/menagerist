@@ -38,6 +38,8 @@ TABLE_RULES = {
     "sessions": TableRule.SKIP,
     "sign_in_attempts": TableRule.SKIP,
     "job_runs": TableRule.SKIP,
+    # Uploads waiting to import: their files are not in a backup either.
+    "item_imports": TableRule.SKIP,
     "schedule_cursors": TableRule.SKIP,
     "update_checks": TableRule.SKIP,
     "worker_heartbeats": TableRule.SKIP,

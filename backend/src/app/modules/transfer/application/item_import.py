@@ -63,6 +63,7 @@ from app.modules.transfer.domain.tabular import (
 from app.modules.transfer.ports.unit_of_work import TransferRepos, TransferUnitOfWork
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import CommandHandler, QueryHandler, UseCase
+from app.shared_kernel.progress import NULL_PROGRESS, Phase
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -71,6 +72,7 @@ if TYPE_CHECKING:
     from app.modules.transfer.ports.targets import GraphTarget, PresetTarget
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.progress import ProgressReporter
 
 logger = structlog.get_logger()
 
@@ -78,6 +80,12 @@ _BUILT_IN = ("name", "description", "tags")
 _SAMPLE_ROWS = 5
 # Kinds the import builds on but never makes, so its preview does not list them.
 _NOT_LISTED = (EntityKind.ITEM_TYPE, EntityKind.RELATIONSHIP_TYPE)
+_ADDED = (EntityKind.ITEM, EntityKind.CONNECTION)
+IMPORT_PHASES = (
+    Phase(key="read", label="Reading the file"),
+    Phase(key="check", label="Checking rows", weight=4),
+    Phase(key="add", label="Adding items", weight=5),
+)
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
@@ -383,9 +391,13 @@ class _Importer:
                 )
 
     async def plan(
-        self, request: ItemImportRequest, extras: BundleExtras
+        self,
+        request: ItemImportRequest,
+        extras: BundleExtras,
+        progress: ProgressReporter = NULL_PROGRESS,
     ) -> tuple[Bundle, Plan]:
         """Plan the file; every problem in it becomes a blocker on the plan."""
+        await progress.start("read")
         fields = await self.fields(request.item_type)
         await self._check_connections(request.connections)
         bundle, problems = build_item_bundle(
@@ -399,9 +411,10 @@ class _Importer:
             request.connections,
         )
         listed = [(p.row, f"Row {p.row}, {p.field}: {p.message}.") for p in problems]
-        for item in bundle.items:
-            if item.lookup is not None:
-                continue  # just a name; a type's required fields are advisory
+        rows = [item for item in bundle.items if item.lookup is None]
+        await progress.start("check", total=len(rows))
+        for item in rows:
+            await progress.advance()
             number = int(item.ref.removeprefix("row-"))
             own = (item.extra_schema or {}).get("properties", {})
             found = await self.graph.check_item_attributes(
@@ -542,6 +555,9 @@ class PlanItemImport(QueryHandler[TransferRepos, ItemImportRequest, Plan]):
 class ImportItems(CommandHandler[TransferUnitOfWork, ItemImportRequest, AppliedBundle]):
     """Import the file: plan it as `PlanItemImport` does, then create the items.
 
+    `progress` hears the phases of `IMPORT_PHASES` and the end of a successful
+    run; a caller that wants a failure reported reports it.
+
     The links that recognise the rows next time are committed once the items are
     made; should that fail, the next import finds the items by their key instead.
 
@@ -559,24 +575,36 @@ class ImportItems(CommandHandler[TransferUnitOfWork, ItemImportRequest, AppliedB
         guard: AccessGuard,
         presets: PresetTarget,
         graph: GraphTarget,
+        progress: ProgressReporter = NULL_PROGRESS,
     ) -> None:
         """Initialise with the unit of work, the access guard and the targets."""
         super().__init__(uow, guard)
         self._importer = _Importer(presets, graph)
+        self._progress = progress
 
     async def _handle(self, request: ItemImportRequest, actor: Actor) -> AppliedBundle:
         """Plan again, and apply only a plan with nothing wrong."""
+        progress = self._progress
+        await progress.begin(IMPORT_PHASES)
         async with self._uow as repos:
             # Planning fills the extras with what applying reads, so both share them.
             extras = _link_extras(request, repos.links, actor)
-            bundle, plan = await self._importer.plan(request, extras)
+            bundle, plan = await self._importer.plan(request, extras, progress)
+            adding = sum(
+                1
+                for e in plan.entities
+                if e.kind in _ADDED and e.action is PlanAction.CREATE
+            )
+            await progress.start("add", total=adding)
             applied = await apply_bundle(
                 plan,
                 bundle,
                 self._importer.presets,
                 self._importer.graph,
                 extras=extras,
+                progress=progress,
             )
             await self._uow.commit()
+        await progress.done()
         logger.info("items imported", created=applied.total_created)
         return applied

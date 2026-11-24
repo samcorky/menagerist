@@ -144,10 +144,17 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "system.CheckForUpdates": "system:release:check",
     "transfer.ExportBundle": "transfer:bundle:read",
     "transfer.ImportBundle": "transfer:bundle:import",
+    "transfer.DeleteItemImport": "transfer:bundle:import",
+    "transfer.GetItemImport": "transfer:bundle:import",
     "transfer.ImportItems": "transfer:bundle:import",
+    "transfer.InspectStoredItemImport": "transfer:bundle:import",
+    "transfer.ListItemImports": "transfer:bundle:import",
     "transfer.InspectItemImport": "transfer:bundle:import",
     "transfer.PlanBundleImport": "transfer:bundle:import",
     "transfer.PlanItemImport": "transfer:bundle:import",
+    "transfer.PlanStoredItemImport": "transfer:bundle:import",
+    "transfer.QueueItemImport": "transfer:bundle:import",
+    "transfer.UploadItemImport": "transfer:bundle:import",
 }
 
 # Permissions are never renamed: a grant stored under a name must keep meaning

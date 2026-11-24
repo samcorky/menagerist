@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING
 
+from app.modules.transfer.adapters.persistence.import_repository import (
+    SqlAlchemyItemImportRepository,
+)
 from app.modules.transfer.adapters.persistence.source_link_repository import (
     SqlAlchemySourceLinkRepository,
 )
@@ -15,7 +18,10 @@ if TYPE_CHECKING:
 
 def build_transfer_repos(session: AsyncSession) -> TransferRepos:
     """Build a `TransferRepos` bundle of SQLAlchemy repositories over `session`."""
-    return TransferRepos(links=SqlAlchemySourceLinkRepository(session))
+    return TransferRepos(
+        links=SqlAlchemySourceLinkRepository(session),
+        imports=SqlAlchemyItemImportRepository(session),
+    )
 
 
 def create_transfer_uow(

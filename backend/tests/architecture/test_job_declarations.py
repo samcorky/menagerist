@@ -16,7 +16,10 @@ CATALOGUE = SRC / "entrypoints" / "api" / "shared" / "job_catalogue.py"
 
 # Jobs that belong to no single module are declared next to the entrypoint.
 CROSS_MODULE_JOB_FILES = frozenset(
-    {SRC / "entrypoints" / "api" / "shared" / "data_jobs.py"}
+    {
+        SRC / "entrypoints" / "api" / "shared" / "data_jobs.py",
+        SRC / "entrypoints" / "api" / "shared" / "import_jobs.py",
+    }
 )
 JOB_KERNEL = SRC / "shared_kernel" / "jobs.py"
 

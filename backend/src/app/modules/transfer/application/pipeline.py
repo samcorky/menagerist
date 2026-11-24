@@ -30,6 +30,7 @@ from app.modules.transfer.domain.plan import (
 from app.modules.transfer.domain.source_link import SourceLink
 from app.modules.transfer.ports.source_link_repository import SourceLinkRepository
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.progress import NULL_PROGRESS
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
         PresetOutcome,
         PresetTarget,
     )
+    from app.shared_kernel.progress import ProgressReporter
 
 _PRESET_EXISTS = "You already have one the same."
 _NAME_TAKEN = "You already have one with this name."
@@ -729,8 +731,11 @@ async def apply_bundle(
     graph: GraphTarget,
     *,
     extras: BundleExtras | None = None,
+    progress: ProgressReporter = NULL_PROGRESS,
 ) -> AppliedBundle:
     """Create what `plan` marks `create`, through the targets, in plan order.
+
+    `progress` advances by one for each item and connection created.
 
     The presets are ensured as one batch, so a type's `$preset` markers resolve to
     the person's existing copy as well as a new one; the target creates only those
@@ -745,7 +750,7 @@ async def apply_bundle(
             plan.conflicts[0].reason if plan.conflicts else plan.blockers[0].reason
         )
         raise BundleConflictError(problem or "The bundle cannot be applied.")
-    applier = _Applier(plan, bundle, graph, extras or BundleExtras())
+    applier = _Applier(plan, bundle, graph, extras or BundleExtras(), progress)
     outcomes = await presets.ensure(bundle.presets)
     await applier.presets(outcomes)
     await applier.relationship_types()
@@ -761,9 +766,15 @@ class _Applier:
     """Applies a plan one kind at a time, remembering what later kinds refer to."""
 
     def __init__(
-        self, plan: Plan, bundle: Bundle, graph: GraphTarget, extras: BundleExtras
+        self,
+        plan: Plan,
+        bundle: Bundle,
+        graph: GraphTarget,
+        extras: BundleExtras,
+        progress: ProgressReporter,
     ) -> None:
         self._plan = plan
+        self._progress = progress
         self._bundle = bundle
         self._graph = graph
         self._extras = extras
@@ -812,6 +823,8 @@ class _Applier:
         self._created[kind] += 1
         if self._extras.ledger is not None:
             await self._extras.ledger.created(kind, ref, label, created)
+        if kind in (EntityKind.ITEM, EntityKind.CONNECTION):
+            await self._progress.advance()
 
     async def _took_back(self, adoption: Adoption, ref: str, label: str) -> None:
         if self._extras.ledger is not None:

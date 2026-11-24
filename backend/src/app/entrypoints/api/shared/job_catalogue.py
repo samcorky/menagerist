@@ -9,6 +9,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from app.entrypoints.api.shared.data_jobs import data_job_contribution
+from app.entrypoints.api.shared.import_jobs import import_job_contribution
 from app.entrypoints.api.shared.settings_reader import (
     get_settings_catalogue,
     get_settings_reader,
@@ -23,6 +24,7 @@ from app.modules.scheduling.adapters.platform.reader_schedule_source import (
 from app.modules.scheduling.adapters.scheduling.jobs import scheduling_job_contribution
 from app.modules.settings.domain.setting import SettingScope
 from app.modules.system.adapters.scheduling.jobs import system_job_contribution
+from app.modules.transfer.adapters.scheduling.jobs import transfer_job_contribution
 
 if TYPE_CHECKING:
     from app.shared_kernel.jobs import JobContribution
@@ -34,6 +36,8 @@ CONTRIBUTIONS: tuple[JobContribution, ...] = (
     media_job_contribution(),
     data_job_contribution(),
     system_job_contribution(),
+    transfer_job_contribution(),
+    import_job_contribution(),
 )
 
 
