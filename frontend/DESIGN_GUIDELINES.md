@@ -118,7 +118,7 @@ Shipped on My items and collection pages, in list and grid views (search results
 - Select (or a touch hold on a card) starts selecting; Done leaves it and changes nothing. Leaving the page or switching collection also ends it.
 - The bar offers Delete, Tag, Add to collection and Connect, plus Remove from this collection on a manual collection. Each action is one all-or-nothing request: if any item no longer exists, nothing changes and the page drops the missing ones.
 - Select all is a three-state checkbox that reflects only the rows in view and acts only on them. It takes the rows loaded on screen, never the whole result.
-- The selection survives a new search or filter within the page, and the bar says how many selected items the view hides (“3 selected, 2 not shown by this search”). One action takes at most 200 items, hidden ones included.
+- The selection survives a new search or filter within the page, and the bar says how many selected items the view hides (“3 selected, 2 not in view”). One action takes at most 200 items, hidden ones included; a pick past that says so in a toast. Undo, or a refused delete, picks the items again.
 - Delete hides the items at once and sends nothing for 5 seconds, so Undo needs no restore; leaving the page sends it immediately.
 
 ## 8. Search

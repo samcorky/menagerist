@@ -9,6 +9,21 @@ export function unknownItemIds(detail: string | undefined): string[] {
 	return detail.match(UUID) ?? [];
 }
 
+/** Shown when a pick is refused because the selection is full. */
+export const SELECTION_FULL_MESSAGE = 'You can pick at most 200 items at once';
+
+/**
+ * Whether a navigation takes the user off the page. A search or filter change rewrites the URL
+ * on the same page, and must not commit a delete that is still inside its Undo window.
+ */
+export function leavesPage(nav: {
+	from: { url: URL } | null;
+	to: { url: URL } | null;
+	willUnload: boolean;
+}): boolean {
+	return nav.willUnload || !nav.to || nav.to.url.pathname !== nav.from?.url.pathname;
+}
+
 /** "3 items" or "1 item". */
 export function itemCount(count: number): string {
 	return `${count} ${count === 1 ? 'item' : 'items'}`;

@@ -13,6 +13,7 @@
 		selection,
 		pending,
 		visibleIds,
+		canCollect = true,
 		onreload,
 		extra
 	}: {
@@ -20,6 +21,8 @@
 		pending: PendingDeletes;
 		/** The rows in view, in order: Select all acts on these only. */
 		visibleIds: string[];
+		/** Whether the person may change collections; without it the collection actions are hidden. */
+		canCollect?: boolean;
 		/** Reload the page's list after an action changed it. */
 		onreload: () => Promise<void> | void;
 		/** Page-specific actions, such as taking items off the collection being viewed. */
@@ -44,7 +47,14 @@
 	function remove() {
 		const doomed = ids;
 		selection.clear();
-		pending.start(doomed, { onsent: onreload, onmissing: drop });
+		pending.start(doomed, {
+			onsent: onreload,
+			onmissing: drop,
+			// Undo or a refusal puts the picks back, unless the person has left selection mode since.
+			onrestore: () => {
+				if (selection.active) selection.selectAll(doomed);
+			}
+		});
 	}
 
 	function done() {
@@ -74,16 +84,18 @@
 			<Tag />
 			Tag
 		</Button>
-		<Button
-			variant="outline"
-			size="sm"
-			class="pointer-coarse:h-11"
-			{disabled}
-			onclick={() => (dialog = 'collection')}
-		>
-			<FolderPlus />
-			Add to collection
-		</Button>
+		{#if canCollect}
+			<Button
+				variant="outline"
+				size="sm"
+				class="pointer-coarse:h-11"
+				{disabled}
+				onclick={() => (dialog = 'collection')}
+			>
+				<FolderPlus />
+				Add to collection
+			</Button>
+		{/if}
 		<Button
 			variant="outline"
 			size="sm"

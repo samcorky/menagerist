@@ -6152,7 +6152,7 @@
           "Nodes"
         ],
         "summary": "Delete Nodes",
-        "description": "Soft-delete several items at once, all or none.\n\nAt most 200 ids. If any id is unknown, already deleted or not yours to delete,\nnothing is deleted and the response names them.\n\n**Requires permission:** `graph:item:write`",
+        "description": "Soft-delete several items at once, all or none.\n\nAt most 200 ids. If any id is unknown or already deleted, nothing is deleted and\nthe response names them. An item you can see but may not delete is a 403, which\nalso deletes nothing.\n\n**Requires permission:** `graph:item:write`",
         "operationId": "delete_nodes",
         "requestBody": {
           "content": {
@@ -7645,7 +7645,7 @@
           "Edges"
         ],
         "summary": "Create Edges",
-        "description": "Connect one source to several targets at once, skipping existing connections.\n\nWith `reverse`, each target connects to the source instead, so many items can\nbe connected to one. The source appearing among the targets is a 400.\n\n**Requires permission:** `graph:item:write`",
+        "description": "Connect one source to several targets at once, skipping existing connections.\n\nWith `reverse`, each target connects to the source instead, so many items can\nbe connected to one. Either way, the source appearing among the targets is a\n400: an item cannot be connected to itself.\n\n**Requires permission:** `graph:item:write`",
         "operationId": "create_edges",
         "requestBody": {
           "content": {

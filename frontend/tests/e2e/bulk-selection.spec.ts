@@ -85,9 +85,7 @@ test('the selection survives a new search and says how many are out of view', as
 	await expect(page.getByRole('checkbox', { name: `Select ${prefix} 2` })).toHaveCount(0);
 	await page.getByRole('checkbox', { name: `Select ${prefix} 3` }).click();
 
-	await expect(bar(page).getByTestId('selection-count')).toHaveText(
-		'3 selected, 2 not shown by this search'
-	);
+	await expect(bar(page).getByTestId('selection-count')).toHaveText('3 selected, 2 not in view');
 });
 
 test('delete shows Undo, Undo keeps the items, and letting it lapse removes them', async ({
@@ -103,13 +101,13 @@ test('delete shows Undo, Undo keeps the items, and letting it lapse removes them
 	await bar(page).getByRole('button', { name: 'Delete' }).click();
 	await expect(page.getByText('3 items deleted')).toBeVisible();
 	await page.getByRole('button', { name: 'Undo' }).click();
-	// Still selecting, so the rows are checkboxes rather than links.
+	// Still selecting, so the rows are checkboxes rather than links, and Undo picks them again.
 	await expect(page.getByRole('checkbox', { name: `Select ${prefix} 1` })).toBeVisible();
+	await expect(bar(page).getByTestId('selection-count')).toHaveText('3 selected');
 	expect((await request.get(`/api/v1/nodes/${items[0].id}`)).status()).toBe(200);
 	// The first toast must be gone, or the second delete shows two with the same text.
 	await expect(page.getByText('3 items deleted')).toHaveCount(0);
 
-	await bar(page).getByRole('checkbox', { name: 'Select all' }).click();
 	await bar(page).getByRole('button', { name: 'Delete' }).click();
 	await expect(page.getByText('3 items deleted')).toBeVisible();
 	await expect
@@ -120,6 +118,29 @@ test('delete shows Undo, Undo keeps the items, and letting it lapse removes them
 	for (const item of items.slice(1)) {
 		expect((await request.get(`/api/v1/nodes/${item.id}`)).status()).toBe(404);
 	}
+});
+
+test('searching while a delete waits does not send it, and Undo still works', async ({
+	page,
+	request
+}) => {
+	const prefix = uniqueName('Wait').replace(/\W+/g, '');
+	const items = await makeItems(request, prefix, 3);
+	await openItems(page, prefix);
+	await page.getByRole('button', { name: 'Select', exact: true }).click();
+	await bar(page).getByRole('checkbox', { name: 'Select all' }).click();
+	await bar(page).getByRole('button', { name: 'Delete' }).click();
+	await expect(page.getByText('3 items deleted')).toBeVisible();
+
+	// A search rewrites the URL on the same page; it must not commit the delete.
+	await page.getByPlaceholder('Search your items…').fill(`${prefix} 1`);
+	await page.getByPlaceholder('Search your items…').fill(prefix);
+	await expect(page.getByText('3 items deleted')).toBeVisible();
+	expect((await request.get(`/api/v1/nodes/${items[0].id}`)).status()).toBe(200);
+
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByRole('checkbox', { name: `Select ${prefix} 1` })).toBeVisible();
+	expect((await request.get(`/api/v1/nodes/${items[0].id}`)).status()).toBe(200);
 });
 
 test('tags every selected item', async ({ page, request }) => {

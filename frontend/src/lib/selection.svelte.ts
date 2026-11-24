@@ -11,6 +11,12 @@ export const SELECTION_LIMIT = 200;
 export class Selection {
 	active = $state(false);
 	readonly #ids = new SvelteSet<string>();
+	readonly #onlimit: (() => void) | undefined;
+
+	/** `onlimit` runs when a pick is refused because the selection is full. */
+	constructor(options: { onlimit?: () => void } = {}) {
+		this.#onlimit = options.onlimit;
+	}
 
 	get ids(): ReadonlySet<string> {
 		return this.#ids;
@@ -42,12 +48,14 @@ export class Selection {
 	toggle(id: string): void {
 		if (this.#ids.has(id)) this.#ids.delete(id);
 		else if (!this.atLimit) this.#ids.add(id);
+		else this.#onlimit?.();
 	}
 
 	/** Pick every visible item, as many as fit under the limit. */
 	selectAll(visibleIds: string[]): void {
 		for (const id of visibleIds) {
-			if (this.atLimit) return;
+			if (this.#ids.has(id)) continue;
+			if (this.atLimit) return this.#onlimit?.();
 			this.#ids.add(id);
 		}
 	}

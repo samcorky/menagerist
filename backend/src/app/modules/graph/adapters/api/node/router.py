@@ -784,8 +784,9 @@ async def delete_nodes(
 ) -> None:
     """Soft-delete several items at once, all or none.
 
-    At most 200 ids. If any id is unknown, already deleted or not yours to delete,
-    nothing is deleted and the response names them.
+    At most 200 ids. If any id is unknown or already deleted, nothing is deleted and
+    the response names them. An item you can see but may not delete is a 403, which
+    also deletes nothing.
     """
     await use_case.handle(payload.to_command(), actor)
 

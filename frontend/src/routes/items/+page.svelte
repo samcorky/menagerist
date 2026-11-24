@@ -76,6 +76,7 @@
 	import { auth } from '$lib/auth.svelte.js';
 	import { PendingDeletes } from '$lib/pending-deletes.svelte';
 	import { Selection } from '$lib/selection.svelte';
+	import { leavesPage, SELECTION_FULL_MESSAGE } from '$lib/bulk-actions';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import {
 		EXAMPLE_FILTER_LABELS,
@@ -145,7 +146,7 @@
 	const shownItems = $derived(visibleItems(items, exampleItemIds, exampleFilter));
 
 	// Bulk selection: kept across searches and filters, ended with the page.
-	const selection = new Selection();
+	const selection = new Selection({ onlimit: () => toast.info(SELECTION_FULL_MESSAGE) });
 	const pendingDeletes = new PendingDeletes();
 	const canSelect = $derived(auth.can('graph:item:write'));
 	const rows = $derived(shownItems.filter((item) => !pendingDeletes.hidden.has(item.id)));
@@ -513,9 +514,11 @@
 	});
 
 	// Scroll preservation: save before navigating into an item, restore on return
-	beforeNavigate(({ to }) => {
-		// Leaving commits a delete still inside its Undo window (§14).
-		void pendingDeletes.flushAll();
+	beforeNavigate((nav) => {
+		// Leaving commits a delete still inside its Undo window (§14); a search or filter change
+		// only rewrites this page's URL, so it must not.
+		if (leavesPage(nav)) void pendingDeletes.flushAll();
+		const to = nav.to;
 		if (to?.url?.pathname.startsWith(resolve('/items/'))) {
 			savedScrollTop = document.getElementById('main-scroll')?.scrollTop ?? 0;
 		}
@@ -713,7 +716,13 @@
 	<p class="sr-only" role="status" aria-live="polite">{filterAnnouncement}</p>
 
 	{#if selection.active}
-		<BulkToolbar {selection} pending={pendingDeletes} visibleIds={rowIds} onreload={reloadList} />
+		<BulkToolbar
+			{selection}
+			pending={pendingDeletes}
+			visibleIds={rowIds}
+			canCollect={auth.can('collections:collection:write')}
+			onreload={reloadList}
+		/>
 	{/if}
 
 	{#if loadingDisplay.show && shownItems.length === 0}
