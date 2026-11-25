@@ -8637,6 +8637,30 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "Delete node type with the id from this response."
+              },
+              "ListSubtypes": {
+                "operationId": "list_subtypes",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "List subtypes with the id from this response."
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a type cannot be a subtype of the named parent.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidParentTypeError",
+                  "status": 400,
+                  "detail": "Parent type 'memorabilia' not found",
+                  "instance": "https://menagerist.example/api/v1/node-types"
+                }
               }
             }
           },
@@ -8897,6 +8921,13 @@
                   "node_type_id": "$response.body#/0/id"
                 },
                 "description": "Delete node type with the id from this response."
+              },
+              "ListSubtypes": {
+                "operationId": "list_subtypes",
+                "parameters": {
+                  "node_type_id": "$response.body#/0/id"
+                },
+                "description": "List subtypes with the id from this response."
               }
             }
           },
@@ -9128,6 +9159,13 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "Delete node type with the id from this response."
+              },
+              "ListSubtypes": {
+                "operationId": "list_subtypes",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "List subtypes with the id from this response."
               }
             }
           },
@@ -9368,6 +9406,30 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "Delete node type with the id from this response."
+              },
+              "ListSubtypes": {
+                "operationId": "list_subtypes",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "List subtypes with the id from this response."
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a type cannot be a subtype of the named parent.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidParentTypeError",
+                  "status": 400,
+                  "detail": "'poster' has fields its parent type 'memorabilia' already has: condition",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
               }
             }
           },
@@ -9645,6 +9707,23 @@
               }
             }
           },
+          "409": {
+            "description": "Returned when deleting an item type that still has subtypes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NodeTypeHasSubtypesError",
+                  "status": 409,
+                  "detail": "Item type 'memorabilia' still has subtypes: poster, figure",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
           "422": {
             "description": "A field is missing or has the wrong type.",
             "content": {
@@ -9695,6 +9774,247 @@
           }
         },
         "x-required-permission": "graph:node_type:delete"
+      }
+    },
+    "/api/v1/node-types/{node_type_id}/subtypes": {
+      "get": {
+        "tags": [
+          "v1",
+          "Node Types"
+        ],
+        "summary": "List Subtypes",
+        "description": "List the subtypes of an item type, paginated by id.\n\n**Requires permission:** `graph:type:read`",
+        "operationId": "list_subtypes",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_type_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The item type's id.",
+              "title": "Node Type Id"
+            },
+            "description": "The item type's id."
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "title": "After"
+            },
+            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NodeTypeResponse"
+                  },
+                  "title": "Response List Subtypes",
+                  "description": "Each entry is a `NodeTypeResponse`."
+                },
+                "example": [
+                  {
+                    "colour": "red",
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "A motion picture.",
+                    "icon": "clapperboard",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "label": "Film",
+                    "slug": "film",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  }
+                ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested node type does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NodeTypeNotFoundError",
+                  "status": 404,
+                  "detail": "NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:type:read"
       }
     },
     "/api/v1/node-types/{node_type_id}/attributes/{key}/usage": {

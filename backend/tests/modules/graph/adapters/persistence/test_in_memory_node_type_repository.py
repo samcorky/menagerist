@@ -33,8 +33,14 @@ async def test_list_subtypes_returns_only_live_subtypes_in_scope() -> None:
         await repo.add(row)
 
     found = await repo.list_subtypes("memo", scope=ContentFilter.of(owner))
+    first = await repo.list_subtypes("memo", scope=ContentFilter.of(owner), limit=1)
+    rest = await repo.list_subtypes(
+        "memo", scope=ContentFilter.of(owner), after=poster.id
+    )
 
     assert [str(t.slug) for t in found] == ["poster", "figure"]
+    assert [str(t.slug) for t in first] == ["poster"]
+    assert [str(t.slug) for t in rest] == ["figure"]
 
 
 async def test_get_returns_none_for_missing_id() -> None:

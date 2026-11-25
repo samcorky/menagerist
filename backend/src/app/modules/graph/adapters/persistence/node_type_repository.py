@@ -140,7 +140,12 @@ class SqlAlchemyNodeTypeRepository:
         return [_to_domain(model) for model in result.scalars()]
 
     async def list_subtypes(
-        self, parent: str, *, scope: ContentFilter
+        self,
+        parent: str,
+        *,
+        scope: ContentFilter,
+        after: uuid.UUID | None = None,
+        limit: int | None = None,
     ) -> builtins.list[NodeType]:
         """List the non-deleted subtypes of the type with slug `parent` in `scope`."""
         stmt = (
@@ -150,6 +155,10 @@ class SqlAlchemyNodeTypeRepository:
             .where(owned_by(NodeTypeModel, scope.user_id))
             .order_by(NodeTypeModel.id)
         )
+        if after is not None:
+            stmt = stmt.where(NodeTypeModel.id > after)
+        if limit is not None:
+            stmt = stmt.limit(limit)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 

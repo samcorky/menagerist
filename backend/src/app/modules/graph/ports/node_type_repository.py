@@ -52,9 +52,17 @@ class NodeTypeRepository(Protocol):
         ...
 
     async def list_subtypes(
-        self, parent: str, *, scope: ContentFilter
+        self,
+        parent: str,
+        *,
+        scope: ContentFilter,
+        after: uuid.UUID | None = None,
+        limit: int | None = None,
     ) -> builtins.list[NodeType]:
-        """List the non-deleted subtypes of the type with slug `parent` in `scope`."""
+        """List the non-deleted subtypes of the type with slug `parent` in `scope`.
+
+        Ordered by id, after `after`, and at most `limit` when one is given.
+        """
         ...
 
     async def list_deleted_before(

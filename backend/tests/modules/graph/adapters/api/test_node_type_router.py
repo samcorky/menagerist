@@ -449,6 +449,45 @@ def test_a_parent_that_cannot_be_used_is_a_400_naming_why() -> None:
     assert "condition" in clash.json()["detail"]
 
 
+def test_a_parents_subtypes_are_listed_with_paging() -> None:
+    """GET /node-types/{id}/subtypes lists only that parent's, paged like the rest."""
+    client = TestClient(_app_with_in_memory_graph())
+    parent = client.post(
+        "/api/v1/node-types", json={"slug": "memorabilia", "label": "Memorabilia"}
+    ).json()
+    client.post("/api/v1/node-types", json={"slug": "music-media", "label": "Music"})
+    for slug, under in (
+        ("poster", "memorabilia"),
+        ("figure", "memorabilia"),
+        ("mug", "memorabilia"),
+        ("vinyl", "music-media"),
+    ):
+        client.post(
+            "/api/v1/node-types", json={"slug": slug, "label": slug, "parent": under}
+        )
+
+    first = client.get(f"/api/v1/node-types/{parent['id']}/subtypes?limit=2")
+
+    assert first.status_code == 200
+    assert [t["slug"] for t in first.json()] == ["poster", "figure"]
+    assert 'rel="next"' in first.headers["Link"]
+    last_id = first.json()[-1]["id"]
+    rest = client.get(
+        f"/api/v1/node-types/{parent['id']}/subtypes?after={last_id}&limit=2"
+    )
+    assert [t["slug"] for t in rest.json()] == ["mug"]
+    assert "Link" not in rest.headers
+
+
+def test_listing_the_subtypes_of_an_unknown_type_is_a_404() -> None:
+    """The parent has to exist."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    missing = client.get(f"/api/v1/node-types/{uuid.uuid4()}/subtypes")
+
+    assert missing.status_code == 404
+
+
 def test_deleting_a_parent_with_subtypes_is_a_409_until_they_are_gone() -> None:
     """The parent can only go once its subtypes have."""
     client = TestClient(_app_with_in_memory_graph())

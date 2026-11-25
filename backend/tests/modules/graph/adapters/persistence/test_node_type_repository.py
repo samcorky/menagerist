@@ -168,7 +168,16 @@ async def test_list_subtypes_returns_only_live_subtypes_of_that_parent(
         "memorabilia", scope=ContentFilter.everyone()
     )
 
+    first = await repository.list_subtypes(
+        "memorabilia", scope=ContentFilter.everyone(), limit=1
+    )
+    rest = await repository.list_subtypes(
+        "memorabilia", scope=ContentFilter.everyone(), after=poster.id
+    )
+
     assert [str(t.slug) for t in found] == ["poster", "figure"]
+    assert [str(t.slug) for t in first] == ["poster"]
+    assert [str(t.slug) for t in rest] == ["figure"]
 
 
 async def test_a_type_cannot_be_its_own_parent_in_the_database(

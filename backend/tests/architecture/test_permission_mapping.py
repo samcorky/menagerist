@@ -82,6 +82,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "graph.ListItemContents": "graph:item:read",
     "graph.ListItemFields": "graph:item:read",
     "graph.ListNodeTypes": "graph:type:read",
+    "graph.ListSubtypes": "graph:type:read",
     "graph.CountNodeTypes": "graph:item:read",
     "graph.CountNodes": "graph:item:read",
     "graph.RandomNode": "graph:item:read",
