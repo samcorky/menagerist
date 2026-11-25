@@ -70,6 +70,7 @@ EXPECTED_SYSTEM: frozenset[str] = frozenset(
         "scheduling.ClaimJobRun",
         "scheduling.MaintainWorker",
         "scheduling.PruneJobRuns",
+        "scheduling.QueueJobRun",
         "scheduling.GetWorkerStatus",
         "scheduling.GetJobNextRun",
         "scheduling.AssessJobHealth",
