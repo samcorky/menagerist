@@ -80,12 +80,14 @@ export function buildTypeItems(args: {
 		// The parent leads its own group; its subtypes follow by name.
 		members.sort((a, b) => Number(b.slug === head) - Number(a.slug === head) || byLabel(a, b));
 		for (const type of members) {
-			// The crumb is for the trigger; the list hides it under the heading that names it.
+			// The crumb is for the trigger; the list hides it under the heading that names it, and
+			// indents a subtype beneath its parent, which leads the group.
 			items.push({
 				value: type.slug,
 				label: type.label,
 				crumb: parentOf(type)?.label,
-				group: bySlug.get(head)!.label
+				group: bySlug.get(head)!.label,
+				nested: type.slug !== head || undefined
 			});
 		}
 	}
@@ -123,7 +125,13 @@ export function groupTypeItems(types: TypeLike[]): ComboboxItem[] {
 		const subtypes = types.filter((type) => type.parent === head.slug).sort(byLabel);
 		items.push({ value: head.slug, label: head.label, group: head.label });
 		for (const type of subtypes) {
-			items.push({ value: type.slug, label: type.label, crumb: head.label, group: head.label });
+			items.push({
+				value: type.slug,
+				label: type.label,
+				crumb: head.label,
+				group: head.label,
+				nested: true
+			});
 		}
 	}
 	return items;

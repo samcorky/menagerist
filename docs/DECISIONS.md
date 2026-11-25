@@ -1861,3 +1861,4 @@ The import page uploads the file once, as it is chosen, and follows the import's
 
 - The chevron is part of an item (`crumb`) rather than a character in its label, so it is a real icon in the combobox and chips, and a plain "›" only in text that cannot hold one (tooltips, a chip's words).
 - The trigger always shows the parent, even when the list row, under its heading, does not.
+- Every combobox draws its list through one component (`combobox-list.svelte`), so the single and multiple-choice pickers cannot drift: headings, a rule between groups, a subtype indented beneath its parent (`nested`), crumbs and counts are the same everywhere.

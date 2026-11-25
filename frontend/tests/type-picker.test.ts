@@ -108,6 +108,21 @@ describe('buildTypeItems with subtypes', () => {
 		expect(heading(make(), 'Other item types')).toEqual(['book', 'film']);
 	});
 
+	it('indents the subtypes under their parent, which leads the group flush with the heading', () => {
+		const rows = make().filter((i) => i.group === 'Memorabilia');
+		expect(rows.map((i) => [i.value, i.nested ?? false])).toEqual([
+			['memorabilia', false],
+			['figure', true],
+			['poster', true]
+		]);
+	});
+
+	it('does not indent a row that is not under a family heading', () => {
+		const rows = make('', new Map([['poster', 3]]));
+		expect(rows.find((i) => i.value === 'poster')?.nested).toBeUndefined();
+		expect(rows.find((i) => i.value === 'film')?.nested).toBeUndefined();
+	});
+
 	it('names the parent as the crumb, which the list hides under the heading that says it', () => {
 		const poster = make().find((i) => i.value === 'poster');
 		expect(poster).toMatchObject({ label: 'Poster', crumb: 'Memorabilia', group: 'Memorabilia' });
@@ -184,6 +199,12 @@ describe('groupTypeItems', () => {
 			['Music media', 'music'],
 			['Music media', 'vinyl']
 		]);
+	});
+
+	it('indents each subtype under its parent', () => {
+		const items = groupTypeItems(all);
+		expect(items.find((i) => i.value === 'poster')?.nested).toBe(true);
+		expect(items.find((i) => i.value === 'memorabilia')?.nested).toBeUndefined();
 	});
 
 	it('gives a subtype its parent as the crumb, and a parent none', () => {

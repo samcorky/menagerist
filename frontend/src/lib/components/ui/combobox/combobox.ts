@@ -8,6 +8,8 @@ export type ComboboxItem = {
 	group?: string;
 	/** A name shown before the label with a muted chevron between, such as a type's parent. */
 	crumb?: string;
+	/** Indent the row under its group's heading, for a member that belongs to the heading's item. */
+	nested?: boolean;
 	/** Shown on the trigger when selected, if different from `label`. */
 	selectedLabel?: string;
 	/** Muted text on the right of the row, such as a count. */
