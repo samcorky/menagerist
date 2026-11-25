@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemImportFieldResponse } from '$lib/api/client';
 import {
+	addedText,
 	BUILT_IN_TARGETS,
 	assignTarget,
 	choicesFrom,
 	confirmText,
 	connectColumn,
-	connectionsJson,
+	connectionEntries,
 	connectionsReady,
 	deletedRows,
 	fieldTitles,
@@ -16,7 +17,7 @@ import {
 	keptDetails,
 	keyColumns,
 	keyFieldFor,
-	mappingJson,
+	mappingEntries,
 	MAX_CONNECTED,
 	MAX_KEPT,
 	namedToCreate,
@@ -25,7 +26,8 @@ import {
 	setKeptKind,
 	rowsAndColumns,
 	targetOptions,
-	type ColumnChoice
+	type ColumnChoice,
+	waitingText
 } from '$lib/csv-import';
 import type { ImportPlan } from '$lib/import-plan';
 
@@ -113,7 +115,7 @@ describe('targetOptions', () => {
 	});
 });
 
-describe('choicesFrom and mappingJson', () => {
+describe('choicesFrom and mappingEntries', () => {
 	it('turns the suggested mapping into choices, keeping null targets', () => {
 		expect(
 			choicesFrom([{ column: 'a', target: 'name' }, { column: 'b' }, { column: 'c', target: null }])
@@ -124,9 +126,8 @@ describe('choicesFrom and mappingJson', () => {
 		]);
 	});
 
-	it('writes the JSON text the server takes, and it reads back the same', () => {
-		const text = mappingJson(choices, []);
-		expect(JSON.parse(text)).toEqual(choices);
+	it('sends each column with its target', () => {
+		expect(mappingEntries(choices, [])).toEqual(choices);
 	});
 });
 
@@ -168,14 +169,14 @@ describe('keeping a column as an extra detail', () => {
 			...next,
 			{ column: 'other', target: null, extra: { title: 'Signed on', kind: 'text' } }
 		];
-		const sent = JSON.parse(mappingJson(next, ['signed_on']));
+		const sent = mappingEntries(next, ['signed_on']);
 		expect(sent[2].extra).toEqual({ key: 'signed_on_2', title: 'Signed on', kind: 'text' });
-		expect(sent[3].extra.key).toBe('signed_on_3');
+		expect(sent[3].extra?.key).toBe('signed_on_3');
 	});
 
 	it('never gives a detail the key of a built-in target', () => {
 		const next = renameKept(keepColumn(choices, 'misc', 'text'), 'misc', 'Name');
-		expect(JSON.parse(mappingJson(next, []))[2].extra.key).toBe('name_2');
+		expect(mappingEntries(next, [])[2].extra?.key).toBe('name_2');
 	});
 
 	it('lists the kept details for the preview', () => {
@@ -188,7 +189,7 @@ describe('keeping a column as an extra detail', () => {
 		let next = keepColumn(choices, 'misc', 'text');
 		next = renameKept(next, 'misc', 'signed', { key: 'signed', kind: 'boolean' });
 		expect(next[2].extra).toEqual({ title: 'signed', kind: 'boolean', key: 'signed' });
-		expect(JSON.parse(mappingJson(next, []))[2].extra).toEqual({
+		expect(mappingEntries(next, [])[2].extra).toEqual({
 			key: 'signed',
 			title: 'signed',
 			kind: 'boolean'
@@ -277,8 +278,8 @@ describe('recognising rows by a key column', () => {
 	});
 
 	it('sends the field a column fills, or the key a kept detail is given', () => {
-		const sent = JSON.parse(mappingJson(keyed, ['signed_on']));
-		expect(keyFieldFor(keyed, ['signed_on'], 'ID')).toBe(sent[0].extra.key);
+		const sent = mappingEntries(keyed, ['signed_on']);
+		expect(keyFieldFor(keyed, ['signed_on'], 'ID')).toBe(sent[0].extra?.key);
 		expect(keyFieldFor(keyed, ['signed_on'], 'Who')).toBe('name');
 		expect(keyFieldFor(keyed, ['signed_on'], 'When')).toBe('signed_on');
 		expect(keyFieldFor(keyed, ['signed_on'], null)).toBeNull();
@@ -341,7 +342,7 @@ describe('connecting a column to items by name', () => {
 	});
 
 	it('sends one entry for a connected column, creating missing items by default', () => {
-		expect(JSON.parse(connectionsJson(ready))).toEqual([
+		expect(connectionEntries(ready)).toEqual([
 			{
 				column: 'where',
 				relationship_type: 'obtained-at',
@@ -350,7 +351,7 @@ describe('connecting a column to items by name', () => {
 				on_missing: 'create'
 			}
 		]);
-		expect(JSON.parse(mappingJson(ready, []))).toEqual([
+		expect(mappingEntries(ready, [])).toEqual([
 			{ column: 'title', target: 'name' },
 			{ column: 'where', target: null }
 		]);
@@ -359,7 +360,7 @@ describe('connecting a column to items by name', () => {
 	it('keeps the settings chosen so far when one more changes', () => {
 		const next = connectColumn(ready, 'where', { on_missing: 'skip' });
 
-		expect(JSON.parse(connectionsJson(next))[0]).toMatchObject({
+		expect(connectionEntries(next)[0]).toMatchObject({
 			item_type: 'event',
 			on_missing: 'skip'
 		});
@@ -369,12 +370,12 @@ describe('connecting a column to items by name', () => {
 		const started = connectColumn(base, 'where');
 
 		expect(connectionsReady(started)).toBe(false);
-		expect(connectionsJson(started)).toBe('[]');
+		expect(connectionEntries(started)).toEqual([]);
 		expect(connectionsReady(ready)).toBe(true);
 	});
 
 	it('stops connecting when the column is matched to a field instead', () => {
-		expect(connectionsJson(assignTarget(ready, 'where', 'description'))).toBe('[]');
+		expect(connectionEntries(assignTarget(ready, 'where', 'description'))).toEqual([]);
 	});
 
 	it('refuses a sixth connected column', () => {
@@ -431,5 +432,24 @@ describe('connecting a column to items by name', () => {
 		};
 
 		expect(namedToCreate(plan)).toEqual(['eBay']);
+	});
+});
+
+describe('addedText and waitingText', () => {
+	it('says what an import added, naming connections only when there are some', () => {
+		expect(addedText({ items_added: 1, connections_added: 0 })).toBe('Added 1 item');
+		expect(addedText({ items_added: 1200, connections_added: 1 })).toBe(
+			'Added 1,200 items and 1 connection'
+		);
+		expect(addedText({ items_added: 2, connections_added: 3 })).toBe(
+			'Added 2 items and 3 connections'
+		);
+	});
+
+	it('says how many imports run first', () => {
+		expect(waitingText(0)).toBe('Starting soon…');
+		expect(waitingText(null)).toBe('Starting soon…');
+		expect(waitingText(1)).toBe('Waiting for 1 other import to finish first');
+		expect(waitingText(3)).toBe('Waiting for 3 other imports to finish first');
 	});
 });

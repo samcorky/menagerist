@@ -82,9 +82,9 @@ export function liveSnapshot(
  * Read progress repeatedly, one request at a time, until the returned function
  * is called. A failed read is skipped and tried again on the next beat.
  */
-export function pollProgress(
-	read: () => Promise<ProgressSnapshotResponse | null>,
-	onSnapshot: (snapshot: ProgressSnapshotResponse | null) => void,
+export function pollProgress<T = ProgressSnapshotResponse>(
+	read: () => Promise<T | null>,
+	onSnapshot: (snapshot: T | null) => void,
 	intervalMs = 1000
 ): () => void {
 	let stopped = false;

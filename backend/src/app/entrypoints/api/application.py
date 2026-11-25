@@ -79,7 +79,6 @@ from app.modules.transfer.adapters.api.bundle.router import router as bundle_rou
 from app.modules.transfer.adapters.api.items.file_router import (
     router as item_import_file_router,
 )
-from app.modules.transfer.adapters.api.items.router import router as item_import_router
 from app.platform.app_info import load_app_info
 from app.platform.config import get_api_settings
 from app.platform.logging_config import configure_logging
@@ -121,7 +120,6 @@ api_v1_router.include_router(search_router)
 api_v1_router.include_router(example_router)
 api_v1_router.include_router(catalogue_router)
 api_v1_router.include_router(bundle_router)
-api_v1_router.include_router(item_import_router)
 api_v1_router.include_router(item_import_file_router)
 api_v1_router.include_router(collection_router)
 api_v1_router.include_router(auth_router)

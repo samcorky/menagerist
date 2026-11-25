@@ -367,3 +367,52 @@ test('a column connects rows to items by name, once, and deletions stay deleted'
 	expect(after).toHaveLength(2);
 	expect(after.some((e) => e.source_id === prowse.id)).toBe(false);
 });
+
+/** Writes screenshots when SHOTS_DIR is set (manual review and the pull request only). */
+test('screenshots: waiting, adding and a failed import', async ({ page, request }) => {
+	const dir = process.env.SHOTS_DIR;
+	test.skip(!dir, 'screenshots only');
+	await page.setViewportSize({ width: 1100, height: 800 });
+	// The bar would otherwise be caught part-way through filling.
+	await page.emulateMedia({ reducedMotion: 'reduce' });
+	const type = await makeType(request);
+	prefix = uniqueName('Shot').replace(/\W+/g, '');
+	const rows = Array.from({ length: 40 }, (_, i) => `${prefix}${i},cover,yes`);
+
+	// The worker finishes a small file at once, so the states in between are held here.
+	const phases = (check: 'running' | 'done', add: 'waiting' | 'running') => [
+		{ key: 'read', label: 'Reading the file', state: 'done', done: 1, total: 1, unit: 'count' },
+		{ key: 'check', label: 'Checking rows', state: check, done: 40, total: 40, unit: 'count' },
+		{ key: 'add', label: 'Adding items', state: add, done: 18, total: 40, unit: 'count' }
+	];
+	let held: Record<string, unknown> = { status: 'queued', ahead: 2 };
+	await page.route(/\/api\/v1\/imports\/items\/files\/[^/]+$/, async (route) => {
+		if (route.request().method() !== 'GET') return route.continue();
+		const real = await route.fetch();
+		await route.fulfill({ response: real, json: { ...(await real.json()), ...held } });
+	});
+
+	await chooseFileAndType(page, csv(rows), type.label);
+	await page.getByRole('button', { name: 'Preview' }).click();
+	await expect(page.getByText('Will be added')).toBeVisible();
+	await page.screenshot({ path: `${dir}/csv-preview.png` });
+
+	await page.getByRole('button', { name: 'Add 40 items' }).click();
+	await expect(page.getByText('Waiting for 2 other imports to finish first')).toBeVisible();
+	await page.screenshot({ path: `${dir}/csv-waiting.png` });
+
+	held = {
+		status: 'running',
+		ahead: 0,
+		progress: { phases: phases('done', 'running'), message: null, percent: 62, outcome: 'running' }
+	};
+	await expect(page.getByText('(18 of 40)')).toBeVisible();
+	await page.screenshot({ path: `${dir}/csv-adding.png` });
+
+	held = {
+		status: 'failed',
+		failure: 'This import stopped because the server restarted. Run it again.'
+	};
+	await expect(page.getByText("The items couldn't be added")).toBeVisible();
+	await page.screenshot({ path: `${dir}/csv-failed.png` });
+});

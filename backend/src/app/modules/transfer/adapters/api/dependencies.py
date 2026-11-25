@@ -27,7 +27,6 @@ from app.modules.transfer.application.bundle_files import (
 )
 from app.modules.transfer.application.codecs import CodecRegistry
 from app.modules.transfer.application.item_import import (
-    ImportItems,
     InspectItemImport,
     PlanItemImport,
 )
@@ -87,15 +86,6 @@ def get_plan_item_import_use_case(
     graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
 ) -> PlanItemImport:
     return PlanItemImport(repos, guard, presets, graph)
-
-
-def get_import_items_use_case(
-    uow: Annotated[TransferUnitOfWork, Depends(get_transfer_uow)],
-    guard: Annotated[AccessGuard, Depends(get_access_guard)],
-    presets: Annotated[PresetPackTarget, Depends(get_preset_pack_target)],
-    graph: Annotated[GraphPackTarget, Depends(get_graph_pack_target)],
-) -> ImportItems:
-    return ImportItems(uow, guard, presets, graph)
 
 
 def get_import_file_store() -> ImportFileStore:

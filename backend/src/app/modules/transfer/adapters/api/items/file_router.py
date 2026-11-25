@@ -5,6 +5,7 @@ The import itself runs on the worker; its progress is read back from the file.
 
 from datetime import UTC, datetime
 from typing import Annotated, Any
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, Header, Request, Response
 
@@ -140,7 +141,7 @@ async def upload_item_import_file(
         str,
         Header(
             alias="X-Filename",
-            description="The file's name, shown in the list of uploaded files.",
+            description="The file's name, percent-encoded so any name fits.",
         ),
     ] = "import.csv",
 ) -> ItemImportResponse:
@@ -151,7 +152,7 @@ async def upload_item_import_file(
     """
     item = await use_case.handle(
         UploadItemImportCommand(
-            filename=filename, chunks=request.stream(), now=datetime.now(UTC)
+            filename=unquote(filename), chunks=request.stream(), now=datetime.now(UTC)
         ),
         actor,
     )

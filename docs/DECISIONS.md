@@ -1623,7 +1623,7 @@ Applying creates the link for each item it creates or matches, and re-points a l
 
 ## Importing a CSV into one item type (2026-11-17)
 
-**Decision:** `POST /imports/items/inspect`, `/plan` and `""` (#550) read a CSV on the server and turn it into items of one existing item type through the transfer pipeline. The file travels with every call (multipart: `file`, `item_type`, `mapping`, `list_separator`); nothing is stored between calls. `InspectItemImport` returns the headers, the first five rows, the row count, the type's fields and a suggested mapping (a header matches a field by key or title, ignoring case, spaces, hyphens and underscores; `title`, `notes` and `tags` match the item's name, description and tags). `PlanItemImport` and `ImportItems` convert every cell, build a `Bundle` of one item type and its items, and call `plan_bundle` and `apply_bundle`; the run plans again, so a stale preview is harmless.
+**Decision:** `POST /imports/items/inspect`, `/plan` and `""` (#550) read a CSV on the server and turn it into items of one existing item type through the transfer pipeline. The file travelled with every call (multipart: `file`, `item_type`, `mapping`, `list_separator`); since #552 it is uploaded once and named by id instead (see "Large CSV imports" below), and the use cases are unchanged. `InspectItemImport` returns the headers, the first five rows, the row count, the type's fields and a suggested mapping (a header matches a field by key or title, ignoring case, spaces, hyphens and underscores; `title`, `notes` and `tags` match the item's name, description and tags). `PlanItemImport` and `ImportItems` convert every cell, build a `Bundle` of one item type and its items, and call `plan_bundle` and `apply_bundle`; the run plans again, so a stale preview is harmless.
 
 **Choices that are not obvious:**
 
@@ -1736,6 +1736,8 @@ Applying creates the link for each item it creates or matches, and re-points a l
 - The file is removed when its import ends either way; rows and never-imported files expire after `MENAGERIST_TRANSFER_IMPORT_TTL_HOURS` (24) through the scheduled `transfer.prune_imports` job. A queued or running import is never pruned. `item_imports` is SKIP in backups, as the files are not in them either.
 - Even an administrator sees only their own uploaded files: they hold personal data.
 
-**Not in this slice:** the frontend still sends the file with each call to the multipart routes, which stay until it moves to the stored upload. Running several imports at once, and checking a 50,000-row preview's values in one batch, wait until waits or previews are measured to be slow.
+The import page uploads the file once, as it is chosen, and follows the import's progress; leaving the page does not stop it, and a file the person moves on from is deleted. The multipart routes that took the file with every call (#550) are gone, so these are the only CSV routes. The `X-Filename` header is percent-encoded, as a header holds only Latin-1.
+
+**Not in this slice:** running several imports at once, and checking a 50,000-row preview's values in one batch, wait until waits or previews are measured to be slow.
 
 **Rationale:** #552 asks to import files too big to send with every call and to keep an import running after leaving the page. The run is the same `ImportItems` as before, so nothing about converting or planning rows changed.
