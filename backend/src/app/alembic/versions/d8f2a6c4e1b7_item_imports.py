@@ -5,7 +5,7 @@ with, its progress and its result, so the worker can import it in the background
 and its owner can watch. The file itself is stored on disk beside the media.
 
 Revision ID: d8f2a6c4e1b7
-Revises: e3a7c1f9b5d2
+Revises: b4d8f2a6c1e7
 Create Date: 2026-11-24 18:00:00.000000
 
 """
@@ -18,7 +18,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "d8f2a6c4e1b7"
-down_revision: str | None = "e3a7c1f9b5d2"
+down_revision: str | None = "b4d8f2a6c1e7"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
