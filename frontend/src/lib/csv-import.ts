@@ -174,9 +174,9 @@ export function connectionsReady(choices: ColumnChoice[]): boolean {
 	return choices.every((c) => !c.connect || (c.connect.relationship_type && c.connect.item_type));
 }
 
-/** The JSON text the server takes for the connected columns that are ready. */
-export function connectionsJson(choices: ColumnChoice[]): string {
-	const entries: ConnectionColumnEntry[] = choices.flatMap(({ column, connect }) =>
+/** What the server takes for the connected columns that are ready. */
+export function connectionEntries(choices: ColumnChoice[]): ConnectionColumnEntry[] {
+	return choices.flatMap(({ column, connect }) =>
 		connect?.relationship_type && connect.item_type
 			? [
 					{
@@ -189,7 +189,6 @@ export function connectionsJson(choices: ColumnChoice[]): string {
 				]
 			: []
 	);
-	return JSON.stringify(entries);
 }
 
 /** "This row's item signed by the other item", and the other way round, from the type's label. */
@@ -222,14 +221,10 @@ export function choicesFrom(suggested: ColumnMappingEntry[]): ColumnChoice[] {
 }
 
 /**
- * The JSON text the server takes for the matching. Each kept detail gets a key from its name,
+ * What the server takes for the matching. Each kept detail gets a key from its name,
  * unique among the type's `fieldKeys`, the built-in targets and the other kept details.
  */
-export function mappingJson(choices: ColumnChoice[], fieldKeys: string[]): string {
-	return JSON.stringify(mappingEntries(choices, fieldKeys));
-}
-
-function mappingEntries(choices: ColumnChoice[], fieldKeys: string[]): ColumnMappingEntry[] {
+export function mappingEntries(choices: ColumnChoice[], fieldKeys: string[]): ColumnMappingEntry[] {
 	const taken = new Set([...fieldKeys, ...BUILT_IN_TARGETS.map((t) => t.value)]);
 	return choices.map(({ column, target, extra }) => {
 		if (!extra) return { column, target };
@@ -333,4 +328,22 @@ const ENCODING_NAMES: Record<CsvEncoding, string> = {
 /** An encoding as people know it, for "Read as ...". */
 export function encodingName(encoding: CsvEncoding): string {
 	return ENCODING_NAMES[encoding];
+}
+
+/** What a finished import added, as the toast says it. */
+export function addedText(result: { items_added: number; connections_added: number }): string {
+	const count = (n: number, one: string, many: string) =>
+		`${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
+	const items = count(result.items_added, 'item', 'items');
+	return result.connections_added > 0
+		? `Added ${items} and ${count(result.connections_added, 'connection', 'connections')}`
+		: `Added ${items}`;
+}
+
+/** What a queued import is waiting for: `ahead` imports run before it. */
+export function waitingText(ahead: number | null | undefined): string {
+	if (!ahead) return 'Starting soon…';
+	return ahead === 1
+		? 'Waiting for 1 other import to finish first'
+		: `Waiting for ${ahead.toLocaleString('en-GB')} other imports to finish first`;
 }

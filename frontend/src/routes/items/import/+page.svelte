@@ -1,15 +1,21 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 	import {
-		importItems,
-		inspectItemImport,
-		planItemImport,
+		deleteItemImportFile,
+		getItemImportFile,
+		importItemImportFile,
+		inspectItemImportFile,
+		planItemImportFile,
+		uploadItemImportFile,
 		type ConnectionEnd,
 		type DayMonthOrder,
 		type ExtraFieldKind,
+		type ImportOptionsBody,
 		type ItemImportInspectionResponse,
+		type ItemImportResponse,
 		type NameLookup
 	} from '$lib/api/client';
 	import { errorMessage, uploadErrorMessage } from '$lib/api/errors';
@@ -18,6 +24,8 @@
 	import FileDrop from '$lib/components/file-drop.svelte';
 	import Page from '$lib/components/page.svelte';
 	import PlanPreview from '$lib/components/plan-preview.svelte';
+	import ProgressPanel from '$lib/components/progress-panel.svelte';
+	import { pollProgress } from '$lib/progress';
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -28,12 +36,13 @@
 	import { fetchItemFields, type ItemField } from '$lib/item-fields';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import {
+		addedText,
 		assignTarget,
 		choicesFrom,
 		confirmText,
 		CONNECT,
 		connectColumn,
-		connectionsJson,
+		connectionEntries,
 		connectionsReady,
 		DATE_ORDERS,
 		deletedRows,
@@ -47,7 +56,7 @@
 		KEPT_KINDS,
 		keyColumns,
 		keyFieldFor,
-		mappingJson,
+		mappingEntries,
 		MAX_CONNECTED,
 		MAX_KEPT,
 		namedToCreate,
@@ -56,15 +65,16 @@
 		rowsAndColumns,
 		setKeptKind,
 		targetOptions,
+		waitingText,
 		type ColumnChoice
 	} from '$lib/csv-import';
 	import { LISTED, type ImportPlan } from '$lib/import-plan';
 	import { ConnectionLookups } from '$lib/query/connection-lookups.svelte';
 
 	// Three steps on one page: choose the file and the item type, match columns to fields, then
-	// preview what would be added. The server keeps nothing between calls, so each one sends the
-	// file again.
-	type Step = 'choose' | 'match' | 'preview';
+	// preview what would be added. The file is uploaded once and named by its id after that;
+	// adding the items runs on the server, which this page follows until it ends.
+	type Step = 'choose' | 'match' | 'preview' | 'adding';
 
 	const SEPARATORS = [
 		{ value: ',', label: 'Comma' },
@@ -79,10 +89,16 @@
 		{ value: 'skip', label: 'Leave the connection out' }
 	];
 	const STEPS = ['Choose file', 'Match columns', 'Preview'];
+	// Adding stays on the preview step in the breadcrumb.
 	const STEP_ORDER: Step[] = ['choose', 'match', 'preview'];
 
 	let step = $state<Step>('choose');
+	const stepIndex = $derived(step === 'adding' ? 2 : STEP_ORDER.indexOf(step));
 	let file = $state<File | null>(null);
+	// The uploaded copy of `file`, once it has gone to the server.
+	let fileId = $state<string | null>(null);
+	// The import adding the items, as last read back.
+	let running = $state<ItemImportResponse | null>(null);
 	let itemType = $state<string | null>(null);
 	let separator = $state(',');
 	let dateOrder = $state<DayMonthOrder>('day_first');
@@ -130,18 +146,50 @@
 		restore = [];
 	}
 
+	/** Remove the uploaded copy of a file the person moved on from; it would expire anyway. */
+	function discardUpload() {
+		if (fileId) void deleteItemImportFile({ path: { file_id: fileId } });
+		fileId = null;
+	}
+
+	// Leaving before adding the items removes the uploaded copy; once queued it is the server's.
+	onDestroy(() => {
+		if (step !== 'adding') discardUpload();
+	});
+
 	function chooseFile(files: FileList | File[]) {
+		discardUpload();
 		file = files[0] ?? null;
 		startAgain();
+	}
+
+	/** Upload the chosen file once; later steps name it by id. */
+	async function uploaded(chosen: File): Promise<string | null> {
+		if (fileId) return fileId;
+		const result = await uploadItemImportFile({
+			body: chosen,
+			headers: { 'X-Filename': encodeURIComponent(chosen.name) }
+		});
+		if (result.error || !result.data) {
+			fileError = uploadErrorMessage(result);
+			return null;
+		}
+		fileId = result.data.id;
+		return fileId;
 	}
 
 	async function readFile() {
 		if (!file || !itemType || loading) return;
 		loading = true;
 		fileError = null;
+		const id = await uploaded(file);
+		if (!id) {
+			loading = false;
+			return;
+		}
 		// The type's existing details come with the file, so a kept column can join one at once.
 		const [result, fields] = await Promise.all([
-			inspectItemImport({ body: { file, item_type: itemType } }),
+			inspectItemImportFile({ path: { file_id: id }, body: { item_type: itemType } }),
 			fetchItemFields(itemType)
 		]);
 		loading = false;
@@ -205,22 +253,21 @@
 	const relationshipOf = (slug: string | null) =>
 		lookups.relationships?.find((relationship) => relationship.slug === slug);
 
-	function body() {
+	function importOptions(): ImportOptionsBody {
 		const fieldKeys = (inspection?.fields ?? []).map((f) => f.key);
 		return {
-			file: file!,
 			item_type: itemType!,
-			mapping: mappingJson(choices, fieldKeys),
+			mapping: mappingEntries(choices, fieldKeys),
 			list_separator: separator,
 			day_month_order: dateOrder,
 			key_field: keyFieldFor(choices, fieldKeys, activeKey),
-			restore: JSON.stringify(restore),
-			connections: connectionsJson(choices)
+			restore,
+			connections: connectionEntries(choices)
 		};
 	}
 
 	async function showPreview() {
-		if (!file || !itemType || !ready) return;
+		if (!fileId || !itemType || !ready) return;
 		step = 'preview';
 		plan = null;
 		restore = [];
@@ -229,9 +276,10 @@
 
 	/** Work the preview out again; the one shown stays until the new one arrives. */
 	async function planAgain() {
+		if (!fileId) return;
 		planError = null;
 		loading = true;
-		const result = await planItemImport({ body: body() });
+		const result = await planItemImportFile({ path: { file_id: fileId }, body: importOptions() });
 		loading = false;
 		if (result.error || !result.data) {
 			planError = uploadErrorMessage(result);
@@ -251,23 +299,48 @@
 	}
 
 	async function addItems() {
-		if (busy || !file || !itemType) return;
+		if (busy || !fileId || !itemType) return;
 		busy = true;
-		const result = await importItems({ body: body() });
+		const result = await importItemImportFile({ path: { file_id: fileId }, body: importOptions() });
 		busy = false;
 		if (result.error || !result.data) {
 			toast.error("Couldn't add the items", { description: errorMessage(result.error) });
 			return;
 		}
-		const added = result.data.items_added;
-		const joins = result.data.connections_added;
-		const items = `${added.toLocaleString('en-GB')} ${added === 1 ? 'item' : 'items'}`;
-		toast.success(
-			joins > 0
-				? `Added ${items} and ${joins.toLocaleString('en-GB')} ${joins === 1 ? 'connection' : 'connections'}`
-				: `Added ${items}`
+		running = result.data;
+		step = 'adding';
+	}
+
+	async function readImport(id: string): Promise<ItemImportResponse | null> {
+		const result = await getItemImportFile({ path: { file_id: id } });
+		return result.data ?? null;
+	}
+
+	// Follow the import until it ends; it carries on if the person leaves.
+	$effect(() => {
+		const id = running?.id;
+		if (step !== 'adding' || !id) return;
+		return pollProgress(
+			() => readImport(id),
+			(latest) => {
+				if (latest) running = latest;
+			}
 		);
-		await goto(resolve('/items'));
+	});
+
+	$effect(() => {
+		if (step !== 'adding' || running?.status !== 'succeeded') return;
+		toast.success(addedText(running.result ?? { items_added: 0, connections_added: 0 }));
+		void goto(resolve('/items'));
+	});
+
+	/** After a failed import the file has gone, so it is chosen again from the start. */
+	function tryAgain() {
+		running = null;
+		fileId = null;
+		file = null;
+		startAgain();
+		step = 'choose';
 	}
 </script>
 
@@ -283,7 +356,7 @@
 				<Breadcrumb.List>
 					{#each STEPS as name, index (name)}
 						<Breadcrumb.Item>
-							{#if index === STEP_ORDER.indexOf(step)}
+							{#if index === stepIndex}
 								<Breadcrumb.Page class="font-semibold">{name}</Breadcrumb.Page>
 							{:else}
 								<span>{name}</span>
@@ -649,6 +722,25 @@
 						Preview
 					</Button>
 				</div>
+			{:else if step === 'adding' && running}
+				{#if running.status === 'failed'}
+					<div class="space-y-1" role="alert">
+						<p class="text-sm font-medium">The items couldn't be added</p>
+						<p class="text-sm text-muted-foreground">{running.failure}</p>
+					</div>
+					<div class="flex justify-end">
+						<Button class="pointer-coarse:h-11" onclick={tryAgain}>Choose a file</Button>
+					</div>
+				{:else}
+					<ProgressPanel
+						snapshot={running.status === 'running' ? (running.progress ?? null) : null}
+						label="Adding the items"
+						fallback={running.status === 'queued' ? waitingText(running.ahead) : 'Starting…'}
+					/>
+					<p class="text-sm text-muted-foreground">
+						You can leave this page; the items are still added.
+					</p>
+				{/if}
 			{:else}
 				{#if kept.length > 0}
 					<p class="text-sm text-muted-foreground">
