@@ -8645,6 +8645,13 @@
                 },
                 "description": "List subtypes with the id from this response."
               },
+              "ListSharedSubtypeFields": {
+                "operationId": "list_shared_subtype_fields",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "List shared subtype fields with the id from this response."
+              },
               "PlanParentChange": {
                 "operationId": "plan_parent_change",
                 "parameters": {
@@ -8936,6 +8943,13 @@
                 },
                 "description": "List subtypes with the id from this response."
               },
+              "ListSharedSubtypeFields": {
+                "operationId": "list_shared_subtype_fields",
+                "parameters": {
+                  "node_type_id": "$response.body#/0/id"
+                },
+                "description": "List shared subtype fields with the id from this response."
+              },
               "PlanParentChange": {
                 "operationId": "plan_parent_change",
                 "parameters": {
@@ -9180,6 +9194,13 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "List subtypes with the id from this response."
+              },
+              "ListSharedSubtypeFields": {
+                "operationId": "list_shared_subtype_fields",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "List shared subtype fields with the id from this response."
               },
               "PlanParentChange": {
                 "operationId": "plan_parent_change",
@@ -9434,6 +9455,13 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "List subtypes with the id from this response."
+              },
+              "ListSharedSubtypeFields": {
+                "operationId": "list_shared_subtype_fields",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "List shared subtype fields with the id from this response."
               },
               "PlanParentChange": {
                 "operationId": "plan_parent_change",
@@ -10043,6 +10071,444 @@
           }
         },
         "x-required-permission": "graph:type:read"
+      }
+    },
+    "/api/v1/node-types/{node_type_id}/subtypes/fields": {
+      "get": {
+        "tags": [
+          "v1",
+          "Node Types"
+        ],
+        "summary": "List Shared Subtype Fields",
+        "description": "List the fields several subtypes of an item type each define themselves.\n\nA field is listed when two or more subtypes define the same key as the same\nkind of field. These are the fields that could move up to the parent item type\nwith the promote action. An item type with no subtypes lists none.\n\n**Requires permission:** `graph:type:read`",
+        "operationId": "list_shared_subtype_fields",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_type_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The item type's id.",
+              "title": "Node Type Id"
+            },
+            "description": "The item type's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedSubtypeFieldResponse"
+                  },
+                  "title": "Response List Shared Subtype Fields",
+                  "description": "Each entry is a `SharedSubtypeFieldResponse`."
+                },
+                "example": [
+                  {
+                    "differing": [],
+                    "key": "condition",
+                    "kind": "choice",
+                    "label": "Condition",
+                    "subtypes": [
+                      "poster",
+                      "photo-print"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested node type does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NodeTypeNotFoundError",
+                  "status": 404,
+                  "detail": "NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:type:read"
+      }
+    },
+    "/api/v1/node-types/{node_type_id}/subtypes/fields/{key}/promote": {
+      "post": {
+        "tags": [
+          "v1",
+          "Node Types"
+        ],
+        "summary": "Promote Subtype Field",
+        "description": "Move a field the subtypes define up to their parent item type.\n\nEvery subtype that defines the key loses its own copy, in one change, and its\nitems keep their values. The definition most subtypes share is used, with the\nchoices of all of them, and it is required if any subtype required it. Refused\nwhen some subtype keeps the key as another kind of field, or has it hidden.\n\n**Requires permission:** `graph:type:write`",
+        "operationId": "promote_subtype_field",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_type_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The item type's id.",
+              "title": "Node Type Id"
+            },
+            "description": "The item type's id."
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The field's key in the item details.",
+              "title": "Key"
+            },
+            "description": "The field's key in the item details."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromotedSubtypeFieldResponse"
+                },
+                "example": {
+                  "node_type": {
+                    "colour": "red",
+                    "created_at": "2026-08-23T10:14:44.465954Z",
+                    "description": "A motion picture.",
+                    "icon": "clapperboard",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+                    "label": "Film",
+                    "slug": "film",
+                    "updated_at": "2026-08-23T10:14:44.465954Z"
+                  },
+                  "subtypes": 2
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when attributes_schema is not valid JSON Schema.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidSchemaError",
+                  "status": 400,
+                  "detail": "1 subtype keeps Condition as a different kind of field. Change them to match first.",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested node type does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NodeTypeNotFoundError",
+                  "status": 404,
+                  "detail": "NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/subtypes/fields/key/promote"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:type:write"
       }
     },
     "/api/v1/node-types/{node_type_id}/parent/plan": {
@@ -40210,6 +40676,41 @@
           }
         ]
       },
+      "PromotedSubtypeFieldResponse": {
+        "properties": {
+          "subtypes": {
+            "type": "integer",
+            "title": "Subtypes",
+            "description": "How many subtypes the field moved off."
+          },
+          "node_type": {
+            "$ref": "#/components/schemas/NodeTypeResponse",
+            "description": "The parent item type, with the field."
+          }
+        },
+        "type": "object",
+        "required": [
+          "subtypes",
+          "node_type"
+        ],
+        "title": "PromotedSubtypeFieldResponse",
+        "description": "What moving a field from the subtypes up to their parent changed.",
+        "examples": [
+          {
+            "node_type": {
+              "colour": "red",
+              "created_at": "2026-08-23T10:14:44.465954Z",
+              "description": "A motion picture.",
+              "icon": "clapperboard",
+              "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20",
+              "label": "Film",
+              "slug": "film",
+              "updated_at": "2026-08-23T10:14:44.465954Z"
+            },
+            "subtypes": 2
+          }
+        ]
+      },
       "PruneBackupsRequest": {
         "properties": {
           "keep_last": {
@@ -41424,6 +41925,69 @@
               "updated_at": "2026-10-10T12:00:00.000000Z",
               "username": "alice"
             }
+          }
+        ]
+      },
+      "SharedSubtypeFieldResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "The field's key."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Its name, from the definition most subtypes share."
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "The field kind, such as `text` or `choice`."
+          },
+          "subtypes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subtypes",
+            "description": "The slugs of the subtypes that define it as that kind."
+          },
+          "differing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Differing",
+            "description": "The slugs of subtypes that keep the key as another kind of field. While there are any, the field cannot be moved up."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "subtypes",
+          "differing"
+        ],
+        "title": "SharedSubtypeFieldResponse",
+        "description": "A field several subtypes of an item type each define the same way.",
+        "examples": [
+          {
+            "differing": [],
+            "key": "condition",
+            "kind": "choice",
+            "label": "Condition",
+            "subtypes": [
+              "poster",
+              "photo-print"
+            ]
           }
         ]
       },

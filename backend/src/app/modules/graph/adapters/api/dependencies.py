@@ -60,11 +60,15 @@ from app.modules.graph.application.list_item_contents import ListItemContents
 from app.modules.graph.application.list_item_fields import ListItemFields
 from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
+from app.modules.graph.application.list_shared_subtype_fields import (
+    ListSharedSubtypeFields,
+)
 from app.modules.graph.application.list_subtypes import ListSubtypes
 from app.modules.graph.application.plan_parent_change import PlanParentChange
 from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
 )
+from app.modules.graph.application.promote_subtype_field import PromoteSubtypeField
 from app.modules.graph.application.purge_deleted_node import PurgeDeletedNode
 from app.modules.graph.application.purge_edge_type_attribute import (
     PurgeEdgeTypeAttribute,
@@ -348,6 +352,20 @@ def get_plan_parent_change_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> PlanParentChange:
     return PlanParentChange(repos, guard)
+
+
+def get_list_shared_subtype_fields_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> ListSharedSubtypeFields:
+    return ListSharedSubtypeFields(repos, guard)
+
+
+def get_promote_subtype_field_use_case(
+    uow: Annotated[GraphUnitOfWork, Depends(get_graph_uow)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> PromoteSubtypeField:
+    return PromoteSubtypeField(uow, guard)
 
 
 def get_update_node_type_use_case(

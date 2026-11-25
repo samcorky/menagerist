@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 from app.modules.graph.application.field_definitions import (
     field_kind,
+    forget_fields,
     with_every_option,
 )
 from app.modules.graph.application.schema_meta import NAMESPACE, effective_schema
@@ -151,37 +152,5 @@ def _merge(
     remaining = copy.deepcopy(own) or {}
     for key in keys:
         remaining["properties"].pop(key, None)
-    _forget(remaining, set(keys))
+    forget_fields(remaining, set(keys))
     return remaining, (widened if widened != parent else None)
-
-
-def _forget(schema: dict[str, Any], keys: set[str]) -> None:
-    """Remove `keys` from the schema's required lists and its layout."""
-    root_required = schema.get("required")
-    if isinstance(root_required, list):
-        schema["required"] = [k for k in root_required if k not in keys]
-        if not schema["required"]:
-            del schema["required"]
-    meta = schema.get(NAMESPACE)
-    if not isinstance(meta, dict):
-        return
-    required = meta.get("required")
-    if isinstance(required, list):
-        meta["required"] = [k for k in required if k not in keys]
-        if not meta["required"]:
-            del meta["required"]
-    layout = meta.get("layout")
-    if isinstance(layout, list):
-        meta["layout"] = _prune(layout, keys)
-
-
-def _prune(items: list[Any], keys: set[str]) -> list[Any]:
-    """A layout without the fields in `keys`, sections kept even when emptied."""
-    pruned: list[Any] = []
-    for item in items:
-        if isinstance(item, dict) and item.get("key") in keys:
-            continue
-        if isinstance(item, dict) and isinstance(item.get("items"), list):
-            item = {**item, "items": _prune(item["items"], keys)}
-        pruned.append(item)
-    return pruned

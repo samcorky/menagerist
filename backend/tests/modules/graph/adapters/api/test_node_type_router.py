@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from starlette.testclient import TestClient
 
@@ -707,3 +707,96 @@ def test_patching_to_remove_a_parent_with_drop_archives_its_fields() -> None:
     assert detached.json()["parent"] is None
     condition = detached.json()["attributes_schema"]["properties"]["condition"]
     assert condition["x-menagerist"]["archived"] is True
+
+
+def _condition(*options: str) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": {
+            "condition": {
+                "type": "string",
+                "title": "Condition",
+                "enum": list(options),
+                "x-menagerist": {"kind": "choice"},
+            }
+        },
+    }
+
+
+def _family(client: TestClient) -> dict[str, Any]:
+    """Memorabilia with two subtypes that each define `condition`; returns it."""
+    parent: dict[str, Any] = client.post(
+        "/api/v1/node-types", json={"slug": "memorabilia", "label": "Memorabilia"}
+    ).json()
+    for slug, options in (("poster", ("Mint", "Good")), ("print", ("Fair", "Mint"))):
+        created = client.post(
+            "/api/v1/node-types",
+            json={
+                "slug": slug,
+                "label": slug.title(),
+                "parent": "memorabilia",
+                "attributes_schema": _condition(*options),
+            },
+        )
+        assert created.status_code == 201, created.text
+    return parent
+
+
+def test_the_fields_subtypes_share_are_listed() -> None:
+    """GET /node-types/{id}/subtypes/fields names each repeated field and who has it."""
+    client = TestClient(_app_with_in_memory_graph())
+    parent = _family(client)
+
+    listed = client.get(f"/api/v1/node-types/{parent['id']}/subtypes/fields")
+
+    assert listed.status_code == 200
+    assert listed.json() == [
+        {
+            "key": "condition",
+            "label": "Condition",
+            "kind": "choice",
+            "subtypes": ["poster", "print"],
+            "differing": [],
+        }
+    ]
+
+
+def test_promoting_a_shared_field_moves_it_to_the_parent() -> None:
+    """POST .../promote adds it above, removes it below and reports how many."""
+    client = TestClient(_app_with_in_memory_graph())
+    parent = _family(client)
+
+    promoted = client.post(
+        f"/api/v1/node-types/{parent['id']}/subtypes/fields/condition/promote"
+    )
+
+    assert promoted.status_code == 200
+    body = promoted.json()
+    assert body["subtypes"] == 2
+    condition = body["node_type"]["attributes_schema"]["properties"]["condition"]
+    assert condition["enum"] == ["Mint", "Good", "Fair"]
+    after = client.get(f"/api/v1/node-types/{parent['id']}/subtypes/fields").json()
+    assert after == []
+    poster = next(
+        t for t in client.get("/api/v1/node-types").json() if t["slug"] == "poster"
+    )
+    assert "condition" not in poster["attributes_schema"]["properties"]
+    assert "condition" in poster["effective_schema"]["properties"]
+
+
+def test_promoting_what_cannot_move_is_a_400_and_an_unknown_type_a_404() -> None:
+    """A key nobody defines is refused with why, and a missing parent is not found."""
+    client = TestClient(_app_with_in_memory_graph())
+    parent = _family(client)
+
+    nothing = client.post(
+        f"/api/v1/node-types/{parent['id']}/subtypes/fields/colour/promote"
+    )
+    missing = client.post(
+        f"/api/v1/node-types/{uuid.uuid4()}/subtypes/fields/condition/promote"
+    )
+    listing = client.get(f"/api/v1/node-types/{uuid.uuid4()}/subtypes/fields")
+
+    assert nothing.status_code == 400
+    assert "No subtype" in nothing.json()["detail"]
+    assert (missing.status_code, listing.status_code) == (404, 404)
