@@ -377,6 +377,9 @@ class ResolvedQuery:
     `relationships` holds the live relationship types connection conditions name
     and `visible_items` the `to` items that exist in scope. A connection naming
     anything else is stale and matches nothing.
+
+    `families` maps a parent item type to its subtypes. Type and field conditions are
+    already widened to cover them; an ordering by a parent's field reads them too.
     """
 
     query: Query
@@ -386,6 +389,7 @@ class ResolvedQuery:
     stale: frozenset[FieldCondition] = frozenset()
     relationships: Mapping[str, RelationshipInfo] = field(default_factory=dict)
     visible_items: frozenset[uuid.UUID] = frozenset()
+    families: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
 
 def walk_conditions(

@@ -1803,3 +1803,20 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - `keep` is the default because it loses nothing; `drop` is the tidy choice and stays reversible.
 - The preview is a `POST` that changes nothing, so it can take a body of choices; it needs the same permission as the update, since it only previews what the person may do.
 - Naming the parent a type already has is not a move: no fields are touched, whatever the choices.
+
+## Searching by a parent type includes its subtypes (2026-11-25)
+
+**Decision:** A query that names a parent item type also matches its subtypes, and one that names a subtype matches only that subtype (#320, #768). It holds for the item type filter, the advanced search, a smart collection that names a type and a sort on a type's field. "Has no item type" still means an item with no type at all.
+
+**How:** the query is widened in the application layer each time it runs (`application/type_families.py`), before the evaluators see it, so the SQL and in-memory evaluators stay an exact match on slugs and cannot disagree about families.
+
+- A type condition naming a parent also names its subtypes, for "is one of" and "is none of" alike. Naming no types is left alone.
+- A field condition on a parent's field becomes an `or` of that and the same condition on each subtype, so every leaf still reads one type's field and the per-type resolution is unchanged.
+- A sort on a parent's field reads its subtypes' items too. An ordering is one key rather than an `or`, so the family travels on the resolved query (`ResolvedQuery.families`) and both evaluators test membership of it.
+- Fields are looked up in each type's effective schema, so a condition on a subtype may name a field it inherits.
+
+**Choices that are not obvious:**
+
+- Nothing is stored. A smart collection keeps naming the parent, so a subtype added afterwards is followed without saving the collection again, the same way a type added later is for a field condition across types.
+- A subtype is found only through the caller's own types, so another person's type with the same parent slug is never followed.
+- The query JSON is unchanged, so `shared/contracts/query-shapes.json` and the frontend are too. The contract pins structure, not what a condition matches.

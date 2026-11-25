@@ -17,6 +17,7 @@ from app.modules.graph.application.type_catalogue import (
     load_edge_types,
     load_node_types,
 )
+from app.modules.graph.application.type_families import expand_type_families, type_views
 from app.modules.graph.domain.query import (
     CollectionCondition,
     Group,
@@ -82,15 +83,21 @@ async def prepare_query(
             itself.
     """
     node_types = await load_node_types(repos, scope)
-    schemas = {str(t.slug): t.attributes_schema or {} for t in node_types}
+    schemas, families = type_views(node_types)
     parsed = parse_query(raw)
-    parsed = replace(parsed, where=expand_field_scopes(parsed.where, schemas))
+    parsed = replace(
+        parsed,
+        where=expand_field_scopes(
+            expand_type_families(parsed.where, families), schemas
+        ),
+    )
     resolution = resolve_fields(parsed, schemas)
     expansion = await expand_collections(
         parsed.where,
         definitions=repos.definitions,
         scope=scope,
         schemas=schemas,
+        families=families,
         self_id=self_id,
     )
     connections = await _resolve_connections(repos, expansion.where, scope)
@@ -117,6 +124,7 @@ async def prepare_query(
         stale=resolution.stale | expansion.stale,
         relationships=connections.relationships,
         visible_items=connections.visible_items,
+        families=families,
     )
     return resolved, warnings
 

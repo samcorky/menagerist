@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Final
 
 from app.modules.graph.application.field_scope_expansion import expand_field_scopes
 from app.modules.graph.application.query_resolution import resolve_fields
+from app.modules.graph.application.type_families import Families, expand_type_families
 from app.modules.graph.domain.query import (
     CollectionCondition,
     CollectionTarget,
@@ -61,6 +62,7 @@ class _Expander:
     definitions: CollectionDefinitions | None
     scope: ContentFilter
     schemas: Mapping[str, Mapping[str, Any]]
+    families: Families
     self_id: uuid.UUID | None
     out: Expansion
     expansions: int = 0
@@ -136,7 +138,10 @@ class _Expander:
         try:
             parsed = parse_query(definition)
             parsed = replace(
-                parsed, where=expand_field_scopes(parsed.where, self.schemas)
+                parsed,
+                where=expand_field_scopes(
+                    expand_type_families(parsed.where, self.families), self.schemas
+                ),
             )
             resolution = resolve_fields(Query(where=parsed.where), self.schemas)
         except InvalidQueryError:
@@ -161,6 +166,7 @@ async def expand_collections(
     definitions: CollectionDefinitions | None,
     scope: ContentFilter,
     schemas: Mapping[str, Mapping[str, Any]],
+    families: Families,
     self_id: uuid.UUID | None,
 ) -> Expansion:
     """Fill in the targets of every collection condition under `where`.
@@ -170,6 +176,6 @@ async def expand_collections(
     """
     out = Expansion(where=None)
     if where is not None:
-        expander = _Expander(definitions, scope, schemas, self_id, out)
+        expander = _Expander(definitions, scope, schemas, families, self_id, out)
         out.where = await expander.group(where, "where", ())
     return out

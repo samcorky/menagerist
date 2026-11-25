@@ -633,12 +633,14 @@ def _field_sort_expression(key: SortKey, ctx: ResolvedQuery) -> _Expr:
     if kind is None or key.key is None:
         return cast(null(), Text)
     j = NodeModel.attributes[key.key]
+    # A parent's field is read from its subtypes' items too.
+    in_family = NodeModel.type.in_((key.type, *ctx.families.get(key.type or "", ())))
     if kind in _NUMERIC:
-        return case((NodeModel.type == key.type, _num(j)), else_=null())
+        return case((in_family, _num(j)), else_=null())
     if kind == "money":
-        return case((NodeModel.type == key.type, _num(j["value"])), else_=null())
+        return case((in_family, _num(j["value"])), else_=null())
     text = _str(j) if kind in {"date", "partialdate"} else _folded(_str(j))
-    return case((NodeModel.type == key.type, text), else_=null()).collate(_C)
+    return case((in_family, text), else_=null()).collate(_C)
 
 
 def _epoch(stamp: SQLColumnExpression[Any]) -> _Expr:

@@ -455,7 +455,8 @@ def matches(node: Node, group: Group, ctx: ResolvedQuery, env: QueryEnv) -> bool
 
 def _field_sort_value(node: Node, key: SortKey, ctx: ResolvedQuery) -> SortValue:
     kind = ctx.field_kinds.get((key.type or "", key.key or "", None))
-    if kind is None or node.type != key.type:
+    family = (key.type, *ctx.families.get(key.type or "", ()))
+    if kind is None or node.type not in family:
         return None
     value = node.attributes.get(key.key or "")
     if kind in _NUMERIC:
