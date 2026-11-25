@@ -9,6 +9,8 @@ from app.modules.graph.application.choice_lists import check_list_refs, strip_li
 from app.modules.graph.application.parent_type import (
     check_can_be_subtype,
     check_subtypes_keep_their_keys,
+    parent_properties,
+    with_inherited,
 )
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import check_meta_shape
@@ -70,7 +72,6 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
                 ).check_schema(command.attributes_schema)
             except jsonschema.SchemaError as exc:
                 raise InvalidSchemaError(str(exc.message)) from exc
-            check_meta_shape(command.attributes_schema)
             attributes_schema = strip_list_enums(command.attributes_schema)
             await check_list_refs(attributes_schema, self._choice_lists)
         else:
@@ -104,8 +105,9 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
 
             await repos.node_types.save(node_type)
             await self._uow.commit()
+            updated = await with_inherited(repos, node_type, scope=self.scope(actor))
         logger.info("node type updated", node_type_id=command.node_type_id)
-        return node_type
+        return updated
 
     async def _check_parent_rules(
         self,
@@ -117,7 +119,9 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
     ) -> None:
         """Check the parent stays one level deep and its fields free of clashes.
 
-        This runs before anything changes, so a refused update leaves the type alone.
+        A new schema is also checked for its highlights, which may name a field the
+        subtype inherits. This runs before anything changes, so a refused update
+        leaves the type alone.
         """
         if command.parent is not None:
             parent: str | None = slugify(command.parent)
@@ -127,15 +131,18 @@ class UpdateNodeType(CommandHandler[GraphUnitOfWork, UpdateNodeTypeCommand, Node
             parent = node_type.parent
         schema_changed = command.attributes_schema is not None
         schema = new_schema if schema_changed else node_type.attributes_schema
+        inherited = None
         if parent is not None and (parent != node_type.parent or schema_changed):
-            await check_can_be_subtype(
+            parent_type = await check_can_be_subtype(
                 repos,
                 slug=str(node_type.slug),
                 schema=schema,
                 parent=parent,
                 scope=scope,
             )
-        if schema_changed:
+            inherited = parent_properties(parent_type)
+        if schema is not None and schema_changed:
+            check_meta_shape(schema, inherited=inherited)
             await check_subtypes_keep_their_keys(
                 repos, parent=node_type, schema=schema, scope=scope
             )

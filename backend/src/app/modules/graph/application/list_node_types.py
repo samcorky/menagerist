@@ -1,10 +1,10 @@
 import uuid
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
-from app.modules.graph.application.choice_lists import resolve_choice_lists
+from app.modules.graph.application.parent_type import type_view
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.node_type import NodeType
 
@@ -49,13 +49,10 @@ class ListNodeTypes(QueryHandler[GraphRepos, ListNodeTypesQuery, list[NodeType]]
             scope=self.scope(actor), after=query.after, limit=query.limit
         )
         logger.debug("node types listed", count=len(result))
-        return [await self._resolved(node_type) for node_type in result]
-
-    async def _resolved(self, node_type: NodeType) -> NodeType:
-        """Fill in linked options, returning the same object if nothing changed."""
-        schema = await resolve_choice_lists(
-            node_type.attributes_schema, self._choice_lists
-        )
-        if schema is node_type.attributes_schema:
-            return node_type
-        return replace(node_type, attributes_schema=schema)
+        scope = self.scope(actor)
+        return [
+            await type_view(
+                self._repos, node_type, scope=scope, choice_lists=self._choice_lists
+            )
+            for node_type in result
+        ]

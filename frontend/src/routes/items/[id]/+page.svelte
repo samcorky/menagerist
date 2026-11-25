@@ -27,6 +27,7 @@
 	import { attributesToRows, rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
+	import { effectiveSchema } from '$lib/node-types';
 	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { coreForProp } from '$lib/field-types';
@@ -106,10 +107,7 @@
 	let reach = $derived(reachChoices(nodeId, edges, edgeTypes));
 	// Changes when a connection is added or removed, so the trail and contents fetch again.
 	let reachKey = $derived(edges.map((e) => e.id).join());
-	let nodeSchema = $derived(
-		(nodeTypes.find((nt) => nt.slug === node?.type)
-			?.attributes_schema as AttributesSchema | null) ?? null
-	);
+	let nodeSchema = $derived(effectiveSchema(nodeTypes.find((nt) => nt.slug === node?.type)));
 	let schemaLayout = $derived(
 		nodeSchema ? normalise(readSchemaMeta(nodeSchema).layout, nodeSchema.properties) : []
 	);
@@ -308,8 +306,7 @@
 	});
 
 	function schemaOfType(slug: string | null | undefined): AttributesSchema | null {
-		const type = nodeTypes.find((nt) => nt.slug === slug);
-		return (type?.attributes_schema as AttributesSchema | null | undefined) ?? null;
+		return effectiveSchema(nodeTypes.find((nt) => nt.slug === slug));
 	}
 
 	function otherNodeId(edge: EdgeResponse): string {

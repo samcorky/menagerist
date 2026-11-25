@@ -53,6 +53,8 @@ export type ItemTypeLike = {
 	slug: string;
 	label: string;
 	attributes_schema?: Record<string, unknown> | null;
+	/** What items of the type use, a subtype's parent's fields then its own; read before the above. */
+	effective_schema?: Record<string, unknown> | null;
 };
 
 export type Catalogue = {
@@ -109,7 +111,7 @@ export function buildCatalogue(
 ): Catalogue {
 	const fields: FieldInfo[] = [];
 	for (const t of itemTypes) {
-		for (const [key, prop] of propertiesOf(t.attributes_schema)) {
+		for (const [key, prop] of propertiesOf(t.effective_schema ?? t.attributes_schema)) {
 			const kind = kindOf(prop);
 			if (!kind) continue;
 			const label = title(prop, key);

@@ -449,6 +449,77 @@ def test_a_parent_that_cannot_be_used_is_a_400_naming_why() -> None:
     assert "condition" in clash.json()["detail"]
 
 
+def _fields(*keys: str) -> dict[str, object]:
+    return {"type": "object", "properties": {k: {"type": "string"} for k in keys}}
+
+
+def test_a_subtypes_response_shows_the_fields_it_uses() -> None:
+    """effective_schema is the parent's fields then its own; the other, just its own."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post(
+        "/api/v1/node-types",
+        json={
+            "slug": "memorabilia",
+            "label": "Memorabilia",
+            "attributes_schema": _fields("condition"),
+        },
+    )
+
+    poster = client.post(
+        "/api/v1/node-types",
+        json={
+            "slug": "poster",
+            "label": "Poster",
+            "parent": "memorabilia",
+            "attributes_schema": _fields("width"),
+        },
+    ).json()
+
+    fetched = client.get(f"/api/v1/node-types/{poster['id']}").json()
+    parent = client.get("/api/v1/node-types").json()[0]
+    assert list(poster["effective_schema"]["properties"]) == ["condition", "width"]
+    assert list(fetched["effective_schema"]["properties"]) == ["condition", "width"]
+    assert list(fetched["attributes_schema"]["properties"]) == ["width"]
+    # A type with no parent uses just its own.
+    assert parent["effective_schema"] == parent["attributes_schema"]
+
+
+def test_a_subtypes_etag_follows_a_change_to_its_parent() -> None:
+    """A cached subtype is not answered 304 once its parent gains a field."""
+    client = TestClient(_app_with_in_memory_graph())
+    parent = client.post(
+        "/api/v1/node-types",
+        json={
+            "slug": "memorabilia",
+            "label": "Memorabilia",
+            "attributes_schema": _fields("condition"),
+        },
+    ).json()
+    poster = client.post(
+        "/api/v1/node-types",
+        json={"slug": "poster", "label": "Poster", "parent": "memorabilia"},
+    ).json()
+    url = f"/api/v1/node-types/{poster['id']}"
+    before = client.get(url)
+    assert (
+        client.get(url, headers={"If-None-Match": before.headers["ETag"]}).status_code
+        == 304
+    )
+
+    client.patch(
+        f"/api/v1/node-types/{parent['id']}",
+        json={"attributes_schema": _fields("condition", "value")},
+    )
+
+    after = client.get(url, headers={"If-None-Match": before.headers["ETag"]})
+    assert after.status_code == 200
+    assert after.headers["ETag"] != before.headers["ETag"]
+    assert list(after.json()["effective_schema"]["properties"]) == [
+        "condition",
+        "value",
+    ]
+
+
 def test_a_parents_subtypes_are_listed_with_paging() -> None:
     """GET /node-types/{id}/subtypes lists only that parent's, paged like the rest."""
     client = TestClient(_app_with_in_memory_graph())

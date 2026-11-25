@@ -7,6 +7,7 @@ import structlog
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
+from app.modules.graph.application.parent_type import resolve_effective_schema
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import (
     check_schema_definition,
@@ -180,7 +181,13 @@ class UpdateNode(CommandHandler[GraphUnitOfWork, UpdateNodeCommand, Node]):
             node_type = await repos.node_types.get_by_slug(
                 type_slug, scope=owner_scope(node.owner_id)
             )
-            type_schema = node_type.attributes_schema if node_type else None
+            type_schema = (
+                await resolve_effective_schema(
+                    repos, node_type, scope=owner_scope(node.owner_id)
+                )
+                if node_type
+                else None
+            )
         extra_schema = (
             command.extra_schema
             if command.extra_schema is not None

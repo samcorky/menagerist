@@ -336,9 +336,10 @@ def get_list_node_types_use_case(
 
 def get_list_subtypes_use_case(
     repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    choice_lists: Annotated[PresetChoiceListSource, Depends(get_choice_list_source)],
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListSubtypes:
-    return ListSubtypes(repos, guard)
+    return ListSubtypes(repos, guard, choice_lists)
 
 
 def get_update_node_type_use_case(
