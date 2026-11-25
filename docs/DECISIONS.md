@@ -1627,7 +1627,7 @@ Applying creates the link for each item it creates or matches, and re-points a l
 
 **Choices that are not obvious:**
 
-- The server parses, with the standard library's `csv` module, so large files, pictures and a later command-line import share one set of rules; the browser only uploads. The first slice is stateless, capped at 10 MB and 5,000 rows (`transfer/domain/tabular.py`); larger files need a stored upload and a background job (#552).
+- The server parses, with the standard library's `csv` module, so large files, pictures and a later command-line import share one set of rules; the browser only uploads. The first slice is stateless, capped at 10 MB and 5,000 rows (`transfer/domain/tabular.py`); #552 raised the caps to 50 MB and 50,000 rows with a stored upload run on the worker (below).
 - One bad value blocks the run. Each problem is a plan blocker (`InvalidCellError`) naming the spreadsheet row (the header is row 1) and the field, such as "Row 14, Signed on: '19th Aug' is not a date, use 2019, 2019-08 or 2019-08-19." Twenty are listed, then "and N more problems." A row with a problem is left out of the planned items. Skipping bad rows and importing the rest waits until a re-import is safe (#556).
 - Values are converted by the field's shape (`transfer/application/cell_values.py`): text as written, numbers, yes/no (`yes`, `y`, `true`, `1` and the opposites), a choice matched to an option ignoring case, several choices split on a separator, a date as `YYYY-MM-DD`, a partial date as `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. A blank cell leaves the field out. After conversion the value is also checked against the type's own schema, so a rule such as a maximum length is reported as a problem too.
 - The graph module describes the type's fields (`GraphTarget.item_type_fields`) and checks values (`check_item_attributes`); `transfer` does not import it. Money, duration, quantity, list, checklist, table, cron and opaque fields are reported as "cannot be imported yet", and mapping a column to one is refused.
@@ -1722,3 +1722,20 @@ Applying creates the link for each item it creates or matches, and re-points a l
 - The examples' content hash includes a list only when it is not empty, so types installed before the change do not read as edited.
 
 **Rationale:** A wrong pick (a person as the thing signed, a box as the signer) made a connection nothing caught; the type's own meaning now says what it can join, and the pickers stop offering the wrong ones.
+
+## Large CSV imports: a stored upload run on the worker (2026-11-24)
+
+**Decision:** a CSV is uploaded once (`POST /imports/items/files`, the raw `text/csv` body, up to 50 MB and 50,000 rows) and kept privately at `<media path>/imports/<owner>/<id>.csv`, with an `ItemImport` row (`transfer/domain/item_import.py`, table `item_imports`) recording its status. Inspecting and previewing name the file by id and run in the request, as before. `POST /imports/items/files/{file_id}/import` stores the options on the row, marks it `queued` and asks for the `transfer.item_imports` job through `JobQueue` (#737), answering 202. The job's run (`RunQueuedImports`) works through every queued import, each as its owner, and writes progress to the row, which the owner reads with `GET /imports/items/files/{file_id}`.
+
+**Choices that are not obvious:**
+
+- The job takes no arguments: the queue is the module's own rows, and a run drains it. Requests share one waiting run, and a request made while a run is going queues one more behind it, so no import is stranded. Runs of a job never overlap, so imports run one at a time across the instance, in turns between people (`turn_order`), not strictly oldest first, so one person's five files cannot hold everyone back. The status says how many imports run first (`ahead`).
+- Because runs never overlap, an import still `running` when a run starts was interrupted (the worker stopped), so it fails with a message to run it again. No heartbeat column is needed.
+- Each import runs as its owner as they are now: identity's `GetAccountRole` (bridged as `ImportActors`) gives their current role, capped by the grants of the token that queued it, so a disabled account imports nothing and a read-only token cannot widen itself on the worker.
+- The worker plans the file again as it starts, as the in-request import does, so a stale preview is harmless; a blocked plan fails the import with the preview's message. A failure that is not a domain error shows a generic message, so paths and internals never reach the person.
+- The file is removed when its import ends either way; rows and never-imported files expire after `MENAGERIST_TRANSFER_IMPORT_TTL_HOURS` (24) through the scheduled `transfer.prune_imports` job. A queued or running import is never pruned. `item_imports` is SKIP in backups, as the files are not in them either.
+- Even an administrator sees only their own uploaded files: they hold personal data.
+
+**Not in this slice:** the frontend still sends the file with each call to the multipart routes, which stay until it moves to the stored upload. Running several imports at once, and checking a 50,000-row preview's values in one batch, wait until waits or previews are measured to be slow.
+
+**Rationale:** #552 asks to import files too big to send with every call and to keep an import running after leaving the page. The run is the same `ImportItems` as before, so nothing about converting or planning rows changed.

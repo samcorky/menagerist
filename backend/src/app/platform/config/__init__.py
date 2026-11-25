@@ -24,6 +24,7 @@ from app.platform.config.scheduler import SchedulerSettings, get_scheduler_setti
 from app.platform.config.server import ServerSettings, get_server_settings
 from app.platform.config.shared_data import SharedDataSettings, get_shared_data_settings
 from app.platform.config.terminal import TerminalSettings, get_terminal_settings
+from app.platform.config.transfer import TransferSettings, get_transfer_settings
 
 # Settings that describe a running instance. The CLI-only identity settings, the
 # shared-data location and the terminal are read fresh where they are needed, so they
@@ -45,6 +46,7 @@ INSTANCE_SETTINGS = (
     get_retention_settings,
     get_scheduler_settings,
     get_server_settings,
+    get_transfer_settings,
 )
 
 # Every deployment settings class, including the CLI-only ones. The generated
@@ -69,6 +71,7 @@ ALL_SETTINGS: tuple[type[MenageristBaseSettings], ...] = (
     ServerSettings,
     SharedDataSettings,
     TerminalSettings,
+    TransferSettings,
 )
 
 __all__ = [
@@ -95,6 +98,7 @@ __all__ = [
     "ServerSettings",
     "SharedDataSettings",
     "TerminalSettings",
+    "TransferSettings",
     "get_api_settings",
     "get_avatar_settings",
     "get_backup_settings",
@@ -114,4 +118,5 @@ __all__ = [
     "get_server_settings",
     "get_shared_data_settings",
     "get_terminal_settings",
+    "get_transfer_settings",
 ]

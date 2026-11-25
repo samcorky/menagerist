@@ -1,6 +1,6 @@
 """Errors raised for malformed bundle content and impossible run changes."""
 
-from app.shared_kernel.errors import ConflictError, ValidationError
+from app.shared_kernel.errors import ConflictError, NotFoundError, ValidationError
 
 
 class InvalidBundleError(ValidationError):
@@ -25,3 +25,15 @@ class CellValueError(ValidationError):
 
 class UnknownFormatError(ValidationError):
     """Raised when no codec reads or writes the named format."""
+
+
+class ImportNotFoundError(NotFoundError):
+    """Raised when the person has no uploaded import file with the id."""
+
+
+class InvalidImportStateError(ConflictError):
+    """Raised when an uploaded import is asked to do something its status forbids."""
+
+
+class ImportFileTooLargeError(ValidationError):
+    """Raised when an uploaded import file is over the size limit."""

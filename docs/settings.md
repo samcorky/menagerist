@@ -210,6 +210,15 @@ What the terminal the process writes to can show.
 | --- | --- | --- | --- | --- | --- |
 | `NO_COLOR` | text | unset | any | Deployment only | Set to any value that does not start with 0 to turn off colour in console logs (see https://no-color.org). |
 
+## Imports
+
+How long uploaded import files are kept.
+
+| Variable | Type | Default | Allowed values | In the app | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `MENAGERIST_TRANSFER_IMPORT_TTL_HOURS` | whole number | `24` | 1 or more | Deployment only | Hours to keep an uploaded CSV file and its import's result. A file is removed as soon as its import finishes; one never imported is removed after this long. |
+| `MENAGERIST_TRANSFER_PRUNE_IMPORTS_SCHEDULE` | cron schedule | `15 * * * *` | five fields; empty turns the job off | Admin setting | Cron expression for removing expired uploaded import files, in the instance timezone. Empty disables the job. |
+
 ## Compose
 
 Read by Docker Compose from `.env` when it starts the stack, not by Menagerist. Recreate the stack after changing one.

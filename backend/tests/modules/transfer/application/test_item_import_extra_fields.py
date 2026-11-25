@@ -5,6 +5,9 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from app.modules.transfer.adapters.persistence.in_memory_import_repository import (
+    InMemoryItemImportRepository,
+)
 from app.modules.transfer.adapters.persistence.in_memory_source_link_repository import (
     InMemorySourceLinkRepository,
 )
@@ -38,7 +41,9 @@ ALICE = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 
 
 def _repos() -> TransferRepos:
-    return TransferRepos(links=InMemorySourceLinkRepository())
+    return TransferRepos(
+        links=InMemorySourceLinkRepository(), imports=InMemoryItemImportRepository()
+    )
 
 
 def _uow() -> TransferUnitOfWork:

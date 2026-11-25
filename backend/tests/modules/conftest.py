@@ -34,6 +34,9 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
     InMemoryPresetRepository,
 )
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.transfer.adapters.persistence.in_memory_import_repository import (
+    InMemoryItemImportRepository,
+)
 from app.modules.transfer.adapters.persistence.in_memory_source_link_repository import (
     InMemorySourceLinkRepository,
 )
@@ -66,7 +69,9 @@ class Shared:
             assets=assets, attachments=InMemoryMediaAttachmentRepository(assets)
         )
         self.catalogue = FileEntryCatalogue()
-        self.transfer_repos = TransferRepos(links=InMemorySourceLinkRepository())
+        self.transfer_repos = TransferRepos(
+            links=InMemorySourceLinkRepository(), imports=InMemoryItemImportRepository()
+        )
 
     def targets(self, actor: Actor, guard: AccessGuard | None = None) -> Targets:
         """Return targets acting as `actor`, optionally with a custom guard."""

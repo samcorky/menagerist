@@ -6,6 +6,7 @@ from starlette.datastructures import Headers
 
 from app.entrypoints.api.shared.http.problem_response import problem_response
 from app.modules.identity.domain.avatar import MAX_AVATAR_BYTES
+from app.modules.transfer.domain.tabular import MAX_IMPORT_BYTES
 from app.platform.config import get_backup_settings, get_media_settings
 
 if TYPE_CHECKING:
@@ -22,6 +23,7 @@ _DRAIN_SECONDS = 30.0
 
 _UPLOAD_PATHS = frozenset({"/api/v1/media", "/api/v1/media/attachments"})
 _AVATAR_PATH = "/api/v1/me/avatar"
+_IMPORT_FILES_PATH = "/api/v1/imports/items/files"
 _BACKUP_PATHS = frozenset(
     {
         "/api/v1/backups/upload",
@@ -49,6 +51,8 @@ def _limit_for(scope: Scope) -> int | None:
         return None
     if path in _BACKUP_PATHS:
         return get_backup_settings().max_upload_size
+    if path == _IMPORT_FILES_PATH:
+        return MAX_IMPORT_BYTES
     if path in _UPLOAD_PATHS:
         return get_media_settings().max_upload_size + _OVERHEAD_ALLOWANCE
     return None

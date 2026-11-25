@@ -209,7 +209,7 @@ def test_a_file_over_the_limit_is_refused(shared: Shared) -> None:
     response = _post(client, "/inspect", data=b"t" * (MAX_IMPORT_BYTES + 1))
 
     assert response.status_code == 400
-    assert "10 MB" in response.text
+    assert "50 MB" in response.text
 
 
 def test_a_token_without_import_permission_is_forbidden(shared: Shared) -> None:

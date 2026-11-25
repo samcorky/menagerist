@@ -41,8 +41,8 @@ class DayMonthOrderGuess:
     certain: bool
 
 
-MAX_IMPORT_BYTES = 10 * 1024 * 1024
-MAX_IMPORT_ROWS = 5000
+MAX_IMPORT_BYTES = 50 * 1024 * 1024
+MAX_IMPORT_ROWS = 50_000
 # Problems a preview lists by name; the rest are counted.
 MAX_LISTED_PROBLEMS = 20
 

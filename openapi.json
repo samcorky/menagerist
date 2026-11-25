@@ -22138,6 +22138,1853 @@
         "x-required-permission": "transfer:bundle:import"
       }
     },
+    "/api/v1/imports/items/files": {
+      "post": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Upload Item Import File",
+        "description": "Upload a CSV file to import, once, as the request body.\n\nThe file is kept privately for a day. Inspect it, preview it and import it by\nits id; it is removed once its import finishes.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "upload_item_import_file",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Filename",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The file's name, shown in the list of uploaded files.",
+              "default": "import.csv",
+              "title": "X-Filename"
+            },
+            "description": "The file's name, shown in the list of uploaded files."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemImportResponse"
+                },
+                "example": {
+                  "created_at": "2026-11-24T12:00:00Z",
+                  "expires_at": "2026-11-25T12:00:00Z",
+                  "filename": "autographs.csv",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                  "progress": {
+                    "message": "Restoring photos and files",
+                    "outcome": "running",
+                    "percent": 81,
+                    "phases": [
+                      {
+                        "done": 2097152,
+                        "key": "verify",
+                        "label": "Checking the backup",
+                        "state": "done",
+                        "total": 2097152,
+                        "unit": "bytes"
+                      },
+                      {
+                        "done": 4210,
+                        "key": "database",
+                        "label": "Restoring your collection",
+                        "state": "done",
+                        "total": 4210,
+                        "unit": "count"
+                      },
+                      {
+                        "done": 1240,
+                        "key": "media",
+                        "label": "Restoring photos and files",
+                        "state": "running",
+                        "total": 2000,
+                        "unit": "count"
+                      }
+                    ]
+                  },
+                  "queued_at": "2026-11-24T12:01:10Z",
+                  "size": 48213,
+                  "started_at": "2026-11-24T12:01:12Z",
+                  "status": "running"
+                }
+              }
+            },
+            "links": {
+              "GetImportFile": {
+                "operationId": "get_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Read the file's status, progress and result."
+              },
+              "DeleteImportFile": {
+                "operationId": "delete_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Remove the file."
+              },
+              "InspectItemImportFile": {
+                "operationId": "inspect_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Inspect item import file with the id from this response."
+              },
+              "PlanItemImportFile": {
+                "operationId": "plan_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Plan item import file with the id from this response."
+              },
+              "ImportItemImportFile": {
+                "operationId": "import_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Import item import file with the id from this response."
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when an uploaded import file is over the size limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ImportFileTooLargeError",
+                  "status": 400,
+                  "detail": "The file is over the 50 MB limit.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is larger than the upload limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Payload Too Large",
+                  "status": 413,
+                  "detail": "The upload is larger than this server allows.",
+                  "instance": "/api/v1/imports/items/files"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/files"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "A CSV file with a header row, up to 50 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:import"
+      },
+      "get": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "List Item Import Files",
+        "description": "List your uploaded files and their imports, newest first.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "list_item_import_files",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemImportResponse"
+                  },
+                  "title": "Response List Item Import Files",
+                  "description": "Each entry is a `ItemImportResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-11-24T12:00:00Z",
+                    "expires_at": "2026-11-25T12:00:00Z",
+                    "filename": "autographs.csv",
+                    "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                    "progress": {
+                      "message": "Restoring photos and files",
+                      "outcome": "running",
+                      "percent": 81,
+                      "phases": [
+                        {
+                          "done": 2097152,
+                          "key": "verify",
+                          "label": "Checking the backup",
+                          "state": "done",
+                          "total": 2097152,
+                          "unit": "bytes"
+                        },
+                        {
+                          "done": 4210,
+                          "key": "database",
+                          "label": "Restoring your collection",
+                          "state": "done",
+                          "total": 4210,
+                          "unit": "count"
+                        },
+                        {
+                          "done": 1240,
+                          "key": "media",
+                          "label": "Restoring photos and files",
+                          "state": "running",
+                          "total": 2000,
+                          "unit": "count"
+                        }
+                      ]
+                    },
+                    "queued_at": "2026-11-24T12:01:10Z",
+                    "size": 48213,
+                    "started_at": "2026-11-24T12:01:12Z",
+                    "status": "running"
+                  }
+                ]
+              }
+            },
+            "links": {
+              "GetItemImportFile": {
+                "operationId": "get_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/0/id"
+                },
+                "description": "Get item import file with the id from this response."
+              },
+              "DeleteItemImportFile": {
+                "operationId": "delete_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/0/id"
+                },
+                "description": "Delete item import file with the id from this response."
+              },
+              "InspectItemImportFile": {
+                "operationId": "inspect_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/0/id"
+                },
+                "description": "Inspect item import file with the id from this response."
+              },
+              "PlanItemImportFile": {
+                "operationId": "plan_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/0/id"
+                },
+                "description": "Plan item import file with the id from this response."
+              },
+              "ImportItemImportFile": {
+                "operationId": "import_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/0/id"
+                },
+                "description": "Import item import file with the id from this response."
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/imports/items/files/{file_id}": {
+      "get": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Get Item Import File",
+        "description": "Read an uploaded file's status, and its import's progress and result.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "get_item_import_file",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The uploaded file's id.",
+              "title": "File Id"
+            },
+            "description": "The uploaded file's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemImportResponse"
+                },
+                "example": {
+                  "created_at": "2026-11-24T12:00:00Z",
+                  "expires_at": "2026-11-25T12:00:00Z",
+                  "filename": "autographs.csv",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                  "progress": {
+                    "message": "Restoring photos and files",
+                    "outcome": "running",
+                    "percent": 81,
+                    "phases": [
+                      {
+                        "done": 2097152,
+                        "key": "verify",
+                        "label": "Checking the backup",
+                        "state": "done",
+                        "total": 2097152,
+                        "unit": "bytes"
+                      },
+                      {
+                        "done": 4210,
+                        "key": "database",
+                        "label": "Restoring your collection",
+                        "state": "done",
+                        "total": 4210,
+                        "unit": "count"
+                      },
+                      {
+                        "done": 1240,
+                        "key": "media",
+                        "label": "Restoring photos and files",
+                        "state": "running",
+                        "total": 2000,
+                        "unit": "count"
+                      }
+                    ]
+                  },
+                  "queued_at": "2026-11-24T12:01:10Z",
+                  "size": 48213,
+                  "started_at": "2026-11-24T12:01:12Z",
+                  "status": "running"
+                }
+              }
+            },
+            "links": {
+              "DeleteItemImportFile": {
+                "operationId": "delete_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Delete item import file with the id from this response."
+              },
+              "InspectItemImportFile": {
+                "operationId": "inspect_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Inspect item import file with the id from this response."
+              },
+              "PlanItemImportFile": {
+                "operationId": "plan_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Plan item import file with the id from this response."
+              },
+              "ImportItemImportFile": {
+                "operationId": "import_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Import item import file with the id from this response."
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when the person has no uploaded import file with the id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ImportNotFoundError",
+                  "status": 404,
+                  "detail": "You have no uploaded file 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:import"
+      },
+      "delete": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Delete Item Import File",
+        "description": "Remove an uploaded file; one waiting to import is taken out of the queue.\n\nA file being imported now cannot be removed.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "delete_item_import_file",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The uploaded file's id.",
+              "title": "File Id"
+            },
+            "description": "The uploaded file's id."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when the person has no uploaded import file with the id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ImportNotFoundError",
+                  "status": 404,
+                  "detail": "You have no uploaded file 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Returned when an uploaded import is asked to do something its status forbids.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidImportStateError",
+                  "status": 409,
+                  "detail": "The uploaded file is no longer stored. Upload it again.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/imports/items/files/{file_id}/inspect": {
+      "post": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Inspect Item Import File",
+        "description": "Say what is in an uploaded file, as `POST /imports/items/inspect` does.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "inspect_item_import_file",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The uploaded file's id.",
+              "title": "File Id"
+            },
+            "description": "The uploaded file's id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectImportFileBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemImportInspectionResponse"
+                },
+                "example": {
+                  "headers": [
+                    "title",
+                    "signed_on",
+                    "authenticated"
+                  ],
+                  "sample_rows": [
+                    {
+                      "title": "Alien #1",
+                      "signed_on": "2019-08",
+                      "authenticated": "yes"
+                    }
+                  ],
+                  "row_count": 1204,
+                  "fields": [
+                    {
+                      "key": "signed_on",
+                      "title": "Signed on",
+                      "kind": "partialdate",
+                      "multiple": false,
+                      "importable": true
+                    }
+                  ],
+                  "suggested_mapping": [
+                    {
+                      "column": "title",
+                      "target": "name"
+                    },
+                    {
+                      "column": "signed_on",
+                      "target": "signed_on"
+                    },
+                    {
+                      "column": "authenticated"
+                    }
+                  ],
+                  "encoding": "utf_8",
+                  "day_month_order_certain": false,
+                  "column_kinds": {
+                    "title": "text",
+                    "signed_on": "partialdate",
+                    "authenticated": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a spreadsheet file or the mapping given for it cannot be imported.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidImportFileError",
+                  "status": 400,
+                  "detail": "You have no item type called 'signature'.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when the person has no uploaded import file with the id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ImportNotFoundError",
+                  "status": 404,
+                  "detail": "You have no uploaded file 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/inspect"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/imports/items/files/{file_id}/plan": {
+      "post": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Plan Item Import File",
+        "description": "See what importing an uploaded file would do, as `POST /imports/items/plan`.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "plan_item_import_file",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The uploaded file's id.",
+              "title": "File Id"
+            },
+            "description": "The uploaded file's id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportOptionsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPlanResponse"
+                },
+                "example": {
+                  "blockers": [],
+                  "entities": [
+                    {
+                      "action": "unchanged",
+                      "changed": [],
+                      "deleted": false,
+                      "kind": "preset",
+                      "label": "Condition grades",
+                      "reason": "You already have one the same.",
+                      "ref": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e30"
+                    }
+                  ],
+                  "ready": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a spreadsheet file or the mapping given for it cannot be imported.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidImportFileError",
+                  "status": 400,
+                  "detail": "You have no item type called 'signature'.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when the person has no uploaded import file with the id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ImportNotFoundError",
+                  "status": 404,
+                  "detail": "You have no uploaded file 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/plan"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
+    "/api/v1/imports/items/files/{file_id}/import": {
+      "post": {
+        "tags": [
+          "v1",
+          "Imports"
+        ],
+        "summary": "Import Item Import File",
+        "description": "Import an uploaded file in the background.\n\nImports run one at a time, taking turns between people; `ahead` says how many\nrun before this one. Read the file's progress with `GET`. The worker plans the\nfile again as it starts, so a problem found then fails the import with the\npreview's message.\n\n**Requires permission:** `transfer:bundle:import`",
+        "operationId": "import_item_import_file",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The uploaded file's id.",
+              "title": "File Id"
+            },
+            "description": "The uploaded file's id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportOptionsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemImportResponse"
+                },
+                "example": {
+                  "created_at": "2026-11-24T12:00:00Z",
+                  "expires_at": "2026-11-25T12:00:00Z",
+                  "filename": "autographs.csv",
+                  "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+                  "progress": {
+                    "message": "Restoring photos and files",
+                    "outcome": "running",
+                    "percent": 81,
+                    "phases": [
+                      {
+                        "done": 2097152,
+                        "key": "verify",
+                        "label": "Checking the backup",
+                        "state": "done",
+                        "total": 2097152,
+                        "unit": "bytes"
+                      },
+                      {
+                        "done": 4210,
+                        "key": "database",
+                        "label": "Restoring your collection",
+                        "state": "done",
+                        "total": 4210,
+                        "unit": "count"
+                      },
+                      {
+                        "done": 1240,
+                        "key": "media",
+                        "label": "Restoring photos and files",
+                        "state": "running",
+                        "total": 2000,
+                        "unit": "count"
+                      }
+                    ]
+                  },
+                  "queued_at": "2026-11-24T12:01:10Z",
+                  "size": 48213,
+                  "started_at": "2026-11-24T12:01:12Z",
+                  "status": "running"
+                }
+              }
+            },
+            "links": {
+              "GetImportFile": {
+                "operationId": "get_item_import_file",
+                "parameters": {
+                  "file_id": "$response.body#/id"
+                },
+                "description": "Read the file's status, progress and result."
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when the person has no uploaded import file with the id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ImportNotFoundError",
+                  "status": 404,
+                  "detail": "You have no uploaded file 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Returned when an uploaded import is asked to do something its status forbids.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidImportStateError",
+                  "status": 409,
+                  "detail": "This import is queued, so it cannot do that.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/imports/items/files/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/import"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "transfer:bundle:import"
+      }
+    },
     "/api/v1/collections": {
       "post": {
         "tags": [
@@ -35229,7 +37076,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "A CSV file with a header row, up to 10 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
+            "description": "A CSV file with a header row, up to 50 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
           },
           "item_type": {
             "type": "string",
@@ -35313,6 +37160,86 @@
         ],
         "title": "ImportItemsBody",
         "description": "The multipart form for `import_items`."
+      },
+      "ImportOptionsBody": {
+        "properties": {
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "description": "The slug of the item type the rows become."
+          },
+          "mapping": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnMappingEntry"
+            },
+            "type": "array",
+            "title": "Mapping",
+            "description": "Where each column goes: a `target`, or `extra` to keep the column as each item's own field."
+          },
+          "list_separator": {
+            "type": "string",
+            "title": "List Separator",
+            "description": "What separates several choices or tags in one cell.",
+            "default": ","
+          },
+          "day_month_order": {
+            "$ref": "#/components/schemas/DayMonthOrder",
+            "description": "Which number of a date written as `03/04/2019` is the day.",
+            "default": "day_first"
+          },
+          "key_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Field",
+            "description": "The field or kept detail that recognises rows imported before. Without it, every row is imported."
+          },
+          "restore": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Restore",
+            "description": "Keys of rows and connections deleted after an earlier import that are to be created again."
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionColumnEntry"
+            },
+            "type": "array",
+            "title": "Connections",
+            "description": "Columns that connect each row to another item, found by its name; at most 5."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_type",
+          "mapping"
+        ],
+        "title": "ImportOptionsBody",
+        "description": "How to import an uploaded file: its item type and where each column goes.",
+        "examples": [
+          {
+            "item_type": "autograph",
+            "key_field": "name",
+            "mapping": [
+              {
+                "column": "title",
+                "target": "name"
+              },
+              {
+                "column": "signed_on",
+                "target": "signed_on"
+              }
+            ]
+          }
+        ]
       },
       "ImportPlanResponse": {
         "properties": {
@@ -35405,13 +37332,46 @@
           }
         ]
       },
+      "ImportStatus": {
+        "type": "string",
+        "enum": [
+          "uploaded",
+          "queued",
+          "running",
+          "succeeded",
+          "failed"
+        ],
+        "title": "ImportStatus",
+        "description": "Where an uploaded file is in its life. The values are stored."
+      },
+      "InspectImportFileBody": {
+        "properties": {
+          "item_type": {
+            "type": "string",
+            "title": "Item Type",
+            "description": "The slug of the item type the rows become."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_type"
+        ],
+        "title": "InspectImportFileBody",
+        "description": "The item type to read an uploaded file against.",
+        "examples": [
+          {
+            "item_type": "autograph"
+          }
+        ]
+      },
       "InspectItemImportBody": {
         "properties": {
           "file": {
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "A CSV file with a header row, up to 10 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
+            "description": "A CSV file with a header row, up to 50 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
           },
           "item_type": {
             "type": "string",
@@ -35910,6 +37870,181 @@
                 "column": "authenticated"
               }
             ]
+          }
+        ]
+      },
+      "ItemImportResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The uploaded file's id."
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "The file's name as uploaded."
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "The file's size in bytes."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus",
+            "description": "`uploaded` until it is imported, then `queued`, `running`, and `succeeded` or `failed`."
+          },
+          "ahead": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ahead",
+            "description": "While `queued`, how many imports will run before this one; otherwise null."
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProgressSnapshotResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How far the import has got, once it has started."
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemImportResultResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the import added, once it has succeeded."
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure",
+            "description": "Why the import failed, if it did."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the file was uploaded."
+          },
+          "queued_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued At",
+            "description": "When the import was asked for."
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "When the import started."
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "When the import ended."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At",
+            "description": "When the file and this record are removed, if not before."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "size",
+          "status",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "ItemImportResponse",
+        "description": "An uploaded CSV file and what has become of its import.",
+        "examples": [
+          {
+            "created_at": "2026-11-24T12:00:00Z",
+            "expires_at": "2026-11-25T12:00:00Z",
+            "filename": "autographs.csv",
+            "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e40",
+            "progress": {
+              "message": "Restoring photos and files",
+              "outcome": "running",
+              "percent": 81,
+              "phases": [
+                {
+                  "done": 2097152,
+                  "key": "verify",
+                  "label": "Checking the backup",
+                  "state": "done",
+                  "total": 2097152,
+                  "unit": "bytes"
+                },
+                {
+                  "done": 4210,
+                  "key": "database",
+                  "label": "Restoring your collection",
+                  "state": "done",
+                  "total": 4210,
+                  "unit": "count"
+                },
+                {
+                  "done": 1240,
+                  "key": "media",
+                  "label": "Restoring photos and files",
+                  "state": "running",
+                  "total": 2000,
+                  "unit": "count"
+                }
+              ]
+            },
+            "queued_at": "2026-11-24T12:01:10Z",
+            "size": 48213,
+            "started_at": "2026-11-24T12:01:12Z",
+            "status": "running"
           }
         ]
       },
@@ -37767,7 +39902,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "A CSV file with a header row, up to 10 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
+            "description": "A CSV file with a header row, up to 50 MB, in UTF-8, UTF-16 or Windows-1252 (what Excel's plain CSV writes)."
           },
           "item_type": {
             "type": "string",

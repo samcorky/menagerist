@@ -17,6 +17,7 @@ CORS_REQUEST_HEADERS = [
     "Request-Id",
     "Time-Zone",
     "X-Client-Display-Mode",
+    "X-Filename",
 ]
 
 # `ETag` is not CORS-safelisted, so a cross-origin client cannot read it unless listed.
