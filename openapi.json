@@ -35129,6 +35129,18 @@
             ],
             "title": "Colour",
             "description": "One of: gray, red, orange, amber, green, teal, blue, violet, pink. A colour name, not a free colour, so every client can draw it with the right contrast."
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent",
+            "description": "The slug of the top-level type this is a subtype of, such as `memorabilia`; null for a type with no parent. A type with subtypes cannot have a parent."
           }
         },
         "additionalProperties": false,
@@ -38617,6 +38629,18 @@
             "title": "Colour",
             "description": "One of: gray, red, orange, amber, green, teal, blue, violet, pink. A colour name, not a free colour, so every client can draw it with the right contrast."
           },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent",
+            "description": "The slug of the top-level type this is a subtype of, such as `memorabilia`; null for a type with no parent. A type with subtypes cannot have a parent."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -41222,12 +41246,24 @@
             ],
             "title": "Colour",
             "description": "One of: gray, red, orange, amber, green, teal, blue, violet, pink. A colour name, not a free colour, so every client can draw it with the right contrast."
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent",
+            "description": "The slug of the top-level type this is a subtype of, such as `memorabilia`; null for a type with no parent. A type with subtypes cannot have a parent."
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "UpdateNodeTypeRequest",
-        "description": "Request body for updating a node type.\n\n`slug` is immutable. Omitted fields are left unchanged. Send `null` for\n`icon` or `colour` to remove it.",
+        "description": "Request body for updating a node type.\n\n`slug` is immutable. Omitted fields are left unchanged. Send `null` for\n`icon`, `colour` or `parent` to remove it.",
         "examples": [
           {
             "description": "A film or movie.",

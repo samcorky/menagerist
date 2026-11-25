@@ -18,6 +18,25 @@ async def test_add_and_get_round_trips() -> None:
     assert await repo.get(nt.id, scope=ContentFilter.everyone()) is nt
 
 
+async def test_list_subtypes_returns_only_live_subtypes_in_scope() -> None:
+    """The same answer as the database: live subtypes of that parent, by id."""
+    repo = InMemoryNodeTypeRepository()
+    owner = uuid.UUID(int=1)
+    other_owner = uuid.UUID(int=2)
+    poster = NodeType.create(owner_id=owner, slug="poster", label="P", parent="memo")
+    figure = NodeType.create(owner_id=owner, slug="figure", label="F", parent="memo")
+    gone = NodeType.create(owner_id=owner, slug="print", label="R", parent="memo")
+    gone.soft_delete()
+    theirs = NodeType.create(owner_id=other_owner, slug="mug", label="M", parent="memo")
+    top = NodeType.create(owner_id=owner, slug="memo", label="Memo")
+    for row in (poster, figure, gone, theirs, top):
+        await repo.add(row)
+
+    found = await repo.list_subtypes("memo", scope=ContentFilter.of(owner))
+
+    assert [str(t.slug) for t in found] == ["poster", "figure"]
+
+
 async def test_get_returns_none_for_missing_id() -> None:
     """get() returns None for an id that was never added."""
     repo = InMemoryNodeTypeRepository()

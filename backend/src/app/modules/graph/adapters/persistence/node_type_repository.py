@@ -31,6 +31,7 @@ def _to_domain(model: NodeTypeModel) -> NodeType:
         attributes_schema=model.attributes_schema,
         icon=model.icon,
         colour=model.colour,
+        parent=model.parent,
         created_at=model.created_at,
         updated_at=model.updated_at,
         deleted_at=model.deleted_at,
@@ -48,6 +49,7 @@ def _to_model(node_type: NodeType) -> NodeTypeModel:
         attributes_schema=node_type.attributes_schema,
         icon=node_type.icon,
         colour=node_type.colour,
+        parent=node_type.parent,
         created_at=node_type.created_at,
         updated_at=node_type.updated_at,
         deleted_at=node_type.deleted_at,
@@ -134,6 +136,20 @@ class SqlAlchemyNodeTypeRepository:
         )
         if after is not None:
             stmt = stmt.where(NodeTypeModel.id > after)
+        result = await self._session.execute(stmt)
+        return [_to_domain(model) for model in result.scalars()]
+
+    async def list_subtypes(
+        self, parent: str, *, scope: ContentFilter
+    ) -> builtins.list[NodeType]:
+        """List the non-deleted subtypes of the type with slug `parent` in `scope`."""
+        stmt = (
+            select(NodeTypeModel)
+            .where(NodeTypeModel.parent == parent)
+            .where(NodeTypeModel.deleted_at.is_(None))
+            .where(owned_by(NodeTypeModel, scope.user_id))
+            .order_by(NodeTypeModel.id)
+        )
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 

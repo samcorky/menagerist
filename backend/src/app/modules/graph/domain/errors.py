@@ -55,6 +55,14 @@ class EdgeTypeInUseError(ConflictError):
     """Raised when deleting an edge type still referenced by existing edges."""
 
 
+class InvalidParentTypeError(ValidationError):
+    """Raised when a type cannot be a subtype of the named parent."""
+
+
+class NodeTypeHasSubtypesError(ConflictError):
+    """Raised when deleting an item type that still has subtypes."""
+
+
 class ItemTypeNotAllowedError(ValidationError):
     """Raised when an item's type is outside a connection type's limit."""
 

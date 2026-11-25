@@ -366,3 +366,103 @@ def test_an_invalid_icon_or_colour_is_a_400() -> None:
     assert "icon must be" in bad_icon.json()["detail"]
     assert bad_colour.status_code == 400
     assert "colour must be one of" in bad_colour.json()["detail"]
+
+
+def test_a_type_has_no_parent_unless_given_one() -> None:
+    """Every type is top-level by default, and says so."""
+    client = TestClient(_app_with_in_memory_graph())
+
+    created = client.post("/api/v1/node-types", json={"slug": "book", "label": "Book"})
+
+    assert created.json()["parent"] is None
+
+
+def test_a_subtype_round_trips_its_parent_and_can_be_made_top_level_again() -> None:
+    """Create with a parent, read it back, then send null to remove it."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post(
+        "/api/v1/node-types", json={"slug": "memorabilia", "label": "Memorabilia"}
+    )
+
+    created = client.post(
+        "/api/v1/node-types",
+        json={"slug": "poster", "label": "Poster", "parent": "memorabilia"},
+    )
+    assert created.status_code == 201
+    assert created.json()["parent"] == "memorabilia"
+    poster_id = created.json()["id"]
+    assert (
+        client.get(f"/api/v1/node-types/{poster_id}").json()["parent"] == "memorabilia"
+    )
+
+    renamed = client.patch(
+        f"/api/v1/node-types/{poster_id}", json={"label": "Film poster"}
+    )
+    assert renamed.json()["parent"] == "memorabilia"
+
+    cleared = client.patch(f"/api/v1/node-types/{poster_id}", json={"parent": None})
+    assert cleared.status_code == 200
+    assert cleared.json()["parent"] is None
+
+
+def test_a_parent_that_cannot_be_used_is_a_400_naming_why() -> None:
+    """A missing parent, a subtype as a parent, and a clashing field are refused."""
+    client = TestClient(_app_with_in_memory_graph())
+    client.post(
+        "/api/v1/node-types",
+        json={
+            "slug": "memorabilia",
+            "label": "Memorabilia",
+            "attributes_schema": {
+                "type": "object",
+                "properties": {"condition": {"type": "string"}},
+            },
+        },
+    )
+    client.post(
+        "/api/v1/node-types",
+        json={"slug": "poster", "label": "Poster", "parent": "memorabilia"},
+    )
+
+    missing = client.post(
+        "/api/v1/node-types", json={"slug": "a", "label": "A", "parent": "nothing"}
+    )
+    nested = client.post(
+        "/api/v1/node-types", json={"slug": "b", "label": "B", "parent": "poster"}
+    )
+    clash = client.post(
+        "/api/v1/node-types",
+        json={
+            "slug": "c",
+            "label": "C",
+            "parent": "memorabilia",
+            "attributes_schema": {
+                "type": "object",
+                "properties": {"condition": {"type": "string"}},
+            },
+        },
+    )
+
+    assert [r.status_code for r in (missing, nested, clash)] == [400, 400, 400]
+    assert "not found" in missing.json()["detail"]
+    assert "one level" in nested.json()["detail"]
+    assert "condition" in clash.json()["detail"]
+
+
+def test_deleting_a_parent_with_subtypes_is_a_409_until_they_are_gone() -> None:
+    """The parent can only go once its subtypes have."""
+    client = TestClient(_app_with_in_memory_graph())
+    parent = client.post(
+        "/api/v1/node-types", json={"slug": "memorabilia", "label": "Memorabilia"}
+    ).json()
+    sub = client.post(
+        "/api/v1/node-types",
+        json={"slug": "poster", "label": "Poster", "parent": "memorabilia"},
+    ).json()
+
+    refused = client.delete(f"/api/v1/node-types/{parent['id']}")
+    assert refused.status_code == 409
+    assert "poster" in refused.json()["detail"]
+
+    assert client.delete(f"/api/v1/node-types/{sub['id']}").status_code == 204
+    assert client.delete(f"/api/v1/node-types/{parent['id']}").status_code == 204

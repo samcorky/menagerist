@@ -51,6 +51,12 @@ class NodeTypeRepository(Protocol):
         """List non-deleted node types in `scope` ordered by id, after `after`."""
         ...
 
+    async def list_subtypes(
+        self, parent: str, *, scope: ContentFilter
+    ) -> builtins.list[NodeType]:
+        """List the non-deleted subtypes of the type with slug `parent` in `scope`."""
+        ...
+
     async def list_deleted_before(
         self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
     ) -> builtins.list[NodeType]:

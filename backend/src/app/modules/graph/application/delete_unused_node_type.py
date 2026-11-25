@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.parent_type import check_has_no_subtypes
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.errors import NodeTypeInUseError, NodeTypeNotFoundError
@@ -47,6 +48,9 @@ class DeleteUnusedNodeType(
                 raise NodeTypeNotFoundError(
                     f"NodeType {command.node_type_id} not found"
                 )
+            await check_has_no_subtypes(
+                repos, node_type, scope=owner_scope(node_type.owner_id)
+            )
             in_use = await repos.nodes.list(
                 scope=owner_scope(node_type.owner_id),
                 after=None,

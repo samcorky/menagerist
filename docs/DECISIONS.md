@@ -1741,3 +1741,23 @@ The import page uploads the file once, as it is chosen, and follows the import's
 **Not in this slice:** running several imports at once, and checking a 50,000-row preview's values in one batch, wait until waits or previews are measured to be slow.
 
 **Rationale:** #552 asks to import files too big to send with every call and to keep an import running after leaving the page. The run is the same `ImportItems` as before, so nothing about converting or planning rows changed.
+
+## Parent types: an item type may be a subtype of another (2026-11-25)
+
+**Decision:** An item type has an optional `parent`, the slug of another of the person's types (#320, #766). No parent is the default, so every existing type stays top-level. `POST /node-types` and `PATCH /node-types/{id}` accept it (`null` clears it) and the type responses return it. Items are unchanged: they still name one type by slug, and may name a parent type itself.
+
+**Rules**, kept in `application/parent_type.py` because they need the other types:
+
+- **One level.** The parent must exist and have no parent of its own, and a type that has subtypes cannot be given a parent. The refusal is a 400 naming why.
+- **No clashing keys.** A subtype's fields may not reuse a key its parent defines, and a parent's fields may not gain a key one of its subtypes has. One key keeps one definition, which the item-level merge (`merge_attribute_schemas`) already assumes.
+- **A parent with subtypes cannot be deleted** (a 409 naming them), by `DeleteNodeType` and by `DeleteUnusedNodeType` (example-pack removal). Deleting a subtype is as before.
+- A type cannot be its own parent: the domain refuses it and `ck_node_types_not_own_parent` backs it up.
+
+**Choices that are not obvious:**
+
+- The parent is a slug, not an id. Items and types already refer to a type by slug, which is immutable and unique per owner, and the rule above means a parent is never deleted while something names it.
+- The checks run before anything changes, so a refused update leaves the type as it was.
+- Inherited fields, filtering, packs and the editor come in the next slices; this one is the model and its rules. Until fields are inherited, a refusal is the only answer to a clash. Later slices add merge and keep choices for attaching and detaching (#775).
+- Names: item type, parent type (has subtypes), subtype (has a parent), top-level type (no parent, used only where a subtype has to be told apart). "Kind" is not used, because the design guide reserves it for a field's kind.
+
+**Rationale:** Memorabilia with Poster, Photo print and Action figure, or Music media with Vinyl, CD and Cassette, share a base of fields and want to be listed together; a one-level parent covers that without the cost of a free tree, which no collector case here needed.

@@ -199,3 +199,67 @@ def test_update_validates_icon_and_colour() -> None:
         nt.update(icon="Not An Icon")
     with pytest.raises(ValidationError, match="colour must be one of"):
         nt.update(colour="purple")
+
+
+def test_a_type_has_no_parent_until_it_is_given_one() -> None:
+    """Every existing type is top-level."""
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="poster", label="Poster")
+
+    assert nt.parent is None
+
+
+def test_create_stores_the_parent_as_a_slug() -> None:
+    """A parent is named by its slug, normalised the way a slug is."""
+    nt = NodeType.create(
+        owner_id=SYSTEM_ACTOR.id,
+        slug="poster",
+        label="Poster",
+        parent="Music Memorabilia",
+    )
+
+    assert nt.parent == "music-memorabilia"
+
+
+@pytest.mark.parametrize("parent", ["", "  ", "!!!"])
+def test_create_rejects_a_parent_that_names_nothing(parent: str) -> None:
+    """A blank parent is an error, not a way to say none."""
+    with pytest.raises(ValidationError, match="parent"):
+        NodeType.create(
+            owner_id=SYSTEM_ACTOR.id, slug="poster", label="Poster", parent=parent
+        )
+
+
+def test_a_type_cannot_be_its_own_parent() -> None:
+    """The slug is the identity, so naming itself is a loop."""
+    with pytest.raises(ValidationError, match="its own parent"):
+        NodeType.create(
+            owner_id=SYSTEM_ACTOR.id, slug="poster", label="Poster", parent="Poster"
+        )
+
+
+def test_update_sets_changes_and_clears_the_parent() -> None:
+    """Giving a parent replaces it; clearing makes the type top-level again."""
+    nt = NodeType.create(owner_id=SYSTEM_ACTOR.id, slug="poster", label="Poster")
+
+    nt.update(parent="memorabilia")
+    nt.update(label="Film poster")
+    kept = nt.parent
+    nt.update(parent="Merchandise")
+    changed = nt.parent
+    nt.clear_parent()
+
+    assert (kept, changed, nt.parent) == ("memorabilia", "merchandise", None)
+
+
+def test_update_refuses_to_make_a_type_its_own_parent_or_a_blank_one() -> None:
+    """update() applies the same checks as create() and changes nothing on failure."""
+    nt = NodeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="poster", label="Poster", parent="memorabilia"
+    )
+
+    with pytest.raises(ValidationError, match="its own parent"):
+        nt.update(parent="poster")
+    with pytest.raises(ValidationError, match="parent"):
+        nt.update(parent="  ")
+
+    assert nt.parent == "memorabilia"
