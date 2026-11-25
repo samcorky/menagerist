@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from app.shared_kernel.content_filter import ContentFilter
 
 _IMAGE = "image/%"
+_PAGE = 200
 
 
 class SqlExternalConditions:
@@ -123,6 +124,19 @@ class CollectionsDefinitions:
         if collection.kind is CollectionKind.DYNAMIC:
             return CollectionDefinition(definition=collection.definition or {})
         return CollectionDefinition(definition=None)
+
+    async def list_ids(self, scope: ContentFilter) -> list[uuid.UUID]:
+        """Return the id of every live collection in `scope`, ordered by id."""
+        ids: list[uuid.UUID] = []
+        after: uuid.UUID | None = None
+        while True:
+            page = await self._repos.collections.list(
+                scope=scope, after=after, limit=_PAGE
+            )
+            ids.extend(collection.id for collection in page)
+            if len(page) < _PAGE:
+                return ids
+            after = page[-1].id
 
 
 def build_search_graph_repos(session: AsyncSession) -> GraphRepos:

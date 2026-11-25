@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-	TIDY_LIST_LIMIT,
 	editedQuery,
 	everythingQuery,
 	favouriteQuery,
@@ -19,10 +18,6 @@ import {
 } from '$lib/dashboard';
 import { decodeQuery, parseQuery } from '$lib/query/codec';
 import { FILTER_PARAM } from '$lib/query/items-page';
-
-const ids = (n: number) =>
-	Array.from({ length: n }, (_, i) => `018f5c2e-7b1a-7c3e-9d4f-${String(i).padStart(12, '0')}`);
-const slugs = (n: number) => Array.from({ length: n }, (_, i) => `type-${i}`);
 
 describe('dashboard queries', () => {
 	it('matches every item, and every favourite', () => {
@@ -65,50 +60,31 @@ describe('dashboard queries', () => {
 			photoQuery(),
 			noPhotoQuery(),
 			noDescriptionQuery(),
-			notInCollectionQuery(ids(3)),
-			noTypeQuery(['film', 'book'])
+			notInCollectionQuery(),
+			noTypeQuery()
 		]) {
 			expect(parseQuery(JSON.parse(JSON.stringify(query)))).not.toBeNull();
 		}
 	});
 });
 
-describe('queries that list ids', () => {
-	it('finds items in none of the collections', () => {
-		expect(notInCollectionQuery(ids(2))?.where?.children).toEqual([
-			{ kind: 'collection', mode: 'none', in: ids(2) }
-		]);
+describe('queries that need no list', () => {
+	it('finds items in no collection, however many collections there are', () => {
+		expect(notInCollectionQuery().where?.children).toEqual([{ kind: 'collection', mode: 'none' }]);
 	});
 
-	it('finds items whose type is none of the types', () => {
-		expect(noTypeQuery(['film'])?.where?.children).toEqual([
-			{ op: 'not', children: [{ kind: 'type', in: ['film'] }] }
-		]);
-	});
-
-	it('is left out with nothing to list or more ids than the server allows', () => {
-		expect(notInCollectionQuery([])).toBeNull();
-		expect(notInCollectionQuery(ids(TIDY_LIST_LIMIT + 1))).toBeNull();
-		expect(notInCollectionQuery(ids(TIDY_LIST_LIMIT))).not.toBeNull();
-		expect(noTypeQuery([])).toBeNull();
-		expect(noTypeQuery(slugs(TIDY_LIST_LIMIT + 1))).toBeNull();
+	it('finds items with no item type at all', () => {
+		expect(noTypeQuery().where?.children).toEqual([{ kind: 'type', mode: 'none' }]);
 	});
 });
 
 describe('tidyRows', () => {
-	it('lists all four rows when the id lists fit', () => {
-		expect(tidyRows({ collectionIds: ids(2), typeSlugs: slugs(2) }).map((r) => r.id)).toEqual([
+	it('always lists all four rows, with no collection or type lists to build', () => {
+		expect(tidyRows().map((r) => r.id)).toEqual([
 			'no-photo',
 			'no-description',
 			'no-collection',
 			'no-type'
-		]);
-	});
-
-	it('leaves out the rows that cannot be asked accurately', () => {
-		expect(tidyRows({ collectionIds: ids(51), typeSlugs: [] }).map((row) => row.id)).toEqual([
-			'no-photo',
-			'no-description'
 		]);
 	});
 });

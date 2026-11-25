@@ -8,7 +8,7 @@ import { ownedData, uniqueName } from './helpers';
  */
 test.describe.configure({ mode: 'serial' });
 
-const { makeItem, makeItemType, cleanUp } = ownedData();
+const { makeItem, makeItemType, makeCollection, addToCollection, cleanUp } = ownedData();
 
 // Items made with attributes are tracked here; they go before their type does.
 const seededItemIds: string[] = [];
@@ -551,4 +551,49 @@ test('type chips change the selected type and the address when ?type= is already
 	await expect(page).not.toHaveURL(/[?&]type=/);
 	await expect(page.getByText('InFirst')).toBeVisible();
 	await expect(page.getByText('InSecond')).toBeVisible();
+});
+
+test('"is in no collection" and "has no item type" take no list (#750)', async ({
+	page,
+	request
+}) => {
+	const prefix = uniqueName('Loose').replace(/\W+/g, '');
+	const type = await makeItemType(request, uniqueName('Kind'));
+	const typed = await makeItem(request, `${prefix} typed`, type.slug);
+	await makeItem(request, `${prefix} bare`);
+	const collection = await makeCollection(request, uniqueName('Shelf'));
+	await addToCollection(request, collection.id, [typed.id]);
+
+	await page.goto('/items');
+	await page.getByPlaceholder('Search your items…').fill(prefix);
+	await expect(itemLink(page, `${prefix} typed`)).toBeVisible();
+	await expect(itemLink(page, `${prefix} bare`)).toBeVisible();
+
+	// No collection: the row asks for nothing more, and only the unfiled item is left.
+	let dialog = await openFilters(page);
+	await pickField(page, 1, 'In collection');
+	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'is in no collection' });
+	await expect(dialog.getByText('Choose at least one collection.')).toHaveCount(0);
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await expect(itemLink(page, `${prefix} bare`)).toBeVisible();
+	await expect(itemLink(page, `${prefix} typed`)).toHaveCount(0);
+	await expect(page.getByRole('list', { name: 'Active filters' })).toContainText(
+		'Not in any collection'
+	);
+
+	// No item type, then the opposite.
+	dialog = await openFilters(page);
+	await dialog.getByRole('button', { name: 'Remove condition 1' }).click();
+	await dialog.getByRole('button', { name: /^Add condition/ }).click();
+	await pickField(page, 1, 'Type');
+	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'has no item type' });
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await expect(itemLink(page, `${prefix} bare`)).toBeVisible();
+	await expect(itemLink(page, `${prefix} typed`)).toHaveCount(0);
+
+	dialog = await openFilters(page);
+	await dialog.getByLabel('Condition 1, operator').selectOption({ label: 'has an item type' });
+	await dialog.getByRole('button', { name: 'Done' }).click();
+	await expect(itemLink(page, `${prefix} typed`)).toBeVisible();
+	await expect(itemLink(page, `${prefix} bare`)).toHaveCount(0);
 });

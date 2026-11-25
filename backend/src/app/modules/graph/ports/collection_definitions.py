@@ -26,3 +26,7 @@ class CollectionDefinitions(Protocol):
         Missing, deleted and someone else's collections are all None.
         """
         ...
+
+    async def list_ids(self, scope: ContentFilter) -> list[uuid.UUID]:
+        """Return the id of every live collection visible in `scope`, ordered by id."""
+        ...

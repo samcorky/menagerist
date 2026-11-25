@@ -234,6 +234,7 @@ function describeCollection(
 	c: Extract<Condition, { kind: 'collection' }>,
 	lookup: SummaryLookup
 ): string {
+	if (c.in === undefined) return c.mode === 'none' ? 'Not in any collection' : 'In a collection';
 	const ids = Array.isArray(c.in) ? c.in : [];
 	const names = ids.map((id) => {
 		const name = safe(() => lookup.collectionName?.(id));
@@ -319,10 +320,12 @@ function describe(c: Condition, lookup: SummaryLookup): string {
 			return `Tag is ${mode} ${listText(c.tags)}`.trim();
 		}
 		case 'type': {
+			const none = c.mode === 'none';
+			if (c.in === undefined) return none ? 'Has no item type' : 'Has an item type';
 			const labels = (Array.isArray(c.in) ? c.in : []).map((slug) => lookup.typeLabel(slug));
 			const last = labels.pop();
 			if (last === undefined) return 'Type is any';
-			return `Type is ${labels.length ? `${labels.join(', ')} or ` : ''}${last}`;
+			return `Type is ${none ? 'not ' : ''}${labels.length ? `${labels.join(', ')} or ` : ''}${last}`;
 		}
 		default:
 			return 'Unknown filter';

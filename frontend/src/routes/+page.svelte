@@ -132,6 +132,7 @@
 		void loadStats().then((result) => !stale() && (stats = result));
 		void loadNewest().then((result) => !stale() && (newest = result));
 		void loadEdited().then((result) => !stale() && (edited = result));
+		void loadTidy(tidyRows()).then((result) => !stale() && (tidy = result));
 		const collectionsResult = await loadCollections();
 		if (stale()) return;
 		// A reload tries the collections whose items failed again (see the effect below).
@@ -145,17 +146,6 @@
 		const breakdownResult = await loadTypeBreakdown(types);
 		if (stale()) return;
 		breakdown = breakdownResult;
-		// "No item type" is asked against the types in use, which always fit one condition.
-		const typeSlugs =
-			breakdownResult.status === 'ok' ? breakdownResult.data.rows.map((row) => row.slug) : [];
-		const tidyResult = await loadTidy(
-			tidyRows({
-				collectionIds:
-					collectionsResult.status === 'ok' ? collectionsResult.data.map((c) => c.id) : [],
-				typeSlugs
-			})
-		);
-		if (!stale()) tidy = tidyResult;
 	}
 
 	const anyFailed = $derived(

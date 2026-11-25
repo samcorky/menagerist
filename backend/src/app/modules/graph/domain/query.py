@@ -131,9 +131,14 @@ class NameCondition:
 
 @dataclass(frozen=True, kw_only=True)
 class TypeCondition:
-    """The item is one of these types."""
+    """The item's type is one of (`any`) or none of (`none`) these types.
 
-    slugs: tuple[str, ...]
+    With no `slugs` it is every type: `any` is "has an item type" and `none` is "has
+    no item type". With some, `none` also matches an item with no type.
+    """
+
+    slugs: tuple[str, ...] = ()
+    mode: Literal["any", "none"] = "any"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -191,14 +196,31 @@ type CollectionTarget = ManualTarget | SmartTarget | StaleTarget
 class CollectionCondition:
     """The item is on any (`any`) or none (`none`) of these collections.
 
+    With no `ids` it is every collection of the caller's: `any` is "in a collection" and
+    `none` is "in no collection". Query preparation then looks the collections up.
+
     `targets` is not part of the wire form: query preparation fills it in with
     what each id turned out to be. Unprepared, nothing is a target and the
     condition matches nothing.
     """
 
     mode: Literal["any", "none"]
-    ids: tuple[uuid.UUID, ...]
+    ids: tuple[uuid.UUID, ...] = ()
     targets: tuple[CollectionTarget, ...] = ()
+
+    @property
+    def every(self) -> bool:
+        """Whether it names no collection and so means all of the caller's."""
+        return not self.ids
+
+    def without_targets(self) -> bool:
+        """What the condition matches when no target is live.
+
+        A named collection that is gone matches nothing, so even `none` does not
+        match. With every collection meant and none left, nothing is a collection,
+        so `none` matches and `any` does not.
+        """
+        return self.every and self.mode == "none"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -535,8 +557,19 @@ def _name(data: Mapping[str, object], path: str) -> NameCondition:
     )
 
 
+def _mode(data: Mapping[str, object], path: str) -> Literal["any", "none"]:
+    mode = data.get("mode", "any")
+    if not isinstance(mode, str) or mode not in {"any", "none"}:
+        msg = "'mode' must be any or none."
+        raise InvalidQueryError(msg, path=path)
+    return cast("Literal['any', 'none']", mode)
+
+
 def _type(data: Mapping[str, object], path: str) -> TypeCondition:
-    return TypeCondition(slugs=_string_list(data.get("in"), path, name="in"))
+    mode = _mode(data, path)
+    if "in" not in data:
+        return TypeCondition(mode=mode)
+    return TypeCondition(slugs=_string_list(data.get("in"), path, name="in"), mode=mode)
 
 
 def _favourite(data: Mapping[str, object], path: str) -> FavouriteCondition:
@@ -588,13 +621,15 @@ def _collection(data: Mapping[str, object], path: str) -> CollectionCondition:
     if not isinstance(mode, str) or mode not in {"any", "none"}:
         msg = "'mode' must be any or none."
         raise InvalidQueryError(msg, path=path)
-    raw = data.get("in")
+    kind = cast("Literal['any', 'none']", mode)
+    if "in" not in data:
+        return CollectionCondition(mode=kind)
+    raw = data["in"]
     if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_LIST_LENGTH:
         msg = f"'in' must be a list of 1 to {MAX_LIST_LENGTH} collection ids."
         raise InvalidQueryError(msg, path=path)
     return CollectionCondition(
-        mode=cast("Literal['any', 'none']", mode),
-        ids=tuple(_collection_id(item, path) for item in raw),
+        mode=kind, ids=tuple(_collection_id(item, path) for item in raw)
     )
 
 
@@ -739,7 +774,7 @@ _CONDITION_KEYS: Final[Mapping[str, frozenset[str]]] = {
     "text": frozenset({"kind", "q"}),
     "description": frozenset({"kind", "op", "value"}),
     "name": frozenset({"kind", "op", "value"}),
-    "type": frozenset({"kind", "in"}),
+    "type": frozenset({"kind", "mode", "in"}),
     "favourite": frozenset({"kind", "value"}),
     "tag": frozenset({"kind", "mode", "tags"}),
     "media": frozenset({"kind", "mode", "type"}),

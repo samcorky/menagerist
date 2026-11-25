@@ -35,6 +35,21 @@ test('Tidy up counts match the list they open', async ({ page, request }) => {
 	await expect(page.getByText(new RegExp(`^${shown} items?$`))).toBeVisible();
 });
 
+// These two rows are one condition each, with no list of collections or types behind them (#750).
+for (const label of ['Not in any collection', 'No item type']) {
+	test(`the "${label}" row counts what its list shows`, async ({ page, request }) => {
+		await makeItem(request, uniqueName('Dash loose'));
+		await page.goto('/');
+		const row = page.getByRole('link', { name: new RegExp(`^${label}`) });
+		await expect(row).toBeVisible();
+		const shown = (await row.innerText()).match(/([\d,]+)\+?\s*$/)?.[1] ?? '';
+		expect(shown).not.toBe('');
+		await row.click();
+		await expect(page).toHaveURL(/\/items\?.*f=/);
+		await expect(page.getByText(new RegExp(`^${shown} items?$`))).toBeVisible();
+	});
+}
+
 test('blocks fold away and stay folded after a reload', async ({ page, request }) => {
 	await makeItem(request, uniqueName('Dash fold'));
 	await page.goto('/');

@@ -11,11 +11,16 @@ import {
 	STALE_COLLECTION_MESSAGE,
 	subjectOf,
 	withCollectionIds,
+	collectionOperator,
+	namesEvery,
+	typeOperator,
 	withCollectionMode,
+	withCollectionOperator,
 	withMediaMode,
 	withMediaType,
 	withOperator,
-	withSubject
+	withSubject,
+	withTypeOperator
 } from '$lib/query/builder';
 import { DESCRIPTION_OPERATORS, NAME_OPERATORS, operatorsForCondition } from '$lib/query/operators';
 import { linkedNarrow, LINKED_TOO_LARGE_MESSAGE } from '$lib/query/narrow';
@@ -89,9 +94,23 @@ describe('decoder: media and collection', () => {
 		{ kind: 'collection', mode: 'any', in: A },
 		{ kind: 'collection', mode: 'any', in: ['nope'] },
 		{ kind: 'collection', mode: 'any', in: [5] },
-		{ kind: 'collection', mode: 'any' }
+		{ kind: 'collection', mode: 'any', in: null },
+		{ kind: 'collection' },
+		{ kind: 'type', mode: 'all', in: ['film'] },
+		{ kind: 'type', in: null },
+		{ kind: 'type', in: [] }
 	])('rejects %j', (c) => {
 		expect(roundTrip(c)).toBeNull();
+	});
+
+	it.each([
+		{ kind: 'collection', mode: 'any' },
+		{ kind: 'collection', mode: 'none' },
+		{ kind: 'type' },
+		{ kind: 'type', mode: 'none' },
+		{ kind: 'type', mode: 'none', in: ['film'] }
+	])('keeps the form with no list, or the mode: %j', (c) => {
+		expect(roundTrip(c)?.where?.children[0]).toEqual(c);
 	});
 
 	it('allows 50 collection ids and refuses 51', () => {
@@ -137,7 +156,13 @@ describe('describeCondition: new kinds', () => {
 		[{ kind: 'collection', mode: 'any', in: [A] }, 'In Watchlist'],
 		[{ kind: 'collection', mode: 'none', in: [A] }, 'Not in Watchlist'],
 		[{ kind: 'collection', mode: 'any', in: [A, B] }, 'In any of Watchlist, Films'],
-		[{ kind: 'collection', mode: 'none', in: [A, B] }, 'In none of Watchlist, Films']
+		[{ kind: 'collection', mode: 'none', in: [A, B] }, 'In none of Watchlist, Films'],
+		[{ kind: 'collection', mode: 'any' }, 'In a collection'],
+		[{ kind: 'collection', mode: 'none' }, 'Not in any collection'],
+		[{ kind: 'type' }, 'Has an item type'],
+		[{ kind: 'type', mode: 'none' }, 'Has no item type'],
+		[{ kind: 'type', in: ['film'] }, 'Type is film'],
+		[{ kind: 'type', mode: 'none', in: ['film'] }, 'Type is not film']
 	] as const)('%j', (c, expected) => {
 		expect(describeCondition(c as Condition, lookup)).toBe(expected);
 	});
@@ -261,6 +286,53 @@ describe('builder: operator and mode edits', () => {
 		expect(withMediaType(fav, 'image')).toBe(fav);
 		expect(withCollectionMode(fav, 'none')).toBe(fav);
 		expect(withCollectionIds(fav, [A])).toBe(fav);
+	});
+});
+
+describe('builder: rows that name every collection or type', () => {
+	it('reads the operator from the mode and whether there is a list', () => {
+		expect(collectionOperator({ kind: 'collection', mode: 'any', in: [A] })).toBe('any');
+		expect(collectionOperator({ kind: 'collection', mode: 'none', in: [A] })).toBe('none');
+		expect(collectionOperator({ kind: 'collection', mode: 'any' })).toBe('anywhere');
+		expect(collectionOperator({ kind: 'collection', mode: 'none' })).toBe('nowhere');
+		expect(typeOperator({ kind: 'type', in: ['film'] })).toBe('any');
+		expect(typeOperator({ kind: 'type', mode: 'none', in: ['film'] })).toBe('none');
+		expect(typeOperator({ kind: 'type' })).toBe('typed');
+		expect(typeOperator({ kind: 'type', mode: 'none' })).toBe('untyped');
+	});
+
+	it('drops the list for a form without one and gives an empty list back for the others', () => {
+		const list: Condition = { kind: 'collection', mode: 'any', in: [A] };
+		expect(withCollectionOperator(list, 'nowhere')).toEqual({ kind: 'collection', mode: 'none' });
+		expect(withCollectionOperator(list, 'anywhere')).toEqual({ kind: 'collection', mode: 'any' });
+		expect(withCollectionOperator(list, 'none')).toEqual({
+			kind: 'collection',
+			mode: 'none',
+			in: [A]
+		});
+		expect(withCollectionOperator({ kind: 'collection', mode: 'none' }, 'any')).toEqual({
+			kind: 'collection',
+			mode: 'any',
+			in: []
+		});
+		const typed: Condition = { kind: 'type', in: ['film'] };
+		expect(withTypeOperator(typed, 'untyped')).toEqual({ kind: 'type', mode: 'none' });
+		expect(withTypeOperator(typed, 'typed')).toEqual({ kind: 'type' });
+		expect(withTypeOperator(typed, 'none')).toEqual({ kind: 'type', mode: 'none', in: ['film'] });
+		expect(withTypeOperator({ kind: 'type', mode: 'none' }, 'any')).toEqual({
+			kind: 'type',
+			in: []
+		});
+	});
+
+	it('knows which rows name no list, and asks for nothing more of them', () => {
+		expect(namesEvery({ kind: 'collection', mode: 'none' })).toBe(true);
+		expect(namesEvery({ kind: 'type' })).toBe(true);
+		expect(namesEvery({ kind: 'type', in: [] })).toBe(false);
+		expect(namesEvery({ kind: 'favourite', value: true })).toBe(false);
+		expect(conditionProblem({ kind: 'collection', mode: 'none' }, catalogue)).toBeNull();
+		expect(conditionProblem({ kind: 'type', mode: 'none' }, catalogue)).toBeNull();
+		expect(conditionProblem({ kind: 'type', in: [] }, catalogue)).toBe('Choose at least one type.');
 	});
 });
 

@@ -308,7 +308,7 @@ def _collection_matches(
     """On any live target; `none` negates that, but all-stale matches nothing."""
     live = [t for t in condition.targets if not isinstance(t, StaleTarget)]
     if not live:
-        return False
+        return condition.without_targets()
     manual = [t.id for t in live if isinstance(t, ManualTarget)]
     on_manual = (
         env.external is not None
@@ -383,12 +383,23 @@ def _connection_matches(
     return found != (condition.mode == "none")
 
 
+def _type_matches(node: Node, condition: TypeCondition) -> bool:
+    """As the SQL: any of the types (any type at all with none named), or none."""
+    if condition.mode == "any":
+        if not condition.slugs:
+            return node.type is not None
+        return node.type in condition.slugs
+    if not condition.slugs:
+        return node.type is None
+    return node.type is None or node.type not in condition.slugs
+
+
 def _item_condition(
     node: Node, condition: Condition, ctx: ResolvedQuery, env: QueryEnv
 ) -> bool:
     """Type, favourite, and the conditions that need other modules' data."""
     if isinstance(condition, TypeCondition):
-        return node.type in condition.slugs
+        return _type_matches(node, condition)
     if isinstance(condition, FavouriteCondition):
         return node.favourite == condition.value
     if isinstance(condition, MediaCondition):

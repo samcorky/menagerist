@@ -251,8 +251,14 @@ function condition(data: Rec): Condition | null {
 			return q === null ? null : { kind: 'text', q };
 		}
 		case 'type': {
+			const { mode } = data;
+			if (mode !== undefined && mode !== 'any' && mode !== 'none') return null;
+			const base: Extract<Condition, { kind: 'type' }> =
+				mode === undefined ? { kind: 'type' } : { kind: 'type', mode };
+			// No list at all is every type; a list that is present has to be a good one.
+			if (!('in' in data)) return base;
 			const list = strList(data.in);
-			return list === null ? null : { kind: 'type', in: list };
+			return list === null ? null : { ...base, in: list };
 		}
 		case 'favourite':
 			return typeof data.value === 'boolean' ? { kind: 'favourite', value: data.value } : null;
@@ -281,9 +287,10 @@ function condition(data: Rec): Condition | null {
 		}
 		case 'collection': {
 			const { mode } = data;
+			if (mode !== 'any' && mode !== 'none') return null;
+			if (!('in' in data)) return { kind: 'collection', mode };
 			const ids = collectionIds(data.in);
-			if ((mode !== 'any' && mode !== 'none') || ids === null) return null;
-			return { kind: 'collection', mode, in: ids };
+			return ids === null ? null : { kind: 'collection', mode, in: ids };
 		}
 		case 'field':
 			return fieldCondition(data);
