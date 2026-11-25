@@ -4,6 +4,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
+	import ComboboxLabel from './combobox-label.svelte';
 	import { cn } from '$lib/utils.js';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import {
@@ -98,7 +99,9 @@
 					class="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary py-0.5 pr-1 pl-2.5 text-xs text-secondary-foreground"
 				>
 					{#if leading}{@render leading(item)}{/if}
-					<span class="min-w-0 truncate">{item.selectedLabel ?? item.label}</span>
+					<span class="min-w-0 truncate">
+						<ComboboxLabel label={item.selectedLabel ?? item.label} crumb={item.crumb} />
+					</span>
 					<button
 						type="button"
 						{disabled}
@@ -182,7 +185,12 @@
 			onSelect={() => toggle(item)}
 		>
 			{#if leading}{@render leading(item)}{/if}
-			<span class="min-w-0 flex-1 truncate">{item.label}</span>
+			<span class="min-w-0 flex-1 truncate">
+				<ComboboxLabel
+					label={item.label}
+					crumb={item.crumb === item.group ? undefined : item.crumb}
+				/>
+			</span>
 			{#if item.description}
 				<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{item.description}</span>
 			{/if}

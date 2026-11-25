@@ -1847,3 +1847,17 @@ The import page uploads the file once, as it is chosen, and follows the import's
 
 - The limit stays what the person typed; nothing is expanded or stored. A subtype added to Person later is covered at once, and a limit never drifts from the types it names.
 - `EdgeType.fits` in the domain stays as it was: nothing uses it, and the domain cannot see other types, so the rule lives in the application layer where the types can be read.
+
+## How a subtype is shown and picked (2026-11-25)
+
+**Decision:** A subtype is shown with its parent wherever a type is chosen or named, and the pickers group a parent's family under its name (#320, #769). The parent comes first and a muted Lucide `ChevronRight`, hidden from screen readers, separates them: "Memorabilia › Poster". Where the room is small (a card, a narrow row) only "Poster" is shown, with the full name as its tooltip and "Poster, a subtype of Memorabilia" for a screen reader. Under a heading that already names the parent, just "Poster". A top-level type, or a subtype whose parent has gone, is shown as before.
+
+- **Grouping:** both select kinds group for real. The combobox takes a `group` heading per item (search matches the heading, so typing a parent's name finds its subtypes) and the native select uses `<optgroup>`. A parent heads its own group and stays selectable as itself, so an item can be of the parent type.
+- **Type picker:** types you have items in stay first, flat and biggest first, each subtype with its parent; the rest follow grouped by family, then "Other item types". A family is never split across two lists inside the rest, and no type appears twice.
+- **Filters:** choosing a parent in a type filter includes its subtypes (#768), so its row reads "All Memorabilia" with the family's total count.
+- **Text:** chips, headings and search results name a type through one helper (`typeNames`), which also gives the order that keeps a subtype after its parent in a row of every type.
+
+**Choices that are not obvious:**
+
+- The chevron is part of an item (`crumb`) rather than a character in its label, so it is a real icon in the combobox and chips, and a plain "›" only in text that cannot hold one (tooltips, a chip's words).
+- The trigger always shows the parent, even when the list row, under its heading, does not.

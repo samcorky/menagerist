@@ -88,6 +88,7 @@
 		type ExampleFilter
 	} from '$lib/examples';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+	import { inFamilyOrder, typeNames } from '$lib/type-names';
 	import { matchContext } from '$lib/search-context';
 	import { normaliseQuery } from '$lib/search-palette';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
@@ -284,9 +285,8 @@
 		});
 	});
 
-	let selectedTypeLabel = $derived(
-		allCategories.find((c) => c.slug === selectedType)?.label ?? selectedType
-	);
+	const typeName = $derived(typeNames(allCategories));
+	let selectedTypeLabel = $derived(selectedType ? typeName.path(selectedType) : selectedType);
 
 	// Initialise view mode from localStorage
 	$effect(() => {
@@ -642,13 +642,13 @@
 			>
 				All
 			</Badge>
-			{#each allCategories as cat (cat.slug)}
+			{#each inFamilyOrder(allCategories) as cat (cat.slug)}
 				<Badge
 					variant={selectedType === cat.slug ? 'default' : 'outline'}
 					class="cursor-pointer"
 					onclick={() => selectType(cat.slug)}
 				>
-					{cat.label}
+					{typeName.path(cat.slug)}
 				</Badge>
 			{/each}
 		</div>
@@ -738,6 +738,7 @@
 					onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 					schema={schemaOf(item.type)}
 					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
+					categoryParent={typeName.parentOf(item.type)?.label}
 					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
 					typeColour={allCategories.find((c) => c.slug === item.type)?.colour}
 					match={q ? matchContext(item, schemaOf(item.type), q) : null}
@@ -756,6 +757,7 @@
 					onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 					schema={schemaOf(item.type)}
 					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
+					categoryParent={typeName.parentOf(item.type)?.label}
 					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
 					typeColour={allCategories.find((c) => c.slug === item.type)?.colour}
 					match={q ? matchContext(item, schemaOf(item.type), q) : null}

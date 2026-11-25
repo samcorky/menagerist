@@ -6,6 +6,8 @@ export type ComboboxItem = {
 	label: string;
 	/** Heading the item sits under; items without one come first, ungrouped. */
 	group?: string;
+	/** A name shown before the label with a muted chevron between, such as a type's parent. */
+	crumb?: string;
 	/** Shown on the trigger when selected, if different from `label`. */
 	selectedLabel?: string;
 	/** Muted text on the right of the row, such as a count. */
@@ -22,7 +24,9 @@ export function filterComboboxItems(items: ComboboxItem[], query: string): Combo
 	const words = foldText(query).split(/\s+/).filter(Boolean);
 	if (words.length === 0) return items;
 	return items.filter((item) => {
-		const haystack = foldText(`${item.group ?? ''} ${item.label} ${item.keywords ?? ''}`);
+		const haystack = foldText(
+			`${item.group ?? ''} ${item.crumb ?? ''} ${item.label} ${item.keywords ?? ''}`
+		);
 		return words.every((word) => haystack.includes(word));
 	});
 }

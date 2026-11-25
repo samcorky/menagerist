@@ -12,12 +12,17 @@ const IN_USE = 'In use';
 const OTHERS = 'Other item types';
 const NEW = 'New item type';
 
-type TypeLike = Pick<NodeTypeResponse, 'slug' | 'label'>;
+type TypeLike = Pick<NodeTypeResponse, 'slug' | 'label'> & { parent?: string | null };
 
 /**
  * The rows of the item type picker: the types you have items in first (biggest first, with their
  * counts), then the rest, narrowed by what was typed, and a Create row last when nothing has
  * exactly the typed name. Counting only your own items keeps the shared list from crowding it.
+ *
+ * A subtype in use shows with its parent (`crumb`), since its row stands alone. Of the rest, a
+ * type with subtypes and its subtypes sit together under the parent's name, the parent first, so
+ * a subtype needs no crumb there; the others follow as "Other item types". A search matches a
+ * subtype by its parent's name too.
  */
 export function buildTypeItems(args: {
 	types: TypeLike[];
@@ -32,14 +37,21 @@ export function buildTypeItems(args: {
 	const text = args.query.trim();
 	const countOf = (type: TypeLike) => args.counts.get(type.slug) ?? 0;
 	const byLabel = (a: TypeLike, b: TypeLike) => a.label.localeCompare(b.label);
+	const bySlug = new Map(args.types.map((type) => [type.slug, type]));
+	const parentOf = (type: TypeLike) => (type.parent ? bySlug.get(type.parent) : undefined);
+	const parents = new Set(args.types.flatMap((type) => (parentOf(type) ? [type.parent!] : [])));
+	// The type whose name heads this type's group, if it belongs to a family.
+	const familyOf = (type: TypeLike) =>
+		parentOf(type) ? type.parent! : parents.has(type.slug) ? type.slug : null;
+
 	const used = args.types
 		.filter((type) => countOf(type) > 0)
 		.sort((a, b) => countOf(b) - countOf(a) || byLabel(a, b));
-	const others = args.types.filter((type) => countOf(type) === 0).sort(byLabel);
+	const unused = args.types.filter((type) => countOf(type) === 0);
 
 	const words = foldText(text).split(/\s+/).filter(Boolean);
 	const matches = (type: TypeLike) => {
-		const haystack = foldText(`${type.label} ${type.slug}`);
+		const haystack = foldText(`${type.label} ${type.slug} ${parentOf(type)?.label ?? ''}`);
 		return words.every((word) => haystack.includes(word));
 	};
 
@@ -49,11 +61,35 @@ export function buildTypeItems(args: {
 		items.push({
 			value: type.slug,
 			label: type.label,
+			crumb: parentOf(type)?.label,
 			group: IN_USE,
 			description: String(countOf(type))
 		});
 	}
-	for (const type of others.filter(matches)) {
+
+	const families = new Map<string, TypeLike[]>();
+	const others: TypeLike[] = [];
+	for (const type of unused.filter(matches)) {
+		const family = familyOf(type);
+		if (family === null) others.push(type);
+		else families.set(family, [...(families.get(family) ?? []), type]);
+	}
+	const heads = [...families.keys()].sort((a, b) => byLabel(bySlug.get(a)!, bySlug.get(b)!));
+	for (const head of heads) {
+		const members = families.get(head)!;
+		// The parent leads its own group; its subtypes follow by name.
+		members.sort((a, b) => Number(b.slug === head) - Number(a.slug === head) || byLabel(a, b));
+		for (const type of members) {
+			// The crumb is for the trigger; the list hides it under the heading that names it.
+			items.push({
+				value: type.slug,
+				label: type.label,
+				crumb: parentOf(type)?.label,
+				group: bySlug.get(head)!.label
+			});
+		}
+	}
+	for (const type of others.sort(byLabel)) {
 		items.push({ value: type.slug, label: type.label, group: OTHERS });
 	}
 
@@ -62,6 +98,33 @@ export function buildTypeItems(args: {
 	);
 	if (text && !exists && args.allowCreate !== false) {
 		items.push({ value: CREATE_PREFIX + text, label: `Create “${text}”`, group: NEW });
+	}
+	return items;
+}
+
+/**
+ * Every type as picker rows, with no counts: the types with no subtypes and no parent first, then
+ * each parent and its subtypes under the parent's name, the parent leading its group. A subtype
+ * carries its parent as the `crumb`, which the list hides under the heading that names it. For
+ * the pickers that offer all types, such as the connection limits.
+ */
+export function groupTypeItems(types: TypeLike[]): ComboboxItem[] {
+	const bySlug = new Map(types.map((type) => [type.slug, type]));
+	const parentOf = (type: TypeLike) => (type.parent ? bySlug.get(type.parent) : undefined);
+	const parents = new Set(types.flatMap((type) => (parentOf(type) ? [type.parent!] : [])));
+	const byLabel = (a: TypeLike, b: TypeLike) => a.label.localeCompare(b.label);
+
+	const items: ComboboxItem[] = types
+		.filter((type) => !parentOf(type) && !parents.has(type.slug))
+		.sort(byLabel)
+		.map((type) => ({ value: type.slug, label: type.label }));
+	const heads = [...parents].map((slug) => bySlug.get(slug)!).sort(byLabel);
+	for (const head of heads) {
+		const subtypes = types.filter((type) => type.parent === head.slug).sort(byLabel);
+		items.push({ value: head.slug, label: head.label, group: head.label });
+		for (const type of subtypes) {
+			items.push({ value: type.slug, label: type.label, crumb: head.label, group: head.label });
+		}
 	}
 	return items;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCatalogue } from '$lib/query/fields';
+import { buildCatalogue, typeLabel } from '$lib/query/fields';
 
 const field = (title: string) => ({ type: 'string', title });
 const memorabilia = {
@@ -36,5 +36,16 @@ describe('the field catalogue for a subtype', () => {
 		const { fields } = buildCatalogue([poster]);
 
 		expect(fields.map((f) => f.key)).toEqual(['width']);
+	});
+});
+
+describe('naming a subtype in a chip', () => {
+	it('shows it with its parent, and a top-level type as it is', () => {
+		const poster = { slug: 'poster', label: 'Poster', parent: 'memorabilia' };
+		const catalogue = buildCatalogue([memorabilia, poster]);
+
+		expect(typeLabel(catalogue, 'poster')).toBe('Memorabilia › Poster');
+		expect(typeLabel(catalogue, 'memorabilia')).toBe('Memorabilia');
+		expect(typeLabel(catalogue, 'gone')).toBe('gone');
 	});
 });

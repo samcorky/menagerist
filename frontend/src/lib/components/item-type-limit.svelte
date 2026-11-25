@@ -4,6 +4,7 @@
 	import type { ComboboxItem } from '$lib/components/ui/combobox/combobox';
 	import TypeIcon from '$lib/components/type-icon.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
+	import { groupTypeItems } from '$lib/type-picker';
 
 	// One end of a connection type's limit: the item types it may join, or any item when empty.
 	let {
@@ -17,7 +18,8 @@
 	} = $props();
 
 	const id = $props.id();
-	const items = $derived(options.map((o) => ({ value: o.slug, label: o.label })));
+	// Parents head their subtypes in the list, and a chosen subtype shows with its parent.
+	const items = $derived(groupTypeItems(options));
 	const bySlug = $derived(new Map(options.map((o) => [o.slug, o])));
 	// A limit on a parent type covers its subtypes, which is worth saying once one is chosen.
 	const coversSubtypes = $derived(selected.some((slug) => options.some((o) => o.parent === slug)));

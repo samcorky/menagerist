@@ -2,6 +2,7 @@ import { coreForProp, getDescriptor } from '$lib/field-types';
 import { readPropMeta, withPropMeta } from '$lib/schema-meta';
 import type { JsonSchemaProperty } from '$lib/schema-types';
 import type { ItemField } from '$lib/item-fields';
+import { typeNames } from '$lib/type-names';
 import { operatorsForKind } from './operators';
 import type { SummaryLookup } from './summary';
 
@@ -52,13 +53,15 @@ export type SavedField = { id: string; label: string; property: JsonSchemaProper
 export type ItemTypeLike = {
 	slug: string;
 	label: string;
+	/** The slug of the type this is a subtype of, if any. */
+	parent?: string | null;
 	attributes_schema?: Record<string, unknown> | null;
 	/** What items of the type use, a subtype's parent's fields then its own; read before the above. */
 	effective_schema?: Record<string, unknown> | null;
 };
 
 export type Catalogue = {
-	types: { slug: string; label: string }[];
+	types: { slug: string; label: string; parent?: string | null }[];
 	fields: FieldInfo[];
 	/** False until the item types have loaded; rows must not be called stale before then. */
 	loaded: boolean;
@@ -134,7 +137,7 @@ export function buildCatalogue(
 		}
 	}
 	return {
-		types: itemTypes.map((t) => ({ slug: t.slug, label: t.label })),
+		types: itemTypes.map((t) => ({ slug: t.slug, label: t.label, parent: t.parent ?? null })),
 		fields,
 		loaded,
 		itemFields,
@@ -142,8 +145,19 @@ export function buildCatalogue(
 	};
 }
 
+const namesByTypes = new WeakMap<object, ReturnType<typeof typeNames>>();
+
+/**
+ * A type's name as a chip or heading shows it: "Memorabilia › Poster" for a subtype, so the
+ * parent is never lost, and just the name for any other type.
+ */
 export function typeLabel(catalogue: Catalogue, slug: string): string {
-	return catalogue.types.find((t) => t.slug === slug)?.label ?? slug;
+	let names = namesByTypes.get(catalogue.types);
+	if (!names) {
+		names = typeNames(catalogue.types);
+		namesByTypes.set(catalogue.types, names);
+	}
+	return names.path(slug);
 }
 
 /** "Film › Rating" for a field reference, from the catalogue when it is known. */

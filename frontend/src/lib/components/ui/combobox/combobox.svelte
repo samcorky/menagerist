@@ -3,6 +3,7 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
+	import ComboboxLabel from './combobox-label.svelte';
 	import { cn } from '$lib/utils.js';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import {
@@ -104,7 +105,11 @@
 >
 	{#if selected && leading}{@render leading(selected)}{/if}
 	<span class={cn('min-w-0 flex-1 truncate', !selected && 'text-muted-foreground')}>
-		{selected ? (selected.selectedLabel ?? selected.label) : placeholder}
+		{#if selected}
+			<ComboboxLabel label={selected.selectedLabel ?? selected.label} crumb={selected.crumb} />
+		{:else}
+			{placeholder}
+		{/if}
 	</span>
 	<ChevronDownIcon class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 </button>
@@ -156,7 +161,12 @@
 			onSelect={() => choose(item)}
 		>
 			{#if leading}{@render leading(item)}{/if}
-			<span class="min-w-0 flex-1 truncate">{item.label}</span>
+			<span class="min-w-0 flex-1 truncate">
+				<ComboboxLabel
+					label={item.label}
+					crumb={item.crumb === item.group ? undefined : item.crumb}
+				/>
+			</span>
 			{#if item.description}
 				<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{item.description}</span>
 			{/if}
