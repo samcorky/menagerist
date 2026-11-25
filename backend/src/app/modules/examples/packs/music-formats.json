@@ -1,0 +1,534 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 8,
+  "id": "music-formats",
+  "relationship_types": [
+    {
+      "ref": "remaster-of",
+      "slug": "music-formats-remaster-of",
+      "label": "Remaster of",
+      "description": "A copy made from the same recording as another, in any format.",
+      "directional": true,
+      "source_types": [
+        "music-formats-media"
+      ],
+      "target_types": [
+        "music-formats-media"
+      ],
+      "reverse_label": "Remastered as"
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "media",
+      "slug": "music-formats-media",
+      "icon": "music",
+      "colour": "violet",
+      "label": "Music media",
+      "description": "Anything music comes on. The fields every format shares live here; each format adds its own.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "artist": {
+            "title": "Artist",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "title": {
+            "title": "Title",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "label": {
+            "title": "Label",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "catalogue_number": {
+            "title": "Catalogue number",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "released": {
+            "title": "Released",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "condition": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "Mint",
+              "Near Mint",
+              "Very Good Plus",
+              "Very Good",
+              "Good",
+              "Fair"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "artist"
+            },
+            {
+              "key": "title"
+            },
+            {
+              "key": "label"
+            },
+            {
+              "key": "catalogue_number"
+            },
+            {
+              "key": "released"
+            },
+            {
+              "key": "condition"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "artist"
+              },
+              {
+                "key": "condition"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "vinyl",
+      "slug": "music-formats-vinyl",
+      "icon": "disc-3",
+      "colour": "violet",
+      "label": "Vinyl",
+      "description": "A record you play on a turntable, with how it was pressed.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "speed": {
+            "title": "Speed",
+            "type": "string",
+            "enum": [
+              "33 1/3 rpm",
+              "45 rpm",
+              "78 rpm"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "size": {
+            "title": "Size",
+            "type": "string",
+            "enum": [
+              "7\"",
+              "10\"",
+              "12\""
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "pressing": {
+            "title": "Pressing",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "matrix": {
+            "title": "Matrix / runout",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "speed"
+            },
+            {
+              "key": "size"
+            },
+            {
+              "key": "pressing"
+            },
+            {
+              "key": "matrix"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "speed"
+              },
+              {
+                "key": "pressing"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "cd",
+      "slug": "music-formats-cd",
+      "icon": "disc-3",
+      "colour": "violet",
+      "label": "CD",
+      "description": "A compact disc.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "edition": {
+            "title": "Edition",
+            "type": "string",
+            "enum": [
+              "Original",
+              "Remaster",
+              "Deluxe",
+              "Box set"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "barcode": {
+            "title": "Barcode",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "edition"
+            },
+            {
+              "key": "barcode"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "edition"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "cassette",
+      "slug": "music-formats-cassette",
+      "icon": "cassette-tape",
+      "colour": "violet",
+      "label": "Cassette",
+      "description": "A compact cassette.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tape_type": {
+            "title": "Tape type",
+            "type": "string",
+            "enum": [
+              "Type I (normal)",
+              "Type II (chrome)",
+              "Type IV (metal)"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "noise_reduction": {
+            "title": "Noise reduction",
+            "type": "string",
+            "enum": [
+              "None",
+              "Dolby B",
+              "Dolby C"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "tape_type"
+            },
+            {
+              "key": "noise_reduction"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "tape_type"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "minidisc",
+      "slug": "music-formats-minidisc",
+      "icon": "disc-3",
+      "colour": "violet",
+      "label": "MiniDisc",
+      "description": "A MiniDisc, pre-recorded or one you recorded yourself.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recorded": {
+            "title": "Recorded",
+            "type": "string",
+            "enum": [
+              "Pre-recorded",
+              "Self-recorded"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "duration"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "recorded"
+            },
+            {
+              "key": "minutes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "recorded"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "kind-of-blue",
+      "type": "vinyl",
+      "name": "Kind of Blue",
+      "description": "The 1959 modal jazz classic on a reissue.",
+      "attributes": {
+        "artist": "Miles Davis",
+        "title": "Kind of Blue",
+        "label": "Columbia",
+        "catalogue_number": "CL 1355",
+        "released": "1959",
+        "condition": "Very Good Plus",
+        "speed": "33 1/3 rpm",
+        "size": "12\"",
+        "pressing": "Six-eye label reissue",
+        "matrix": "XSM 53585"
+      },
+      "tags": [
+        "jazz"
+      ]
+    },
+    {
+      "ref": "unknown-pleasures",
+      "type": "vinyl",
+      "name": "Unknown Pleasures",
+      "description": "An early pressing in the textured sleeve.",
+      "attributes": {
+        "artist": "Joy Division",
+        "title": "Unknown Pleasures",
+        "label": "Factory",
+        "catalogue_number": "FACT 10",
+        "released": "1979",
+        "condition": "Near Mint",
+        "speed": "33 1/3 rpm",
+        "size": "12\""
+      },
+      "tags": [
+        "post-punk"
+      ]
+    },
+    {
+      "ref": "blue-lines",
+      "type": "cd",
+      "name": "Blue Lines",
+      "description": "The 1998 remaster.",
+      "attributes": {
+        "artist": "Massive Attack",
+        "title": "Blue Lines",
+        "label": "Virgin",
+        "catalogue_number": "CDV 2640",
+        "released": "1991",
+        "condition": "Mint",
+        "edition": "Remaster"
+      },
+      "tags": [
+        "trip-hop"
+      ]
+    },
+    {
+      "ref": "ok-computer",
+      "type": "cd",
+      "name": "OK Computer",
+      "description": "The original pressing with the booklet.",
+      "attributes": {
+        "artist": "Radiohead",
+        "title": "OK Computer",
+        "label": "Parlophone",
+        "released": "1997",
+        "condition": "Very Good Plus",
+        "edition": "Original"
+      },
+      "tags": [
+        "alt-rock"
+      ]
+    },
+    {
+      "ref": "mixtape-summer",
+      "type": "cassette",
+      "name": "Summer mixtape",
+      "description": "Recorded off the radio, labelled in felt tip.",
+      "attributes": {
+        "artist": "Various",
+        "title": "Summer mixtape",
+        "released": "1991",
+        "condition": "Good",
+        "tape_type": "Type II (chrome)",
+        "noise_reduction": "Dolby B"
+      }
+    },
+    {
+      "ref": "field-recordings",
+      "type": "minidisc",
+      "name": "Field recordings",
+      "description": "A walk along the canal, recorded on a portable MiniDisc deck.",
+      "attributes": {
+        "title": "Field recordings",
+        "condition": "Good",
+        "recorded": "Self-recorded",
+        "minutes": 74
+      }
+    },
+    {
+      "ref": "blue-lines-lp",
+      "type": "vinyl",
+      "name": "Blue Lines",
+      "description": "The original 1991 double LP.",
+      "attributes": {
+        "artist": "Massive Attack",
+        "title": "Blue Lines",
+        "label": "Wild Bunch",
+        "catalogue_number": "WBRLP 1",
+        "released": "1991",
+        "condition": "Very Good",
+        "speed": "33 1/3 rpm",
+        "size": "12\"",
+        "pressing": "First UK pressing"
+      },
+      "tags": [
+        "trip-hop"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "blue-lines",
+      "to": "blue-lines-lp",
+      "type": "remaster-of"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "all-music-media",
+      "name": "All music media",
+      "description": "Every record, disc and tape: filtering by Music media finds each format.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "music-formats-media"
+              ]
+            }
+          ]
+        },
+        "sort": [
+          {
+            "by": "name",
+            "dir": "asc"
+          }
+        ]
+      }
+    }
+  ]
+}

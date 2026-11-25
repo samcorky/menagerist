@@ -294,9 +294,13 @@ export const EXAMPLE_PACK_IDS = [
 	'movies',
 	'conventions',
 	'parts',
-	'games'
+	'games',
+	'music-formats',
+	'film-formats',
+	'currency'
 ];
-export const EXAMPLE_SLUG_PREFIXES = /^(music|recipes|movies|conventions|parts|games|storage)-/;
+export const EXAMPLE_SLUG_PREFIXES =
+	/^(music|recipes|movies|conventions|parts|games|storage|film-formats|currency)-/;
 
 /**
  * DELETE that retries up to 3 times when the connection drops (`socket hang up` / `ECONNRESET`,

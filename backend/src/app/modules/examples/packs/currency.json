@@ -1,0 +1,395 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 8,
+  "id": "currency",
+  "relationship_types": [
+    {
+      "ref": "found-with",
+      "slug": "currency-found-with",
+      "label": "Found with",
+      "description": "Pieces that turned up together, such as in the same drawer or purse.",
+      "directional": false,
+      "source_types": [
+        "currency-money"
+      ],
+      "target_types": [
+        "currency-money"
+      ]
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "money",
+      "slug": "currency-money",
+      "icon": "coins",
+      "colour": "amber",
+      "label": "Currency",
+      "description": "Coins, notes and tokens. The fields every kind shares live here; each kind adds its own.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "country": {
+            "title": "Country",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "denomination": {
+            "title": "Denomination",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "issued": {
+            "title": "Issued",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "condition": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "Poor",
+              "Fair",
+              "Fine",
+              "Very fine",
+              "Extremely fine",
+              "Uncirculated"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "value": {
+            "title": "Value",
+            "type": "object",
+            "properties": {
+              "value": {
+                "title": "Value",
+                "type": "number"
+              },
+              "currency": {
+                "title": "Currency",
+                "type": "string"
+              }
+            },
+            "x-menagerist": {
+              "kind": "money"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "country"
+            },
+            {
+              "key": "denomination"
+            },
+            {
+              "key": "issued"
+            },
+            {
+              "key": "condition"
+            },
+            {
+              "key": "value"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "denomination"
+              },
+              {
+                "key": "condition"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "coin",
+      "slug": "currency-coin",
+      "icon": "coins",
+      "colour": "amber",
+      "label": "Coin",
+      "description": "A coin.",
+      "parent": "money",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "metal": {
+            "title": "Metal",
+            "type": "string",
+            "enum": [
+              "Gold",
+              "Silver",
+              "Copper",
+              "Bronze",
+              "Nickel",
+              "Other"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "mint_mark": {
+            "title": "Mint mark",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "diameter": {
+            "title": "Diameter (mm)",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "metal"
+            },
+            {
+              "key": "mint_mark"
+            },
+            {
+              "key": "diameter"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "metal"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "banknote",
+      "slug": "currency-banknote",
+      "icon": "banknote",
+      "colour": "amber",
+      "label": "Banknote",
+      "description": "A banknote.",
+      "parent": "money",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "serial_number": {
+            "title": "Serial number",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "signatory": {
+            "title": "Signatory",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "printer": {
+            "title": "Printer",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "serial_number"
+            },
+            {
+              "key": "signatory"
+            },
+            {
+              "key": "printer"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "serial_number"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "token",
+      "slug": "currency-token",
+      "icon": "ticket",
+      "colour": "amber",
+      "label": "Token",
+      "description": "A token, a tally or a transport pass used in place of money.",
+      "parent": "money",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "title": "Issuer",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "used_for": {
+            "title": "Used for",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "issuer"
+            },
+            {
+              "key": "used_for"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "issuer"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "sovereign",
+      "type": "coin",
+      "name": "Gold sovereign",
+      "description": "A 1913 sovereign, kept in its own capsule.",
+      "attributes": {
+        "country": "United Kingdom",
+        "denomination": "Sovereign",
+        "issued": "1913",
+        "condition": "Extremely fine",
+        "metal": "Gold",
+        "diameter": 22
+      }
+    },
+    {
+      "ref": "florin",
+      "type": "coin",
+      "name": "Florin",
+      "description": "A silver florin found in a drawer.",
+      "attributes": {
+        "country": "United Kingdom",
+        "denomination": "Two shillings",
+        "issued": "1946",
+        "condition": "Fine",
+        "metal": "Silver",
+        "diameter": 28.5
+      }
+    },
+    {
+      "ref": "ten-shilling",
+      "type": "banknote",
+      "name": "Ten shilling note",
+      "description": "The red-brown note with Britannia.",
+      "attributes": {
+        "country": "United Kingdom",
+        "denomination": "Ten shillings",
+        "issued": "1954",
+        "condition": "Very fine",
+        "serial_number": "R12 345678",
+        "signatory": "L. K. O'Brien",
+        "printer": "Bank of England"
+      }
+    },
+    {
+      "ref": "tube-token",
+      "type": "token",
+      "name": "Pneumatic post token",
+      "description": "A brass token from a long-gone service.",
+      "attributes": {
+        "country": "France",
+        "denomination": "One use",
+        "condition": "Fine",
+        "issuer": "Paris pneumatic post",
+        "used_for": "Sending a message by pneumatic tube"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "florin",
+      "to": "ten-shilling",
+      "type": "found-with"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "all-currency",
+      "name": "All currency",
+      "description": "Every coin, note and token: filtering by Currency finds each kind.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "currency-money"
+              ]
+            }
+          ]
+        },
+        "sort": [
+          {
+            "by": "name",
+            "dir": "asc"
+          }
+        ]
+      }
+    }
+  ]
+}

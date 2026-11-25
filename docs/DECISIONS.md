@@ -1892,3 +1892,14 @@ The import page uploads the file once, as it is chosen, and follows the import's
 
 - The promotion edits the types directly rather than through `UpdateNodeType`. Updating the parent first would be refused for clashing with the subtypes, and updating a subtype first could be refused for highlighting a field that is not defined yet. It checks the resulting schemas itself, all before anything is saved.
 - A field defined by a single subtype can be promoted through the route even though the list does not offer it, since moving it up is harmless.
+
+## Three example packs show parent types (2026-11-25)
+
+**Decision:** Three packs ship with a parent type and its subtypes: `music-formats` (Music media with Vinyl, CD, Cassette and MiniDisc), `film-formats` (Film media with Laser Disc, DVD, Blu-ray and VHS) and `currency` (Currency with Coin, Banknote and Token) (#320, #772).
+
+- **Fields:** what every subtype shares is on the parent (artist, title and condition for music; title, year and director for film; country, denomination and condition for currency). Each subtype adds only what suits it, such as pressing and matrix for Vinyl or CAV and CLV for Laser Disc. No field key is on both, which the pack parser refuses.
+- **Connections:** each pack has one connection type whose source and target are limited to the parent, so it covers every subtype (the limit rule above): _Remaster of_ links a CD to the vinyl it came from, _Same film as_ links a DVD to a Blu-ray, _Found with_ links a coin to a note.
+- **Collections:** each pack has a smart collection filtered by the parent type, which finds every subtype's items (search by parent, above), so the grouping shows straight after installing.
+- **Slugs** start with the pack id like any pack's, so the parents are `music-formats-media`, `film-formats-media` and `currency-money`. The packs sit with the base packs in the index, ahead of the add-ons.
+- **A parent type may have no items of its own** when its subtypes do; the shipped-pack test counts a parent as used then. Its other test checks a subtype's values against the parent's fields as well as its own.
+- **Not done:** a pack cannot name a parent in a pack it requires, so no add-on can make a subtype of a base pack's type (a games Expansion, say). Existing packs keep their single types.
