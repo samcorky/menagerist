@@ -180,10 +180,16 @@ class BundleRelationshipTypeEntry(BaseModel):
 
 
 class BundleRelationshipTypeExport(BundleRelationshipTypeEntry):
-    """A connection type as exported: every field is written, `holder` included."""
+    """A connection type as exported: every field is written, the limits included."""
 
     holder: Literal["source", "target", "none"] = Field(
         description="Which end holds the other: `source`, `target` or `none`."
+    )
+    source_types: list[str] = Field(
+        description="Item types allowed at the source end; empty allows any."
+    )
+    target_types: list[str] = Field(
+        description="Item types allowed at the target end; empty allows any."
     )
 
 

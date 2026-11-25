@@ -32874,10 +32874,12 @@
           "ref",
           "slug",
           "label",
-          "holder"
+          "holder",
+          "source_types",
+          "target_types"
         ],
         "title": "BundleRelationshipTypeExport",
-        "description": "A connection type as exported: every field is written, `holder` included.",
+        "description": "A connection type as exported: every field is written, the limits included.",
         "examples": [
           {
             "directional": true,
