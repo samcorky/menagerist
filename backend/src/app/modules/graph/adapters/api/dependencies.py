@@ -61,6 +61,7 @@ from app.modules.graph.application.list_item_fields import ListItemFields
 from app.modules.graph.application.list_node_types import ListNodeTypes
 from app.modules.graph.application.list_nodes import ListNodes
 from app.modules.graph.application.list_subtypes import ListSubtypes
+from app.modules.graph.application.plan_parent_change import PlanParentChange
 from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
 )
@@ -340,6 +341,13 @@ def get_list_subtypes_use_case(
     guard: Annotated[AccessGuard, Depends(get_access_guard)],
 ) -> ListSubtypes:
     return ListSubtypes(repos, guard, choice_lists)
+
+
+def get_plan_parent_change_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+) -> PlanParentChange:
+    return PlanParentChange(repos, guard)
 
 
 def get_update_node_type_use_case(

@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
-from app.modules.graph.application.field_kinds import kind_of
+from app.modules.graph.application.field_definitions import (
+    field_kind,
+    with_every_option,
+)
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import NAMESPACE, archived_keys
 from app.modules.graph.application.update_node_type import (
@@ -26,8 +29,6 @@ from app.shared_kernel.cqrs import CommandHandler
 from app.shared_kernel.unit_of_work import JoinedUnitOfWork
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from app.modules.graph.ports.unit_of_work import GraphRepos
     from app.shared_kernel.actor import Actor
 
@@ -128,7 +129,7 @@ class PromoteExtraSchemaField(
                         **type_schema,
                         "properties": {
                             **type_properties,
-                            command.key: _with_every_option(chosen, definitions),
+                            command.key: with_every_option(chosen, definitions),
                         },
                     },
                 ),
@@ -189,16 +190,6 @@ def _properties(node: Node) -> dict[str, Any]:
     return (node.extra_schema or {}).get("properties") or {}
 
 
-def _kind(prop: dict[str, Any]) -> str | None:
-    """The field's kind: the recorded one, else what its JSON Schema shape says."""
-    meta = prop.get(NAMESPACE)
-    explicit = meta.get("kind") if isinstance(meta, dict) else None
-    if isinstance(explicit, str):
-        return explicit
-    declared = prop.get("type")
-    return kind_of(prop) or (declared if isinstance(declared, str) else None)
-
-
 def _most_common(definitions: list[dict[str, Any]]) -> dict[str, Any]:
     """The definition most items share; the first seen wins a tie."""
     counts = Counter(json.dumps(d, sort_keys=True) for d in definitions)
@@ -210,48 +201,13 @@ def _check_kinds(
     key: str, chosen: dict[str, Any], definitions: list[dict[str, Any]]
 ) -> None:
     """Refuse when some items keep the key as another kind of field."""
-    kind = _kind(chosen)
-    others = sum(1 for d in definitions if _kind(d) != kind)
+    kind = field_kind(chosen)
+    others = sum(1 for d in definitions if field_kind(d) != kind)
     if others:
         noun = "item keeps" if others == 1 else "items keep"
         title = chosen.get("title") or key
         message = f"{others} {noun} {title} as a different kind of field."
         raise InvalidSchemaError(f"{message} Change them to match first.")
-
-
-def _with_every_option(
-    chosen: dict[str, Any], definitions: list[dict[str, Any]]
-) -> dict[str, Any]:
-    """`chosen` with its choices widened to every option the items list."""
-    if isinstance(chosen.get("enum"), list):
-        return {**chosen, "enum": _union(chosen["enum"], definitions, _direct)}
-    items = chosen.get("items")
-    if isinstance(items, dict) and isinstance(items.get("enum"), list):
-        widened = {**items, "enum": _union(items["enum"], definitions, _nested)}
-        return {**chosen, "items": widened}
-    return chosen
-
-
-def _direct(prop: dict[str, Any]) -> object:
-    return prop.get("enum")
-
-
-def _nested(prop: dict[str, Any]) -> object:
-    items = prop.get("items")
-    return items.get("enum") if isinstance(items, dict) else None
-
-
-def _union(
-    first: list[Any],
-    definitions: list[dict[str, Any]],
-    options_of: Callable[[dict[str, Any]], object],
-) -> list[Any]:
-    combined = list(first)
-    for definition in definitions:
-        options = options_of(definition)
-        if isinstance(options, list):
-            combined.extend(o for o in options if o not in combined)
-    return combined
 
 
 def _without(extra_schema: dict[str, Any] | None, key: str) -> dict[str, Any]:

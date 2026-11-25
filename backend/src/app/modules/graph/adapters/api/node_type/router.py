@@ -33,6 +33,7 @@ from app.modules.graph.adapters.api.dependencies import (
     get_list_attribute_values_use_case,
     get_list_node_types_use_case,
     get_list_subtypes_use_case,
+    get_plan_parent_change_use_case,
     get_purge_node_type_attribute_use_case,
     get_update_node_type_use_case,
 )
@@ -40,6 +41,8 @@ from app.modules.graph.adapters.api.node_type.schemas import (
     AttributeValueCountResponse,
     CreateNodeTypeRequest,
     NodeTypeResponse,
+    ParentChangePlanResponse,
+    ParentChangeRequest,
     UpdateNodeTypeRequest,
 )
 from app.modules.graph.application.count_node_type_attribute_usage import (
@@ -61,6 +64,7 @@ from app.modules.graph.application.list_node_types import (
     ListNodeTypesQuery,
 )
 from app.modules.graph.application.list_subtypes import ListSubtypes, ListSubtypesQuery
+from app.modules.graph.application.plan_parent_change import PlanParentChange
 from app.modules.graph.application.purge_node_type_attribute import (
     PurgeNodeTypeAttribute,
     PurgeNodeTypeAttributeCommand,
@@ -234,6 +238,36 @@ async def update_node_type(
     node_type = await update_usecase.handle(payload.to_command(node_type_id), actor)
     cond.set_response_etag(node_type, _etag_extra(node_type))
     return NodeTypeResponse.from_domain(node_type)
+
+
+@router.post(
+    "/{node_type_id}/parent/plan",
+    response_model=ParentChangePlanResponse,
+    operation_id="plan_parent_change",
+    responses={
+        **error_response(
+            NodeTypeNotFoundError,
+            detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            InvalidParentTypeError, detail="Parent type 'memorabilia' not found"
+        ),
+    },
+)
+async def plan_parent_change(
+    node_type_id: NodeTypeId,
+    payload: ParentChangeRequest,
+    use_case: Annotated[PlanParentChange, Depends(get_plan_parent_change_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> ParentChangePlanResponse:
+    """Preview giving an item type another parent, or none, without changing it.
+
+    Reports which fields would be merged, copied onto the type or archived, and
+    whether the change is allowed as asked. Nothing is saved. A clash or a field
+    defined as a different kind is reported with `allowed: false`, not as an error.
+    """
+    plan = await use_case.handle(payload.to_query(node_type_id), actor)
+    return ParentChangePlanResponse.from_domain(plan)
 
 
 @router.delete(
