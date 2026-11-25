@@ -86,6 +86,8 @@
 	let nodeId = $derived(page.params.id!);
 	// Bumped when a cover is added from the placeholder, so the cover and the Files card reload.
 	let coverVersion = $state(0);
+	// The gallery changed the cover: the one above reads again, and the gallery stays as it is.
+	let headerCoverVersion = $state(0);
 
 	let node = $state<NodeResponse | null>(null);
 	let edges = $state<EdgeResponse[]>([]);
@@ -714,7 +716,7 @@
 				class="lg:sticky lg:top-4 lg:col-start-1 lg:row-span-2 lg:row-start-1"
 			>
 				{#if node}
-					{#key coverVersion}
+					{#key `${coverVersion}:${headerCoverVersion}`}
 						<NodeCover
 							nodeId={node.id}
 							class="w-full overflow-hidden rounded-xl border bg-card"
@@ -1246,7 +1248,7 @@
 						</Card.Header>
 						<Card.Content>
 							{#key coverVersion}
-								<MediaGallery {nodeId} />
+								<MediaGallery {nodeId} oncoverchange={() => headerCoverVersion++} />
 							{/key}
 						</Card.Content>
 					</Card.Root>
