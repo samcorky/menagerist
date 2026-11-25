@@ -124,6 +124,25 @@ def test_the_service_worker_script_is_always_revalidated(
     assert "connect-src 'self'" in resp.headers["Content-Security-Policy"]
 
 
+def test_the_offline_page_may_use_its_own_style_and_script(
+    client: TestClient, dist: Path
+) -> None:
+    """The API default would leave it unstyled, with a dead button."""
+    (dist / "offline.html").write_text("<style>p{}</style><script>1</script>")
+
+    resp = client.get("/offline.html")
+
+    assert resp.status_code == 200
+    csp = resp.headers["Content-Security-Policy"]
+    assert "style-src 'unsafe-inline'" in csp
+    assert "script-src 'unsafe-inline'" in csp
+    assert "connect-src 'self'" in csp
+    # Still nothing from outside, and never framed.
+    assert "default-src 'none'" in csp
+    assert "frame-ancestors 'none'" in csp
+    assert resp.headers.get_list("Cache-Control") == ["public, max-age=3600"]
+
+
 def test_a_missing_service_worker_is_a_real_404(client: TestClient) -> None:
     """Browsers drop a worker whose script is gone, so it must not be the shell."""
     assert client.get("/service-worker.js").status_code == 404
