@@ -9,6 +9,7 @@ from app.modules.transfer.domain.bundle import (
     BundleCollection,
     BundleConnection,
     BundleItem,
+    BundleItemType,
     BundleRelationshipType,
     unportable_condition,
 )
@@ -133,3 +134,58 @@ def test_a_relationship_holder_is_one_of_three() -> None:
     assert BundleRelationshipType(ref="r", slug="r", label="R").holder == "none"
     with pytest.raises(InvalidBundleError, match="unknown holder"):
         BundleRelationshipType(ref="r", slug="r", label="R", holder="middle")
+
+
+def _types(**parents: str | None) -> tuple[BundleItemType, ...]:
+    """Item types named by ref, each with the parent ref given for it."""
+    return tuple(
+        BundleItemType(ref=ref, slug=ref, label=ref.title(), parent=parent)
+        for ref, parent in parents.items()
+    )
+
+
+def test_an_item_type_may_name_a_parent_in_the_same_bundle() -> None:
+    """A subtype and its parent, in either order, make a bundle."""
+    parent_first = Bundle(id="b", item_types=_types(memo=None, poster="memo"))
+    subtype_first = Bundle(id="b", item_types=_types(poster="memo", memo=None))
+
+    assert [t.parent for t in parent_first.item_types] == [None, "memo"]
+    assert [t.parent for t in subtype_first.item_types] == ["memo", None]
+
+
+def test_a_parent_must_be_a_type_in_the_bundle() -> None:
+    """A subtype whose parent is not in the file could not be imported on its own."""
+    with pytest.raises(InvalidBundleError, match=r"'poster'.*parent 'memo'.*not in"):
+        Bundle(id="b", item_types=_types(poster="memo"))
+
+
+def test_a_type_cannot_be_its_own_parent() -> None:
+    """Naming itself is refused."""
+    with pytest.raises(InvalidBundleError, match="its own parent"):
+        Bundle(id="b", item_types=_types(poster="poster"))
+
+
+def test_a_parent_cannot_have_a_parent() -> None:
+    """Only one level of parent types is supported."""
+    with pytest.raises(InvalidBundleError, match="one level"):
+        Bundle(id="b", item_types=_types(top=None, memo="top", poster="memo"))
+
+
+def test_a_subtype_cannot_reuse_its_parents_field_keys() -> None:
+    """The same key in both would make two answers for one field."""
+    parent = BundleItemType(
+        ref="memo",
+        slug="memo",
+        label="Memo",
+        attributes_schema={"properties": {"condition": {}, "value": {}}},
+    )
+    subtype = BundleItemType(
+        ref="poster",
+        slug="poster",
+        label="Poster",
+        parent="memo",
+        attributes_schema={"properties": {"width": {}, "condition": {}}},
+    )
+
+    with pytest.raises(InvalidBundleError, match="condition"):
+        Bundle(id="b", item_types=(parent, subtype))

@@ -44,6 +44,7 @@ _ITEM_TYPE_KEYS = _TYPE_REQUIRED | {
     "attributes_schema",
     "icon",
     "colour",
+    "parent",
 }
 _RELATIONSHIP_TYPE_KEYS = _TYPE_REQUIRED | {
     "description",
@@ -124,6 +125,9 @@ def _item_type(raw: object, n: int) -> BundleItemType:
         attributes_schema=_schema(entry, where),
         icon=_optional_text(entry, "icon", where),
         colour=_optional_text(entry, "colour", where),
+        parent=(
+            None if entry.get("parent") is None else _ref_text(entry, "parent", where)
+        ),
     )
 
 
@@ -361,6 +365,7 @@ class MenageristBundleCodec:
                     "attributes_schema": t.attributes_schema,
                     "icon": t.icon,
                     "colour": t.colour,
+                    "parent": t.parent,
                 }
                 for t in bundle.item_types
             ],

@@ -160,7 +160,10 @@ class BundleCover:
 
 @dataclass(kw_only=True, frozen=True, eq=False)
 class BundleItemType:
-    """An item type (a node type) the pack creates."""
+    """An item type (a node type) the pack creates.
+
+    `parent` is the ref of the item type this is a subtype of, in the same bundle.
+    """
 
     ref: str
     slug: str
@@ -170,6 +173,7 @@ class BundleItemType:
     cover: BundleCover | None = None
     icon: str | None = None
     colour: str | None = None
+    parent: str | None = None
 
     def __post_init__(self) -> None:
         """Reject a cover style outside the closed set."""
@@ -249,6 +253,12 @@ class BundleSource:
     require_keys: bool = False
 
 
+def _field_keys(item_type: BundleItemType) -> set[str]:
+    """The keys of the fields an item type's schema defines."""
+    properties = (item_type.attributes_schema or {}).get("properties")
+    return set(properties) if isinstance(properties, dict) else set()
+
+
 @dataclass(kw_only=True, frozen=True, eq=False)
 class Bundle:
     """What one import or install brings in, whatever its source.
@@ -291,6 +301,34 @@ class Bundle:
         self._check_collections()
         self._check_lookups()
         self._check_source()
+        self._check_parents()
+
+    def _check_parents(self) -> None:
+        """Each parent is another type here, one level deep, sharing no field key."""
+        by_ref = {t.ref: t for t in self.item_types}
+        for subtype in self.item_types:
+            if subtype.parent is None:
+                continue
+            parent = by_ref.get(subtype.parent)
+            where = f"item type '{subtype.ref}'"
+            if subtype.parent == subtype.ref:
+                raise InvalidBundleError(f"{where} cannot be its own parent")
+            if parent is None:
+                raise InvalidBundleError(
+                    f"{where} names the parent '{subtype.parent}', "
+                    + "which is not in the file"
+                )
+            if parent.parent is not None:
+                raise InvalidBundleError(
+                    f"{where} has the parent '{parent.ref}', which is itself a "
+                    + "subtype; only one level of parent types is supported"
+                )
+            shared = _field_keys(subtype) & _field_keys(parent)
+            if shared:
+                raise InvalidBundleError(
+                    f"{where} has fields its parent '{parent.ref}' already has: "
+                    + ", ".join(sorted(shared))
+                )
 
     def _check_lookups(self) -> None:
         for item in self.items:

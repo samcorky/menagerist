@@ -38,6 +38,9 @@ from app.modules.backup.domain.errors import CorruptBackupError
         ("node_types", {"slug": "book", "label": "Book", "colour": 3}),
         ("node_types", {"slug": "book", "label": "Book", "icon": "Not An Icon"}),
         ("node_types", {"slug": "book", "label": "Book", "icon": ["book"]}),
+        ("node_types", {"slug": "book", "label": "Book", "parent": 3}),
+        ("node_types", {"slug": "book", "label": "Book", "parent": "Not A Slug"}),
+        ("node_types", {"slug": "book", "label": "Book", "parent": "book"}),
         ("edge_types", {"slug": "owns", "label": "Owns", "directional": "yes"}),
         (
             "edge_types",
@@ -71,6 +74,10 @@ async def test_rejects_invalid_user_rows(table: str, row: dict[str, object]) -> 
             {"slug": "book", "label": "Book", "icon": "book-open", "colour": "teal"},
         ),
         ("node_types", {"slug": "book", "label": "Book", "icon": None, "colour": None}),
+        # A backup from before parent types has no such column.
+        ("node_types", {"slug": "book", "label": "Book"}),
+        ("node_types", {"slug": "book", "label": "Book", "parent": None}),
+        ("node_types", {"slug": "poster", "label": "Poster", "parent": "memorabilia"}),
         ("edge_types", {"slug": "owns", "label": "Owns", "directional": True}),
         ("media_assets", {"status": "orphaned", "filename": "original.pdf"}),
         ("nodes", {"extra_schema": None}),

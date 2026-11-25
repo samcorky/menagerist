@@ -55,7 +55,7 @@ def _mutated(data: dict[str, Any], path: list[str | int], value: object) -> obje
 
 _BAD: list[tuple[list[str | int], object]] = [
     (["format"], "other"),
-    (["version"], 8),
+    (["version"], 9),
     (["surprise"], 1),
     (["items"], "nope"),
     (["items", 0], "nope"),
@@ -310,6 +310,41 @@ def test_a_non_string_icon_or_colour_is_rejected(
 
     with pytest.raises(InvalidBundleError):
         parse_pack(pack_data)
+
+
+def _with_a_subtype(pack_data: dict[str, Any], **change: object) -> dict[str, Any]:
+    """The pack with a second item type, `child`, whose parent is `thing`."""
+    child = {"ref": "child", "slug": "child", "label": "Child", "parent": "thing"}
+    pack_data["item_types"].append({**child, **change})
+    return pack_data
+
+
+def test_a_v8_pack_parses_an_item_types_parent(pack_data: dict[str, Any]) -> None:
+    """A version 8 item type may name the ref of its parent, in either order."""
+    pack_data["version"] = 8
+
+    pack = parse_pack(_with_a_subtype(pack_data))
+
+    assert [t.parent for t in pack.item_types] == [None, "thing"]
+
+
+def test_a_parent_is_optional(pack_data: dict[str, Any]) -> None:
+    """Item types without a parent parse with it unset."""
+    assert parse_pack(pack_data).item_types[0].parent is None
+
+
+@pytest.mark.parametrize(
+    ("parent", "message"),
+    [(5, "parent"), ("gone", "not in the file"), ("child", "its own parent")],
+)
+def test_a_parent_that_cannot_be_used_is_rejected(
+    pack_data: dict[str, Any], parent: object, message: str
+) -> None:
+    """The parent must be text naming another item type in the pack."""
+    pack_data["version"] = 8
+
+    with pytest.raises(InvalidBundleError, match=message):
+        parse_pack(_with_a_subtype(pack_data, parent=parent))
 
 
 def test_a_cover_is_optional(pack_data: dict[str, Any]) -> None:

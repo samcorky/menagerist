@@ -62,6 +62,7 @@ BUNDLE_EXAMPLE: dict[str, Any] = {
             },
             "icon": None,
             "colour": None,
+            "parent": None,
         }
     ],
     "items": [
@@ -142,6 +143,13 @@ class BundleItemTypeEntry(BaseModel):
     )
     icon: str | None = Field(default=None, description="Its icon name.")
     colour: str | None = Field(default=None, description="Its colour name.")
+    parent: str | None = Field(
+        default=None,
+        description=(
+            "The `ref` of the item type this is a subtype of, which is in the same "
+            + "file and is not itself a subtype; null for a top-level type."
+        ),
+    )
 
 
 class BundleRelationshipTypeEntry(BaseModel):

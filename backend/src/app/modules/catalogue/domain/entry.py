@@ -10,6 +10,7 @@ from app.modules.transfer.domain.bundle import (
     BundlePreset,
     BundleRelationshipType,
 )
+from app.modules.transfer.domain.errors import InvalidBundleError
 
 
 class EntrySection(StrEnum):
@@ -40,6 +41,10 @@ class CatalogueEntry:
             raise InvalidEntryError(f"entry '{self.id}' has nothing to install")
         if self.presets and types:
             raise InvalidEntryError(f"entry '{self.id}' mixes presets with types")
+        try:
+            self.bundle()
+        except InvalidBundleError as exc:
+            raise InvalidEntryError(f"entry '{self.id}': {exc}") from exc
 
     def bundle(self) -> Bundle:
         """Return what the entry installs, as a bundle to plan and apply."""

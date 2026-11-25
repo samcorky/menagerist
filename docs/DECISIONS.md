@@ -1820,3 +1820,17 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - Nothing is stored. A smart collection keeps naming the parent, so a subtype added afterwards is followed without saving the collection again, the same way a type added later is for a field condition across types.
 - A subtype is found only through the caller's own types, so another person's type with the same parent slug is never followed.
 - The query JSON is unchanged, so `shared/contracts/query-shapes.json` and the frontend are too. The contract pins structure, not what a condition matches.
+
+## A type's parent travels in bundles, packs, the catalogue and backups (2026-11-25)
+
+**Decision:** An item type's parent moves with it through `menagerist-bundle` files, example packs, catalogue entries and backups (#320, #770), so a pack can ship Music media with its subtypes and an export and import keeps the link.
+
+- **Bundle and pack:** `BundleItemType.parent` is the `ref` of another item type in the same file, named the way an item names its type. The file version does not change: `parent` is an optional key, a file without it reads as no parent, and an export always writes it (`null` for a top-level type), as it does `holder`. Example packs take it from version 8.
+- **Catalogue:** an entry's types use their slug as their ref, so `parent` is a slug.
+- **The file is checked as a whole** when the bundle is built: a parent that is not in the file, a type that is its own parent, a parent that is itself a subtype, and a subtype that reuses a field key its parent has are all refused. A catalogue entry runs the same check when it is parsed, so a bad entry fails to load rather than at install.
+- **Import creates parents before subtypes**, whatever order the file lists them in. A subtype created under a parent the person already has goes beneath that parent, which is kept as it is.
+- **Export brings the parent** of any subtype asked for, so the file imports on its own, and names it by id.
+- **Edit detection:** the content kept for an installed type gains `parent` only when set, so types installed before parent types do not read as edited.
+- **Backups:** rows are copied whole, so the column travels; a backup from before it has none, and reads as top-level. A restored row's parent must be text in normalised slug form.
+
+**Not checked on import:** whether a parent the person already has is itself a subtype, or shares a field key with the new subtype. That is the rule `CreateNodeType` applies, so the import stops with its message rather than repeating the check.

@@ -410,7 +410,26 @@ def _node_type_content(t: NodeType) -> dict[str, Any]:
         content["icon"] = t.icon
     if t.colour is not None:
         content["colour"] = t.colour
+    if t.parent is not None:
+        content["parent"] = t.parent
     return content
+
+
+def _item_type_spec(
+    node_type: NodeType, parents: Mapping[str, NodeType]
+) -> BundleItemType:
+    """The bundle form of an item type, its `ref` its id and its parent's id."""
+    parent = parents.get(node_type.parent) if node_type.parent else None
+    return BundleItemType(
+        ref=str(node_type.id),
+        slug=str(node_type.slug),
+        label=node_type.label,
+        description=node_type.description,
+        attributes_schema=_marked(node_type.attributes_schema),
+        icon=node_type.icon,
+        colour=node_type.colour,
+        parent=str(parent.id) if parent is not None else None,
+    )
 
 
 def _edge_type_content(t: EdgeType) -> dict[str, Any]:
@@ -677,9 +696,13 @@ class GraphPackTarget:
         return Created(entity_id=edge_type.id, content=_edge_type_content(edge_type))
 
     async def create_item_type(
-        self, spec: BundleItemType, presets: Mapping[str, uuid.UUID]
+        self,
+        spec: BundleItemType,
+        presets: Mapping[str, uuid.UUID],
+        *,
+        parent_slug: str | None = None,
     ) -> Created:
-        """Create the item type."""
+        """Create the item type, under `parent_slug` when it is a subtype."""
         command = CreateNodeTypeCommand(
             slug=spec.slug,
             label=spec.label,
@@ -687,6 +710,7 @@ class GraphPackTarget:
             attributes_schema=_resolved(spec.attributes_schema, presets),
             icon=spec.icon,
             colour=spec.colour,
+            parent=parent_slug,
         )
         async with self._stores.choice_lists(self._scope) as source:
             node_type = await CreateNodeType(
@@ -697,24 +721,30 @@ class GraphPackTarget:
     async def read_item_types(
         self, type_ids: Sequence[uuid.UUID]
     ) -> list[BundleItemType]:
-        """Return the person's item types with `type_ids`, each `ref` its id."""
+        """Return the person's item types with `type_ids`, each `ref` its id.
+
+        A subtype's parent is included after the types asked for, and named by id.
+        """
         found: list[BundleItemType] = []
         async with self._stores.read() as repos:
-            for type_id in type_ids:
-                node_type = await GetNodeType(repos, self._access).handle(
+            asked = [
+                await GetNodeType(repos, self._access).handle(
                     GetNodeTypeQuery(node_type_id=type_id), self._actor
                 )
-                found.append(
-                    BundleItemType(
-                        ref=str(node_type.id),
-                        slug=str(node_type.slug),
-                        label=node_type.label,
-                        description=node_type.description,
-                        attributes_schema=_marked(node_type.attributes_schema),
-                        icon=node_type.icon,
-                        colour=node_type.colour,
-                    )
+                for type_id in type_ids
+            ]
+            parents: dict[str, NodeType] = {}
+            for node_type in asked:
+                if node_type.parent is None or node_type.parent in parents:
+                    continue
+                parent = await repos.node_types.get_by_slug(
+                    node_type.parent, scope=self._scope
                 )
+                if parent is not None:
+                    parents[node_type.parent] = parent
+            seen = {t.id for t in asked}
+            extra = [p for p in parents.values() if p.id not in seen]
+            found = [_item_type_spec(t, parents) for t in [*asked, *extra]]
         return found
 
     async def read_relationship_types(

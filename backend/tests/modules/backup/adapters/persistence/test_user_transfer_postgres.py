@@ -51,6 +51,13 @@ async def test_reflected_user_transfer_keeps_other_accounts(
                 VALUES (:id,'book','Book',NULL,now(),now())"""),
                 {"id": type_id},
             )
+            await connection.execute(
+                text("""INSERT INTO node_types
+                (id, owner_id, slug, label, attributes_schema, parent,
+                created_at, updated_at)
+                VALUES (:id,:owner,'novel','Novel',NULL,'book',now(),now())"""),
+                {"id": uuid7(), "owner": owner},
+            )
             for identifier, user_id, name in (
                 (item, owner, "Mine"),
                 (private, other, "Private"),
@@ -77,6 +84,11 @@ async def test_reflected_user_transfer_keeps_other_accounts(
         assert b"Private" not in b"".join(members.values())
         assert "data/users.ndjson" not in members
         assert json.loads(members["data/nodes.ndjson"])["id"] == str(item)
+        # A subtype's parent travels with its row.
+        types = [
+            json.loads(line) for line in members["data/node_types.ndjson"].splitlines()
+        ]
+        assert {row["slug"]: row["parent"] for row in types} == {"novel": "book"}
         starred = [
             json.loads(line)
             for line in members["data/node_favourites.ndjson"].splitlines()
@@ -93,6 +105,7 @@ async def test_reflected_user_transfer_keeps_other_accounts(
             await connection.execute(
                 text("DELETE FROM nodes WHERE id=:id"), {"id": item}
             )
+            await connection.execute(text("DELETE FROM node_types WHERE slug='novel'"))
         await restorer.import_user(
             InMemoryBackupReader(members).members(), new_owner_id=destination
         )
@@ -109,6 +122,12 @@ async def test_reflected_user_transfer_keeps_other_accounts(
                 )
                 == other
             )
+            restored = (
+                await connection.execute(
+                    text("SELECT owner_id, parent FROM node_types WHERE slug='novel'")
+                )
+            ).one()
+            assert (restored.owner_id, restored.parent) == (destination, "book")
             favourites = (
                 await connection.execute(
                     text("SELECT user_id, node_id FROM node_favourites")
