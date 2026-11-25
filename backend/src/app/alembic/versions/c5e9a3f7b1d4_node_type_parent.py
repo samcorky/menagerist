@@ -5,7 +5,7 @@ default, so every existing type stays top-level. A type cannot be its own parent
 the use cases keep the nesting one level deep.
 
 Revision ID: c5e9a3f7b1d4
-Revises: b4d8f2a6c1e7
+Revises: d8f2a6c4e1b7
 Create Date: 2026-11-25 14:55:00.000000
 
 """
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c5e9a3f7b1d4"
-down_revision: str | None = "b4d8f2a6c1e7"
+down_revision: str | None = "d8f2a6c4e1b7"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
