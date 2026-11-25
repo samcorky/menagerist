@@ -122,9 +122,9 @@
 					class="mt-0.5 truncate text-xs text-muted-foreground"
 					title={categoryParent ? `${categoryParent} › ${categoryLabel}` : undefined}
 				>
-					{categoryLabel}{#if categoryParent}<span class="sr-only"
-							>, a subtype of {categoryParent}</span
-						>{/if}
+					{categoryLabel}{#if categoryParent}<span class="sr-only">
+							, a subtype of {categoryParent}
+						</span>{/if}
 				</p>
 			{/if}
 			{#if item.tags.length > 0}

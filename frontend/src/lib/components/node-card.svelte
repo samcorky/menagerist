@@ -119,9 +119,9 @@
 				class="shrink-0"
 				title={categoryParent ? `${categoryParent} › ${categoryText}` : undefined}
 			>
-				{categoryText}{#if categoryParent}<span class="sr-only"
-						>, a subtype of {categoryParent}</span
-					>{/if}
+				{categoryText}{#if categoryParent}<span class="sr-only">
+						, a subtype of {categoryParent}
+					</span>{/if}
 			</Badge>
 		</Item.Actions>
 	{/if}
