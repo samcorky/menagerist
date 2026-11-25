@@ -10,16 +10,8 @@
 		takeStaysOnPage
 	} from '$lib/back-layers.js';
 	import { onNavigate, beforeNavigate, afterNavigate, goto } from '$app/navigation';
-	import {
-		CirclePlus,
-		LayoutGrid,
-		House,
-		Settings,
-		Library,
-		Menu,
-		Search,
-		WifiOff
-	} from '@lucide/svelte';
+	import { CirclePlus, LayoutGrid, House, Settings, Library, Menu, Search } from '@lucide/svelte';
+	import UnreachableIcon from '$lib/components/unreachable-icon.svelte';
 	import { onMount, setContext, untrack } from 'svelte';
 	import { Toaster, toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -427,7 +419,7 @@
 						data-testid="start-offline"
 						class="flex flex-1 flex-col items-center gap-3 px-4 py-16 text-center"
 					>
-						<WifiOff class="size-10 text-muted-foreground/50" />
+						<UnreachableIcon class="size-10 text-muted-foreground/50" />
 						<h1 class="font-heading text-xl font-semibold">
 							{offlineWording.title}
 						</h1>

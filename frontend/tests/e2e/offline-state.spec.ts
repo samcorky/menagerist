@@ -153,6 +153,9 @@ test('Home shows that it is offline, and loads again from the banner Retry', asy
 	await expect(page.getByText("Can't reach Menagerist, so your totals can't load.")).toBeVisible();
 	const banner = page.getByTestId('offline-banner');
 	await expect(banner).toBeVisible();
+	// The connection is fine and the server is not answering, so the mark is a server's.
+	await expect(banner.locator('[data-icon="server-off"]')).toBeVisible();
+	await expect(banner.locator('[data-icon="wifi-off"]')).toHaveCount(0);
 
 	// Any request answered would bring Home back by itself and take the banner with it, so the
 	// API stays cut until the page has seen Retry pressed: only then are requests let through.
@@ -194,6 +197,8 @@ test('Home never shows blank counts when the browser itself goes offline', async
 	await page.getByRole('link', { name: 'Home', exact: true }).first().click();
 
 	await expect(page.getByTestId('offline-banner')).toBeVisible();
+	// The browser has no connection, so the mark is the broken wifi.
+	await expect(page.getByTestId('offline-banner').locator('[data-icon="wifi-off"]')).toBeVisible();
 	await expect(page.getByText("You're offline, so your totals can't load.")).toBeVisible();
 	await expect(page.getByText("You don't have any items yet")).toHaveCount(0);
 
