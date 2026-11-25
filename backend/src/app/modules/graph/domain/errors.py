@@ -55,5 +55,9 @@ class EdgeTypeInUseError(ConflictError):
     """Raised when deleting an edge type still referenced by existing edges."""
 
 
+class ItemTypeNotAllowedError(ValidationError):
+    """Raised when an item's type is outside a connection type's limit."""
+
+
 class RelationshipHoldsNothingError(ValidationError):
     """Raised when a contents or path is asked of a relationship that holds nothing."""

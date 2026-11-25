@@ -1707,3 +1707,18 @@ Applying creates the link for each item it creates or matches, and re-points a l
 - Relationship and item types the import builds on are never created and are left out of its preview.
 
 **Rationale:** A row often names other things, such as who signed it and where it was got; they become connections to real items rather than text, and importing again neither repeats them nor undoes a deletion.
+
+## Limiting which item types a connection type joins (2026-11-25)
+
+**Decision:** A connection type has `source_types` and `target_types`, lists of item type slugs allowed at its source and target ends (#744). An empty list is no limit, so existing types behave as before. `CreateEdge` and `CreateEdges` refuse an item outside a limit with a 400 (`ItemTypeNotAllowedError`) naming the end, the allowed types and the item, and `CreateEdges` checks every new target before writing, so a bad one creates nothing. With `reverse`, each target is the start of its edge, so its limit is the source end's. Bundles, example packs, catalogue entries (`sourceTypes`, `targetTypes`) and backups carry the lists, and a file without them reads as no limit.
+
+**Choices that are not obvious:**
+
+- An item with no type never satisfies a limit; it passes an unlimited end.
+- Existing connections are left alone and flagged, not refused: the item page marks one whose items no longer fit "Doesn't fit", and `CreateEdges` does not recheck a target that is already connected. Changing an item's type is never refused because of a limit.
+- The lists hold slugs and nothing follows an item type's deletion: the editor shows a slug with no item type as "no longer an item type" so it can be removed, and no item matches it.
+- The pickers apply the same rule on the client (`$lib/connection-limits`), and the server stays the authority. Bulk Connect checks only the shared item, because the dialog holds the selected items' ids but not their types; the server refuses the rest.
+- Limits are by item type only, not by tag or collection.
+- The examples' content hash includes a list only when it is not empty, so types installed before the change do not read as edited.
+
+**Rationale:** A wrong pick (a person as the thing signed, a box as the signer) made a connection nothing caught; the type's own meaning now says what it can join, and the pickers stop offering the wrong ones.

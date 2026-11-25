@@ -17,7 +17,11 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 from app.modules.graph.application.create_edges import CreateEdges, CreateEdgesCommand
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.edge_type import EdgeType
-from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
+from app.modules.graph.domain.errors import (
+    InvalidAttributesError,
+    ItemTypeNotAllowedError,
+    NodeNotFoundError,
+)
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
@@ -281,3 +285,100 @@ async def test_create_edges_refuses_to_connect_an_item_to_itself(reverse: bool) 
         )
         == []
     )
+
+
+async def _with_limit(
+    repos: GraphRepos,
+    *,
+    source_types: tuple[str, ...] = (),
+    target_types: tuple[str, ...] = (),
+) -> None:
+    await repos.edge_types.add(
+        EdgeType.create(
+            owner_id=SYSTEM_ACTOR.id,
+            slug="pictured-with",
+            label="Pictured with",
+            source_types=source_types,
+            target_types=target_types,
+        )
+    )
+
+
+async def test_create_edges_checks_each_target_against_the_limit() -> None:
+    """One target of the wrong type refuses the batch and creates nothing."""
+    repos, source, targets = await _repos_with_source_and_targets(2)
+    film = Node.create(owner_id=uuid.UUID(int=1), name="Film", type="film")
+    await repos.nodes.add(film)
+    await _with_limit(repos, target_types=("person",))
+    uow = InMemoryUnitOfWork(repos)
+
+    with pytest.raises(ItemTypeNotAllowedError, match="Film"):
+        await CreateEdges(uow, InMemoryAccessGuard()).handle(
+            CreateEdgesCommand(
+                source_id=source.id,
+                target_ids=[targets[0].id, film.id],
+                type="pictured-with",
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    assert uow.committed is False
+    assert (
+        await repos.edges.list_for_node(
+            source.id, after=None, limit=10, scope=ContentFilter.everyone()
+        )
+        == []
+    )
+
+
+async def test_create_edges_reverse_checks_the_shared_item_as_the_target() -> None:
+    """With `reverse` each target starts its edge, so limits swap ends."""
+    repos, shared, others = await _repos_with_source_and_targets(2)
+    await _with_limit(repos, source_types=("person",), target_types=("photo",))
+
+    result = await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+        CreateEdgesCommand(
+            source_id=shared.id,
+            target_ids=[o.id for o in others],
+            type="pictured-with",
+            reverse=True,
+        ),
+        SYSTEM_ACTOR,
+    )
+    assert len(result.created) == 2
+
+    # The same limit refuses the unreversed batch: the photo would be the source.
+    repos, shared, others = await _repos_with_source_and_targets(2)
+    await _with_limit(repos, source_types=("person",), target_types=("photo",))
+    with pytest.raises(ItemTypeNotAllowedError, match="at its source"):
+        await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+            CreateEdgesCommand(
+                source_id=shared.id,
+                target_ids=[o.id for o in others],
+                type="pictured-with",
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def test_create_edges_does_not_recheck_targets_already_connected() -> None:
+    """An existing connection is left alone, even if it no longer fits."""
+    repos, source, targets = await _repos_with_source_and_targets(1)
+    command = CreateEdgesCommand(
+        source_id=source.id, target_ids=[targets[0].id], type="pictured-with"
+    )
+    await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+        command, SYSTEM_ACTOR
+    )
+    edge_type = await repos.edge_types.get_by_slug(
+        "pictured-with", scope=ContentFilter.everyone()
+    )
+    assert edge_type is not None
+    edge_type.update(target_types=["film"])
+    await repos.edge_types.save(edge_type)
+
+    result = await CreateEdges(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+        command, SYSTEM_ACTOR
+    )
+
+    assert result.skipped == [targets[0].id]

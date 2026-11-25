@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.database import Base
@@ -200,3 +200,10 @@ class EdgeTypeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     )
     # Backstopped by ck_edge_types_holder; the domain owns the rule.
     holder: Mapped[str] = mapped_column(default="none", server_default="none")
+    # Item type slugs allowed at each end; empty means no limit.
+    source_types: Mapped[list[str]] = mapped_column(
+        ARRAY(String), default=list, server_default="{}"
+    )
+    target_types: Mapped[list[str]] = mapped_column(
+        ARRAY(String), default=list, server_default="{}"
+    )

@@ -84,6 +84,12 @@ def _opt_str(value: object, where: str) -> str | None:
     return None if value is None else _str(value, where)
 
 
+def _str_list(value: object, where: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    return tuple(_str(v, where) for v in _array(value, where))
+
+
 def _bool(value: object, where: str) -> bool:
     if not isinstance(value, bool):
         raise InvalidBundleError(f"{where} must be a boolean")
@@ -183,6 +189,8 @@ def _parse_relationship_type(t: Mapping[str, Any]) -> BundleRelationshipType:
             "directional",
             "attributes_schema",
             "holder",
+            "source_types",
+            "target_types",
         },
         where="a relationship type",
     )
@@ -195,6 +203,8 @@ def _parse_relationship_type(t: Mapping[str, Any]) -> BundleRelationshipType:
         directional=_bool(t.get("directional", True), "directional"),
         attributes_schema=_opt_object(t.get("attributes_schema"), "attributes_schema"),
         holder=_opt_str(t.get("holder"), "holder") or "none",
+        source_types=_str_list(t.get("source_types"), "source_types"),
+        target_types=_str_list(t.get("target_types"), "target_types"),
     )
 
 

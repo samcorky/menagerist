@@ -425,6 +425,11 @@ def _edge_type_content(t: EdgeType) -> dict[str, Any]:
     # Only when set, so types installed before `holder` existed hash as they did.
     if t.holder != "none":
         content["holder"] = t.holder
+    # Likewise for the item type limits.
+    if t.source_types:
+        content["source_types"] = list(t.source_types)
+    if t.target_types:
+        content["target_types"] = list(t.target_types)
     return content
 
 
@@ -662,6 +667,8 @@ class GraphPackTarget:
             directional=spec.directional,
             attributes_schema=_resolved(spec.attributes_schema, presets),
             holder=cast("Holder", spec.holder),
+            source_types=spec.source_types,
+            target_types=spec.target_types,
         )
         async with self._stores.choice_lists(self._scope) as source:
             edge_type = await CreateEdgeType(
@@ -730,6 +737,8 @@ class GraphPackTarget:
                         directional=edge_type.directional,
                         attributes_schema=_marked(edge_type.attributes_schema),
                         holder=edge_type.holder,
+                        source_types=edge_type.source_types,
+                        target_types=edge_type.target_types,
                     )
                 )
         return found

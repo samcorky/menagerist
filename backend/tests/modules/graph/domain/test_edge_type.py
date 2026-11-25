@@ -199,3 +199,66 @@ def test_dropping_the_direction_of_a_holding_relationship_is_refused() -> None:
         et.update(directional=False)
     et.update(directional=False, holder="none")
     assert (et.directional, et.holder) == (False, "none")
+
+
+def test_item_type_limits_default_to_none_and_can_be_set_and_cleared() -> None:
+    """No limit until said; an empty list clears it again."""
+    et = _located_in()
+    seen = [(et.source_types, et.target_types)]
+    et.update(source_types=["book", "comic"], target_types=["person"])
+    seen.append((et.source_types, et.target_types))
+    et.update(label="Kept in")
+    seen.append((et.source_types, et.target_types))
+    et.update(source_types=[])
+    seen.append((et.source_types, et.target_types))
+
+    assert seen == [
+        ((), ()),
+        (("book", "comic"), ("person",)),
+        (("book", "comic"), ("person",)),
+        ((), ("person",)),
+    ]
+
+
+def test_item_type_limits_are_slugified_and_deduplicated() -> None:
+    """Names are normalised the way an item's own type is."""
+    et = _located_in(
+        source_types=["Book", "book", "Graphic Novel"], target_types=["person"]
+    )
+    assert et.source_types == ("book", "graphic-novel")
+
+
+def test_a_blank_item_type_in_a_limit_is_refused() -> None:
+    """A limit cannot list a name that slugifies to nothing."""
+    with pytest.raises(ValidationError, match="item type"):
+        _located_in(source_types=["book", " "])
+
+
+def test_too_long_a_list_of_item_types_is_refused() -> None:
+    """A limit lists at most 50 item types."""
+    with pytest.raises(ValidationError, match="at most"):
+        _located_in(target_types=[f"t{n}" for n in range(51)])
+
+
+@pytest.mark.parametrize(
+    ("source_types", "target_types", "source", "target", "fits"),
+    [
+        ((), (), None, None, True),
+        (("book",), (), "book", None, True),
+        (("book",), (), "film", None, False),
+        (("book",), (), None, "person", False),
+        ((), ("person",), "book", "person", True),
+        ((), ("person",), "book", None, False),
+        (("book", "comic"), ("person",), "comic", "person", True),
+    ],
+)
+def test_fits_checks_both_ends(
+    source_types: tuple[str, ...],
+    target_types: tuple[str, ...],
+    source: str | None,
+    target: str | None,
+    fits: bool,
+) -> None:
+    """An untyped item fails any limit on its end, and passes an unlimited one."""
+    et = _located_in(source_types=source_types, target_types=target_types)
+    assert et.fits(source_type=source, target_type=target) is fits

@@ -17,6 +17,7 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError, uploadErrorMessage } from '$lib/api/errors';
 	import { connectionBody, connectionChoices } from '$lib/capture-connection';
+	import { allowsItemType } from '$lib/connection-limits';
 	import * as Combobox from '$lib/components/ui/combobox/index.js';
 	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import TypePicker from '$lib/components/type-picker.svelte';
@@ -53,16 +54,18 @@
 	let edgeTypes = $state<EdgeTypeResponse[]>([]);
 	let connectionKey = $state('');
 	let connectTo = $state<{ id: string; name: string } | null>(null);
-	let found = $state<{ id: string; name: string }[]>([]);
+	let found = $state<{ id: string; name: string; type: string | null }[]>([]);
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 	let searchSeq = 0;
 
-	const choices = $derived(connectionChoices(edgeTypes));
+	// Only the readings the new item's type allows, and only items the other end allows.
+	const choices = $derived(connectionChoices(edgeTypes, selectedType));
 	const choice = $derived(choices.find((c) => c.key === connectionKey) ?? null);
 	const targetItems = $derived.by((): ComboboxItem[] => {
 		const out: ComboboxItem[] = connectTo ? [{ value: connectTo.id, label: connectTo.name }] : [];
 		for (const item of found)
-			if (item.id !== connectTo?.id) out.push({ value: item.id, label: item.name });
+			if (item.id !== connectTo?.id && allowsItemType(choice?.pickedTypes, item.type))
+				out.push({ value: item.id, label: item.name });
 		return out;
 	});
 
@@ -79,13 +82,28 @@
 		});
 	});
 
+	// Changing the connection can leave the picked item outside what its other end allows.
+	$effect(() => {
+		const picked = connectTo ? found.find((n) => n.id === connectTo?.id) : undefined;
+		if (picked && !allowsItemType(choice?.pickedTypes, picked.type)) connectTo = null;
+	});
+
 	function searchTargets(text: string) {
 		clearTimeout(searchTimer);
 		const mine = ++searchSeq;
 		searchTimer = setTimeout(
 			async () => {
-				const r = await listNodes({ query: { limit: 20, q: text || undefined } });
-				if (mine === searchSeq && r.data) found = r.data.map((n) => ({ id: n.id, name: n.name }));
+				// One allowed type is asked of the server, so a full page of others cannot hide it.
+				const allowed = choice?.pickedTypes ?? [];
+				const r = await listNodes({
+					query: {
+						limit: 20,
+						q: text || undefined,
+						type: allowed.length === 1 ? allowed[0] : undefined
+					}
+				});
+				if (mine === searchSeq && r.data)
+					found = r.data.map((n) => ({ id: n.id, name: n.name, type: n.type ?? null }));
 			},
 			text ? 250 : 0
 		);

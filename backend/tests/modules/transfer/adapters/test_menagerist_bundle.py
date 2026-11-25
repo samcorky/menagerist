@@ -195,17 +195,76 @@ def test_a_version_two_file_carries_types() -> None:
     assert [(r.reverse_label, r.directional) for r in bundle.relationship_types] == [
         ("Written by", False)
     ]
-    # A file from before `holder` reads as holding nothing, and says so when written.
+    # A file from before `holder` or the item type limits reads as holding nothing
+    # and limiting nothing, and says so when written.
     assert CODEC.encode(bundle) == {
         **data,
         "version": 3,
         "relationship_types": [
-            r | {"holder": "none"} for r in data["relationship_types"]
+            r | {"holder": "none", "source_types": [], "target_types": []}
+            for r in data["relationship_types"]
         ],
         "items": [],
         "connections": [],
         "collections": [],
     }
+
+
+def test_a_connection_types_item_type_limits_round_trip() -> None:
+    """Both lists decode from a file and encode back."""
+    data = {
+        "format": "menagerist-bundle",
+        "version": 3,
+        "presets": [],
+        "relationship_types": [
+            {
+                "ref": "signed-by",
+                "slug": "signed-by",
+                "label": "Signed by",
+                "source_types": ["book", "comic"],
+                "target_types": ["person"],
+            }
+        ],
+        "item_types": [],
+        "items": [],
+        "connections": [],
+        "collections": [],
+    }
+
+    bundle = CODEC.decode(data)
+
+    assert [(r.source_types, r.target_types) for r in bundle.relationship_types] == [
+        (("book", "comic"), ("person",))
+    ]
+    written = CODEC.encode(bundle)["relationship_types"][0]
+    assert (written["source_types"], written["target_types"]) == (
+        ["book", "comic"],
+        ["person"],
+    )
+
+
+@pytest.mark.parametrize("limit", ["person", [1], {"a": "b"}])
+def test_a_malformed_item_type_limit_is_refused(limit: object) -> None:
+    """A limit must be a list of text."""
+    data = {
+        "format": "menagerist-bundle",
+        "version": 3,
+        "presets": [],
+        "relationship_types": [
+            {
+                "ref": "r",
+                "slug": "r",
+                "label": "R",
+                "target_types": limit,
+            }
+        ],
+        "item_types": [],
+        "items": [],
+        "connections": [],
+        "collections": [],
+    }
+    with pytest.raises(InvalidBundleError, match="target_types"):
+        CODEC.decode(data)
 
 
 def _item(**change: object) -> dict[str, Any]:

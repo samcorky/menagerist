@@ -10395,6 +10395,12 @@
                   "label": "Directed by",
                   "reverse_label": "Directed",
                   "slug": "directed-by",
+                  "source_types": [
+                    "film"
+                  ],
+                  "target_types": [
+                    "person"
+                  ],
                   "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
@@ -10650,6 +10656,12 @@
                     "label": "Directed by",
                     "reverse_label": "Directed",
                     "slug": "directed-by",
+                    "source_types": [
+                      "film"
+                    ],
+                    "target_types": [
+                      "person"
+                    ],
                     "updated_at": "2026-08-23T10:14:44.465954Z"
                   }
                 ]
@@ -10882,6 +10894,12 @@
                   "label": "Directed by",
                   "reverse_label": "Directed",
                   "slug": "directed-by",
+                  "source_types": [
+                    "film"
+                  ],
+                  "target_types": [
+                    "person"
+                  ],
                   "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
@@ -11145,6 +11163,12 @@
                   "label": "Directed by",
                   "reverse_label": "Directed",
                   "slug": "directed-by",
+                  "source_types": [
+                    "film"
+                  ],
+                  "target_types": [
+                    "person"
+                  ],
                   "updated_at": "2026-08-23T10:14:44.465954Z"
                 }
               }
@@ -21175,7 +21199,9 @@
                       "label": "Wrote",
                       "reverse_label": "Written by",
                       "directional": true,
-                      "holder": "none"
+                      "holder": "none",
+                      "source_types": [],
+                      "target_types": []
                     }
                   ],
                   "item_types": [
@@ -32224,7 +32250,9 @@
                 "label": "Wrote",
                 "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
                 "reverse_label": "Written by",
-                "slug": "wrote"
+                "slug": "wrote",
+                "source_types": [],
+                "target_types": []
               }
             ],
             "version": 3
@@ -32388,7 +32416,9 @@
                 "label": "Wrote",
                 "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
                 "reverse_label": "Written by",
-                "slug": "wrote"
+                "slug": "wrote",
+                "source_types": [],
+                "target_types": []
               }
             ],
             "version": 3
@@ -32699,6 +32729,22 @@
             "description": "Which end holds the other: `source`, `target` or `none`.",
             "default": "none"
           },
+          "source_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Types",
+            "description": "Item types allowed at the source end; empty allows any."
+          },
+          "target_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Types",
+            "description": "Item types allowed at the target end; empty allows any."
+          },
           "attributes_schema": {
             "anyOf": [
               {
@@ -32729,7 +32775,9 @@
             "label": "Wrote",
             "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
             "reverse_label": "Written by",
-            "slug": "wrote"
+            "slug": "wrote",
+            "source_types": [],
+            "target_types": []
           }
         ]
       },
@@ -32790,6 +32838,22 @@
             "title": "Holder",
             "description": "Which end holds the other: `source`, `target` or `none`."
           },
+          "source_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Types",
+            "description": "Item types allowed at the source end; empty allows any."
+          },
+          "target_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Types",
+            "description": "Item types allowed at the target end; empty allows any."
+          },
           "attributes_schema": {
             "anyOf": [
               {
@@ -32810,10 +32874,12 @@
           "ref",
           "slug",
           "label",
-          "holder"
+          "holder",
+          "source_types",
+          "target_types"
         ],
         "title": "BundleRelationshipTypeExport",
-        "description": "A connection type as exported: every field is written, `holder` included.",
+        "description": "A connection type as exported: every field is written, the limits included.",
         "examples": [
           {
             "directional": true,
@@ -32821,7 +32887,9 @@
             "label": "Wrote",
             "ref": "01978c3e-9a40-7c11-b3d2-5e7a0f4c8d62",
             "reverse_label": "Written by",
-            "slug": "wrote"
+            "slug": "wrote",
+            "source_types": [],
+            "target_types": []
           }
         ]
       },
@@ -33642,6 +33710,24 @@
             "title": "Holder",
             "description": "Which end holds the other, for an item's contents and path: `source` (the source contains the target, as Contains), `target` (the target contains the source, as Located in) or `none`. Needs a direction.",
             "default": "none"
+          },
+          "source_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Source Types",
+            "description": "The item types allowed at the source end, as slugs. Empty allows any item."
+          },
+          "target_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Target Types",
+            "description": "The item types allowed at the target end, as slugs. Empty allows any item."
           },
           "attributes_schema": {
             "anyOf": [
@@ -34645,6 +34731,22 @@
             "title": "Holder",
             "description": "Which end holds the other, for an item's contents and path: `source` (the source contains the target, as Contains), `target` (the target contains the source, as Located in) or `none`. Needs a direction."
           },
+          "source_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Types",
+            "description": "The item types allowed at the source end, as slugs. Empty allows any item."
+          },
+          "target_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Types",
+            "description": "The item types allowed at the target end, as slugs. Empty allows any item."
+          },
           "attributes_schema": {
             "anyOf": [
               {
@@ -34680,6 +34782,8 @@
           "description",
           "directional",
           "holder",
+          "source_types",
+          "target_types",
           "attributes_schema",
           "created_at",
           "updated_at"
@@ -34699,6 +34803,12 @@
             "label": "Directed by",
             "reverse_label": "Directed",
             "slug": "directed-by",
+            "source_types": [
+              "film"
+            ],
+            "target_types": [
+              "person"
+            ],
             "updated_at": "2026-08-23T10:14:44.465954Z"
           }
         ]
@@ -39640,6 +39750,38 @@
             ],
             "title": "Holder",
             "description": "Which end holds the other, for an item's contents and path: `source` (the source contains the target, as Contains), `target` (the target contains the source, as Located in) or `none`. Needs a direction."
+          },
+          "source_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Types",
+            "description": "The item types allowed at the source end, as slugs. Empty allows any item. Replaces the list; empty removes it."
+          },
+          "target_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Types",
+            "description": "The item types allowed at the target end, as slugs. Empty allows any item. Replaces the list; empty removes it."
           },
           "attributes_schema": {
             "anyOf": [

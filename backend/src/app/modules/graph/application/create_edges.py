@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
+from app.modules.graph.application._check_item_types import check_item_types_fit
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.permissions import GraphPermission
@@ -23,6 +24,7 @@ from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.slug import slugify
 
 if TYPE_CHECKING:
+    from app.modules.graph.domain.node import Node
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
@@ -65,19 +67,26 @@ def _endpoints(
     return command.source_id, target_id
 
 
-async def _check_targets_exist(
+async def _load_new_targets(
     repos: GraphRepos,
     target_ids: list[uuid.UUID],
     existing: set[uuid.UUID],
     scope: ContentFilter,
-) -> None:
-    """Raise `NodeNotFoundError` for the first target that is not connected or live."""
+) -> dict[uuid.UUID, Node]:
+    """The targets not yet connected, by id.
+
+    Raises:
+        NodeNotFoundError: For the first such target that is not live.
+    """
+    nodes: dict[uuid.UUID, Node] = {}
     for target_id in target_ids:
-        if (
-            target_id not in existing
-            and await repos.nodes.get(target_id, scope=scope) is None
-        ):
+        if target_id in existing:
+            continue
+        node = await repos.nodes.get(target_id, scope=scope)
+        if node is None:
             raise NodeNotFoundError(f"Node {target_id} not found")
+        nodes[target_id] = node
+    return nodes
 
 
 async def _existing_targets(
@@ -122,7 +131,8 @@ class CreateEdges(
             raise ValidationError("An item cannot be connected to itself")
         scope = self.scope(actor)
         async with self._uow as repos:
-            if await repos.nodes.get(command.source_id, scope=scope) is None:
+            shared = await repos.nodes.get(command.source_id, scope=scope)
+            if shared is None:
                 raise NodeNotFoundError(f"Node {command.source_id} not found")
 
             existing = await _existing_targets(
@@ -130,7 +140,9 @@ class CreateEdges(
             )
 
             # Check every endpoint before writing, so a bad one creates nothing.
-            await _check_targets_exist(repos, command.target_ids, existing, scope)
+            new_targets = await _load_new_targets(
+                repos, command.target_ids, existing, scope
+            )
 
             slug = slugify(command.type)
             edge_type = await repos.edge_types.get_by_slug(slug, scope=scope)
@@ -142,11 +154,17 @@ class CreateEdges(
                         label=command.type.replace("-", " ").title(),
                     )
                 )
-            elif edge_type.attributes_schema is not None:
-                schema = await resolve_choice_lists(
-                    edge_type.attributes_schema, self._choice_lists
-                )
-                validate_attributes(schema, command.attributes)
+            else:
+                for node in new_targets.values():
+                    first, second = (
+                        (node, shared) if command.reverse else (shared, node)
+                    )
+                    check_item_types_fit(edge_type, first, second)
+                if edge_type.attributes_schema is not None:
+                    schema = await resolve_choice_lists(
+                        edge_type.attributes_schema, self._choice_lists
+                    )
+                    validate_attributes(schema, command.attributes)
 
             created: list[Edge] = []
             skipped: list[uuid.UUID] = []

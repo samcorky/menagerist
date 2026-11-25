@@ -37,6 +37,8 @@ class CreateEdgeTypeCommand:
     description: str | None = field(default=None)
     directional: bool = field(default=True)
     holder: Holder = field(default="none")
+    source_types: tuple[str, ...] = field(default=())
+    target_types: tuple[str, ...] = field(default=())
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
@@ -85,6 +87,8 @@ class CreateEdgeType(CommandHandler[GraphUnitOfWork, CreateEdgeTypeCommand, Edge
                 description=command.description,
                 directional=command.directional,
                 holder=command.holder,
+                source_types=command.source_types,
+                target_types=command.target_types,
                 attributes_schema=attributes_schema,
             )
             await repos.edge_types.add(edge_type)

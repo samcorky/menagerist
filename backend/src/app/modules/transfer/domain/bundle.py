@@ -127,6 +127,8 @@ class BundleRelationshipType:
 
     `holder` is which end holds the other (`source`, `target` or `none`), as on
     the graph's relationship types; the graph checks it again on creation.
+    `source_types` and `target_types` list the item type slugs allowed at each
+    end; empty means no limit.
     """
 
     ref: str
@@ -137,6 +139,8 @@ class BundleRelationshipType:
     directional: bool = True
     attributes_schema: dict[str, Any] | None = None
     holder: str = "none"
+    source_types: tuple[str, ...] = ()
+    target_types: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Reject a holder outside the closed set."""
