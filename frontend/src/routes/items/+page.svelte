@@ -89,6 +89,7 @@
 	} from '$lib/examples';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import { inFamilyOrder, typeNames } from '$lib/type-names';
+	import { appearanceOf } from '$lib/type-inheritance';
 	import { matchContext } from '$lib/search-context';
 	import { normaliseQuery } from '$lib/search-palette';
 	import { registerShortcut } from '$lib/shortcuts.svelte';
@@ -739,8 +740,8 @@
 					schema={schemaOf(item.type)}
 					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
 					categoryParent={typeName.parentOf(item.type)?.label}
-					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
-					typeColour={allCategories.find((c) => c.slug === item.type)?.colour}
+					typeIcon={appearanceOf(item.type, allCategories).icon}
+					typeColour={appearanceOf(item.type, allCategories).colour}
 					match={q ? matchContext(item, schemaOf(item.type), q) : null}
 					isExample={exampleItemIds.has(item.id)}
 				/>
@@ -758,8 +759,8 @@
 					schema={schemaOf(item.type)}
 					categoryLabel={allCategories.find((c) => c.slug === item.type)?.label}
 					categoryParent={typeName.parentOf(item.type)?.label}
-					typeIcon={allCategories.find((c) => c.slug === item.type)?.icon}
-					typeColour={allCategories.find((c) => c.slug === item.type)?.colour}
+					typeIcon={appearanceOf(item.type, allCategories).icon}
+					typeColour={appearanceOf(item.type, allCategories).colour}
 					match={q ? matchContext(item, schemaOf(item.type), q) : null}
 					isExample={exampleItemIds.has(item.id)}
 				/>

@@ -21,8 +21,14 @@
 	// repeating the current choice, so a few presses is a quick way to find something that suits.
 	let {
 		icon = $bindable(null as string | null),
-		colour = $bindable(null as string | null)
-	}: { icon?: string | null; colour?: string | null } = $props();
+		colour = $bindable(null as string | null),
+		inherited = null
+	}: {
+		icon?: string | null;
+		colour?: string | null;
+		/** A subtype's parent's icon and colour, drawn in the preview until it sets its own. */
+		inherited?: { icon: string | null; colour: string | null } | null;
+	} = $props();
 
 	let open = $state(false);
 	let query = $state('');
@@ -86,7 +92,12 @@
 	<Label>Icon and colour</Label>
 	<div class="flex flex-wrap items-center gap-3">
 		<div data-testid="type-appearance-preview">
-			<TypeIcon {icon} {colour} boxed class="size-10 rounded-xl text-2xl" />
+			<TypeIcon
+				icon={icon ?? inherited?.icon}
+				colour={colour ?? inherited?.colour}
+				boxed
+				class="size-10 rounded-xl text-2xl"
+			/>
 		</div>
 
 		<Button

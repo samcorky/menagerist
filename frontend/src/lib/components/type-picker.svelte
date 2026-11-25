@@ -9,6 +9,7 @@
 	import { refreshItemTypes, resetItemTypeCache } from '$lib/palette-sources';
 	import { CREATE_PREFIX, NONE_VALUE, buildTypeItems, createdLabel } from '$lib/type-picker';
 	import { slugify } from '$lib/utils.js';
+	import { appearanceOf } from '$lib/type-inheritance';
 
 	// The one place an item type is chosen: search the types, the ones you use first, or type a
 	// new name and create it in the same step.
@@ -112,8 +113,8 @@
 	{:else if item.value.startsWith(CREATE_PREFIX)}
 		<Plus class="size-4 shrink-0 text-muted-foreground" />
 	{:else}
-		{@const type = bySlug.get(item.value)}
-		<TypeIcon icon={type?.icon} colour={type?.colour} class="size-4 text-base" />
+		{@const look = appearanceOf(item.value, types)}
+		<TypeIcon icon={look.icon} colour={look.colour} class="size-4 text-base" />
 	{/if}
 {/snippet}
 
