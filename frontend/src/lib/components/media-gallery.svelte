@@ -31,7 +31,14 @@
 	import ConfirmDialog from './confirm-dialog.svelte';
 	import FileDrop from './file-drop.svelte';
 
-	let { nodeId }: { nodeId: string } = $props();
+	let {
+		nodeId,
+		oncoverchange
+	}: {
+		nodeId: string;
+		/** Called after the item's cover changes here (set, removed, deleted or uploaded as one). */
+		oncoverchange?: () => void;
+	} = $props();
 
 	type UploadingEntry = {
 		id: string;
@@ -154,6 +161,7 @@
 				uploading = uploading.filter((u) => u.id !== entry.id);
 				if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
 				await loadMedia();
+				if (attributeKey === 'cover') oncoverchange?.();
 			}
 		});
 	}
@@ -168,12 +176,15 @@
 		const asset = deleteTarget;
 		if (!asset) return;
 		deleting = true;
+		const wasCover = coverIds.has(asset.id);
 		const removed = assets.filter((a) => a.id === asset.id);
 		assets = assets.filter((a) => a.id !== asset.id);
 		const result = await deleteMedia({ path: { asset_id: asset.id } });
 		if (result.error) {
 			assets = [...assets, ...removed];
 			toast.error('Delete failed', { description: errorMessage(result.error) });
+		} else if (wasCover) {
+			oncoverchange?.();
 		}
 		deleting = false;
 		deleteTarget = null;
@@ -196,6 +207,7 @@
 			return;
 		}
 		await loadMedia();
+		oncoverchange?.();
 	}
 
 	async function removeCover(asset: NodeMediaItemResponse) {
@@ -208,6 +220,7 @@
 			return;
 		}
 		await loadMedia();
+		oncoverchange?.();
 	}
 
 	function startRename(asset: NodeMediaItemResponse) {
