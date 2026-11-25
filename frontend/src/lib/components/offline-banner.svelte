@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { RefreshCw, WifiOff } from '@lucide/svelte';
+	import { RefreshCw } from '@lucide/svelte';
+	import UnreachableIcon from '$lib/components/unreachable-icon.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { offlineController, unreachableWording } from '$lib/offline.svelte.js';
 </script>
@@ -11,7 +12,7 @@
 		class="flex flex-wrap items-center justify-between gap-2 border-b bg-muted px-4 py-2 text-sm"
 	>
 		<p class="flex items-center gap-2">
-			<WifiOff class="size-4 shrink-0 text-muted-foreground" />
+			<UnreachableIcon class="size-4 shrink-0 text-muted-foreground" />
 			{unreachableWording(offlineController.browserOffline).title}. Some things may not load.
 		</p>
 		<Button variant="outline" size="sm" onclick={() => offlineController.retry()}>

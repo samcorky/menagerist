@@ -105,6 +105,15 @@ describe('the offline page', () => {
 		expect(html).toContain('Try again');
 	});
 
+	it('has a mark and wording for no connection and for a server that does not answer', () => {
+		expect(html).toContain('data-icon="wifi-off"');
+		expect(html).toContain('data-icon="server-off"');
+		expect(html).toContain("Can't reach Menagerist");
+		// Without script it shows the offline case, which the markup starts in.
+		expect(html).toContain('<main data-state="offline">');
+		expect(html).toMatch(/<script>[^]*navigator\.onLine/);
+	});
+
 	it('needs nothing else from the network', () => {
 		expect(html).not.toMatch(/<script[^>]*\ssrc=|<link[^>]*rel="stylesheet"|<img|url\(/);
 	});

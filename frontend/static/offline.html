@@ -43,9 +43,14 @@
 				max-width: 24rem;
 			}
 			svg {
-				width: 4rem;
-				height: 4rem;
-				color: var(--accent);
+				width: 3rem;
+				height: 3rem;
+				color: var(--muted);
+			}
+			/* No script, or one that has not run yet: the browser-offline wording shows. */
+			main[data-state='offline'] .server,
+			main[data-state='server'] .offline {
+				display: none;
 			}
 			h1 {
 				margin: 1rem 0 0.5rem;
@@ -74,26 +79,100 @@
 		</style>
 	</head>
 	<body>
-		<main>
-			<svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
-				<polyline
-					points="8,50 20,16 32,34 44,16 56,50"
-					stroke="currentColor"
-					stroke-width="4"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				/>
-				<g fill="currentColor">
-					<circle cx="8" cy="50" r="4" />
-					<circle cx="20" cy="16" r="4" />
-					<circle cx="32" cy="34" r="4" />
-					<circle cx="44" cy="16" r="4" />
-					<circle cx="56" cy="50" r="4" />
-				</g>
+		<main data-state="offline">
+			<svg
+				class="offline"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+				data-icon="wifi-off"
+			>
+				<path d="M12 20h.01" />
+				<path d="M8.5 16.429a5 5 0 0 1 7 0" />
+				<path d="M5 12.859a10 10 0 0 1 5.17-2.69" />
+				<path d="M19 12.859a10 10 0 0 0-2.007-1.523" />
+				<path d="M2 8.82a15 15 0 0 1 4.177-2.643" />
+				<path d="M22 8.82a15 15 0 0 0-11.288-3.764" />
+				<path d="m2 2 20 20" />
 			</svg>
-			<h1>You're offline</h1>
-			<p>Menagerist needs a connection to reach your collection. Check your connection, then try again.</p>
+			<svg
+				class="server"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+				data-icon="server-off"
+			>
+				<path d="M7 2h13a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-5" />
+				<path d="M10 10 2.5 2.5C2 2 2 2.5 2 5v3a2 2 0 0 0 2 2h6z" />
+				<path d="M22 17v-1a2 2 0 0 0-2-2h-1" />
+				<path d="M4 14a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16.5l1-.5.5.5-8-8H4z" />
+				<path d="M6 18h.01" />
+				<path d="m2 2 20 20" />
+			</svg>
+			<h1>
+				<span class="offline">You're offline</span>
+				<span class="server">Can't reach Menagerist</span>
+			</h1>
+			<p class="offline">
+				Menagerist needs a connection to reach your collection. Check your connection, then try again.
+			</p>
+			<p class="server">The server isn't answering. This page will load by itself when it's back.</p>
 			<button type="button" onclick="location.reload()">Try again</button>
 		</main>
+		<script>
+			// The browser's own flag tells the two cases apart: no connection, or a connection with no
+			// answer from the server. Without script the page keeps the offline wording.
+			(function () {
+				var main = document.querySelector('main');
+				var KEY = 'menagerist-offline-left';
+				var timer;
+
+				// The app's own check: a proxy standing in for a stopped server does not answer 200.
+				function serverAnswers() {
+					return fetch('/api/health', { cache: 'no-store' }).then(function (response) {
+						return response.ok;
+					});
+				}
+
+				// Leave for the app once the server answers, whether this page was opened directly or
+				// the server has come back. At most once in fifteen seconds, so a page load that
+				// fails again cannot bounce back and forth.
+				function leaveIfBack() {
+					serverAnswers()
+						.then(function (answers) {
+							if (!answers) return;
+							try {
+								if (Date.now() - (Number(sessionStorage.getItem(KEY)) || 0) < 15000) return;
+								sessionStorage.setItem(KEY, String(Date.now()));
+							} catch (e) {
+								// No storage here: leave anyway, without the guard.
+							}
+							location.replace('/');
+						})
+						.catch(function () {});
+				}
+
+				function update() {
+					var offline = navigator.onLine === false;
+					main.setAttribute('data-state', offline ? 'offline' : 'server');
+					clearInterval(timer);
+					if (offline) return;
+					leaveIfBack();
+					timer = setInterval(leaveIfBack, 5000);
+				}
+
+				update();
+				window.addEventListener('online', update);
+				window.addEventListener('offline', update);
+			})();
+		</script>
 	</body>
 </html>
