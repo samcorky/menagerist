@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 7,
+  "version": 8,
   "id": "movies",
   "relationship_types": [
     {
@@ -304,30 +304,11 @@
       "icon": "star",
       "colour": "violet",
       "label": "Memorabilia",
-      "description": "A poster, ticket stub or programme from the collection.",
+      "description": "Something kept from a film. What every kind shares lives here; posters, ticket stubs and programmes add their own.",
       "attributes_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "kind": {
-            "title": "Kind",
-            "type": "string",
-            "enum": [
-              "Poster",
-              "Ticket stub",
-              "Programme"
-            ],
-            "x-menagerist": {
-              "kind": "choice"
-            }
-          },
-          "size": {
-            "title": "Size",
-            "type": "string",
-            "x-menagerist": {
-              "kind": "text"
-            }
-          },
           "condition": {
             "title": "Condition",
             "type": "string",
@@ -361,13 +342,6 @@
               "kind": "money"
             }
           },
-          "framed": {
-            "title": "Framed",
-            "type": "boolean",
-            "x-menagerist": {
-              "kind": "boolean"
-            }
-          },
           "notes": {
             "title": "Notes",
             "type": "string",
@@ -380,19 +354,10 @@
           "version": 1,
           "layout": [
             {
-              "key": "kind"
-            },
-            {
-              "key": "size"
-            },
-            {
               "key": "condition"
             },
             {
               "key": "price_paid"
-            },
-            {
-              "key": "framed"
             },
             {
               "key": "notes"
@@ -406,9 +371,147 @@
               },
               {
                 "key": "price_paid"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "poster",
+      "slug": "movies-poster",
+      "icon": "star",
+      "colour": "violet",
+      "label": "Poster",
+      "description": "A film poster, from a one-sheet to a cinema quad.",
+      "parent": "memorabilia",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "size": {
+            "title": "Size",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "framed": {
+            "title": "Framed",
+            "type": "boolean",
+            "x-menagerist": {
+              "kind": "boolean"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "size"
+            },
+            {
+              "key": "framed"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "size"
               },
               {
                 "key": "framed"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "ticket-stub",
+      "slug": "movies-ticket-stub",
+      "icon": "star",
+      "colour": "violet",
+      "label": "Ticket stub",
+      "description": "The stub from a screening you went to.",
+      "parent": "memorabilia",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "screening_date": {
+            "title": "Screening date",
+            "type": "string",
+            "format": "date",
+            "x-menagerist": {
+              "kind": "date"
+            }
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "screening_date"
+            },
+            {
+              "key": "seat"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "screening_date"
+              },
+              {
+                "key": "seat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "programme",
+      "slug": "movies-programme",
+      "icon": "star",
+      "colour": "violet",
+      "label": "Programme",
+      "description": "A programme from a screening, a festival or a re-release.",
+      "parent": "memorabilia",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pages": {
+            "title": "Pages",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "pages"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "pages"
               }
             ]
           }
@@ -595,11 +698,10 @@
     },
     {
       "ref": "cold-harbour-poster",
-      "type": "memorabilia",
+      "type": "poster",
       "name": "Cold Harbour poster",
       "description": "A poster for a ferry-bound thriller, signed in blue pen.",
       "attributes": {
-        "kind": "Poster",
         "size": "A3",
         "condition": "Very Good",
         "price_paid": {
@@ -612,11 +714,10 @@
     },
     {
       "ref": "quiet-hours-poster",
-      "type": "memorabilia",
+      "type": "poster",
       "name": "Quiet Hours poster",
       "description": "A quiet poster for a quiet film.",
       "attributes": {
-        "kind": "Poster",
         "size": "Quad (UK cinema size)",
         "condition": "Good",
         "price_paid": {
@@ -625,6 +726,35 @@
         },
         "framed": false,
         "notes": "Charity shop find. Folded once, flattened under the dictionary."
+      }
+    },
+    {
+      "ref": "quiet-hours-stub",
+      "type": "ticket-stub",
+      "name": "Quiet Hours ticket stub",
+      "description": "Kept in the book I was reading that night.",
+      "attributes": {
+        "condition": "Good",
+        "price_paid": {
+          "value": 8.5,
+          "currency": "GBP"
+        },
+        "screening_date": "2024-03-09",
+        "seat": "Row F, seat 12"
+      }
+    },
+    {
+      "ref": "cold-harbour-programme",
+      "type": "programme",
+      "name": "Cold Harbour programme",
+      "description": "From the re-release, with the director's note inside.",
+      "attributes": {
+        "condition": "Near Mint",
+        "price_paid": {
+          "value": 3,
+          "currency": "GBP"
+        },
+        "pages": 24
       }
     }
   ],
@@ -757,6 +887,16 @@
     {
       "from": "quiet-hours-poster",
       "to": "quiet-hours",
+      "type": "memorabilia-for"
+    },
+    {
+      "from": "quiet-hours-stub",
+      "to": "quiet-hours",
+      "type": "memorabilia-for"
+    },
+    {
+      "from": "cold-harbour-programme",
+      "to": "cold-harbour",
       "type": "memorabilia-for"
     },
     {

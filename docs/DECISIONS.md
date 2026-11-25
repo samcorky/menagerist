@@ -1902,4 +1902,15 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Collections:** each pack has a smart collection filtered by the parent type, which finds every subtype's items (search by parent, above), so the grouping shows straight after installing.
 - **Slugs** start with the pack id like any pack's, so the parents are `music-formats-media`, `film-formats-media` and `currency-money`. The packs sit with the base packs in the index, ahead of the add-ons.
 - **A parent type may have no items of its own** when its subtypes do; the shipped-pack test counts a parent as used then. Its other test checks a subtype's values against the parent's fields as well as its own.
-- **Not done:** a pack cannot name a parent in a pack it requires, so no add-on can make a subtype of a base pack's type (a games Expansion, say). Existing packs keep their single types.
+- **Not done:** a pack cannot name a parent in a pack it requires, so no add-on can make a subtype of a base pack's type (a games Expansion, say). The older packs that gained subtypes are in the next entry.
+
+## The Parts, Comic con and Movies packs use parent types where a "kind" field stood in for them (2026-11-25)
+
+**Decision:** Three packs that already had a catch-all type now split it into subtypes under it, so the shipped examples show parent types where they fit (#320, #788).
+
+- **Parts:** Part is the parent, holding part number, stock, reorder level, price, datasheet and notes. Resistor, Capacitor and Semiconductor add resistance and tolerance, capacitance and voltage, and kind and package. Six parts that fit none (a trimmer, banana sockets, a Pico, solder, a button and a breadboard) stay on Part itself, which shows that items may sit on the parent.
+- **Comic con:** Collectable is the parent, with size, condition, framed and notes. Poster, Photo print and Programme replace its `kind` choice and add printing, photographer and finish, and pages. Their covers keep the poster style.
+- **Movies:** Memorabilia is the parent, with condition, price paid and notes. Poster keeps size and framed; Ticket stub adds a screening date and seat; Programme adds pages. A ticket stub and a programme were added so every subtype has an item, each connected to its film like the posters.
+- **The `kind` choice goes** where a subtype says the same thing. A field that only one subtype used moves down to it, and the shared ones stay up.
+- **Collections keep working** without change: "Running low", "Not signed yet" and "No poster yet" filter by the parent or by a field the parent has, which the family widening and the effective schema cover. The shipped smart-collection tests pass unchanged.
+- **Installs made before this** keep their single types; only new installs get the subtypes. Nothing migrates, since a pack's types are the user's once added.

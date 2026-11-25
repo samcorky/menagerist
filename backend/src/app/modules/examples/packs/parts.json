@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 7,
+  "version": 8,
   "id": "parts",
   "relationship_types": [
     {
@@ -81,7 +81,7 @@
       "icon": "cpu",
       "colour": "teal",
       "label": "Part",
-      "description": "A component or consumable in the parts drawer.",
+      "description": "A component or consumable in the parts drawer. What every part shares lives here; resistors, capacitors and semiconductors add their own.",
       "attributes_schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -173,6 +173,196 @@
               },
               {
                 "key": "typical_price"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "resistor",
+      "slug": "parts-resistor",
+      "icon": "zap",
+      "colour": "teal",
+      "label": "Resistor",
+      "description": "A fixed resistor, with its value and how much power it takes.",
+      "parent": "part",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "resistance": {
+            "title": "Resistance",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "power_rating": {
+            "title": "Power rating (W)",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "tolerance": {
+            "title": "Tolerance",
+            "type": "string",
+            "enum": [
+              "1%",
+              "2%",
+              "5%",
+              "10%"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "resistance"
+            },
+            {
+              "key": "power_rating"
+            },
+            {
+              "key": "tolerance"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "resistance"
+              },
+              {
+                "key": "tolerance"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "capacitor",
+      "slug": "parts-capacitor",
+      "icon": "battery",
+      "colour": "teal",
+      "label": "Capacitor",
+      "description": "A capacitor, with its value, its voltage rating and what it is made of.",
+      "parent": "part",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "capacitance": {
+            "title": "Capacitance",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "voltage": {
+            "title": "Voltage rating (V)",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "dielectric": {
+            "title": "Dielectric",
+            "type": "string",
+            "enum": [
+              "Ceramic",
+              "Electrolytic",
+              "Film"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "capacitance"
+            },
+            {
+              "key": "voltage"
+            },
+            {
+              "key": "dielectric"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "capacitance"
+              },
+              {
+                "key": "voltage"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "semiconductor",
+      "slug": "parts-semiconductor",
+      "icon": "lightbulb",
+      "colour": "teal",
+      "label": "Semiconductor",
+      "description": "A diode, LED, regulator or transistor, and the package it comes in.",
+      "parent": "part",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string",
+            "enum": [
+              "Diode",
+              "LED",
+              "Voltage regulator",
+              "Transistor"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "package": {
+            "title": "Package",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "kind"
+            },
+            {
+              "key": "package"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "kind"
+              },
+              {
+                "key": "package"
               }
             ]
           }
@@ -330,7 +520,7 @@
   "items": [
     {
       "ref": "10k-resistor-025-w",
-      "type": "part",
+      "type": "resistor",
       "name": "10k resistor, 0.25 W",
       "description": "The workhorse of every circuit, bought in hundreds and still never enough.",
       "attributes": {
@@ -342,12 +532,15 @@
           "currency": "GBP"
         },
         "datasheet": "https://datasheets.example/r-10k.pdf",
-        "notes": "The drawer you can never find the right one in."
+        "notes": "The drawer you can never find the right one in.",
+        "resistance": "10 k\u03a9",
+        "power_rating": 0.25,
+        "tolerance": "5%"
       }
     },
     {
       "ref": "100-nf-ceramic-capacitor",
-      "type": "part",
+      "type": "capacitor",
       "name": "100 nF ceramic capacitor",
       "description": "Decoupling duty on practically every board in the house.",
       "attributes": {
@@ -358,12 +551,15 @@
           "value": 0.08,
           "currency": "GBP"
         },
-        "datasheet": "https://datasheets.example/c-100n.pdf"
+        "datasheet": "https://datasheets.example/c-100n.pdf",
+        "capacitance": "100 nF",
+        "voltage": 50,
+        "dielectric": "Ceramic"
       }
     },
     {
       "ref": "470-uf-electrolytic-capacitor",
-      "type": "part",
+      "type": "capacitor",
       "name": "470 \u00b5F electrolytic capacitor",
       "description": "A chunky can for smoothing out a power supply's ripples.",
       "attributes": {
@@ -375,12 +571,15 @@
           "currency": "GBP"
         },
         "datasheet": "https://datasheets.example/c-470u.pdf",
-        "notes": "Close to the reorder line."
+        "notes": "Close to the reorder line.",
+        "capacitance": "470 \u00b5F",
+        "voltage": 25,
+        "dielectric": "Electrolytic"
       }
     },
     {
       "ref": "lm317-voltage-regulator",
-      "type": "part",
+      "type": "semiconductor",
       "name": "LM317 voltage regulator",
       "description": "An adjustable regulator that has outlived most of its rivals.",
       "attributes": {
@@ -392,12 +591,14 @@
           "currency": "GBP"
         },
         "datasheet": "https://datasheets.example/lm317.pdf",
-        "notes": "Low on stock."
+        "notes": "Low on stock.",
+        "kind": "Voltage regulator",
+        "package": "TO-220"
       }
     },
     {
       "ref": "1n4007-diode",
-      "type": "part",
+      "type": "semiconductor",
       "name": "1N4007 diode",
       "description": "A humble rectifier diode, one-way traffic only.",
       "attributes": {
@@ -408,12 +609,14 @@
           "value": 0.06,
           "currency": "GBP"
         },
-        "datasheet": "https://datasheets.example/1n4007.pdf"
+        "datasheet": "https://datasheets.example/1n4007.pdf",
+        "kind": "Diode",
+        "package": "DO-41"
       }
     },
     {
       "ref": "red-led-5-mm",
-      "type": "part",
+      "type": "semiconductor",
       "name": "Red LED, 5 mm",
       "description": "The classic power-on light, and the first thing anyone blinks.",
       "attributes": {
@@ -424,7 +627,9 @@
           "value": 0.1,
           "currency": "GBP"
         },
-        "datasheet": "https://datasheets.example/led-r5.pdf"
+        "datasheet": "https://datasheets.example/led-r5.pdf",
+        "kind": "LED",
+        "package": "5 mm"
       }
     },
     {
@@ -494,7 +699,7 @@
     },
     {
       "ref": "green-led-5-mm",
-      "type": "part",
+      "type": "semiconductor",
       "name": "Green LED, 5 mm",
       "description": "The cheerful sibling of the red one, for go signals.",
       "attributes": {
@@ -505,7 +710,9 @@
           "value": 0.1,
           "currency": "GBP"
         },
-        "datasheet": "https://datasheets.example/led-g5.pdf"
+        "datasheet": "https://datasheets.example/led-g5.pdf",
+        "kind": "LED",
+        "package": "5 mm"
       }
     },
     {
