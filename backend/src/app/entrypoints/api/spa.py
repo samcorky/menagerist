@@ -69,6 +69,21 @@ _REVALIDATED_FILES = frozenset({"service-worker.js"})
 # (`default-src 'none'`) would block it from fetching the files it precaches.
 _WORKER_CSP = "default-src 'none'; connect-src 'self'"
 _NO_CACHE = "no-store, no-cache, must-revalidate"
+# The worker's last-resort page is hand-written with its own inline style and script,
+# and asks `/api/health` whether the server is back. The API default
+# (`default-src 'none'`) would leave it unstyled with a dead button, in the worker's
+# cached copy as much as a direct visit.
+_OFFLINE_PAGE = "offline.html"
+_OFFLINE_PAGE_CSP = "; ".join(
+    [
+        "default-src 'none'",
+        "style-src 'unsafe-inline'",
+        "script-src 'unsafe-inline'",
+        "connect-src 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+    ]
+)
 
 _SHELL_CSP = "; ".join(
     [
@@ -120,6 +135,11 @@ def _asset_headers(path: str) -> dict[str, str]:
         return {"Cache-Control": _IMMUTABLE_CACHE}
     if path in _REVALIDATED_FILES:
         return {"Cache-Control": _REVALIDATE, "Content-Security-Policy": _WORKER_CSP}
+    if path == _OFFLINE_PAGE:
+        return {
+            "Cache-Control": _ASSET_CACHE,
+            "Content-Security-Policy": _OFFLINE_PAGE_CSP,
+        }
     return {"Cache-Control": _ASSET_CACHE}
 
 
