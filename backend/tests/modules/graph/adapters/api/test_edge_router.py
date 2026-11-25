@@ -361,3 +361,53 @@ def test_create_edges_batch_returns_404_for_a_missing_node() -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_a_connection_outside_the_type_limits_is_a_400_naming_the_types() -> None:
+    """POST /edges and the batch route refuse an item of the wrong type."""
+    client = TestClient(_app_with_in_memory_graph())
+    limited = client.post(
+        "/api/v1/edge-types",
+        json={
+            "slug": "directed-by",
+            "label": "Directed by",
+            "source_types": ["film"],
+            "target_types": ["person"],
+        },
+    )
+    assert limited.status_code == 201
+    assert limited.json()["target_types"] == ["person"]
+    film = _create_node(client, name="Alien", type_="film")
+    other_film = _create_node(client, name="Aliens", type_="film")
+    director = _create_node(client, name="Ridley Scott", type_="person")
+
+    single = client.post(
+        "/api/v1/edges",
+        json={
+            "source_id": film["id"],
+            "target_id": other_film["id"],
+            "type": "directed-by",
+        },
+    )
+    batch = client.post(
+        "/api/v1/edges/batch",
+        json={
+            "source_id": film["id"],
+            "target_ids": [other_film["id"]],
+            "type": "directed-by",
+        },
+    )
+    allowed = client.post(
+        "/api/v1/edges",
+        json={
+            "source_id": film["id"],
+            "target_id": director["id"],
+            "type": "directed-by",
+        },
+    )
+
+    for refused in (single, batch):
+        assert refused.status_code == 400
+        assert "joins only person at its target" in refused.json()["detail"]
+        assert "Aliens" in refused.json()["detail"]
+    assert allowed.status_code == 201

@@ -11,7 +11,8 @@
 		createEdgeType,
 		updateEdgeType,
 		deleteEdgeType,
-		type EdgeTypeResponse
+		type EdgeTypeResponse,
+		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import { downloadBundle, exportConnectionTypeBundle, presetFilename } from '$lib/preset-packs';
@@ -28,6 +29,9 @@
 	import { offlineController } from '$lib/offline.svelte.js';
 	import TypeEditorDialog from '$lib/components/type-editor-dialog.svelte';
 	import SchemaEditor from '$lib/components/schema-editor.svelte';
+	import ItemTypeLimit from '$lib/components/item-type-limit.svelte';
+	import { fetchAllNodeTypes } from '$lib/node-types';
+	import { describeLimits } from '$lib/connection-limits';
 	import type { AttributesSchema } from '$lib/schema-types';
 
 	const PAGE_SIZE = 50;
@@ -47,6 +51,21 @@
 	let description = $state('');
 	let directional = $state(true);
 	let holder = $state<EdgeTypeResponse['holder']>('none');
+	let sourceTypes = $state<string[]>([]);
+	let targetTypes = $state<string[]>([]);
+	// The item types to choose from, read when the editor first opens.
+	let itemTypes = $state<NodeTypeResponse[]>([]);
+	let itemTypesRead = false;
+	const itemTypeLabels = $derived(new Map(itemTypes.map((t) => [t.slug, t.label])));
+
+	async function readItemTypes() {
+		if (itemTypesRead) return;
+		itemTypesRead = true;
+		const all = await fetchAllNodeTypes();
+		if (all) itemTypes = all;
+		else itemTypesRead = false;
+	}
+	void readItemTypes();
 	let schema = $state<AttributesSchema | null>(null);
 	let saving = $state(false);
 
@@ -97,8 +116,11 @@
 		description = '';
 		directional = true;
 		holder = 'none';
+		sourceTypes = [];
+		targetTypes = [];
 		schema = null;
 		editorOpen = true;
+		void readItemTypes();
 	}
 
 	function openEdit(et: EdgeTypeResponse) {
@@ -108,8 +130,11 @@
 		description = et.description ?? '';
 		directional = et.directional;
 		holder = et.holder;
+		sourceTypes = [...et.source_types];
+		targetTypes = [...et.target_types];
 		schema = (et.attributes_schema as AttributesSchema | null) ?? null;
 		editorOpen = true;
+		void readItemTypes();
 	}
 
 	async function handleSubmit(event: SubmitEvent) {
@@ -125,6 +150,8 @@
 					description: description || null,
 					directional,
 					holder: directional ? holder : 'none',
+					source_types: sourceTypes,
+					target_types: targetTypes,
 					attributes_schema: schema
 				}
 			});
@@ -144,6 +171,8 @@
 					description: description || undefined,
 					directional,
 					holder: directional ? holder : 'none',
+					source_types: sourceTypes,
+					target_types: targetTypes,
 					attributes_schema: schema
 				}
 			});
@@ -246,6 +275,11 @@
 							{#if et.description}
 								<p class="truncate text-sm text-muted-foreground">{et.description}</p>
 							{/if}
+							{#if describeLimits(et, itemTypeLabels)}
+								<p class="truncate text-xs text-muted-foreground">
+									Joins {describeLimits(et, itemTypeLabels)}
+								</p>
+							{/if}
 						</div>
 						<Badge variant="outline" class="hidden shrink-0 sm:inline-flex">
 							{et.directional ? 'Directional →' : 'Symmetric ↔'}
@@ -309,7 +343,16 @@
 	submitLabel={editingId ? 'Save' : 'Add relationship type'}
 	busyLabel={editingId ? 'Saving…' : 'Adding…'}
 	busy={saving}
-	value={{ label, reverseLabel, description, directional, holder, schema }}
+	value={{
+		label,
+		reverseLabel,
+		description,
+		directional,
+		holder,
+		sourceTypes,
+		targetTypes,
+		schema
+	}}
 	onSubmit={handleSubmit}
 	onClose={() => (editorOpen = false)}
 >
@@ -365,6 +408,10 @@
 			</p>
 		</div>
 	{/if}
+	<div class="grid gap-3 sm:grid-cols-2">
+		<ItemTypeLimit legend="Starts from" options={itemTypes} bind:selected={sourceTypes} />
+		<ItemTypeLimit legend="Points to" options={itemTypes} bind:selected={targetTypes} />
+	</div>
 	<SchemaEditor
 		bind:schema
 		typeId={editingId ?? undefined}

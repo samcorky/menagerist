@@ -34,6 +34,8 @@ class UpdateEdgeTypeCommand:
     description: str | None = field(default=None)
     directional: bool | None = field(default=None)
     holder: Holder | None = field(default=None)
+    source_types: tuple[str, ...] | None = field(default=None)
+    target_types: tuple[str, ...] | None = field(default=None)
     attributes_schema: dict[str, Any] | None = field(default=None)
 
 
@@ -79,6 +81,8 @@ class UpdateEdgeType(CommandHandler[GraphUnitOfWork, UpdateEdgeTypeCommand, Edge
                 description=command.description,
                 directional=command.directional,
                 holder=command.holder,
+                source_types=command.source_types,
+                target_types=command.target_types,
                 attributes_schema=attributes_schema,
             )
             await repos.edge_types.save(edge_type)

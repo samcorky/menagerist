@@ -51,6 +51,8 @@ _RELATIONSHIP_TYPE_KEYS = _TYPE_REQUIRED | {
     "reverse_label",
     "directional",
     "holder",
+    "source_types",
+    "target_types",
 }
 
 
@@ -63,6 +65,13 @@ def _text(value: object, what: str) -> str:
 def _optional_text(raw: Mapping[str, Any], key: str, where: str) -> str | None:
     value = raw.get(key)
     return None if value is None else _text(value, f"{where} {key}")
+
+
+def _text_list(raw: Mapping[str, Any], key: str, where: str) -> tuple[str, ...]:
+    value = raw.get(key, [])
+    if not isinstance(value, list):
+        raise InvalidBundleError(f"{where} {key} must be a list of text")
+    return tuple(_text(v, f"{where} {key}") for v in value)
 
 
 def _entry(
@@ -133,6 +142,8 @@ def _relationship_type(raw: object, n: int) -> BundleRelationshipType:
         directional=directional,
         attributes_schema=_schema(entry, where),
         holder=_optional_text(entry, "holder", where) or "none",
+        source_types=_text_list(entry, "source_types", where),
+        target_types=_text_list(entry, "target_types", where),
     )
 
 
@@ -335,6 +346,8 @@ class MenageristBundleCodec:
                     "description": r.description,
                     "directional": r.directional,
                     "holder": r.holder,
+                    "source_types": list(r.source_types),
+                    "target_types": list(r.target_types),
                     "attributes_schema": r.attributes_schema,
                 }
                 for r in bundle.relationship_types

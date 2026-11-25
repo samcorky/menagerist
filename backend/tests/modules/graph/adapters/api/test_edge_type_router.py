@@ -311,6 +311,39 @@ def test_attribute_usage_and_purge_can_target_a_group_sub_key() -> None:
     }
 
 
+def test_item_type_limits_are_set_changed_and_cleared() -> None:
+    """The limits round-trip, PATCH replaces them and an empty list clears one."""
+    client = TestClient(_app_with_in_memory_graph())
+    created = client.post(
+        "/api/v1/edge-types",
+        json={
+            "slug": "signed-by",
+            "label": "Signed by",
+            "source_types": ["Book", "comic"],
+            "target_types": ["person"],
+        },
+    )
+    assert created.status_code == 201
+    et = created.json()
+    assert (et["source_types"], et["target_types"]) == (["book", "comic"], ["person"])
+
+    plain = client.post("/api/v1/edge-types", json={"slug": "near", "label": "Near"})
+    assert (plain.json()["source_types"], plain.json()["target_types"]) == ([], [])
+
+    patched = client.patch(
+        f"/api/v1/edge-types/{et['id']}",
+        json={"source_types": [], "label": "Autograph"},
+    )
+    assert patched.status_code == 200
+    assert (patched.json()["source_types"], patched.json()["target_types"]) == (
+        [],
+        ["person"],
+    )
+
+    blank = client.patch(f"/api/v1/edge-types/{et['id']}", json={"target_types": [" "]})
+    assert blank.status_code == 400
+
+
 def test_holder_is_set_changed_and_refused_without_a_direction() -> None:
     """`holder` round-trips, PATCH changes it, and a direction is required."""
     client = TestClient(_app_with_in_memory_graph())

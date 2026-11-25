@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
+from app.modules.graph.application._check_item_types import check_item_types_fit
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.permissions import GraphPermission
@@ -59,9 +60,11 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
         """
         scope = self.scope(actor)
         async with self._uow as repos:
-            if await repos.nodes.get(command.source_id, scope=scope) is None:
+            source = await repos.nodes.get(command.source_id, scope=scope)
+            if source is None:
                 raise NodeNotFoundError(f"Node {command.source_id} not found")
-            if await repos.nodes.get(command.target_id, scope=scope) is None:
+            target = await repos.nodes.get(command.target_id, scope=scope)
+            if target is None:
                 raise NodeNotFoundError(f"Node {command.target_id} not found")
 
             slug = slugify(command.type)
@@ -74,11 +77,13 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
                         label=command.type.replace("-", " ").title(),
                     )
                 )
-            elif edge_type.attributes_schema is not None:
-                schema = await resolve_choice_lists(
-                    edge_type.attributes_schema, self._choice_lists
-                )
-                validate_attributes(schema, command.attributes)
+            else:
+                check_item_types_fit(edge_type, source, target)
+                if edge_type.attributes_schema is not None:
+                    schema = await resolve_choice_lists(
+                        edge_type.attributes_schema, self._choice_lists
+                    )
+                    validate_attributes(schema, command.attributes)
 
             edge = Edge.create(
                 owner_id=actor.id,

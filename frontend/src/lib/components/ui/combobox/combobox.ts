@@ -39,6 +39,25 @@ export function groupComboboxItems(items: ComboboxItem[]): ComboboxGroup[] {
 	return [...groups].map(([heading, list]) => ({ heading, items: list }));
 }
 
+/** The values with `value` added, or removed if it is already there (order kept). */
+export function toggleComboboxValue(values: readonly string[], value: string): string[] {
+	return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
+}
+
+/**
+ * One entry per chosen value, in the order chosen. A value with no item (it was deleted, say)
+ * keeps an entry labelled by `unknownLabel` so it can still be removed.
+ */
+export function selectedComboboxItems(
+	items: ComboboxItem[],
+	values: readonly string[],
+	unknownLabel: (value: string) => string = (value) => value
+): ComboboxItem[] {
+	return values.map(
+		(value) => selectedComboboxItem(items, value) ?? { value, label: unknownLabel(value) }
+	);
+}
+
 export function selectedComboboxItem(
 	items: ComboboxItem[],
 	value: string

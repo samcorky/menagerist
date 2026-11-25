@@ -16,7 +16,11 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 )
 from app.modules.graph.application.create_edge import CreateEdge, CreateEdgeCommand
 from app.modules.graph.domain.edge_type import EdgeType
-from app.modules.graph.domain.errors import InvalidAttributesError, NodeNotFoundError
+from app.modules.graph.domain.errors import (
+    InvalidAttributesError,
+    ItemTypeNotAllowedError,
+    NodeNotFoundError,
+)
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
@@ -115,6 +119,78 @@ async def test_create_edge_validates_attributes_against_schema() -> None:
                 target_id=target.id,
                 type="directed-by",
                 attributes={"since": "not-a-date"},
+            ),
+            SYSTEM_ACTOR,
+        )
+
+
+async def _limited(
+    repos: GraphRepos,
+    *,
+    source_types: tuple[str, ...] = (),
+    target_types: tuple[str, ...] = (),
+) -> None:
+    await repos.edge_types.add(
+        EdgeType.create(
+            owner_id=SYSTEM_ACTOR.id,
+            slug="directed-by",
+            label="Directed by",
+            source_types=source_types,
+            target_types=target_types,
+        )
+    )
+
+
+async def test_create_edge_allows_items_inside_the_limits() -> None:
+    """A film joined to a person satisfies "film to person"."""
+    repos, source, target = await _repos_with_two_nodes()
+    await _limited(repos, source_types=("film",), target_types=("person",))
+
+    edge = await CreateEdge(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+        CreateEdgeCommand(source_id=source.id, target_id=target.id, type="directed-by"),
+        SYSTEM_ACTOR,
+    )
+
+    assert edge.type == "directed-by"
+
+
+@pytest.mark.parametrize(
+    ("source_types", "target_types", "message"),
+    [
+        ((), ("film",), "joins only film at its target"),
+        (("person", "place"), (), "person, place at its source"),
+    ],
+)
+async def test_create_edge_refuses_an_item_outside_a_limit(
+    source_types: tuple[str, ...], target_types: tuple[str, ...], message: str
+) -> None:
+    """The error names the end, the allowed types and the item's own type."""
+    repos, source, target = await _repos_with_two_nodes()
+    await _limited(repos, source_types=source_types, target_types=target_types)
+    uow = InMemoryUnitOfWork(repos)
+
+    with pytest.raises(ItemTypeNotAllowedError, match=message):
+        await CreateEdge(uow, InMemoryAccessGuard()).handle(
+            CreateEdgeCommand(
+                source_id=source.id, target_id=target.id, type="directed-by"
+            ),
+            SYSTEM_ACTOR,
+        )
+
+    assert uow.committed is False
+
+
+async def test_create_edge_refuses_an_untyped_item_under_a_limit() -> None:
+    """An item with no type is never one of the listed types."""
+    repos, source, _ = await _repos_with_two_nodes()
+    untyped = Node.create(owner_id=uuid.UUID(int=1), name="Mystery")
+    await repos.nodes.add(untyped)
+    await _limited(repos, target_types=("person",))
+
+    with pytest.raises(ItemTypeNotAllowedError, match="no type"):
+        await CreateEdge(InMemoryUnitOfWork(repos), InMemoryAccessGuard()).handle(
+            CreateEdgeCommand(
+                source_id=source.id, target_id=untyped.id, type="directed-by"
             ),
             SYSTEM_ACTOR,
         )

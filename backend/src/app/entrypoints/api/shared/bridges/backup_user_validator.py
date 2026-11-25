@@ -34,6 +34,14 @@ def _optional_text(row: Mapping[str, object], key: str) -> str | None:
     return value
 
 
+def _text_list(row: Mapping[str, object], key: str) -> tuple[str, ...]:
+    # A backup from before the limits existed has no such column.
+    value = row.get(key) or []
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise ValueError(f"{key} must be a list of text")
+    return tuple(value)
+
+
 def _object(row: Mapping[str, object], key: str) -> dict[str, Any]:
     value = row[key]
     if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
@@ -78,6 +86,8 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
             reverse_label=_optional_text(row, "reverse_label"),
             # A backup from before `holder` existed has no such column.
             holder=cast("Holder", row.get("holder", "none")),
+            source_types=_text_list(row, "source_types"),
+            target_types=_text_list(row, "target_types"),
         )
     if str(entity.slug) != slug:
         raise ValueError("slug must be normalised")

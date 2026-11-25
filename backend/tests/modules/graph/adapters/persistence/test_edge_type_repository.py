@@ -36,6 +36,35 @@ async def test_slug_can_be_reused_after_soft_delete(db_session: AsyncSession) ->
     assert live.id == second.id
 
 
+async def test_item_type_limits_are_stored_and_read_back(
+    db_session: AsyncSession,
+) -> None:
+    """The two lists survive a round trip; a type without them has none."""
+    repository = SqlAlchemyEdgeTypeRepository(db_session)
+    limited = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id,
+        slug="signed-by",
+        label="Signed by",
+        source_types=["book", "comic"],
+        target_types=["person"],
+    )
+    open_ended = EdgeType.create(
+        owner_id=SYSTEM_ACTOR.id, slug="related", label="Related"
+    )
+    await repository.add(limited)
+    await repository.add(open_ended)
+    limited.update(target_types=[])
+    await repository.save(limited)
+
+    scope = ContentFilter.everyone()
+    first = await repository.get_by_slug("signed-by", scope=scope)
+    second = await repository.get_by_slug("related", scope=scope)
+    assert first is not None
+    assert second is not None
+    assert (first.source_types, first.target_types) == (("book", "comic"), ())
+    assert (second.source_types, second.target_types) == ((), ())
+
+
 async def test_live_edge_types_cannot_share_a_slug(db_session: AsyncSession) -> None:
     """The index backs the use case's check: two live types cannot share a slug."""
     repository = SqlAlchemyEdgeTypeRepository(db_session)

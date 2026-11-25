@@ -9,6 +9,7 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { itemCount, unknownItemIds } from '$lib/bulk-actions';
+	import { allowsItemType } from '$lib/connection-limits';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -39,8 +40,14 @@
 	let seq = 0;
 
 	// The shared item cannot be one of the selection: an item is never connected to itself.
-	const choices = $derived(results.filter((r) => !ids.includes(r.id)));
+	// Each selected item starts its own connection, so the shared item is the target end: only
+	// items that end allows are offered. The selected items' own types are checked by the server.
 	const chosenType = $derived(types?.find((t) => t.slug === typeSlug) ?? null);
+	// Changing the connection after picking an item can leave that item outside the limit.
+	const targetFits = $derived(!target || allowsItemType(chosenType?.target_types, target.type));
+	const choices = $derived(
+		results.filter((r) => !ids.includes(r.id) && allowsItemType(chosenType?.target_types, r.type))
+	);
 
 	$effect(() => {
 		if (!open) return;
@@ -57,10 +64,13 @@
 	$effect(() => {
 		if (!open) return;
 		const text = search;
+		// A single allowed type is asked of the server, so a full page of other items cannot hide it.
+		const allowed = chosenType?.target_types ?? [];
+		const type = allowed.length === 1 ? allowed[0] : undefined;
 		const mine = ++seq;
 		const timer = setTimeout(
 			async () => {
-				const r = await listNodes({ query: { limit: 20, q: text || undefined } });
+				const r = await listNodes({ query: { limit: 20, q: text || undefined, type } });
 				if (mine === seq && r.data) results = r.data;
 			},
 			text ? 250 : 0
@@ -70,7 +80,7 @@
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
-		if (sending || !target || !typeSlug) return;
+		if (sending || !target || !typeSlug || !targetFits) return;
 		sending = true;
 		error = null;
 		// Many items to one: each selected item is the start of its own connection into the target.
@@ -152,10 +162,14 @@
 						{/each}
 					</ul>
 				</div>
-				{#if target && chosenType}
+				{#if target && chosenType && targetFits}
 					<p class="text-sm text-muted-foreground" aria-live="polite">
 						{itemCount(ids.length)}: {chosenType.label}
 						{target.name}
+					</p>
+				{:else if target && chosenType}
+					<p class="text-sm text-muted-foreground" aria-live="polite">
+						{chosenType.label} doesn't connect to {target.name}. Pick another item.
 					</p>
 				{/if}
 			{/if}
@@ -164,7 +178,7 @@
 			{/if}
 			<div class="flex justify-end gap-2">
 				<Button type="button" variant="outline" onclick={() => onOpenChange(false)}>Cancel</Button>
-				<Button type="submit" disabled={sending || !target || !typeSlug}>
+				<Button type="submit" disabled={sending || !target || !typeSlug || !targetFits}>
 					{sending ? 'Connecting…' : 'Connect'}
 				</Button>
 			</div>

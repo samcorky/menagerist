@@ -36,6 +36,8 @@ BUNDLE_EXAMPLE: dict[str, Any] = {
             "description": None,
             "directional": True,
             "holder": "none",
+            "source_types": [],
+            "target_types": [],
             "attributes_schema": None,
         }
     ],
@@ -163,6 +165,14 @@ class BundleRelationshipTypeEntry(BaseModel):
     holder: Literal["source", "target", "none"] = Field(
         default="none",
         description="Which end holds the other: `source`, `target` or `none`.",
+    )
+    source_types: list[str] = Field(
+        default_factory=list,
+        description="Item types allowed at the source end; empty allows any.",
+    )
+    target_types: list[str] = Field(
+        default_factory=list,
+        description="Item types allowed at the target end; empty allows any.",
     )
     attributes_schema: dict[str, Any] | None = Field(
         default=None, description="Its fields, as an item type's are."

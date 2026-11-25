@@ -88,6 +88,13 @@ def _item_types(value: object, where: str) -> tuple[BundleItemType, ...]:
     return tuple(result)
 
 
+def _slugs(data: dict[str, Any], key: str, where: str) -> tuple[str, ...]:
+    value = data.get(key, [])
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise InvalidEntryError(f"{where} {key} must be an array of text")
+    return tuple(value)
+
+
 def _optional_text(data: dict[str, Any], key: str, where: str) -> str | None:
     """A key that may be left out, but is non-blank text when given."""
     return None if data.get(key) is None else _text(data, key, where)
@@ -111,6 +118,8 @@ def _relationship_types(
                 description=item.get("description"),
                 directional=bool(item.get("directional", True)),
                 holder=str(item.get("holder") or "none"),
+                source_types=_slugs(item, "sourceTypes", where),
+                target_types=_slugs(item, "targetTypes", where),
             )
         )
     return tuple(result)

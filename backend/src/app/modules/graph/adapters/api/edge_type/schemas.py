@@ -19,6 +19,14 @@ HOLDER_DESCRIPTION = (
 )
 
 
+SOURCE_TYPES_DESCRIPTION = (
+    "The item types allowed at the source end, as slugs. Empty allows any item."
+)
+TARGET_TYPES_DESCRIPTION = (
+    "The item types allowed at the target end, as slugs. Empty allows any item."
+)
+
+
 class CreateEdgeTypeRequest(RequestModel):
     """Request body for POST /edge-type."""
 
@@ -52,6 +60,12 @@ class CreateEdgeTypeRequest(RequestModel):
     holder: Literal["source", "target", "none"] = Field(
         description=HOLDER_DESCRIPTION, default="none"
     )
+    source_types: list[str] = Field(
+        description=SOURCE_TYPES_DESCRIPTION, default_factory=list, max_length=50
+    )
+    target_types: list[str] = Field(
+        description=TARGET_TYPES_DESCRIPTION, default_factory=list, max_length=50
+    )
     attributes_schema: dict[str, Any] | None = Field(
         description="Its fields, as a JSON Schema.", default=None
     )
@@ -65,6 +79,8 @@ class CreateEdgeTypeRequest(RequestModel):
             description=self.description,
             directional=self.directional,
             holder=self.holder,
+            source_types=tuple(self.source_types),
+            target_types=tuple(self.target_types),
             attributes_schema=self.attributes_schema,
         )
 
@@ -89,6 +105,16 @@ class UpdateEdgeTypeRequest(RequestModel):
     holder: Literal["source", "target", "none"] | None = Field(
         description=HOLDER_DESCRIPTION, default=None
     )
+    source_types: list[str] | None = Field(
+        description=SOURCE_TYPES_DESCRIPTION + " Replaces the list; empty removes it.",
+        default=None,
+        max_length=50,
+    )
+    target_types: list[str] | None = Field(
+        description=TARGET_TYPES_DESCRIPTION + " Replaces the list; empty removes it.",
+        default=None,
+        max_length=50,
+    )
     attributes_schema: dict[str, Any] | None = Field(
         description="Its fields, as a JSON Schema; replaces them all.", default=None
     )
@@ -102,6 +128,12 @@ class UpdateEdgeTypeRequest(RequestModel):
             description=self.description,
             directional=self.directional,
             holder=self.holder,
+            source_types=None
+            if self.source_types is None
+            else tuple(self.source_types),
+            target_types=None
+            if self.target_types is None
+            else tuple(self.target_types),
             attributes_schema=self.attributes_schema,
         )
 
@@ -120,6 +152,8 @@ class EdgeTypeResponse(BaseModel):
                     "description": "Links a film to its director.",
                     "directional": True,
                     "holder": "none",
+                    "source_types": ["film"],
+                    "target_types": ["person"],
                     "attributes_schema": {"type": "object"},
                     "created_at": "2026-08-23T10:14:44.465954Z",
                     "updated_at": "2026-08-23T10:14:44.465954Z",
@@ -137,6 +171,8 @@ class EdgeTypeResponse(BaseModel):
     description: str | None = Field(description="Free text about it.")
     directional: bool = Field(description="Whether the connection has a direction.")
     holder: Literal["source", "target", "none"] = Field(description=HOLDER_DESCRIPTION)
+    source_types: list[str] = Field(description=SOURCE_TYPES_DESCRIPTION)
+    target_types: list[str] = Field(description=TARGET_TYPES_DESCRIPTION)
     attributes_schema: dict[str, Any] | None = Field(
         description="Its fields, as a JSON Schema."
     )
@@ -154,6 +190,8 @@ class EdgeTypeResponse(BaseModel):
             description=edge_type.description,
             directional=edge_type.directional,
             holder=edge_type.holder,
+            source_types=list(edge_type.source_types),
+            target_types=list(edge_type.target_types),
             attributes_schema=edge_type.attributes_schema,
             created_at=edge_type.created_at,
             updated_at=edge_type.updated_at,

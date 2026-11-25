@@ -62,6 +62,7 @@
 	import ItemContents from '$lib/components/item-contents.svelte';
 	import ItemPath from '$lib/components/item-path.svelte';
 	import { reachChoices } from '$lib/item-reach';
+	import { allowsItemType, fitsLimits } from '$lib/connection-limits';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import CoverPlaceholder from '$lib/components/cover-placeholder.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
@@ -185,10 +186,12 @@
 	let creatingEdge = $state(false);
 	let edgeTargetSearch = $state('');
 	let edgeTargetOpen = $state(false);
+	// Once a connection type is chosen, only items its target end allows are offered.
 	let filteredNodes = $derived(
 		otherNodes.filter(
 			(n) =>
 				!selectedTargets.some((t) => t.id === n.id) &&
+				allowsItemType(edgeTypesById.get(newEdgeType)?.target_types, n.type) &&
 				`${n.name} ${n.type ?? ''}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
 		)
 	);
@@ -196,11 +199,13 @@
 	// Autocomplete for relationship types
 	let edgeTypeSearch = $state('');
 	let edgeTypeOpen = $state(false);
+	// Only types that fit this item at the source end, and any items already picked at the target.
 	let filteredEdgeTypes = $derived(
 		edgeTypes.filter(
 			(et) =>
-				et.label.toLowerCase().includes(edgeTypeSearch.toLowerCase()) ||
-				et.slug.includes(edgeTypeSearch.toLowerCase())
+				(et.label.toLowerCase().includes(edgeTypeSearch.toLowerCase()) ||
+					et.slug.includes(edgeTypeSearch.toLowerCase())) &&
+				selectedTargets.every((t) => fitsLimits(et, node?.type, t.type))
 		)
 	);
 
@@ -1002,10 +1007,28 @@
 										: edge.type}
 									{@const other = nodesById.get(otherNodeId(edge))}
 									{@const rowSchema = edgeTypeSchemaOf(edge)}
+									{@const doesNotFit =
+										other !== undefined &&
+										!fitsLimits(
+											et,
+											isOutgoing ? node?.type : other.type,
+											isOutgoing ? other.type : node?.type
+										)}
 									<li>
 										<Item.Root variant="outline">
 											<Item.Content class="text-sm">
-												<Item.Title class="min-w-0 break-words">{relationLabel}</Item.Title>
+												<Item.Title class="min-w-0 break-words">
+													{relationLabel}
+													{#if doesNotFit}
+														<Badge
+															variant="outline"
+															class="ml-1 align-middle text-muted-foreground"
+															title="These items' types no longer match what this connection type allows"
+														>
+															Doesn't fit
+														</Badge>
+													{/if}
+												</Item.Title>
 												<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
 													<a
 														href={resolve('/items/[id]', { id: otherNodeId(edge) })}
