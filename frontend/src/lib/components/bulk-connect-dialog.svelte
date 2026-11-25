@@ -4,12 +4,14 @@
 		createEdges,
 		listEdgeTypes,
 		listNodes,
+		listNodeTypes,
 		type EdgeTypeResponse,
-		type NodeResponse
+		type NodeResponse,
+		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { itemCount, unknownItemIds } from '$lib/bulk-actions';
-	import { allowsItemType } from '$lib/connection-limits';
+	import { allowsItemType, parentsByType } from '$lib/connection-limits';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -31,6 +33,7 @@
 	} = $props();
 
 	let types = $state<EdgeTypeResponse[] | null>(null);
+	let itemTypes = $state<NodeTypeResponse[]>([]);
 	let typeSlug = $state('');
 	let search = $state('');
 	let results = $state<NodeResponse[]>([]);
@@ -44,9 +47,15 @@
 	// items that end allows are offered. The selected items' own types are checked by the server.
 	const chosenType = $derived(types?.find((t) => t.slug === typeSlug) ?? null);
 	// Changing the connection after picking an item can leave that item outside the limit.
-	const targetFits = $derived(!target || allowsItemType(chosenType?.target_types, target.type));
+	// A limit on a parent type covers its subtypes.
+	const parentOfType = $derived(parentsByType(itemTypes));
+	const targetFits = $derived(
+		!target || allowsItemType(chosenType?.target_types, target.type, parentOfType)
+	);
 	const choices = $derived(
-		results.filter((r) => !ids.includes(r.id) && allowsItemType(chosenType?.target_types, r.type))
+		results.filter(
+			(r) => !ids.includes(r.id) && allowsItemType(chosenType?.target_types, r.type, parentOfType)
+		)
 	);
 
 	$effect(() => {
@@ -59,14 +68,19 @@
 		void listEdgeTypes({ query: { limit: 100 } }).then((r) => {
 			types = r.data ?? [];
 		});
+		void listNodeTypes({ query: { limit: 200 } }).then((r) => {
+			itemTypes = r.data ?? [];
+		});
 	});
 
 	$effect(() => {
 		if (!open) return;
 		const text = search;
-		// A single allowed type is asked of the server, so a full page of other items cannot hide it.
+		// A single allowed type is asked of the server, so a full page of other items cannot hide
+		// it. A parent type is not, since the server matches a type exactly, not its subtypes.
 		const allowed = chosenType?.target_types ?? [];
-		const type = allowed.length === 1 ? allowed[0] : undefined;
+		const isParent = allowed.length === 1 && [...parentOfType.values()].includes(allowed[0]);
+		const type = allowed.length === 1 && !isParent ? allowed[0] : undefined;
 		const mine = ++seq;
 		const timer = setTimeout(
 			async () => {

@@ -63,7 +63,7 @@
 	import ItemContents from '$lib/components/item-contents.svelte';
 	import ItemPath from '$lib/components/item-path.svelte';
 	import { reachChoices } from '$lib/item-reach';
-	import { allowsItemType, fitsLimits } from '$lib/connection-limits';
+	import { allowsItemType, fitsLimits, parentsByType } from '$lib/connection-limits';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import CoverPlaceholder from '$lib/components/cover-placeholder.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
@@ -96,6 +96,8 @@
 	let edgeTypes = $state<EdgeTypeResponse[]>([]);
 	let nodeTypes = $state<NodeTypeResponse[]>([]);
 	const typeOfNode = $derived(nodeTypes.find((nt) => nt.slug === node?.type));
+	// A connection type's limit on a parent type covers its subtypes.
+	const parentOfType = $derived(parentsByType(nodeTypes));
 	let settingType = $state(false);
 	// A type change waiting for a yes, because some values would have no field to show them.
 	let pendingType = $state<{ slug: string | null; orphaned: string[] } | null>(null);
@@ -191,7 +193,7 @@
 		otherNodes.filter(
 			(n) =>
 				!selectedTargets.some((t) => t.id === n.id) &&
-				allowsItemType(edgeTypesById.get(newEdgeType)?.target_types, n.type) &&
+				allowsItemType(edgeTypesById.get(newEdgeType)?.target_types, n.type, parentOfType) &&
 				`${n.name} ${n.type ?? ''}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
 		)
 	);
@@ -205,7 +207,7 @@
 			(et) =>
 				(et.label.toLowerCase().includes(edgeTypeSearch.toLowerCase()) ||
 					et.slug.includes(edgeTypeSearch.toLowerCase())) &&
-				selectedTargets.every((t) => fitsLimits(et, node?.type, t.type))
+				selectedTargets.every((t) => fitsLimits(et, node?.type, t.type, parentOfType))
 		)
 	);
 
@@ -1011,7 +1013,8 @@
 										!fitsLimits(
 											et,
 											isOutgoing ? node?.type : other.type,
-											isOutgoing ? other.type : node?.type
+											isOutgoing ? other.type : node?.type,
+											parentOfType
 										)}
 									<li>
 										<Item.Root variant="outline">

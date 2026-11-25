@@ -1,5 +1,5 @@
 import type { EdgeTypeResponse } from '$lib/api/client';
-import { allowsItemType } from '$lib/connection-limits';
+import { allowsItemType, type ParentsByType } from '$lib/connection-limits';
 
 /** One way a new item can be connected: a connection type, read from one end. */
 export type ConnectionChoice = {
@@ -29,12 +29,13 @@ export type RememberedConnection = {
  */
 export function connectionChoices(
 	types: EdgeTypeResponse[],
-	newItemType?: string | null
+	newItemType?: string | null,
+	parents?: ParentsByType
 ): ConnectionChoice[] {
 	const filter = newItemType !== undefined;
 	return types.flatMap((type) => {
 		const choices: ConnectionChoice[] = [];
-		if (!filter || allowsItemType(type.source_types, newItemType)) {
+		if (!filter || allowsItemType(type.source_types, newItemType, parents)) {
 			choices.push({
 				key: `${type.slug}:forward`,
 				typeSlug: type.slug,
@@ -43,7 +44,10 @@ export function connectionChoices(
 				pickedTypes: type.target_types ?? []
 			});
 		}
-		if (type.reverse_label && (!filter || allowsItemType(type.target_types, newItemType))) {
+		if (
+			type.reverse_label &&
+			(!filter || allowsItemType(type.target_types, newItemType, parents))
+		) {
 			choices.push({
 				key: `${type.slug}:reverse`,
 				typeSlug: type.slug,
