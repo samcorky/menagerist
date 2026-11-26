@@ -79,7 +79,8 @@ rules:
   menagerist-list-paging-parameters:
     description: A route that declares `after` must also declare `limit`, `sort` and `order`.
     severity: warn
-    given: "$.paths[*].get.parameters"
+    # The contents of an item come in (depth, id) order, so they cannot be sorted.
+    given: "$.paths[?(!@property.endsWith('/contents'))].get.parameters"
     then:
       function: schema
       functionOptions:

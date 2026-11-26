@@ -15,6 +15,7 @@ from app.modules.graph.application.schema_meta import NAMESPACE
 from app.modules.graph.domain import reach as reach_rules
 from app.modules.graph.domain.query import ItemFieldUse, SearchHit, TypeCount
 from app.modules.graph.domain.reach import Reached
+from app.shared_kernel.paging import page_rows, timestamp_value
 
 if TYPE_CHECKING:
     import builtins
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 def _sort_at(hit: SearchHit, *, index: int) -> str | float:
@@ -599,14 +601,20 @@ class InMemoryNodeRepository:
         return next((n for n in self._deleted_rows(scope) if n.id == node_id), None)
 
     async def list_deleted(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> builtins.list[Node]:
-        """List soft-deleted nodes in `scope`, newest deleted first (ties by id)."""
-        rows = self._deleted_rows(scope)
-        if after is not None:
-            ids = [n.id for n in rows]
-            rows = rows[ids.index(after) + 1 :] if after in ids else []
-        return rows[:limit]
+        self, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Node]:
+        """List soft-deleted nodes in `scope`, one page in the order `page` asks."""
+        return page_rows(
+            self._deleted_rows(scope),
+            page,
+            id_of=lambda n: n.id,
+            values={
+                "deleted_at": lambda n: (
+                    timestamp_value(n.deleted_at) if n.deleted_at else None
+                ),
+                "name": lambda n: n.name.lower(),
+            },
+        )
 
     async def count_deleted(self, *, scope: ContentFilter) -> int:
         """Return the number of soft-deleted nodes in `scope`."""

@@ -10,6 +10,7 @@ from app.modules.collections.adapters.persistence.collection_repository import (
 from app.modules.collections.domain.collection import Collection
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError
+from app.shared_kernel.paging import PageRequest, SortOrder
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -45,12 +46,15 @@ async def test_deleted_collections_list_newest_first_and_page(
     await _shelf(repo, "Theirs", owner=BOB, deleted_ago=1)
     scope = ContentFilter.of(ALICE)
 
-    first = await repo.list_deleted(scope=scope, after=None, limit=3)
-    second = await repo.list_deleted(scope=scope, after=first[-1].id, limit=3)
-    stale = await repo.list_deleted(scope=scope, after=uuid.uuid7(), limit=3)
+    request = PageRequest(sort="deleted_at", order=SortOrder.DESC, limit=3)
+    first = await repo.list_deleted(scope=scope, page=request)
+    assert first.next is not None
+    second = await repo.list_deleted(
+        scope=scope, page=PageRequest(**{**vars(request), "after": first.next})
+    )
 
-    assert [c.id for c in first + second] == [r.id for r in rows]
-    assert stale == []
+    assert [c.id for c in first.items + second.items] == [r.id for r in rows]
+    assert second.next is None
     assert await repo.count_deleted(scope=scope) == 4
 
 

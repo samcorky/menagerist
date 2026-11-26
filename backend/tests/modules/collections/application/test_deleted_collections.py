@@ -76,20 +76,18 @@ async def test_list_shows_only_own_deleted_collections_newest_first(
 
 
 async def test_list_pages_by_the_last_row_id(world: World) -> None:
-    """`after` continues past the previous page; a stale one gives an empty page."""
+    """The cursor continues past the previous page, newest deleted first."""
     rows = [await _collection(world, str(i), deleted_ago=i) for i in range(1, 5)]
     use_case = _lister(world)
 
     first = await use_case.handle(ListDeletedCollectionsQuery(limit=3), ALICE)
+    assert first.next is not None
     second = await use_case.handle(
-        ListDeletedCollectionsQuery(after=first.items[-1].id, limit=3), ALICE
-    )
-    stale = await use_case.handle(
-        ListDeletedCollectionsQuery(after=uuid.uuid7()), ALICE
+        ListDeletedCollectionsQuery(after=first.next, limit=3), ALICE
     )
 
     assert [c.id for c in first.items + second.items] == [r.id for r in rows]
-    assert stale.items == []
+    assert second.next is None
 
 
 async def test_restore_a_smart_collection_keeps_its_definition(world: World) -> None:

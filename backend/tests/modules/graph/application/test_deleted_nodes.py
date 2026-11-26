@@ -108,11 +108,13 @@ async def test_list_pages_by_the_last_row_id() -> None:
     rows = [await _item(repos, str(i), deleted_ago=i) for i in range(1, 6)]
     # Newest deleted first is the smallest `deleted_ago`.
     first = await _list(repos).handle(ListDeletedNodesQuery(limit=2), ALICE)
+    assert first.next is not None
     second = await _list(repos).handle(
-        ListDeletedNodesQuery(after=first.items[-1].id, limit=2), ALICE
+        ListDeletedNodesQuery(after=first.next, limit=2), ALICE
     )
+    assert second.next is not None
     third = await _list(repos).handle(
-        ListDeletedNodesQuery(after=second.items[-1].id, limit=2), ALICE
+        ListDeletedNodesQuery(after=second.next, limit=2), ALICE
     )
 
     assert [n.id for n in first.items + second.items + third.items] == [
@@ -121,14 +123,19 @@ async def test_list_pages_by_the_last_row_id() -> None:
     assert first.total == second.total == third.total == 5
 
 
-async def test_list_after_an_id_no_longer_in_recently_deleted_is_empty() -> None:
-    """A stale cursor yields an empty page rather than restarting."""
+async def test_list_cursor_survives_its_row_being_restored_or_purged() -> None:
+    """The cursor holds a position, so removing its row does not empty the next page."""
     repos = _repos()
-    await _item(repos, "A", deleted_ago=1)
+    rows = [await _item(repos, str(i), deleted_ago=i) for i in range(1, 4)]
+    first = await _list(repos).handle(ListDeletedNodesQuery(limit=1), ALICE)
+    assert first.next is not None
+    await repos.nodes.purge(first.items[0].id)
 
-    result = await _list(repos).handle(ListDeletedNodesQuery(after=uuid.uuid7()), ALICE)
+    second = await _list(repos).handle(
+        ListDeletedNodesQuery(after=first.next, limit=5), ALICE
+    )
 
-    assert result.items == []
+    assert [n.id for n in second.items] == [rows[1].id, rows[2].id]
 
 
 async def test_restore_clears_only_the_mark_and_keeps_live_connections() -> None:

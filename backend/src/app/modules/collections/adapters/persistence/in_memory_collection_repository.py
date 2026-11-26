@@ -124,14 +124,20 @@ class InMemoryCollectionRepository:
         )
 
     async def list_deleted(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> builtins.list[Collection]:
-        """List soft-deleted collections in `scope`, newest deleted first."""
-        rows = self._deleted_rows(scope)
-        if after is not None:
-            ids = [c.id for c in rows]
-            rows = rows[ids.index(after) + 1 :] if after in ids else []
-        return rows[:limit]
+        self, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Collection]:
+        """List soft-deleted collections in `scope`, one page as `page` asks."""
+        return page_rows(
+            self._deleted_rows(scope),
+            page,
+            id_of=lambda c: c.id,
+            values={
+                "deleted_at": lambda c: (
+                    timestamp_value(c.deleted_at) if c.deleted_at else None
+                ),
+                "name": lambda c: c.name.lower(),
+            },
+        )
 
     async def count_deleted(self, *, scope: ContentFilter) -> int:
         """Return the number of soft-deleted collections in `scope`."""
