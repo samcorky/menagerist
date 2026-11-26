@@ -86,10 +86,9 @@ async def _assert_empty(world: World) -> None:
     ).items == []
     assert (
         await world.graph_repos.edges.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.preset_repos.presets.list(
             scope=ContentFilter.everyone(), page=PageRequest(limit=10)
@@ -196,10 +195,9 @@ async def test_no_pack_connection_is_left_dangling(make_world: MakeWorld) -> Non
     assert not any(k.kind is EntityKind.CONNECTION for k in result.kept)
     assert (
         await world.graph_repos.edges.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
 
 
 async def test_an_item_with_a_users_own_connection_is_kept(

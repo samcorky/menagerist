@@ -44,7 +44,7 @@ async def test_list_edges_returns_all_edges() -> None:
         await edges.add(edge)
     use_case = ListEdges(_make_repos(edges), InMemoryAccessGuard())
 
-    result = await use_case.handle(ListEdgesQuery(), SYSTEM_ACTOR)
+    result = (await use_case.handle(ListEdgesQuery(), SYSTEM_ACTOR)).items
 
     assert result == sorted(items, key=lambda e: e.id)
 
@@ -69,6 +69,8 @@ async def test_list_edges_filters_by_node_id() -> None:
     await edges.add(unrelated)
     use_case = ListEdges(_make_repos(edges), InMemoryAccessGuard())
 
-    result = await use_case.handle(ListEdgesQuery(node_id=node_id), SYSTEM_ACTOR)
+    result = (
+        await use_case.handle(ListEdgesQuery(node_id=node_id), SYSTEM_ACTOR)
+    ).items
 
     assert result == [touching]

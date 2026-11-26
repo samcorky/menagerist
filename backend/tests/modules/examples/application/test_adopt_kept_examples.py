@@ -254,9 +254,11 @@ async def _connection_kept_world(make_world: MakeWorld) -> World:
     world = make_world()
     await _install(world)
     edge = (
-        await world.graph_repos.edges.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
-        )
+        (
+            await world.graph_repos.edges.list(
+                scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+            )
+        ).items
     )[0]
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
@@ -278,9 +280,11 @@ async def test_connections_are_adopted_when_they_still_join_the_same_items(
     assert result.created.connections == 0
     assert (
         len(
-            await world.graph_repos.edges.list(
-                after=None, limit=10, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.edges.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+                )
+            ).items
         )
         == 1
     )

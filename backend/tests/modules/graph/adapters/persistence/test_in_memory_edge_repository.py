@@ -5,6 +5,7 @@ from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
 )
 from app.modules.graph.domain.edge import Edge
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 
 def _make_edge() -> Edge:
@@ -66,7 +67,11 @@ async def test_list_orders_by_id_ascending() -> None:
     for edge in reversed(edges):
         await repository.add(edge)
 
-    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repository.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
 
     assert result == sorted(edges, key=lambda edge: edge.id)
 
@@ -82,7 +87,11 @@ async def test_list_excludes_soft_deleted_edges() -> None:
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repository.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
 
     assert result == [kept]
 

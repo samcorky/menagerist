@@ -12,6 +12,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest, SortOrder
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,7 +94,11 @@ async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
     repository = SqlAlchemyEdgeRepository(db_session)
     edges = [await _make_edge(db_session) for _ in range(3)]
 
-    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repository.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
 
     assert [e.id for e in result] == sorted(e.id for e in edges)
 
@@ -107,7 +112,11 @@ async def test_list_excludes_soft_deleted_edges(db_session: AsyncSession) -> Non
     deleted.soft_delete()
     await repository.save(deleted)
 
-    result = await repository.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repository.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
 
     assert [e.id for e in result] == [kept.id]
 
@@ -332,3 +341,48 @@ async def test_count_and_list_with_attribute_can_match_a_group_sub_key(
         )
         == 0
     )
+
+
+@pytest.mark.parametrize("order", list(SortOrder))
+@pytest.mark.parametrize("sort", [None, "type", "created_at", "updated_at"])
+async def test_list_cursors_visit_every_edge_once_in_order(
+    db_session: AsyncSession, sort: str | None, order: SortOrder
+) -> None:
+    """Following `next` never repeats a connection or skips one, whatever the sort."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    scope = ContentFilter.everyone()
+    for _ in range(5):
+        await _make_edge(db_session)
+    everything = (
+        await repository.list(
+            scope=scope, page=PageRequest(sort=sort, order=order, limit=100)
+        )
+    ).items
+
+    seen: list[uuid.UUID] = []
+    request = PageRequest(sort=sort, order=order, limit=2)
+    while True:
+        page = await repository.list(scope=scope, page=request)
+        seen.extend(e.id for e in page.items)
+        if page.next is None:
+            break
+        request = PageRequest(after=page.next, sort=sort, order=order, limit=2)
+
+    assert seen == [e.id for e in everything]
+    assert len(set(seen)) == 5
+
+
+async def test_page_for_node_pages_only_the_edges_touching_the_node(
+    db_session: AsyncSession,
+) -> None:
+    """The node filter is part of the query, so a page never holds another's edge."""
+    repository = SqlAlchemyEdgeRepository(db_session)
+    mine = await _make_edge(db_session)
+    await _make_edge(db_session)
+
+    page = await repository.page_for_node(
+        mine.source_id, scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+    )
+
+    assert [e.id for e in page.items] == [mine.id]
+    assert page.next is None

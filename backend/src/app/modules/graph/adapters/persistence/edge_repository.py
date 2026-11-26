@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.modules.graph.adapters.persistence.models import EdgeModel
 from app.modules.graph.domain.edge import Edge
+from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
@@ -13,12 +14,20 @@ if TYPE_CHECKING:
     import uuid
     from datetime import datetime
 
-    from sqlalchemy import ColumnElement, SQLColumnExpression
+    from sqlalchemy import ColumnElement, Select, SQLColumnExpression
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 logger = structlog.get_logger()
+
+# What `list` can sort by; the names are fields of the API's connection response.
+_SORT_COLUMNS = {
+    "type": text_column(EdgeModel.type),
+    "created_at": timestamp_column(EdgeModel.created_at),
+    "updated_at": timestamp_column(EdgeModel.updated_at),
+}
 
 
 def _has_matching_row(
@@ -128,21 +137,31 @@ class SqlAlchemyEdgeRepository:
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[Edge]:
-        """List non-deleted edge ordered by id, starting after `after` if given."""
-        logger.debug("listing edges", after=after, limit=limit)
-        stmt = (
-            select(EdgeModel)
-            .where(_in_scope(scope))
-            .order_by(EdgeModel.id)
-            .limit(limit)
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[Edge]:
+        """List non-deleted edges in `scope`, one page in the order `page` asks."""
+        logger.debug("listing edges", page=page)
+        return await self._page(select(EdgeModel).where(_in_scope(scope)), page)
+
+    async def page_for_node(
+        self, node_id: uuid.UUID, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Edge]:
+        """One page of the non-deleted edges where `node_id` is source or target."""
+        logger.debug("listing a page of edges for node", node_id=node_id)
+        stmt = select(EdgeModel).where(
+            _in_scope(scope),
+            or_(EdgeModel.source_id == node_id, EdgeModel.target_id == node_id),
         )
-        if after is not None:
-            stmt = stmt.where(EdgeModel.id > after)
-        result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars()]
+        return await self._page(stmt, page)
+
+    async def _page(self, stmt: Select[EdgeModel], page: PageRequest) -> Page[Edge]:
+        return await keyset_page(
+            self._session,
+            stmt,
+            id_column=EdgeModel.id,
+            columns=_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
+        )
 
     async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""

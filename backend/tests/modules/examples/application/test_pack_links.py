@@ -29,6 +29,7 @@ from app.modules.transfer.domain.run import Outcome, Run
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
@@ -85,9 +86,11 @@ async def _pairs(world: World) -> set[tuple[str, str]]:
             scope=ContentFilter.everyone(), after=None, limit=50
         )
     }
-    edges = await world.graph_repos.edges.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    )
+    edges = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items
     return {(names[e.source_id], names[e.target_id]) for e in edges}
 
 
@@ -259,9 +262,11 @@ async def test_an_edited_link_is_kept_and_keeps_its_item(
     world = _world(make_world)
     await _install(world, "music")
     await _install(world, "movies")
-    [edge] = await world.graph_repos.edges.list(
-        after=None, limit=10, scope=ContentFilter.everyone()
-    )
+    [edge] = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
 
@@ -280,9 +285,11 @@ async def test_a_kept_link_is_not_duplicated_when_the_pack_comes_back(
     world = _world(make_world)
     await _install(world, "music")
     await _install(world, "movies")
-    [edge] = await world.graph_repos.edges.list(
-        after=None, limit=10, scope=ContentFilter.everyone()
-    )
+    [edge] = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
     await _uninstall(world, "movies")
