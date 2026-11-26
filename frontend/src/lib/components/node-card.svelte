@@ -18,6 +18,7 @@
 		item,
 		schema,
 		categoryLabel,
+		categoryParent,
 		typeIcon,
 		typeColour,
 		match,
@@ -30,6 +31,8 @@
 		item: NodeResponse;
 		schema: AttributesSchema | null;
 		categoryLabel?: string | null;
+		/** The parent type's name when the item's type is a subtype; the card shows only its own. */
+		categoryParent?: string | null;
 		/** The item type's icon and colour, shown when the item has no cover. */
 		typeIcon?: string | null;
 		typeColour?: string | null;
@@ -111,7 +114,15 @@
 	</Item.Content>
 	{#if categoryText}
 		<Item.Actions>
-			<Badge variant="secondary" class="shrink-0">{categoryText}</Badge>
+			<Badge
+				variant="secondary"
+				class="shrink-0"
+				title={categoryParent ? `${categoryParent} › ${categoryText}` : undefined}
+			>
+				{categoryText}{#if categoryParent}<span class="sr-only">
+						, a subtype of {categoryParent}
+					</span>{/if}
+			</Badge>
 		</Item.Actions>
 	{/if}
 {/snippet}

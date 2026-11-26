@@ -143,6 +143,7 @@
 	} from '$lib/examples';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { effectiveSchema } from '$lib/node-types';
+	import { groupByFamily, typeNames } from '$lib/type-names';
 	import { matchContext } from '$lib/search-context';
 
 	const EMPTY_LINES = [
@@ -331,7 +332,10 @@
 	let addOpen = $state(false);
 	let addTrigger: HTMLElement | null = null;
 	let headerAddButton = $state<HTMLElement | null>(null);
-	const typeLabels = $derived(Object.fromEntries(itemTypes.map((t) => [t.slug, t.label])));
+	const typeName = $derived(typeNames(itemTypes));
+	const typeLabels = $derived(
+		Object.fromEntries(itemTypes.map((t) => [t.slug, typeName.path(t.slug)]))
+	);
 	// The types this collection holds, with counts. Untyped items are a row with no slug.
 	let typeCounts = $state<NodeTypeCountResponse[]>([]);
 	// One row is nothing to choose between, unless a type is already selected (say from a link).
@@ -346,6 +350,21 @@
 		}
 		return options;
 	});
+	// The filter's rows, a parent and its subtypes grouped under the parent's name. Choosing the
+	// parent includes its subtypes, so its row is "All …" with the whole family's count.
+	const typeOptionGroups = $derived(
+		groupByFamily(typeOptions, itemTypes).map((group) => {
+			const total = group.options.reduce((sum, o) => sum + (o.count ?? 0), 0);
+			return {
+				heading: group.heading,
+				options: group.options.map((o) => ({
+					slug: o.slug,
+					label: o.isParent ? `All ${typeName.short(o.slug)}` : typeName.short(o.slug),
+					count: o.isParent && o.count !== null ? total : o.count
+				}))
+			};
+		})
+	);
 	let typeCountsSeq = 0;
 
 	async function loadTypeCounts(id: string) {
@@ -1246,12 +1265,22 @@
 						onchange={(e) => selectType(e.currentTarget.value)}
 					>
 						<NativeSelect.Option value="">All types</NativeSelect.Option>
-						{#each typeOptions as option (option.slug)}
-							<NativeSelect.Option value={option.slug}>
-								{typeLabels[option.slug] ?? option.slug}{option.count === null
-									? ''
-									: ` (${option.count})`}
-							</NativeSelect.Option>
+						{#each typeOptionGroups as group (group.heading ?? '')}
+							{#if group.heading}
+								<NativeSelect.OptGroup label={group.heading}>
+									{#each group.options as option (option.slug)}
+										<NativeSelect.Option value={option.slug}>
+											{option.label}{option.count === null ? '' : ` (${option.count})`}
+										</NativeSelect.Option>
+									{/each}
+								</NativeSelect.OptGroup>
+							{:else}
+								{#each group.options as option (option.slug)}
+									<NativeSelect.Option value={option.slug}>
+										{option.label}{option.count === null ? '' : ` (${option.count})`}
+									</NativeSelect.Option>
+								{/each}
+							{/if}
 						{/each}
 					</NativeSelect.Root>
 				{/if}
@@ -1408,6 +1437,7 @@
 							onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 							schema={schemaOf(item.type)}
 							categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
+							categoryParent={typeName.parentOf(item.type)?.label}
 							typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
 							typeColour={itemTypes.find((t) => t.slug === item.type)?.colour}
 							match={q ? matchContext(item, schemaOf(item.type), q) : null}
@@ -1442,6 +1472,7 @@
 								onlongpress={canSelect && !selection.active ? () => pick(item.id) : undefined}
 								schema={schemaOf(item.type)}
 								categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
+								categoryParent={typeName.parentOf(item.type)?.label}
 								typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
 								typeColour={itemTypes.find((t) => t.slug === item.type)?.colour}
 								match={q ? matchContext(item, schemaOf(item.type), q) : null}

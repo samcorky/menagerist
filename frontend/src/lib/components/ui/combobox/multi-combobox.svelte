@@ -4,6 +4,8 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
+	import ComboboxLabel from './combobox-label.svelte';
+	import ComboboxList from './combobox-list.svelte';
 	import { cn } from '$lib/utils.js';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import {
@@ -98,7 +100,9 @@
 					class="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary py-0.5 pr-1 pl-2.5 text-xs text-secondary-foreground"
 				>
 					{#if leading}{@render leading(item)}{/if}
-					<span class="min-w-0 truncate">{item.selectedLabel ?? item.label}</span>
+					<span class="min-w-0 truncate">
+						<ComboboxLabel label={item.selectedLabel ?? item.label} crumb={item.crumb} />
+					</span>
 					<button
 						type="button"
 						{disabled}
@@ -152,40 +156,14 @@
 	>
 		<Command.Root shouldFilter={false} loop bind:value={highlighted} class="bg-transparent p-0">
 			<Command.Input bind:value={query} placeholder={searchPlaceholder} aria-label="Search" />
-			<Command.List id={listId} class="mt-1 max-h-[min(18rem,50dvh)]">
-				{#if groups.length === 0}
-					<p class="py-6 text-center text-sm text-muted-foreground" role="status">{emptyText}</p>
-				{/if}
-				{#each groups as group (group.heading ?? '')}
-					{#if group.heading}
-						<Command.Group heading={group.heading}>
-							{@render rows(group.items)}
-						</Command.Group>
-					{:else}
-						<Command.Group>
-							{@render rows(group.items)}
-						</Command.Group>
-					{/if}
-				{/each}
-			</Command.List>
+			<ComboboxList
+				id={listId}
+				{groups}
+				{emptyText}
+				checked={(item) => value.includes(item.value)}
+				{leading}
+				onselect={toggle}
+			/>
 		</Command.Root>
 	</Popover.Content>
 </Popover.Root>
-
-{#snippet rows(list: ComboboxItem[])}
-	{#each list as item (item.value)}
-		<Command.Item
-			value={item.value}
-			disabled={item.disabled}
-			data-checked={value.includes(item.value)}
-			class="min-h-9"
-			onSelect={() => toggle(item)}
-		>
-			{#if leading}{@render leading(item)}{/if}
-			<span class="min-w-0 flex-1 truncate">{item.label}</span>
-			{#if item.description}
-				<span class="shrink-0 text-xs text-muted-foreground tabular-nums">{item.description}</span>
-			{/if}
-		</Command.Item>
-	{/each}
-{/snippet}

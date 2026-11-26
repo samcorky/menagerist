@@ -17,6 +17,7 @@
 		item,
 		schema,
 		categoryLabel,
+		categoryParent,
 		typeIcon,
 		typeColour,
 		match,
@@ -29,6 +30,8 @@
 		item: NodeResponse;
 		schema: AttributesSchema | null;
 		categoryLabel?: string | null;
+		/** The parent type's name when the item's type is a subtype; the card shows only its own. */
+		categoryParent?: string | null;
 		/** The item type's icon and colour, for the tile shown when there is no cover. */
 		typeIcon?: string | null;
 		typeColour?: string | null;
@@ -115,7 +118,14 @@
 				{/if}
 			</div>
 			{#if categoryLabel}
-				<p class="mt-0.5 truncate text-xs text-muted-foreground">{categoryLabel}</p>
+				<p
+					class="mt-0.5 truncate text-xs text-muted-foreground"
+					title={categoryParent ? `${categoryParent} › ${categoryLabel}` : undefined}
+				>
+					{categoryLabel}{#if categoryParent}<span class="sr-only">
+							, a subtype of {categoryParent}
+						</span>{/if}
+				</p>
 			{/if}
 			{#if item.tags.length > 0}
 				<div class="mt-1">

@@ -72,7 +72,13 @@
 	);
 	const selectedType = $derived(value ? bySlug.get(value) : undefined);
 	const selectedItem = $derived<ComboboxItem | undefined>(
-		value ? { value, label: selectedType?.label ?? value } : undefined
+		value
+			? {
+					value,
+					label: selectedType?.label ?? value,
+					crumb: selectedType?.parent ? bySlug.get(selectedType.parent)?.label : undefined
+				}
+			: undefined
 	);
 
 	function select(slug: string | null) {

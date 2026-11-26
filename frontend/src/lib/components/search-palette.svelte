@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { auth } from '$lib/auth.svelte.js';
+	import { typeNames } from '$lib/type-names';
 	import { ArrowRight, Search } from '@lucide/svelte';
 	import { collectionRouteParams } from '$lib/collections';
 	import type { NodeTypeResponse } from '$lib/api/client';
@@ -246,7 +247,10 @@
 		const type = typeOf(item);
 		const schema = effectiveSchema(type);
 		const found = { name: item.title, description: item.description, attributes: item.attributes };
-		return resultSubtitle(type?.label ?? null, matchContext(found, schema, query));
+		return resultSubtitle(
+			type ? typeNames(types).path(type.slug) : null,
+			matchContext(found, schema, query)
+		);
 	}
 
 	function countLabel(n: number): string {

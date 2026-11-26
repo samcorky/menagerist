@@ -2,7 +2,7 @@ import { test, expect, type APIRequestContext } from './fixtures';
 import { chooseItemType, ownedData, uniqueName } from './helpers';
 
 /** An item type may be a subtype of another and uses its parent's fields (#320). */
-const { cleanUp } = ownedData();
+const { cleanUp, makeItem } = ownedData();
 const typeIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
@@ -73,6 +73,47 @@ test('an item of the parent type itself has only the parent`s fields', async ({
 
 	await expect(page.getByLabel('Condition')).toBeVisible();
 	await expect(page.getByLabel('Width')).toHaveCount(0);
+});
+
+test('the type picker groups a family under its parent and shows a subtype with it', async ({
+	page,
+	request
+}) => {
+	const parent = await makeType(request, uniqueName('Memorabilia'), {});
+	const poster = await makeType(request, uniqueName('Poster'), {}, parent.slug);
+	const figure = await makeType(request, uniqueName('Figure'), {}, parent.slug);
+	await makeItem(request, uniqueName('Alien one-sheet'), poster.slug);
+
+	await page.goto('/items/new');
+	await page.getByRole('combobox', { name: 'Item type' }).click();
+
+	// A subtype in use is listed on its own with its parent; the rest sit under the parent's name.
+	const list = page.getByRole('listbox');
+	await expect(list.getByRole('group', { name: parent.label })).toContainText(figure.label);
+	await expect(
+		list.getByRole('option', { name: new RegExp(`${parent.label}.*${poster.label}`) })
+	).toBeVisible();
+
+	await page.getByRole('option', { name: new RegExp(figure.label) }).click();
+	const trigger = page.getByRole('combobox', { name: 'Item type' });
+	await expect(trigger).toContainText(parent.label);
+	await expect(trigger).toContainText(figure.label);
+});
+
+test('a subtype`s items show its parent in the type row and keep just its name on cards', async ({
+	page,
+	request
+}) => {
+	const parent = await makeType(request, uniqueName('Memorabilia'), {});
+	const poster = await makeType(request, uniqueName('Poster'), {}, parent.slug);
+	const name = uniqueName('Alien one-sheet');
+	await makeItem(request, name, poster.slug);
+
+	await page.goto('/items');
+	await expect(page.getByText(`${parent.label} › ${poster.label}`)).toBeVisible();
+	const card = page.getByRole('link', { name: new RegExp(name) }).first();
+	await expect(card).toContainText(poster.label);
+	await expect(card.getByText(`, a subtype of ${parent.label}`)).toBeAttached();
 });
 
 test('a parent with subtypes cannot be deleted, and the list of its subtypes shows them', async ({
