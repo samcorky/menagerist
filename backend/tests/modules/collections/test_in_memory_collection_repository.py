@@ -6,6 +6,7 @@ from app.modules.collections.adapters.persistence.in_memory_collection_repositor
 )
 from app.modules.collections.domain.collection import Collection, CollectionKind
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Cursor, PageRequest
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -44,7 +45,9 @@ async def test_soft_deleted_collection_is_hidden(
     await repo.save(collection)
     assert await repo.get(collection.id, scope=ContentFilter.everyone()) is None
     assert await repo.get_by_slug("jazz", scope=ContentFilter.everyone()) is None
-    assert await repo.list(scope=ContentFilter.everyone(), after=None, limit=10) == []
+    assert (
+        await repo.list(scope=ContentFilter.everyone(), page=PageRequest(limit=10))
+    ).items == []
 
 
 async def test_slug_of_a_deleted_collection_does_not_shadow_a_live_one(
@@ -70,18 +73,30 @@ async def test_list_is_ordered_by_id_with_keyset_paging(
     for collection in reversed(made):
         await repo.add(collection)
 
-    first = await repo.list(scope=ContentFilter.everyone(), after=None, limit=2)
+    first = (
+        await repo.list(scope=ContentFilter.everyone(), page=PageRequest(limit=2))
+    ).items
     assert first == made[:2]
-    second = await repo.list(
-        scope=ContentFilter.everyone(), after=first[-1].id, limit=2
-    )
+    second = (
+        await repo.list(
+            scope=ContentFilter.everyone(),
+            page=PageRequest(after=Cursor.after_id(first[-1].id), limit=2),
+        )
+    ).items
     assert second == made[2:4]
-    last = await repo.list(scope=ContentFilter.everyone(), after=second[-1].id, limit=2)
+    last = (
+        await repo.list(
+            scope=ContentFilter.everyone(),
+            page=PageRequest(after=Cursor.after_id(second[-1].id), limit=2),
+        )
+    ).items
     assert last == made[4:]
     assert (
-        await repo.list(scope=ContentFilter.everyone(), after=last[-1].id, limit=2)
-        == []
-    )
+        await repo.list(
+            scope=ContentFilter.everyone(),
+            page=PageRequest(after=Cursor.after_id(last[-1].id), limit=2),
+        )
+    ).items == []
 
 
 async def test_list_q_matches_name_or_description_ignoring_case(
@@ -96,9 +111,11 @@ async def test_list_q_matches_name_or_description_ignoring_case(
     for collection in (by_name, by_description, miss):
         await repo.add(collection)
 
-    found = await repo.list(
-        scope=ContentFilter.everyone(), after=None, limit=10, q="tape"
-    )
+    found = (
+        await repo.list(
+            scope=ContentFilter.everyone(), q="tape", page=PageRequest(limit=10)
+        )
+    ).items
 
     assert {c.id for c in found} == {by_name.id, by_description.id}
 
@@ -115,12 +132,16 @@ async def test_list_q_treats_percent_and_underscore_literally(
     for collection in (percent, plain, underscore, other):
         await repo.add(collection)
 
-    assert await repo.list(
-        scope=ContentFilter.everyone(), after=None, limit=10, q="50%"
-    ) == [percent]
-    assert await repo.list(
-        scope=ContentFilter.everyone(), after=None, limit=10, q="a_b"
-    ) == [underscore]
+    assert (
+        await repo.list(
+            scope=ContentFilter.everyone(), q="50%", page=PageRequest(limit=10)
+        )
+    ).items == [percent]
+    assert (
+        await repo.list(
+            scope=ContentFilter.everyone(), q="a_b", page=PageRequest(limit=10)
+        )
+    ).items == [underscore]
 
 
 async def test_list_blank_q_returns_everything(
@@ -134,9 +155,11 @@ async def test_list_blank_q_returns_everything(
     for q in (None, "", "   "):
         assert (
             len(
-                await repo.list(
-                    scope=ContentFilter.everyone(), after=None, limit=10, q=q
-                )
+                (
+                    await repo.list(
+                        scope=ContentFilter.everyone(), q=q, page=PageRequest(limit=10)
+                    )
+                ).items
             )
             == 2
         )
@@ -154,12 +177,18 @@ async def test_list_q_combines_with_after_limit_and_deletion(
     made[3].soft_delete()
     await repo.save(made[3])
 
-    first = await repo.list(
-        scope=ContentFilter.everyone(), after=None, limit=2, q="tape"
-    )
-    rest = await repo.list(
-        scope=ContentFilter.everyone(), after=first[-1].id, limit=2, q="tape"
-    )
+    first = (
+        await repo.list(
+            scope=ContentFilter.everyone(), q="tape", page=PageRequest(limit=2)
+        )
+    ).items
+    rest = (
+        await repo.list(
+            scope=ContentFilter.everyone(),
+            q="tape",
+            page=PageRequest(after=Cursor.after_id(first[-1].id), limit=2),
+        )
+    ).items
 
     assert first == made[:2]
     assert rest == [made[2]]
@@ -182,9 +211,11 @@ async def test_list_q_ignores_accents_both_ways(
     async def ids(q: str) -> set[object]:
         return {
             c.id
-            for c in await repo.list(
-                scope=ContentFilter.everyone(), after=None, limit=10, q=q
-            )
+            for c in (
+                await repo.list(
+                    scope=ContentFilter.everyone(), q=q, page=PageRequest(limit=10)
+                )
+            ).items
         }
 
     assert await ids("cafe") == {accented.id, plain.id, percent.id}
@@ -218,13 +249,17 @@ async def test_list_filters_by_kind(make_collection: MakeCollection) -> None:
     await repo.add(smart)
     everyone = ContentFilter.everyone()
 
-    only_manual = await repo.list(
-        scope=everyone, after=None, limit=10, kind=CollectionKind.MANUAL
-    )
-    only_smart = await repo.list(
-        scope=everyone, after=None, limit=10, kind=CollectionKind.DYNAMIC
-    )
-    both = await repo.list(scope=everyone, after=None, limit=10)
+    only_manual = (
+        await repo.list(
+            scope=everyone, kind=CollectionKind.MANUAL, page=PageRequest(limit=10)
+        )
+    ).items
+    only_smart = (
+        await repo.list(
+            scope=everyone, kind=CollectionKind.DYNAMIC, page=PageRequest(limit=10)
+        )
+    ).items
+    both = (await repo.list(scope=everyone, page=PageRequest(limit=10))).items
 
     assert only_manual == [manual]
     assert only_smart == [smart]

@@ -1,6 +1,8 @@
 import unicodedata
 from typing import TYPE_CHECKING
 
+from app.shared_kernel.paging import page_rows, timestamp_value
+
 if TYPE_CHECKING:
     import builtins
     import uuid
@@ -8,6 +10,7 @@ if TYPE_CHECKING:
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 def _fold(text: str) -> str:
@@ -68,33 +71,37 @@ class InMemoryCollectionRepository:
         self,
         *,
         scope: ContentFilter,
-        after: uuid.UUID | None,
-        limit: int,
+        page: PageRequest,
         q: str | None = None,
         kind: CollectionKind | None = None,
-    ) -> list[Collection]:
-        """Return up to `limit` live collections in `scope`, ordered by id.
+    ) -> Page[Collection]:
+        """Return one page of live collections in `scope`, in the order `page` asks.
 
         A non-blank `q` keeps collections whose name or description contains it,
         ignoring case and accents. A `kind` keeps only collections of that kind.
         """
         needle = _fold((q or "").strip())
-        live = sorted(
-            (
-                c
-                for c in self._collections.values()
-                if self._visible(c, scope)
-                and (after is None or c.id > after)
-                and (kind is None or c.kind is kind)
-                and (
-                    not needle
-                    or needle in _fold(c.name)
-                    or needle in _fold(c.description or "")
-                )
-            ),
-            key=lambda c: c.id,
+        live = [
+            c
+            for c in self._collections.values()
+            if self._visible(c, scope)
+            and (kind is None or c.kind is kind)
+            and (
+                not needle
+                or needle in _fold(c.name)
+                or needle in _fold(c.description or "")
+            )
+        ]
+        return page_rows(
+            live,
+            page,
+            id_of=lambda c: c.id,
+            values={
+                "name": lambda c: c.name.lower(),
+                "created_at": lambda c: timestamp_value(c.created_at),
+                "updated_at": lambda c: timestamp_value(c.updated_at),
+            },
         )
-        return live[:limit]
 
     def _deleted_rows(self, scope: ContentFilter) -> builtins.list[Collection]:
         """Soft-deleted collections in `scope`, newest deleted first (ties by id)."""

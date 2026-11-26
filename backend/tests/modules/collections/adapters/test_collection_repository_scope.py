@@ -23,6 +23,7 @@ from app.modules.collections.ports.collection_repository import CollectionReposi
 from app.modules.collections.ports.membership_repository import MembershipRepository
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ConflictError
+from app.shared_kernel.paging import Cursor, PageRequest
 from app.shared_kernel.slug import Slug
 
 ALICE = uuid.UUID(int=101)
@@ -87,7 +88,9 @@ async def test_soft_deleted_collections_are_excluded(repos: Repos) -> None:
     for scope in (A, ALL):
         assert await repos.collections.get(shelf.id, scope=scope) is None
         assert await repos.collections.get_by_slug("jazz", scope=scope) is None
-        assert await repos.collections.list(scope=scope, after=None, limit=5) == []
+        assert (
+            await repos.collections.list(scope=scope, page=PageRequest(limit=5))
+        ).items == []
 
 
 async def test_list_is_scoped_with_paging_and_search(repos: Repos) -> None:
@@ -98,13 +101,22 @@ async def test_list_is_scoped_with_paging_and_search(repos: Repos) -> None:
         await repos.collections.add(shelf)
     mine_ids = sorted(s.id for s in mine)
 
-    first = await repos.collections.list(scope=A, after=None, limit=2)
-    rest = await repos.collections.list(scope=A, after=first[-1].id, limit=2)
-    searched = await repos.collections.list(scope=B, after=None, limit=10, q="tape")
+    first = (await repos.collections.list(scope=A, page=PageRequest(limit=2))).items
+    rest = (
+        await repos.collections.list(
+            scope=A, page=PageRequest(after=Cursor.after_id(first[-1].id), limit=2)
+        )
+    ).items
+    searched = (
+        await repos.collections.list(scope=B, q="tape", page=PageRequest(limit=10))
+    ).items
 
     assert [c.id for c in [*first, *rest]] == mine_ids
     assert {c.id for c in searched} == {s.id for s in theirs}
-    assert len(await repos.collections.list(scope=ALL, after=None, limit=10)) == 5
+    assert (
+        len((await repos.collections.list(scope=ALL, page=PageRequest(limit=10))).items)
+        == 5
+    )
 
 
 async def test_same_slug_for_two_owners_is_allowed(repos: Repos) -> None:

@@ -78,7 +78,12 @@ def test_domain_layer_has_no_framework_dependencies() -> None:
 
 
 def test_shared_kernel_has_no_framework_dependencies() -> None:
-    """Shared kernel may only depend on pure data modeling and typing primitives."""
+    """Shared kernel may only depend on pure data modeling and typing primitives.
+
+    The standard-library modules for encoding (`base64`, `binascii`, `json`) and
+    ordering (`functools`) are pure computation like `hashlib` and `re`: the list
+    cursor in `paging.py` uses them.
+    """
     rule = (
         project_files(SRC_PATH)
         .in_folder("*shared_kernel*")
@@ -95,6 +100,10 @@ def test_shared_kernel_has_no_framework_dependencies() -> None:
         .matching("hashlib*")
         .matching("re*")
         .matching("unicodedata*")
+        .matching("base64*")
+        .matching("binascii*")
+        .matching("functools*")
+        .matching("json*")
     )
     assert_passes(rule)
 

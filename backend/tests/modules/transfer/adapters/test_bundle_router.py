@@ -22,6 +22,7 @@ from app.modules.transfer.domain.bundle import (
 from app.modules.transfer.domain.entity_kind import EntityKind
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -409,9 +410,11 @@ async def test_a_collection_travels_with_its_items_and_imports(shared: Shared) -
 
 
 async def _bobs_collection_names(shared: Shared) -> list[str]:
-    found = await shared.collection_repos.collections.list(
-        scope=ContentFilter(user_id=BOB.id), after=None, limit=50
-    )
+    found = (
+        await shared.collection_repos.collections.list(
+            scope=ContentFilter(user_id=BOB.id), page=PageRequest(limit=50)
+        )
+    ).items
     return sorted(c.name for c in found)
 
 

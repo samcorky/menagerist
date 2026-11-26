@@ -3,12 +3,14 @@
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
 from app.entrypoints.api.shared.bridges.collection_items import get_item_lookup
+from app.modules.collections.adapters.api.collection.schemas import CollectionResponse
 from app.modules.collections.adapters.api.dependencies import (
     get_collections_repos,
     get_collections_uow,
@@ -25,7 +27,9 @@ from app.modules.collections.adapters.persistence.in_memory_membership_repositor
 from app.modules.collections.adapters.persistence.unit_of_work import (
     create_in_memory_collections_uow,
 )
+from app.modules.collections.application.list_collections import CollectionSort
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
+from app.shared_kernel.paging import decode_cursor
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -267,12 +271,22 @@ def test_list_pages_with_link_header_and_counts(api: Api) -> None:
     assert [c["item_count"] for c in page_one.json()] == [0, 2]
     link = page_one.headers["Link"]
     assert 'rel="next"' in link
-    assert f"after={second['id']}" in link
+    assert decode_cursor(_next_after(page_one.headers["Link"])).id == uuid.UUID(
+        second["id"]
+    )
 
-    page_two = api.client.get(BASE, params={"limit": 2, "after": second["id"]})
+    page_two = api.client.get(
+        BASE, params={"limit": 2, "after": _next_after(page_one.headers["Link"])}
+    )
 
     assert [c["id"] for c in page_two.json()] == [third["id"]]
     assert "Link" not in page_two.headers
+
+
+def _next_after(link: str) -> str:
+    """The `after` cursor a `Link` header value points to."""
+    url = link[link.index("<") + 1 : link.index(">")]
+    return parse_qs(urlparse(url).query)["after"][0]
 
 
 def test_list_empty_and_no_link_when_all_fit(api: Api) -> None:
@@ -581,7 +595,7 @@ def test_list_limit_bounds_are_accepted_and_link_is_correct(api: Api) -> None:
     hundred = api.client.get(BASE, params={"limit": 100})
 
     assert [c["id"] for c in one.json()] == [first["id"]]
-    assert f"after={first['id']}" in one.headers["Link"]
+    assert decode_cursor(_next_after(one.headers["Link"])).id == uuid.UUID(first["id"])
     assert [c["id"] for c in hundred.json()] == [first["id"], second["id"]]
     assert "Link" not in hundred.headers
 
@@ -754,3 +768,112 @@ def test_deleted_collections_slug_no_longer_resolves_and_is_reusable(api: Api) -
         == 200
     )
     assert api.client.get(f"{BASE}/shelf").json()["id"] == again["id"]
+
+
+def test_list_sorts_by_a_key_and_pages_through_it(api: Api) -> None:
+    """`sort` changes the order, and the `Link` keeps it for the next page."""
+    for name in ["banana", "Apple", "cherry"]:
+        api.create(name)
+
+    first = api.client.get(BASE, params={"sort": "name", "limit": 2})
+    second = api.client.get(
+        BASE,
+        params={
+            "sort": "name",
+            "limit": 2,
+            "after": _next_after(first.headers["Link"]),
+        },
+    )
+
+    assert [c["name"] for c in first.json()] == ["Apple", "banana"]
+    assert "sort=name" in first.headers["Link"]
+    assert [c["name"] for c in second.json()] == ["cherry"]
+    assert "Link" not in second.headers
+
+
+def test_list_order_desc_alone_lists_the_newest_first(api: Api) -> None:
+    """With no `sort`, `order=desc` reverses the default order by id."""
+    first = api.create("A")
+    second = api.create("B")
+
+    response = api.client.get(BASE, params={"order": "desc"})
+
+    assert [c["id"] for c in response.json()] == [second["id"], first["id"]]
+
+
+def test_list_an_old_bare_id_cursor_still_resumes_the_default_order(api: Api) -> None:
+    """Links from before sorting carried the row's id, and still work."""
+    first = api.create("A")
+    second = api.create("B")
+
+    response = api.client.get(BASE, params={"after": first["id"]})
+
+    assert [c["id"] for c in response.json()] == [second["id"]]
+
+
+def test_list_a_cursor_from_another_sort_is_a_400(api: Api) -> None:
+    """Passing a name-sorted cursor to an id-ordered list names the mismatch."""
+    api.create("A")
+    api.create("B")
+    first = api.client.get(BASE, params={"sort": "name", "limit": 1})
+
+    response = api.client.get(
+        BASE, params={"after": _next_after(first.headers["Link"])}
+    )
+
+    assert response.status_code == 400
+
+
+def test_list_an_unreadable_cursor_is_a_400(api: Api) -> None:
+    """A cursor that is not one is the caller's mistake."""
+    assert api.client.get(BASE, params={"after": "not-a-cursor"}).status_code == 400
+
+
+def test_list_an_unknown_sort_key_is_a_422(api: Api) -> None:
+    """`sort` is an enum, so an unknown key is rejected with the accepted values."""
+    response = api.client.get(BASE, params={"sort": "colour"})
+
+    assert response.status_code == 422
+    assert "name" in response.text
+
+
+@pytest.mark.parametrize("order", ["asc", "desc"])
+@pytest.mark.parametrize("sort", [key.value for key in CollectionSort])
+def test_list_walks_every_sort_key_to_the_end_in_order(
+    api: Api, sort: str, order: str
+) -> None:
+    """Following `Link` visits each collection once, in the order the key gives.
+
+    The contract the list convention asks of a route: no id repeats or goes
+    missing, and every key the enum declares orders correctly both ways.
+    """
+    created = [api.create(name) for name in ["b", "A", "b", "c", "B", "a", "c"]]
+    expected_ids = {c["id"] for c in created}
+
+    everything = api.client.get(
+        BASE, params={"sort": sort, "order": order, "limit": 100}
+    ).json()
+    seen: list[dict[str, Any]] = []
+    params: dict[str, Any] = {"sort": sort, "order": order, "limit": 2}
+    while True:
+        response = api.client.get(BASE, params=params)
+        seen.extend(response.json())
+        if "Link" not in response.headers:
+            break
+        params = {**params, "after": _next_after(response.headers["Link"])}
+
+    assert [c["id"] for c in seen] == [c["id"] for c in everything]
+    assert {c["id"] for c in seen} == expected_ids
+    assert len(seen) == len(expected_ids)
+
+    def key(collection: dict[str, Any]) -> str:
+        name: str = collection[sort]
+        return name.lower() if sort == "name" else name
+
+    values = [key(c) for c in seen]
+    assert values == sorted(values, reverse=order == "desc")
+
+
+def test_the_sort_keys_a_route_declares_are_fields_of_the_collection() -> None:
+    """The enum's keys are names in the response, so a client sorts by what it sees."""
+    assert {key.value for key in CollectionSort} <= set(CollectionResponse.model_fields)

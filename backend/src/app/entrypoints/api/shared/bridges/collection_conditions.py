@@ -28,6 +28,7 @@ from app.modules.media.adapters.persistence.models import (
 from app.modules.media.domain.media_asset import MediaStatus
 from app.modules.media.domain.media_attachment import AttachmentTarget
 from app.platform.orm_mixins import owned_by
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     import uuid
@@ -128,15 +129,13 @@ class CollectionsDefinitions:
     async def list_ids(self, scope: ContentFilter) -> list[uuid.UUID]:
         """Return the id of every live collection in `scope`, ordered by id."""
         ids: list[uuid.UUID] = []
-        after: uuid.UUID | None = None
+        request = PageRequest(limit=_PAGE)
         while True:
-            page = await self._repos.collections.list(
-                scope=scope, after=after, limit=_PAGE
-            )
-            ids.extend(collection.id for collection in page)
-            if len(page) < _PAGE:
+            page = await self._repos.collections.list(scope=scope, page=request)
+            ids.extend(collection.id for collection in page.items)
+            if page.next is None:
                 return ids
-            after = page[-1].id
+            request = PageRequest(after=page.next, limit=_PAGE)
 
 
 def build_search_graph_repos(session: AsyncSession) -> GraphRepos:

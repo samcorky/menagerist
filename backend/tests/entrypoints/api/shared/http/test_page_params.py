@@ -5,11 +5,9 @@ import pytest
 from fastapi import FastAPI, Query
 from fastapi.testclient import TestClient
 
-from app.entrypoints.api.shared.http.parameters import (
-    PageParams,
-    SearchPageParams,
-    SortOrder,
-)
+# FastAPI reads the route's annotations at runtime, so these cannot be type-only.
+from app.entrypoints.api.shared.http.parameters import PageParams, SearchPageParams  # noqa: TC001
+from app.shared_kernel.paging import SortOrder
 
 
 class _Sort(StrEnum):

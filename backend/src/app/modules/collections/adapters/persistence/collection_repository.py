@@ -10,6 +10,7 @@ from app.modules.collections.domain.collection import (
     CollectionKind,
     Visibility,
 )
+from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
@@ -24,11 +25,19 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import InstrumentedAttribute
 
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 logger = structlog.get_logger()
 
 
 _LIKE_ESCAPE = "\\"
+
+# What `list` can sort by; the names are fields of the API's collection response.
+_SORT_COLUMNS = {
+    "name": text_column(CollectionModel.name),
+    "created_at": timestamp_column(CollectionModel.created_at),
+    "updated_at": timestamp_column(CollectionModel.updated_at),
+}
 
 
 def _like_pattern(q: str) -> str:
@@ -159,24 +168,16 @@ class SqlAlchemyCollectionRepository:
         self,
         *,
         scope: ContentFilter,
-        after: uuid.UUID | None,
-        limit: int,
+        page: PageRequest,
         q: str | None = None,
         kind: CollectionKind | None = None,
-    ) -> list[Collection]:
-        """Return up to `limit` live collections in `scope`, ordered by id.
+    ) -> Page[Collection]:
+        """Return one page of live collections in `scope`, in the order `page` asks.
 
         A non-blank `q` keeps collections whose name or description contains it,
         ignoring case and accents. A `kind` keeps only collections of that kind.
         """
-        stmt = (
-            select(CollectionModel)
-            .where(_in_scope(scope))
-            .order_by(CollectionModel.id)
-            .limit(limit)
-        )
-        if after is not None:
-            stmt = stmt.where(CollectionModel.id > after)
+        stmt = select(CollectionModel).where(_in_scope(scope))
         if kind is not None:
             stmt = stmt.where(CollectionModel.kind == kind.value)
         needle = (q or "").strip()
@@ -186,7 +187,14 @@ class SqlAlchemyCollectionRepository:
                 _unaccent_ilike(CollectionModel.name, pattern)
                 | _unaccent_ilike(CollectionModel.description, pattern)
             )
-        return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
+        return await keyset_page(
+            self._session,
+            stmt,
+            id_column=CollectionModel.id,
+            columns=_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
+        )
 
     @staticmethod
     def _deleted(scope: ContentFilter) -> ColumnElement[bool]:

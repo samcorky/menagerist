@@ -27,6 +27,7 @@ from app.modules.transfer.ports.targets import RemoveResult
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
@@ -103,9 +104,11 @@ class Rig:
 
     async def collection(self) -> Collection:
         """Return the live pack collection."""
-        found = await self.collection_repos.collections.list(
-            scope=EVERYONE, after=None, limit=10
-        )
+        found = (
+            await self.collection_repos.collections.list(
+                scope=EVERYONE, page=PageRequest(limit=10)
+            )
+        ).items
         return found[0]
 
 
