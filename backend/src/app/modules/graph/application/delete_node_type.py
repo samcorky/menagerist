@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
+from app.modules.graph.application.parent_type import check_has_no_subtypes
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.type_scope import owner_scope
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
@@ -43,6 +44,9 @@ class DeleteNodeType(CommandHandler[GraphUnitOfWork, DeleteNodeTypeCommand, None
                     f"NodeType {command.node_type_id} not found"
                 )
 
+            await check_has_no_subtypes(
+                repos, node_type, scope=owner_scope(node_type.owner_id)
+            )
             node_type.soft_delete()
 
             await repos.node_types.save(node_type)

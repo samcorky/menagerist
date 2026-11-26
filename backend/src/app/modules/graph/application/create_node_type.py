@@ -5,6 +5,7 @@ import jsonschema
 import structlog
 
 from app.modules.graph.application.choice_lists import check_list_refs, strip_list_enums
+from app.modules.graph.application.parent_type import check_can_be_subtype
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import check_meta_shape
 from app.modules.graph.domain.errors import (
@@ -36,6 +37,7 @@ class CreateNodeTypeCommand:
     attributes_schema: dict[str, Any] | None = field(default=None)
     icon: str | None = field(default=None)
     colour: str | None = field(default=None)
+    parent: str | None = field(default=None)
 
 
 class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, NodeType]):
@@ -84,7 +86,16 @@ class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, Node
                 attributes_schema=attributes_schema,
                 icon=command.icon,
                 colour=command.colour,
+                parent=command.parent,
             )
+            if node_type.parent is not None:
+                await check_can_be_subtype(
+                    repos,
+                    slug=str(node_type.slug),
+                    schema=attributes_schema,
+                    parent=node_type.parent,
+                    scope=self.scope(actor),
+                )
             await repos.node_types.add(node_type)
             await self._uow.commit()
         logger.info("node type created", node_type_id=node_type.id, slug=command.slug)

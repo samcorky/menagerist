@@ -69,6 +69,29 @@ class InMemoryNodeTypeRepository:
             ordered = [nt for nt in ordered if nt.id > after]
         return ordered[:limit]
 
+    async def list_subtypes(
+        self,
+        parent: str,
+        *,
+        scope: ContentFilter,
+        after: uuid.UUID | None = None,
+        limit: int | None = None,
+    ) -> builtins.list[NodeType]:
+        """List the non-deleted subtypes of the type with slug `parent` in `scope`."""
+        ordered = sorted(
+            (
+                nt
+                for nt in self._node_types.values()
+                if nt.parent == parent
+                and not nt.is_deleted
+                and scope.covers(nt.owner_id)
+            ),
+            key=lambda nt: nt.id,
+        )
+        if after is not None:
+            ordered = [nt for nt in ordered if nt.id > after]
+        return ordered if limit is None else ordered[:limit]
+
     async def list_deleted_before(
         self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
     ) -> builtins.list[NodeType]:

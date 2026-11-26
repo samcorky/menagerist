@@ -25,6 +25,9 @@ class NodeTypeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     # Only live rows reserve a slug, and only within their owner; the use cases check
     # this too, the index backs them.
     __table_args__ = (
+        CheckConstraint(
+            "parent IS NULL OR parent <> slug", name="ck_node_types_not_own_parent"
+        ),
         Index(
             "uq_node_types_owner_slug_live",
             "owner_id",
@@ -42,6 +45,8 @@ class NodeTypeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):
     )
     icon: Mapped[str | None]
     colour: Mapped[str | None]
+    # The slug of the type this is a subtype of; the use cases keep it one level deep.
+    parent: Mapped[str | None] = mapped_column(index=True)
 
 
 class NodeModel(IdentifiableMixin, OwnedMixin, SoftDeletableMixin, Base):

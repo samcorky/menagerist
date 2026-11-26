@@ -20,6 +20,7 @@ NODE_TYPE_EXAMPLE: dict[str, Any] = {
     "attributes_schema": None,
     "icon": "clapperboard",
     "colour": "red",
+    "parent": None,
     "created_at": "2026-08-23T10:14:44.465954Z",
     "updated_at": "2026-08-23T10:14:44.465954Z",
 }
@@ -31,6 +32,10 @@ _ICON_DESCRIPTION = (
 _COLOUR_DESCRIPTION = (
     f"One of: {', '.join(TYPE_COLOURS)}. A colour name, not a free colour, so "
     + "every client can draw it with the right contrast."
+)
+_PARENT_DESCRIPTION = (
+    "The slug of the top-level type this is a subtype of, such as `memorabilia`; "
+    + "null for a type with no parent. A type with subtypes cannot have a parent."
 )
 
 
@@ -61,6 +66,7 @@ class CreateNodeTypeRequest(RequestModel):
     )
     icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
     colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
+    parent: str | None = Field(default=None, description=_PARENT_DESCRIPTION)
 
     def to_command(self) -> CreateNodeTypeCommand:
         """Convert this request into a `CreateNodeTypeCommand`."""
@@ -71,6 +77,7 @@ class CreateNodeTypeRequest(RequestModel):
             attributes_schema=self.attributes_schema,
             icon=self.icon,
             colour=self.colour,
+            parent=self.parent,
         )
 
 
@@ -78,7 +85,7 @@ class UpdateNodeTypeRequest(RequestModel):
     """Request body for updating a node type.
 
     `slug` is immutable. Omitted fields are left unchanged. Send `null` for
-    `icon` or `colour` to remove it.
+    `icon`, `colour` or `parent` to remove it.
     """
 
     model_config = ConfigDict(
@@ -99,6 +106,7 @@ class UpdateNodeTypeRequest(RequestModel):
     )
     icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
     colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
+    parent: str | None = Field(default=None, description=_PARENT_DESCRIPTION)
 
     def to_command(self, node_type_id: uuid.UUID) -> UpdateNodeTypeCommand:
         """Convert this request into an `UpdateNodeTypeCommand` for `node_type_id`."""
@@ -109,8 +117,10 @@ class UpdateNodeTypeRequest(RequestModel):
             attributes_schema=self.attributes_schema,
             icon=self.icon,
             colour=self.colour,
+            parent=self.parent,
             clear_icon="icon" in self.model_fields_set and self.icon is None,
             clear_colour="colour" in self.model_fields_set and self.colour is None,
+            clear_parent="parent" in self.model_fields_set and self.parent is None,
         )
 
 
@@ -128,6 +138,7 @@ class NodeTypeResponse(BaseModel):
     )
     icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
     colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
+    parent: str | None = Field(default=None, description=_PARENT_DESCRIPTION)
     created_at: datetime = Field(description="When it was created.")
     updated_at: datetime = Field(description="When it last changed.")
 
@@ -142,6 +153,7 @@ class NodeTypeResponse(BaseModel):
             attributes_schema=node_type.attributes_schema,
             icon=node_type.icon,
             colour=node_type.colour,
+            parent=node_type.parent,
             created_at=node_type.created_at,
             updated_at=node_type.updated_at,
         )

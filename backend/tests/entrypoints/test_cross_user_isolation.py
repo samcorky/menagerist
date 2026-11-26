@@ -387,6 +387,7 @@ ALLOWED: dict[Route, str] = {
     ("GET", "/api/v1/node-types/{node_type_id}"): VOCABULARY,
     ("POST", "/api/v1/node-types"): VOCABULARY,
     ("PATCH", "/api/v1/node-types/{node_type_id}"): VOCABULARY,
+    ("GET", "/api/v1/node-types/{node_type_id}/subtypes"): VOCABULARY,
     ("GET", "/api/v1/edge-types"): VOCABULARY,
     ("GET", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
     ("POST", "/api/v1/edge-types"): VOCABULARY,
@@ -634,6 +635,7 @@ ADMIN_PREFIXES = ("/api/v1/users", "/api/v1/sessions", "/api/v1/devices")
 # Setup the positive control needs because the seed already did the thing.
 POSITIVE_PREP: dict[Route, Callable[[World], None]] = {
     ("PUT", "/api/v1/examples/{pack_id}/installation"): lambda w: w.uninstall_pack(),
+    ("DELETE", "/api/v1/node-types/{node_type_id}"): lambda w: w.remove_subtype(),
 }
 
 
@@ -879,6 +881,13 @@ class World:
         film = _created(
             a.post("/api/v1/node-types", json={"slug": "film", "label": "F"})
         )
+        # A subtype, so the parent's subtypes are not an empty answer for its owner.
+        _created(
+            a.post(
+                "/api/v1/node-types",
+                json={"slug": "short", "label": "Short", "parent": "film"},
+            )
+        )
         item = _created(
             a.post(
                 "/api/v1/nodes",
@@ -1020,6 +1029,14 @@ class World:
         """Let A install the pack again."""
         removed = self.act_as(ALICE).delete(f"/api/v1/examples/{PACK_ID}/installation")
         assert removed.status_code == 200, removed.text
+
+    def remove_subtype(self) -> None:
+        """Let A delete `film`, which cannot go while it has a subtype."""
+        a = self.act_as(ALICE)
+        types = a.get("/api/v1/node-types").json()
+        short = next(t for t in types if t["slug"] == "short")
+        removed = a.delete(f"/api/v1/node-types/{short['id']}")
+        assert removed.status_code == 204, removed.text
 
     def snapshot(self, seed: Seed) -> dict[str, object]:
         """A's own view of all its content, to prove B's call changed nothing."""

@@ -6,7 +6,7 @@ from typing import Any, Final
 
 from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.mixins import Identifiable, Owned, SoftDeletable
-from app.shared_kernel.slug import Slug
+from app.shared_kernel.slug import Slug, slugify
 
 # A fixed palette of theme-aware names rather than free colours, so every client can
 # render them with the right contrast in light and dark mode.
@@ -43,6 +43,16 @@ def _clean_icon(icon: str | None) -> str | None:
     return name
 
 
+def _clean_parent(parent: str, *, own_slug: str) -> str:
+    """Return the parent's slug, or raise if it names nothing or the type itself."""
+    slug = slugify(parent)
+    if not slug:
+        raise ValidationError("parent must name a type")
+    if slug == own_slug:
+        raise ValidationError("a type cannot be its own parent")
+    return slug
+
+
 def _clean_colour(colour: str | None) -> str | None:
     """Return a palette colour, or `None` for a blank one."""
     if colour is None or not colour.strip():
@@ -63,6 +73,7 @@ class NodeType(Identifiable, Owned, SoftDeletable):
     attributes_schema: dict[str, Any] | None = None
     icon: str | None = None
     colour: str | None = None
+    parent: str | None = None
 
     def __post_init__(self) -> None:
         """Validate required fields after dataclass initialisation."""
@@ -70,6 +81,8 @@ class NodeType(Identifiable, Owned, SoftDeletable):
             raise ValidationError("label must be provided")
         self.icon = _clean_icon(self.icon)
         self.colour = _clean_colour(self.colour)
+        if self.parent is not None:
+            self.parent = _clean_parent(self.parent, own_slug=str(self.slug))
 
     @classmethod
     def create(
@@ -82,8 +95,14 @@ class NodeType(Identifiable, Owned, SoftDeletable):
         attributes_schema: dict[str, Any] | None = None,
         icon: str | None = None,
         colour: str | None = None,
+        parent: str | None = None,
     ) -> NodeType:
-        """Create a new NodeType, generating its id and timestamps."""
+        """Create a new NodeType, generating its id and timestamps.
+
+        `parent` is the slug of the type this is a subtype of; the domain checks only
+        that it names something other than the type itself, and the use cases check
+        the rest, which needs the other types.
+        """
         now = datetime.now(UTC)
         return cls(
             id=uuid.uuid7(),
@@ -94,6 +113,7 @@ class NodeType(Identifiable, Owned, SoftDeletable):
             attributes_schema=attributes_schema,
             icon=icon,
             colour=colour,
+            parent=parent,
             created_at=now,
             updated_at=now,
         )
@@ -106,13 +126,17 @@ class NodeType(Identifiable, Owned, SoftDeletable):
         attributes_schema: dict[str, Any] | None = None,
         icon: str | None = None,
         colour: str | None = None,
+        parent: str | None = None,
     ) -> None:
         """Apply partial changes to editable fields. Slug is immutable.
 
         `None` leaves a field unchanged. An `icon` or `colour` is replaced by a
         valid value; a blank one is an error, and `clear_icon` / `clear_colour`
-        remove them.
+        remove them. A `parent` replaces the parent (`clear_parent` removes it).
         """
+        new_parent = (
+            None if parent is None else _clean_parent(parent, own_slug=str(self.slug))
+        )
         if label is not None:
             if not label.strip():
                 raise ValidationError("label must be provided")
@@ -122,6 +146,8 @@ class NodeType(Identifiable, Owned, SoftDeletable):
         if attributes_schema is not None:
             self.attributes_schema = attributes_schema
         self._set_appearance(icon=icon, colour=colour)
+        if new_parent is not None:
+            self.parent = new_parent
         self.touch()
 
     def _set_appearance(self, *, icon: str | None, colour: str | None) -> None:
@@ -148,4 +174,9 @@ class NodeType(Identifiable, Owned, SoftDeletable):
     def clear_colour(self) -> None:
         """Remove the colour."""
         self.colour = None
+        self.touch()
+
+    def clear_parent(self) -> None:
+        """Make the type top-level again."""
+        self.parent = None
         self.touch()

@@ -32,6 +32,7 @@ from app.modules.graph.adapters.api.dependencies import (
     get_get_node_type_use_case,
     get_list_attribute_values_use_case,
     get_list_node_types_use_case,
+    get_list_subtypes_use_case,
     get_purge_node_type_attribute_use_case,
     get_update_node_type_use_case,
 )
@@ -59,12 +60,15 @@ from app.modules.graph.application.list_node_types import (
     ListNodeTypes,
     ListNodeTypesQuery,
 )
+from app.modules.graph.application.list_subtypes import ListSubtypes, ListSubtypesQuery
 from app.modules.graph.application.purge_node_type_attribute import (
     PurgeNodeTypeAttribute,
     PurgeNodeTypeAttributeCommand,
 )
 from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.domain.errors import (
+    InvalidParentTypeError,
+    NodeTypeHasSubtypesError,
     NodeTypeNotFoundError,
     NodeTypeSlugConflictError,
 )
@@ -81,9 +85,14 @@ router = APIRouter(
     response_model=NodeTypeResponse,
     status_code=201,
     operation_id="create_node_type",
-    responses=error_response(
-        NodeTypeSlugConflictError, detail="NodeType with slug 'film' already exists"
-    ),
+    responses={
+        **error_response(
+            NodeTypeSlugConflictError, detail="NodeType with slug 'film' already exists"
+        ),
+        **error_response(
+            InvalidParentTypeError, detail="Parent type 'memorabilia' not found"
+        ),
+    },
 )
 async def create_node_type(
     payload: CreateNodeTypeRequest,
@@ -148,6 +157,40 @@ async def list_node_types(
     return [NodeTypeResponse.from_domain(nt) for nt in node_types[:limit]]
 
 
+@router.get(
+    "/{node_type_id}/subtypes",
+    response_model=list[NodeTypeResponse],
+    operation_id="list_subtypes",
+    responses={
+        **link_header_responses(),
+        **error_response(
+            NodeTypeNotFoundError,
+            detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+    },
+)
+async def list_subtypes(
+    node_type_id: NodeTypeId,
+    use_case: Annotated[ListSubtypes, Depends(get_list_subtypes_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    request: Request,
+    response: Response,
+    after: PageAfter = None,
+    limit: PageLimit = 50,
+) -> list[NodeTypeResponse]:
+    """List the subtypes of an item type, paginated by id."""
+    subtypes = await use_case.handle(
+        ListSubtypesQuery(node_type_id=node_type_id, after=after, limit=limit + 1),
+        actor,
+    )
+    if len(subtypes) > limit:
+        response.headers["Link"] = link_next_header(
+            request, str(subtypes[limit - 1].id)
+        )
+
+    return [NodeTypeResponse.from_domain(nt) for nt in subtypes[:limit]]
+
+
 @router.patch(
     "/{node_type_id}",
     response_model=NodeTypeResponse,
@@ -157,6 +200,11 @@ async def list_node_types(
         **error_response(
             NodeTypeNotFoundError,
             detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            InvalidParentTypeError,
+            detail="'poster' has fields its parent type 'memorabilia' already has: "
+            + "condition",
         ),
     },
 )
@@ -187,6 +235,10 @@ async def update_node_type(
         **error_response(
             NodeTypeNotFoundError,
             detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            NodeTypeHasSubtypesError,
+            detail="Item type 'memorabilia' still has subtypes: poster, figure",
         ),
         **error_response(
             ForbiddenError, detail="You do not have permission to do this."
