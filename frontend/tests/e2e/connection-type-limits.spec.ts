@@ -53,6 +53,8 @@ test('limits a connection type in the editor and offers only fitting items', asy
 		await page.getByRole('option', { name: itemType.label, exact: true }).click();
 		await page.keyboard.press('Escape');
 		await expect(page.getByRole('button', { name: `Remove ${itemType.label}` })).toBeVisible();
+		// The list is gone before the next one opens: two search boxes at once cannot be filled.
+		await expect(page.getByPlaceholder('Search item types…')).toHaveCount(0);
 	}
 
 	// A chip can be removed again, and the list offers the type once more.
@@ -62,6 +64,7 @@ test('limits a connection type in the editor and offers only fitting items', asy
 	await page.getByPlaceholder('Search item types…').fill(bookType.label);
 	await page.getByRole('option', { name: bookType.label, exact: true }).click();
 	await page.keyboard.press('Escape');
+	await expect(page.getByPlaceholder('Search item types…')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Add relationship type' }).click();
 	await expect(page.getByText('Connection type created')).toBeVisible();
 	await expect(page.getByText(`Joins ${bookType.label} → ${personType.label}`)).toBeVisible();

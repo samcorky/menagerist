@@ -1935,6 +1935,15 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Refusals.** A parent with subtypes cannot be deleted, and a subtype and its parent cannot define the same field key, so one key always has one meaning.
 - **Not compared:** how each tool searches a parent. Tana's documentation does not say whether a node tagged with a child appears in the parent's search; here a parent's search includes its subtypes (see "Searching by a parent type includes its subtypes").
 
+## An untouched type editor does not ask to discard changes (2026-11-26)
+
+**Decision:** Opening a type that has fields and pressing Cancel or Escape closes the editor without asking "Discard changes?", for item types and relationship types alike (#780).
+
+- **Cause:** the editor shell compares what the form holds now with what it held when it opened. The schema editor rewrites the schema it is given as soon as it mounts (it adds the layout, version and highlights it keeps), so a stored schema written by a script or an older version was already different a moment after opening. A type with no fields never wrote anything back, so it did not show the problem.
+- **Fix:** an edit loads the schema through `settleSchema` (`lib/schema-editor-items.ts`), the same conversion the schema editor applies, so the form holds the schema as the editor will write it from the start and opening it is not a change. The conversion is stable: settling a settled schema gives the same schema. Connection types pass the `connection` highlight list the editor is given there.
+- **Why not take the baseline later:** the editor mounts when the dialog opens and writes in its own time, so any "wait until it has settled" would be a timing guess, and a real edit made quickly could be taken for the baseline. Starting from the settled schema needs no timing.
+- **What does not change:** a type saved without touching the schema sends the settled schema, as it did before, since the editor wrote that back anyway. A real edit still asks.
+
 ## Searching the item types shows a family together (2026-11-26)
 
 **Decision:** On the Item types page, a search that matches a parent type also lists its subtypes, and one that matches a subtype also lists its parent, so a subtype is never shown without its place in the family (#320, #791).

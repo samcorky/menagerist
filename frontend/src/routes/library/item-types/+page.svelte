@@ -49,6 +49,7 @@
 	import { appearanceOf } from '$lib/type-inheritance';
 	import { inFamilyOrder, matchTypes } from '$lib/type-names';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import { settleSchema } from '$lib/schema-editor-items';
 
 	const PAGE_SIZE = 50;
 
@@ -184,7 +185,8 @@
 		editingId = cat.id;
 		label = cat.label;
 		description = cat.description ?? '';
-		schema = (cat.attributes_schema as AttributesSchema | null) ?? null;
+		// As the schema editor will write it, so opening the editor is not a change.
+		schema = settleSchema((cat.attributes_schema as AttributesSchema | null) ?? null);
 		icon = cat.icon ?? null;
 		colour = cat.colour ?? null;
 		parent = cat.parent ?? null;
