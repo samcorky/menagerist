@@ -58,9 +58,9 @@ def _export(shared: Shared, actor: Actor) -> ExportBundle:
 
 
 async def _ids(shared: Shared, actor: Actor) -> list[uuid.UUID]:
-    presets = await ListPresets(shared.preset_repos, GUARD).handle(
-        ListPresetsQuery(), actor
-    )
+    presets = (
+        await ListPresets(shared.preset_repos, GUARD).handle(ListPresetsQuery(), actor)
+    ).items
     return [p.id for p in presets]
 
 

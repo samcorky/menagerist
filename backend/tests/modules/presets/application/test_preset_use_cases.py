@@ -28,6 +28,7 @@ from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 OWNER = uuid.uuid7()
@@ -66,7 +67,9 @@ async def test_create_preset_rejects_a_malformed_definition() -> None:
             SYSTEM_ACTOR,
         )
 
-    assert await repos.presets.list(scope=EVERYONE, after=None, limit=10) == []
+    assert (
+        await repos.presets.list(scope=EVERYONE, page=PageRequest(limit=10))
+    ).items == []
 
 
 async def test_get_preset_returns_it() -> None:
@@ -107,14 +110,18 @@ async def test_list_presets_filters_by_kind_and_q() -> None:
     for preset in [field, other_kind, other_label]:
         await repos.presets.add(preset)
 
-    by_kind = await ListPresets(repos, InMemoryAccessGuard()).handle(
-        ListPresetsQuery(kind="field"), SYSTEM_ACTOR
-    )
+    by_kind = (
+        await ListPresets(repos, InMemoryAccessGuard()).handle(
+            ListPresetsQuery(kind="field"), SYSTEM_ACTOR
+        )
+    ).items
     assert {p.id for p in by_kind} == {field.id, other_label.id}
 
-    by_q = await ListPresets(repos, InMemoryAccessGuard()).handle(
-        ListPresetsQuery(q="condition"), SYSTEM_ACTOR
-    )
+    by_q = (
+        await ListPresets(repos, InMemoryAccessGuard()).handle(
+            ListPresetsQuery(q="condition"), SYSTEM_ACTOR
+        )
+    ).items
     assert {p.id for p in by_q} == {field.id, other_kind.id}
 
 

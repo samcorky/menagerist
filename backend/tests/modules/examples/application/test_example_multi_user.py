@@ -47,6 +47,7 @@ from app.modules.transfer.domain.removal import KEEP_IN_USE
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 USER_A = Actor(id=uuid.UUID(int=0xA1), roles=frozenset({"member"}))
 USER_B = Actor(id=uuid.UUID(int=0xB2), roles=frozenset({"member"}))
@@ -111,7 +112,9 @@ async def _type_slugs(world: World, owner: uuid.UUID | None = None) -> set[str]:
 
 async def _lists(world: World, owner: uuid.UUID | None = None) -> list[Preset]:
     scope = ContentFilter.everyone() if owner is None else ContentFilter.of(owner)
-    return await world.preset_repos.presets.list(scope=scope, after=None, limit=50)
+    return (
+        await world.preset_repos.presets.list(scope=scope, page=PageRequest(limit=50))
+    ).items
 
 
 async def _assets_by_owner(world: World) -> list[uuid.UUID | None]:

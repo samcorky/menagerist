@@ -26,6 +26,7 @@ from app.modules.examples.application.uninstall_example_pack import (
 from app.modules.transfer.domain.bundle import preset_refs
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -115,9 +116,11 @@ async def _live_counts(world: World) -> list[int]:
             )
         ),
         len(
-            await world.preset_repos.presets.list(
-                scope=ContentFilter.everyone(), after=None, limit=_LIMIT
-            )
+            (
+                await world.preset_repos.presets.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=_LIMIT)
+                )
+            ).items
         ),
     ]
     counts.append(

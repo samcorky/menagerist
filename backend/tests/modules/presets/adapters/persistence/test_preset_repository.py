@@ -11,6 +11,7 @@ from app.modules.presets.domain.preset import Preset
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Cursor, PageRequest, SortOrder
 
 OWNER = uuid.uuid7()
 EVERYONE = ContentFilter.everyone()
@@ -102,7 +103,7 @@ async def test_list_orders_by_id_ascending(db_session: AsyncSession) -> None:
     for preset in reversed(presets):
         await repository.add(preset)
 
-    result = await repository.list(scope=EVERYONE, after=None, limit=10)
+    result = (await repository.list(scope=EVERYONE, page=PageRequest(limit=10))).items
 
     assert [p.id for p in result] == sorted(p.id for p in presets)
 
@@ -118,10 +119,15 @@ async def test_list_respects_after_and_limit(db_session: AsyncSession) -> None:
         await repository.add(preset)
     ordered = sorted(presets, key=lambda p: p.id)
 
-    page = await repository.list(scope=EVERYONE, after=None, limit=2)
+    page = (await repository.list(scope=EVERYONE, page=PageRequest(limit=2))).items
     assert [p.id for p in page] == [p.id for p in ordered[:2]]
 
-    rest = await repository.list(scope=EVERYONE, after=page[-1].id, limit=10)
+    rest = (
+        await repository.list(
+            scope=EVERYONE,
+            page=PageRequest(after=Cursor.after_id(page[-1].id), limit=10),
+        )
+    ).items
     assert [p.id for p in rest] == [p.id for p in ordered[2:]]
 
 
@@ -138,12 +144,16 @@ async def test_list_filters_by_kind_and_label_search(db_session: AsyncSession) -
     for preset in [field, choice_list, other]:
         await repository.add(preset)
 
-    by_kind = await repository.list(
-        scope=EVERYONE, after=None, limit=10, kind="choice_list"
-    )
+    by_kind = (
+        await repository.list(
+            scope=EVERYONE, kind="choice_list", page=PageRequest(limit=10)
+        )
+    ).items
     assert [p.id for p in by_kind] == [choice_list.id]
 
-    by_q = await repository.list(scope=EVERYONE, after=None, limit=10, q="condition")
+    by_q = (
+        await repository.list(scope=EVERYONE, q="condition", page=PageRequest(limit=10))
+    ).items
     assert {p.id for p in by_q} == {field.id, choice_list.id}
 
 
@@ -157,7 +167,9 @@ async def test_list_excludes_soft_deleted_presets(db_session: AsyncSession) -> N
     preset.soft_delete()
     await repository.save(preset)
 
-    assert await repository.list(scope=EVERYONE, after=None, limit=10) == []
+    assert (
+        await repository.list(scope=EVERYONE, page=PageRequest(limit=10))
+    ).items == []
 
 
 async def test_get_and_list_are_scoped_to_the_owner(db_session: AsyncSession) -> None:
@@ -175,9 +187,10 @@ async def test_get_and_list_are_scoped_to_the_owner(db_session: AsyncSession) ->
     fetched = await repository.get(mine.id, scope=scope)
     assert fetched is not None
     assert fetched.owner_id == OWNER
-    assert [p.id for p in await repository.list(scope=scope, after=None, limit=10)] == [
-        mine.id
-    ]
+    assert [
+        p.id
+        for p in (await repository.list(scope=scope, page=PageRequest(limit=10))).items
+    ] == [mine.id]
 
 
 async def test_claim_orphaned_assigns_ownerless_and_legacy_rows(
@@ -205,3 +218,87 @@ async def test_claim_orphaned_assigns_ownerless_and_legacy_rows(
     assert await repository.get(ownerless.id, scope=scope) is not None
     assert await repository.get(legacy.id, scope=scope) is not None
     assert await repository.get(other.id, scope=scope) is None
+
+
+def _preset(label: str, kind: str = "field") -> Preset:
+    """A saved field with `label`, owned by `OWNER`."""
+    return Preset.create(
+        owner_id=OWNER,
+        kind=kind,
+        label=label,
+        description=None,
+        definition={"property": {"type": "string"}},
+    )
+
+
+async def test_list_sorts_by_label_ignoring_case_in_both_directions(
+    db_session: AsyncSession,
+) -> None:
+    """`label` orders by `lower(label)`, and `desc` reverses it."""
+    repository = SqlAlchemyPresetRepository(db_session)
+    for label in ["banana", "Apple", "cherry", "apricot"]:
+        await repository.add(_preset(label))
+
+    ascending = await repository.list(scope=EVERYONE, page=PageRequest(sort="label"))
+    descending = await repository.list(
+        scope=EVERYONE, page=PageRequest(sort="label", order=SortOrder.DESC)
+    )
+
+    assert [p.label for p in ascending.items] == [
+        "Apple",
+        "apricot",
+        "banana",
+        "cherry",
+    ]
+    assert [p.label for p in descending.items] == [
+        "cherry",
+        "banana",
+        "apricot",
+        "Apple",
+    ]
+
+
+@pytest.mark.parametrize("order", list(SortOrder))
+@pytest.mark.parametrize("sort", [None, "label", "kind", "created_at", "updated_at"])
+async def test_list_cursors_visit_every_row_once_in_order(
+    db_session: AsyncSession, sort: str | None, order: SortOrder
+) -> None:
+    """Following `next` never repeats a preset or skips one."""
+    repository = SqlAlchemyPresetRepository(db_session)
+    for n, label in enumerate(["b", "A", "b", "c", "B", "a", "c"]):
+        await repository.add(_preset(label, "choice_list" if n % 2 else "field"))
+    everything = (
+        await repository.list(
+            scope=EVERYONE, page=PageRequest(sort=sort, order=order, limit=100)
+        )
+    ).items
+
+    seen: list[uuid.UUID] = []
+    request = PageRequest(sort=sort, order=order, limit=2)
+    while True:
+        page = await repository.list(scope=EVERYONE, page=request)
+        seen.extend(p.id for p in page.items)
+        if page.next is None:
+            break
+        request = PageRequest(after=page.next, sort=sort, order=order, limit=2)
+
+    assert seen == [p.id for p in everything]
+    assert len(set(seen)) == 7
+
+
+async def test_list_q_ignores_accents_and_reads_wildcards_literally(
+    db_session: AsyncSession,
+) -> None:
+    """`cafe` finds Café, and `%` or `_` only match themselves."""
+    repository = SqlAlchemyPresetRepository(db_session)
+    for label in ["Café au lait", "Tea", "50% off", "a_b", "axb"]:
+        await repository.add(_preset(label))
+
+    async def found(q: str) -> list[str]:
+        page = await repository.list(scope=EVERYONE, page=PageRequest(), q=q)
+        return [p.label for p in page.items]
+
+    assert await found("CAFE") == ["Café au lait"]
+    assert await found("50%") == ["50% off"]
+    assert await found("a_b") == ["a_b"]
+    assert await found("   ") == ["Café au lait", "Tea", "50% off", "a_b", "axb"]

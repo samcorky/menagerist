@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING
 
+from app.shared_kernel.paging import page_rows, timestamp_value
+from app.shared_kernel.text import fold
+
 if TYPE_CHECKING:
     import builtins
     import uuid
@@ -7,6 +10,7 @@ if TYPE_CHECKING:
 
     from app.modules.presets.domain.preset import Preset
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 class InMemoryPresetRepository:
@@ -34,28 +38,31 @@ class InMemoryPresetRepository:
         self,
         *,
         scope: ContentFilter,
-        after: uuid.UUID | None,
-        limit: int,
+        page: PageRequest,
         kind: str | None = None,
         q: str | None = None,
-    ) -> list[Preset]:
-        """List non-deleted presets in `scope` ordered by id, after `after` if given."""
-        ordered = sorted(
-            (
-                p
-                for p in self._presets.values()
-                if not p.is_deleted and scope.covers(p.owner_id)
-            ),
-            key=lambda p: p.id,
+    ) -> Page[Preset]:
+        """List non-deleted presets in `scope`, one page in the order `page` asks."""
+        needle = fold((q or "").strip())
+        live = [
+            p
+            for p in self._presets.values()
+            if not p.is_deleted
+            and scope.covers(p.owner_id)
+            and (kind is None or p.kind == kind)
+            and (not needle or needle in fold(p.label))
+        ]
+        return page_rows(
+            live,
+            page,
+            id_of=lambda p: p.id,
+            values={
+                "label": lambda p: p.label.lower(),
+                "kind": lambda p: p.kind.lower(),
+                "created_at": lambda p: timestamp_value(p.created_at),
+                "updated_at": lambda p: timestamp_value(p.updated_at),
+            },
         )
-        if kind is not None:
-            ordered = [p for p in ordered if p.kind == kind]
-        if after is not None:
-            ordered = [p for p in ordered if p.id > after]
-        if q is not None:
-            needle = q.casefold()
-            ordered = [p for p in ordered if needle in p.label.casefold()]
-        return ordered[:limit]
 
     async def list_deleted_before(
         self, cutoff: datetime, *, after: uuid.UUID | None, limit: int

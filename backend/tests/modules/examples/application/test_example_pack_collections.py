@@ -21,6 +21,7 @@ from app.modules.transfer.domain.removal import KEEP_EDITED, KEEP_USER_DATA
 from app.modules.transfer.domain.run import Outcome, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.examples.domain.pack import ExamplePack
@@ -157,10 +158,9 @@ async def test_a_failing_collection_step_rolls_everything_back(
     )
     assert (
         await world.preset_repos.presets.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None

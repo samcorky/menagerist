@@ -35,6 +35,7 @@ from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
@@ -91,8 +92,11 @@ async def test_list_shows_only_the_actors_presets() -> None:
     repos = PresetRepos(presets=InMemoryPresetRepository())
     await _alices(repos)
 
-    assert await ListPresets(repos, GUARD).handle(ListPresetsQuery(), BOB) == []
-    assert len(await ListPresets(repos, GUARD).handle(ListPresetsQuery(), ALICE)) == 1
+    assert (await ListPresets(repos, GUARD).handle(ListPresetsQuery(), BOB)).items == []
+    assert (
+        len((await ListPresets(repos, GUARD).handle(ListPresetsQuery(), ALICE)).items)
+        == 1
+    )
 
 
 async def test_update_and_delete_cannot_reach_another_persons_preset() -> None:
@@ -136,7 +140,9 @@ async def test_import_deduplicates_per_owner() -> None:
 
     assert (first.created, second.created, again.created) == (1, 1, 0)
     assert first.items[0].id != second.items[0].id
-    bobs = await repos.presets.list(
-        scope=ContentFilter.of(BOB.id), after=None, limit=10
-    )
+    bobs = (
+        await repos.presets.list(
+            scope=ContentFilter.of(BOB.id), page=PageRequest(limit=10)
+        )
+    ).items
     assert [p.id for p in bobs] == [second.items[0].id]
