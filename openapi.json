@@ -8872,6 +8872,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
@@ -9916,6 +9918,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
@@ -11731,6 +11735,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"

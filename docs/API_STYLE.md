@@ -60,7 +60,7 @@ A list route that pages declares all four of `after`, `limit`, `sort` and `order
 | `q`       | Keep the rows whose searchable text contains this, ignoring case and accents, the same matching as the main search. At most 200 characters. |
 
 - **Keys:** the name of the response field the list is ordered by, so a client sorts by what it sees. A route offers only the keys that carry meaning for it (typically `name`, `created_at`, `updated_at`, and the route's own, such as `slug` or `kind`), and documents them in the enum. Sorting by a custom field is only for item search, which has its own query-body `sort`.
-- **Page size:** a page never holds more than 1,000 rows, whatever `limit` asks for, and a `limit` below one gives an empty page. Most lists also bound `limit` to 1–100 in the schema; the item type and connection type lists have never bounded it, and keep to the 1,000 backstop until the app pages them.
+- **Page size:** `limit` is 1 to 100 on every list. The paging helpers also never return more than 1,000 rows in a page, so a caller that builds a request itself cannot ask for everything. A client that needs every row follows `Link` to the end.
 - **Default order:** `id` ascending, which is creation order because ids are uuid7. A route that lists something other than live rows in creation order says so on its own description: the recently deleted lists run newest deletion first.
 - **Ties and gaps:** every sort adds `id` as the final key, in the same direction as `order`, so rows with equal values keep a fixed order and a page never repeats or skips one. A row with no value for the key (an empty optional field) sorts after the rest in both directions.
 - **Text keys** compare ignoring case, using the database's collation.

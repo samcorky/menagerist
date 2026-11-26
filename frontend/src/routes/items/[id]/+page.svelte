@@ -13,7 +13,6 @@
 		getNode,
 		listEdges,
 		listEdgeTypes,
-		listNodeTypes,
 		listNodes,
 		updateEdge,
 		updateNode,
@@ -27,7 +26,7 @@
 	import { attributesToRows, rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
-	import { effectiveSchema } from '$lib/node-types';
+	import { effectiveSchema, fetchAllNodeTypes } from '$lib/node-types';
 	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { coreForProp } from '$lib/field-types';
@@ -232,7 +231,7 @@
 				listEdges({ query: { node_id: nodeId, limit: 100 } }),
 				listNodes({ query: { limit: 500 } }),
 				listEdgeTypes({ query: { limit: 100 } }),
-				listNodeTypes({ query: { limit: 200 } })
+				fetchAllNodeTypes()
 			]);
 
 		if (nodeResult.response?.status === 404 || nodeResult.response?.status === 422) {
@@ -254,7 +253,7 @@
 		edges = edgesResult.data ?? [];
 		otherNodes = (nodesResult.data ?? []).filter((candidate) => candidate.id !== nodeId);
 		edgeTypes = edgeTypesResult.data ?? [];
-		nodeTypes = nodeTypesResult.data ?? [];
+		nodeTypes = nodeTypesResult ?? [];
 		// nodeSchema is a $derived and hasn't reacted to the nodeTypes assignment above
 		// yet within this synchronous block, so use schemaOfType (reads nodeTypes directly)
 		// rather than nodeSchema here.

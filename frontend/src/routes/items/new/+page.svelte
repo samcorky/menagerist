@@ -9,13 +9,13 @@
 	import {
 		attachMedia,
 		createNode,
-		listNodeTypes,
 		uploadAndAttachMedia,
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { networkAwareError, uploadErrorMessage } from '$lib/api/errors';
 	import { captureController, type StagedPhoto } from '$lib/capture.svelte.js';
 	import { rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
+	import { fetchAllNodeTypes } from '$lib/node-types';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { effectiveSchema } from '$lib/node-types';
@@ -66,8 +66,8 @@
 	let nodeSchema = $derived(effectiveSchema(nodeTypes.find((nt) => nt.slug === selectedType)));
 
 	$effect(() => {
-		listNodeTypes({ query: { limit: 200 } }).then((r) => {
-			if (r.data) nodeTypes = r.data;
+		void fetchAllNodeTypes().then((all) => {
+			if (all) nodeTypes = all;
 		});
 		return () => {
 			if (photoPreview) URL.revokeObjectURL(photoPreview);
