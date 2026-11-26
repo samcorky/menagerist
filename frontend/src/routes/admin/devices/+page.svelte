@@ -10,6 +10,7 @@
 		type AdminSessionResponse,
 		type UserResponse
 	} from '$lib/api/client';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import { untrack } from 'svelte';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
@@ -59,8 +60,8 @@
 	async function loadUsers() {
 		if (!canListUsers) return;
 		try {
-			const res = await listUsers();
-			if (res.data) users = res.data;
+			const read = await readPages((after) => listUsers({ query: { after, limit: PAGE_LIMIT } }));
+			if (read.ok) users = read.rows;
 		} catch {
 			// User list is optional for filtering
 		}
@@ -75,24 +76,28 @@
 		loading = true;
 		loadFailed = false;
 		try {
-			const [res, ownRes] = await Promise.all([
-				listSessions({
-					query: selectedUserId ? { user_id: selectedUserId } : undefined
-				}),
-				listOwnSessions()
+			const [read, ownRead] = await Promise.all([
+				readPages((after) =>
+					listSessions({
+						query: {
+							...(selectedUserId ? { user_id: selectedUserId } : {}),
+							after,
+							limit: PAGE_LIMIT
+						}
+					})
+				),
+				readPages((after) => listOwnSessions({ query: { after, limit: PAGE_LIMIT } }))
 			]);
-			if (ownRes.data) {
-				currentSessionId = ownRes.data.find((s) => s.current)?.id ?? null;
-			}
-			if (res.error || !res.data) {
+			currentSessionId = ownRead.rows.find((s) => s.current)?.id ?? null;
+			if (!read.ok) {
 				refreshFailed();
 				// A failed refresh keeps the list already shown; only an empty page shows LoadFailed.
 				if (sessions.length > 0) {
-					const { title, description } = networkAwareError(res);
+					const { title, description } = networkAwareError(read.failure);
 					toast.error(title, { description });
 				}
 			} else {
-				sessions = res.data;
+				sessions = read.rows;
 				shownUserId = selectedUserId;
 			}
 		} catch {

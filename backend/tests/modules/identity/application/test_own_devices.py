@@ -77,9 +77,9 @@ async def test_list_own_sessions_returns_active_sessions_newest_first(
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
-    results = await handler.handle(
-        ListOwnSessionsQuery(current_session_id=s2.id), actor
-    )
+    results = (
+        await handler.handle(ListOwnSessionsQuery(current_session_id=s2.id), actor)
+    ).items
 
     assert len(results) == 2
     assert results[0].session.id == s2.id
@@ -136,9 +136,9 @@ async def test_list_own_sessions_excludes_expired_and_idle_sessions(
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
-    results = await handler.handle(
-        ListOwnSessionsQuery(current_session_id=active.id), actor
-    )
+    results = (
+        await handler.handle(ListOwnSessionsQuery(current_session_id=active.id), actor)
+    ).items
 
     assert len(results) == 1
     assert results[0].session.id == active.id
@@ -174,9 +174,11 @@ async def test_list_own_sessions_excludes_other_users_sessions(
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
-    results = await handler.handle(
-        ListOwnSessionsQuery(current_session_id=alice_session.id), actor
-    )
+    results = (
+        await handler.handle(
+            ListOwnSessionsQuery(current_session_id=alice_session.id), actor
+        )
+    ).items
 
     assert len(results) == 1
     assert results[0].session.id == alice_session.id
@@ -203,15 +205,17 @@ async def test_list_own_sessions_with_unknown_or_none_current_session(
     handler = ListOwnSessions(repos, get_access_guard(), idle_timeout=IDLE_TIMEOUT)
 
     actor = _make_actor(alice.id)
-    results1 = await handler.handle(
-        ListOwnSessionsQuery(current_session_id=None), actor
-    )
+    results1 = (
+        await handler.handle(ListOwnSessionsQuery(current_session_id=None), actor)
+    ).items
     assert len(results1) == 1
     assert results1[0].current is False
 
-    results2 = await handler.handle(
-        ListOwnSessionsQuery(current_session_id=uuid.uuid7()), actor
-    )
+    results2 = (
+        await handler.handle(
+            ListOwnSessionsQuery(current_session_id=uuid.uuid7()), actor
+        )
+    ).items
     assert len(results2) == 1
     assert results2[0].current is False
 

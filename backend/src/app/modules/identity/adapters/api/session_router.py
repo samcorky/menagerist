@@ -1,9 +1,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 
-from app.entrypoints.api.shared.http.parameters import SessionId
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import NewestFirstPageParams, SessionId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.dependencies import (
@@ -16,6 +20,7 @@ from app.modules.identity.adapters.api.schemas import AdminSessionResponse
 from app.modules.identity.application.list_sessions import (
     ListSessions,
     ListSessionsQuery,
+    SessionSort,
 )
 from app.modules.identity.application.revoke_session import (
     RevokeSession,
@@ -43,18 +48,31 @@ _ADMIN_ONLY = {
     "",
     response_model=list[AdminSessionResponse],
     operation_id="list_sessions",
-    responses=_ADMIN_ONLY,
+    responses={**_ADMIN_ONLY, **paging_responses("Active sessions")},
 )
 async def list_sessions(
+    request: Request,
+    response: Response,
     use_case: Annotated[ListSessions, Depends(get_list_sessions_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    page: Annotated[NewestFirstPageParams[SessionSort], Query()],
     user_id: Annotated[
         uuid.UUID | None, Query(description="Keep the sessions of this user.")
     ] = None,
 ) -> list[AdminSessionResponse]:
-    """List active sessions for all users or a specific user. Administrators only."""
-    listings = await use_case.handle(ListSessionsQuery(user_id=user_id), actor)
-    return [AdminSessionResponse.from_listing(listing) for listing in listings]
+    """List active sessions for all users or one, newest first. Administrators only."""
+    result = await use_case.handle(
+        ListSessionsQuery(
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+            user_id=user_id,
+        ),
+        actor,
+    )
+    set_page_headers(request, response, result)
+    return [AdminSessionResponse.from_listing(listing) for listing in result.items]
 
 
 @router.delete(

@@ -336,3 +336,15 @@ def test_a_paged_query_without_a_sort_uses_the_default_one_or_none() -> None:
     assert query.page_request().sort is None
     assert query.page_request(_Key.CREATED_AT).sort == "created_at"
     assert PagedQuery[_Key](sort=_Key.NAME).page_request(_Key.CREATED_AT).sort == "name"
+
+
+@pytest.mark.fast
+def test_a_page_of_rows_in_memory_knows_how_many_rows_there_were() -> None:
+    """The total is the rows given, whatever the page holds or the cursor skipped."""
+    rows = _rows("a", "b", "c", "d")
+    first = _page(rows, PageRequest(limit=2))
+    assert first.next is not None
+    second = _page(rows, PageRequest(after=first.next, limit=2))
+
+    assert first.total == second.total == 4
+    assert _page([], PageRequest()).total == 0

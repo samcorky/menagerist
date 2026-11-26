@@ -20,11 +20,9 @@ export interface PageResult<T> {
 	response?: Response;
 }
 
-export interface PagesRead<T> {
-	rows: T[];
-	/** False when a page failed; `rows` then holds what was read before it. */
-	ok: boolean;
-}
+/** Every row, or the page that failed and the rows read before it. */
+export type PagesRead<T> =
+	{ rows: T[]; ok: true } | { rows: T[]; ok: false; failure: PageResult<T> };
 
 /**
  * Read a list a page at a time, following the Link header's cursor until there is no next page,
@@ -38,7 +36,7 @@ export async function readPages<T>(
 	let after: string | undefined;
 	for (let page = 0; page < maxPages && rows.length < maxRows; page++) {
 		const result = await fetchPage(after);
-		if (result.error || !result.data) return { rows, ok: false };
+		if (result.error || !result.data) return { rows, ok: false, failure: result };
 		rows.push(...result.data);
 		const next = nextCursor(result.response?.headers.get('link'));
 		if (next === null) break;

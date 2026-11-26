@@ -167,7 +167,7 @@ async def test_list_sessions_returns_all_active_sessions_with_user_details(
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
 
     admin_actor = _make_admin_actor()
-    results = await handler.handle(ListSessionsQuery(), admin_actor)
+    results = (await handler.handle(ListSessionsQuery(), admin_actor)).items
 
     assert len(results) == 3
     # Newest last_seen_at first: Bob (5m), Alice2 (15m), Alice1 (30m)
@@ -230,7 +230,7 @@ async def test_list_sessions_excludes_expired_and_idle_sessions(
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
 
     admin_actor = _make_admin_actor()
-    results = await handler.handle(ListSessionsQuery(), admin_actor)
+    results = (await handler.handle(ListSessionsQuery(), admin_actor)).items
 
     assert len(results) == 1
     assert results[0].session.id == active.id
@@ -264,7 +264,9 @@ async def test_list_sessions_filters_by_user_id(
     handler = ListSessions(repos, guard, idle_timeout=IDLE_TIMEOUT)
 
     admin_actor = _make_admin_actor()
-    results = await handler.handle(ListSessionsQuery(user_id=alice.id), admin_actor)
+    results = (
+        await handler.handle(ListSessionsQuery(user_id=alice.id), admin_actor)
+    ).items
 
     assert len(results) == 1
     assert results[0].session.id == s_alice.id
@@ -296,7 +298,9 @@ async def test_list_sessions_unknown_user_id_returns_empty_list(
 
     admin_actor = _make_admin_actor()
     unknown_id = uuid.uuid7()
-    results = await handler.handle(ListSessionsQuery(user_id=unknown_id), admin_actor)
+    results = (
+        await handler.handle(ListSessionsQuery(user_id=unknown_id), admin_actor)
+    ).items
 
     assert results == []
 

@@ -1,8 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, Request, Response
 
-from app.entrypoints.api.shared.http.parameters import UserId
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import PageParams, UserId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.dependencies import (
@@ -20,7 +24,11 @@ from app.modules.identity.adapters.api.schemas import (
     UserResponse,
 )
 from app.modules.identity.application.create_user import CreateUser
-from app.modules.identity.application.list_users import ListUsers, ListUsersQuery
+from app.modules.identity.application.list_users import (
+    ListUsers,
+    ListUsersQuery,
+    UserSort,
+)
 from app.modules.identity.application.reset_password import ResetPassword
 from app.modules.identity.application.unlock_user import UnlockUser, UnlockUserCommand
 from app.modules.identity.application.update_user import UpdateUser
@@ -47,15 +55,24 @@ _NOT_FOUND = error_response(UserNotFoundError, detail="That account does not exi
     "",
     response_model=list[UserResponse],
     operation_id="list_users",
-    responses=_ADMIN_ONLY,
+    responses={**_ADMIN_ONLY, **paging_responses("Accounts")},
 )
 async def list_users(
+    request: Request,
+    response: Response,
     use_case: Annotated[ListUsers, Depends(get_list_users_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    page: Annotated[PageParams[UserSort], Query()],
 ) -> list[UserResponse]:
-    """List every account. Administrators only."""
-    listings = await use_case.handle(ListUsersQuery(), actor)
-    return [UserResponse.from_listing(listing) for listing in listings]
+    """List every account, by username unless sorted. Administrators only."""
+    result = await use_case.handle(
+        ListUsersQuery(
+            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+        ),
+        actor,
+    )
+    set_page_headers(request, response, result)
+    return [UserResponse.from_listing(listing) for listing in result.items]
 
 
 @router.post(

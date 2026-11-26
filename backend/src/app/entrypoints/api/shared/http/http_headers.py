@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from starlette.requests import Request
     from starlette.responses import Response
 
-    from app.shared_kernel.paging import Cursor
+    from app.shared_kernel.paging import Cursor, Page
 
 
 def http_date(dt: datetime) -> str:
@@ -85,6 +85,34 @@ def conditional_patch_responses() -> dict[int | str, dict[str, Any]]:
                     "schema": {"type": "string"},
                 }
             },
+        }
+    }
+
+
+def set_page_headers(request: Request, response: Response, page: Page[Any]) -> None:
+    """Set `Link` to the next page, and `Total-Count` when the page knows the total."""
+    set_next_link(request, response, page.next)
+    if page.total is not None:
+        response.headers["Total-Count"] = str(page.total)
+
+
+def paging_responses(what: str) -> dict[int | str, dict[str, Any]]:
+    """OpenAPI docs for the `Link` and `Total-Count` headers of a paged list.
+
+    `what` names the rows counted, such as "API tokens".
+    """
+    return {
+        200: {
+            "headers": {
+                "Link": {
+                    "description": "RFC 8288 next-page cursor. Absent on last page.",
+                    "schema": {"type": "string"},
+                },
+                "Total-Count": {
+                    "description": f"{what} in total. Always exact.",
+                    "schema": {"type": "integer"},
+                },
+            }
         }
     }
 

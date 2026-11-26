@@ -7,6 +7,7 @@
 		renameOwnDevice,
 		type DeviceNameSuggestionResponse
 	} from '$lib/api/client';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import { errorMessage } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { describeDevice } from '$lib/devices';
@@ -39,8 +40,10 @@
 
 	async function check() {
 		try {
-			const result = await listOwnDevices();
-			const current = result.data?.find((d) => d.current && d.id && !d.name);
+			const devices = await readPages((after) =>
+				listOwnDevices({ query: { after, limit: PAGE_LIMIT } })
+			);
+			const current = devices.rows.find((d) => d.current && d.id && !d.name);
 			if (!current?.id || read(() => localStorage, DISMISSED_PREFIX + current.id)) return;
 			const found = await listDeviceNameSuggestions();
 			suggestions = found.data ?? [];

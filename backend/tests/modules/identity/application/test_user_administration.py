@@ -72,7 +72,9 @@ async def test_list_users_returns_everyone_for_admins_only(
     await world.users.add(make_user("alice"))
     await world.users.add(make_user("bob"))
 
-    assert len(await cases.list_users.handle(ListUsersQuery(), admin_actor)) == 2
+    assert (
+        len((await cases.list_users.handle(ListUsersQuery(), admin_actor)).items) == 2
+    )
     with pytest.raises(ForbiddenError):
         await cases.list_users.handle(ListUsersQuery(), MEMBER)
 
@@ -108,7 +110,7 @@ async def test_the_system_actor_passes_the_admin_gate(
         ResetPasswordCommand(user_id=target.id, password="another-pass-1"),
         SYSTEM_ACTOR,
     )
-    listings = await cases.list_users.handle(ListUsersQuery(), SYSTEM_ACTOR)
+    listings = (await cases.list_users.handle(ListUsersQuery(), SYSTEM_ACTOR)).items
 
     assert {item.user.username for item in listings} == {"alice", "bob"}
 

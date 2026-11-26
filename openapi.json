@@ -78,142 +78,6 @@
       }
     },
     "/api/v1/backups": {
-      "get": {
-        "tags": [
-          "v1",
-          "Backups"
-        ],
-        "summary": "List Backups",
-        "description": "List committed instance archive summaries.\n\n**Requires permission:** `backup:archive:read`",
-        "operationId": "list_backups",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/BackupResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Backups",
-                  "description": "Each entry is a `BackupResponse`."
-                },
-                "example": [
-                  {
-                    "alembic_revision": "a1b2c3d4e5f6",
-                    "app_version": "0.1.0",
-                    "created_at": "2026-10-19T12:00:00Z",
-                    "id": "0199ec2d-f086-7000-8000-000000000001",
-                    "label": "manual",
-                    "size": 1048576
-                  }
-                ]
-              }
-            },
-            "links": {
-              "VerifyBackup": {
-                "operationId": "verify_backup",
-                "parameters": {
-                  "backup_id": "$response.body#/0/id"
-                },
-                "description": "Verify backup with the id from this response."
-              },
-              "DownloadBackup": {
-                "operationId": "download_backup",
-                "parameters": {
-                  "backup_id": "$response.body#/0/id"
-                },
-                "description": "Download backup with the id from this response."
-              },
-              "DeleteBackup": {
-                "operationId": "delete_backup",
-                "parameters": {
-                  "backup_id": "$response.body#/0/id"
-                },
-                "description": "Delete backup with the id from this response."
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in, or the session is no longer valid.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "not_signed_in": {
-                    "summary": "Not signed in",
-                    "value": {
-                      "type": "unauthenticated",
-                      "title": "SessionRequiredError",
-                      "status": 401,
-                      "detail": "Sign in to continue.",
-                      "instance": "https://menagerist.example/api/v1/backups"
-                    }
-                  },
-                  "setup_required": {
-                    "summary": "No account exists yet",
-                    "value": {
-                      "type": "setup_required",
-                      "title": "SetupRequiredError",
-                      "status": 401,
-                      "detail": "Create the first account to continue.",
-                      "instance": "https://menagerist.example/api/v1/backups"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Administrator permission required.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "example": {
-                  "type": "about:blank",
-                  "title": "ForbiddenError",
-                  "status": 403,
-                  "detail": "You do not have permission to do that.",
-                  "instance": "https://menagerist.example/api/v1/backups"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "internal_error": {
-                    "summary": "Server error",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Internal Server Error",
-                      "status": 500,
-                      "detail": "An unexpected error occurred.",
-                      "instance": "https://menagerist.example/api/v1/backups"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
-        "x-required-permission": "backup:archive:read"
-      },
       "post": {
         "tags": [
           "v1",
@@ -222,15 +86,20 @@
         "summary": "Create Backup",
         "description": "Create and verify an instance archive.\n\n**Requires permission:** `backup:archive:create`",
         "operationId": "create_backup",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateBackupRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -372,12 +241,247 @@
             }
           }
         },
+        "x-required-permission": "backup:archive:create"
+      },
+      "get": {
+        "tags": [
+          "v1",
+          "Backups"
+        ],
+        "summary": "List Backups",
+        "description": "List committed instance archive summaries, newest first unless sorted.\n\n**Requires permission:** `backup:archive:read`",
+        "operationId": "list_backups",
         "security": [
           {
             "APIKeyCookie": []
           }
         ],
-        "x-required-permission": "backup:archive:create"
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/BackupSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackupResponse"
+                  },
+                  "title": "Response List Backups",
+                  "description": "Each entry is a `BackupResponse`."
+                },
+                "example": [
+                  {
+                    "alembic_revision": "a1b2c3d4e5f6",
+                    "app_version": "0.1.0",
+                    "created_at": "2026-10-19T12:00:00Z",
+                    "id": "0199ec2d-f086-7000-8000-000000000001",
+                    "label": "manual",
+                    "size": 1048576
+                  }
+                ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Committed backups in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "links": {
+              "VerifyBackup": {
+                "operationId": "verify_backup",
+                "parameters": {
+                  "backup_id": "$response.body#/0/id"
+                },
+                "description": "Verify backup with the id from this response."
+              },
+              "DownloadBackup": {
+                "operationId": "download_backup",
+                "parameters": {
+                  "backup_id": "$response.body#/0/id"
+                },
+                "description": "Download backup with the id from this response."
+              },
+              "DeleteBackup": {
+                "operationId": "delete_backup",
+                "parameters": {
+                  "backup_id": "$response.body#/0/id"
+                },
+                "description": "Delete backup with the id from this response."
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/backups"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/backups"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Administrator permission required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "ForbiddenError",
+                  "status": 403,
+                  "detail": "You do not have permission to do that.",
+                  "instance": "https://menagerist.example/api/v1/backups"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/backups"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/backups"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "backup:archive:read"
       }
     },
     "/api/v1/backups/prune": {
@@ -1158,148 +1262,6 @@
       }
     },
     "/api/v1/me/exports": {
-      "get": {
-        "tags": [
-          "v1",
-          "Personal backups"
-        ],
-        "summary": "List User Exports",
-        "description": "List the caller's unexpired personal exports, newest first.\n\n**Requires permission:** `backup:own_data:export`",
-        "operationId": "list_user_exports",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UserExportResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List User Exports",
-                  "description": "Each entry is a `UserExportResponse`."
-                },
-                "example": [
-                  {
-                    "created_at": "2026-10-24T12:00:00Z",
-                    "expires_at": "2026-10-25T12:00:00Z",
-                    "id": "0199ec2d-f086-7000-8000-000000000001",
-                    "size": 1048576
-                  }
-                ]
-              }
-            },
-            "links": {
-              "DownloadExport": {
-                "operationId": "download_user_export",
-                "parameters": {
-                  "export_id": "$response.body#/0/id"
-                },
-                "description": "Download the newest export in this list."
-              },
-              "DeleteExport": {
-                "operationId": "delete_user_export",
-                "parameters": {
-                  "export_id": "$response.body#/0/id"
-                },
-                "description": "Delete the newest export in this list."
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in, or the session is no longer valid.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "not_signed_in": {
-                    "summary": "Not signed in",
-                    "value": {
-                      "type": "unauthenticated",
-                      "title": "SessionRequiredError",
-                      "status": 401,
-                      "detail": "Sign in to continue.",
-                      "instance": "https://menagerist.example/api/v1/me/exports"
-                    }
-                  },
-                  "setup_required": {
-                    "summary": "No account exists yet",
-                    "value": {
-                      "type": "setup_required",
-                      "title": "SetupRequiredError",
-                      "status": 401,
-                      "detail": "Create the first account to continue.",
-                      "instance": "https://menagerist.example/api/v1/me/exports"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "permission_refused": {
-                    "summary": "Permission refused",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "ForbiddenError",
-                      "status": 403,
-                      "detail": "You do not have permission to do that.",
-                      "instance": "https://menagerist.example/api/v1/me/exports"
-                    }
-                  },
-                  "password_expired": {
-                    "summary": "Password must be changed",
-                    "value": {
-                      "type": "password_expired",
-                      "title": "PasswordExpiredError",
-                      "status": 403,
-                      "detail": "Change your password to continue.",
-                      "instance": "https://menagerist.example/api/v1/me/exports"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                },
-                "examples": {
-                  "internal_error": {
-                    "summary": "Server error",
-                    "value": {
-                      "type": "about:blank",
-                      "title": "Internal Server Error",
-                      "status": 500,
-                      "detail": "An unexpected error occurred.",
-                      "instance": "https://menagerist.example/api/v1/me/exports"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
-        "x-required-permission": "backup:own_data:export"
-      },
       "post": {
         "tags": [
           "v1",
@@ -1308,6 +1270,11 @@
         "summary": "Export User Data",
         "description": "Create a verified archive of the caller's content.\n\n**Requires permission:** `backup:own_data:export`",
         "operationId": "export_user_data",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -1440,11 +1407,252 @@
             }
           }
         },
+        "x-required-permission": "backup:own_data:export"
+      },
+      "get": {
+        "tags": [
+          "v1",
+          "Personal backups"
+        ],
+        "summary": "List User Exports",
+        "description": "List the caller's unexpired personal exports, newest first unless sorted.\n\n**Requires permission:** `backup:own_data:export`",
+        "operationId": "list_user_exports",
         "security": [
           {
             "APIKeyCookie": []
           }
         ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserExportSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserExportResponse"
+                  },
+                  "title": "Response List User Exports",
+                  "description": "Each entry is a `UserExportResponse`."
+                },
+                "example": [
+                  {
+                    "created_at": "2026-10-24T12:00:00Z",
+                    "expires_at": "2026-10-25T12:00:00Z",
+                    "id": "0199ec2d-f086-7000-8000-000000000001",
+                    "size": 1048576
+                  }
+                ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Unexpired exports in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "links": {
+              "DownloadExport": {
+                "operationId": "download_user_export",
+                "parameters": {
+                  "export_id": "$response.body#/0/id"
+                },
+                "description": "Download the newest export in this list."
+              },
+              "DeleteExport": {
+                "operationId": "delete_user_export",
+                "parameters": {
+                  "export_id": "$response.body#/0/id"
+                },
+                "description": "Delete the newest export in this list."
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/exports"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/exports"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/me/exports"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/me/exports"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/exports"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/me/exports"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "x-required-permission": "backup:own_data:export"
       }
     },
@@ -3670,10 +3878,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest.",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
               "default": "desc"
             },
-            "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
           }
         ],
         "responses": {
@@ -18223,7 +18431,7 @@
           "Scheduling"
         ],
         "summary": "List Job Runs",
-        "description": "Show a job's recent runs, newest first.\n\n**Requires permission:** `scheduling:job:read`",
+        "description": "Show a job's recent runs, newest first unless sorted.\n\nHistory is kept to a bounded number of runs, which this pages through.\n\n**Requires permission:** `scheduling:job:read`",
         "operationId": "list_job_runs",
         "security": [
           {
@@ -18243,6 +18451,25 @@
             "description": "The job's key, such as `backup`."
           },
           {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -18250,11 +18477,40 @@
               "type": "integer",
               "maximum": 100,
               "minimum": 1,
-              "description": "How many recent runs to return.",
-              "default": 20,
+              "description": "Most rows to return on this page.",
+              "default": 50,
               "title": "Limit"
             },
-            "description": "How many recent runs to return."
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/JobRunSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
           }
         ],
         "responses": {
@@ -18281,6 +18537,20 @@
                     "status": "succeeded"
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Recent runs in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             }
           },
@@ -23008,7 +23278,7 @@
           "Imports"
         ],
         "summary": "List Item Import Files",
-        "description": "List your uploaded files and their imports, newest first.\n\n**Requires permission:** `transfer:bundle:import`",
+        "description": "List your uploaded files and their imports, newest first unless sorted.\n\n**Requires permission:** `transfer:bundle:import`",
         "operationId": "list_item_import_files",
         "security": [
           {
@@ -23016,6 +23286,70 @@
           },
           {
             "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ItemImportSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
           }
         ],
         "responses": {
@@ -23074,6 +23408,20 @@
                     "status": "running"
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Uploaded files in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -23184,6 +23532,32 @@
                       "instance": "https://menagerist.example/api/v1/imports/items/files"
                     }
                   }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/imports/items/files"
                 }
               }
             }
@@ -25245,10 +25619,10 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest.",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
               "default": "desc"
             },
-            "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
           }
         ],
         "responses": {
@@ -28236,18 +28610,87 @@
           "Sessions"
         ],
         "summary": "List Own Devices",
-        "description": "List the browsers you are signed in on, each with its active sessions.",
+        "description": "List the browsers you are signed in on, most recently used first unless sorted.\n\nEach comes with its active sessions.",
         "operationId": "list_own_devices",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/OwnDeviceSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/OwnDeviceResponse"
                   },
-                  "type": "array",
                   "title": "Response List Own Devices",
                   "description": "Each entry is a `OwnDeviceResponse`."
                 },
@@ -28279,6 +28722,20 @@
                     ]
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Devices in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -28354,6 +28811,32 @@
               }
             }
           },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/devices"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -28376,12 +28859,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/me/devices/{device_id}": {
@@ -29076,18 +29554,87 @@
           "Sessions"
         ],
         "summary": "List Own Sessions",
-        "description": "List all active devices for the current user.",
+        "description": "List all active devices for the current user, newest first unless sorted.",
         "operationId": "list_own_sessions",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/OwnSessionSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/SessionResponse"
                   },
-                  "type": "array",
                   "title": "Response List Own Sessions",
                   "description": "Each entry is a `SessionResponse`."
                 },
@@ -29106,6 +29653,20 @@
                     "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0"
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Active sessions in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -29167,6 +29728,32 @@
               }
             }
           },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/me/sessions"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -29189,12 +29776,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ]
+        }
       },
       "delete": {
         "tags": [
@@ -29205,6 +29787,11 @@
         "summary": "Revoke Other Sessions",
         "description": "Sign out everywhere except this device, forgetting the other devices.",
         "operationId": "revoke_other_sessions",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -29300,12 +29887,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/me/sessions/{session_id}": {
@@ -29624,18 +30206,87 @@
           "Users"
         ],
         "summary": "List Users",
-        "description": "List every account. Administrators only.\n\n**Requires permission:** `identity:user:list`",
+        "description": "List every account, by username unless sorted. Administrators only.\n\n**Requires permission:** `identity:user:list`",
         "operationId": "list_users",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
+              "default": "asc"
+            },
+            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/UserResponse"
                   },
-                  "type": "array",
                   "title": "Response List Users",
                   "description": "Each entry is a `UserResponse`."
                 },
@@ -29654,6 +30305,20 @@
                     "username": "alice"
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Accounts in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -29721,6 +30386,32 @@
               }
             }
           },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/users"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -29744,11 +30435,6 @@
             }
           }
         },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
         "x-required-permission": "identity:user:list"
       },
       "post": {
@@ -29759,15 +30445,20 @@
         "summary": "Create User",
         "description": "Create an account whose initial password must be changed at first sign-in.\n\n**Requires permission:** `identity:user:create`",
         "operationId": "create_user",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateUserRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -29940,11 +30631,6 @@
             }
           }
         },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
         "x-required-permission": "identity:user:create"
       }
     },
@@ -31331,7 +32017,7 @@
           "Sessions"
         ],
         "summary": "List Sessions",
-        "description": "List active sessions for all users or a specific user. Administrators only.\n\n**Requires permission:** `identity:session:list`",
+        "description": "List active sessions for all users or one, newest first. Administrators only.\n\n**Requires permission:** `identity:session:list`",
         "operationId": "list_sessions",
         "security": [
           {
@@ -31339,6 +32025,68 @@
           }
         ],
         "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SessionSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
           {
             "name": "user_id",
             "in": "query",
@@ -31390,6 +32138,20 @@
                     "username": "alice"
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Active sessions in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -31924,18 +32686,87 @@
           "API tokens"
         ],
         "summary": "List Api Tokens",
-        "description": "List your active tokens, newest first. Secrets are never shown.",
+        "description": "List your active tokens, newest first unless sorted. Secrets are never shown.",
         "operationId": "list_api_tokens",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ApiTokenSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/ApiTokenResponse"
                   },
-                  "type": "array",
                   "title": "Response List Api Tokens",
                   "description": "Each entry is a `ApiTokenResponse`."
                 },
@@ -31950,6 +32781,20 @@
                     "name": "Backup script"
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Active tokens in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -32018,6 +32863,32 @@
               }
             }
           },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/tokens"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -32040,12 +32911,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ]
+        }
       },
       "post": {
         "tags": [
@@ -32055,15 +32921,20 @@
         "summary": "Create Api Token",
         "description": "Create a token that acts as you with the permissions you choose.\n\nThe token value is in this response only and cannot be shown again. Your\npassword is required, and wrong passwords are throttled.",
         "operationId": "create_api_token",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateApiTokenRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -32223,14 +33094,6 @@
           },
           "429": {
             "description": "Too many wrong passwords recently; wait for `Retry-After` seconds.",
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds to wait before trying again.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            },
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -32242,6 +33105,14 @@
                   "status": 429,
                   "detail": "Too many failed attempts. Try again later.",
                   "instance": "https://menagerist.example/api/v1/tokens"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             }
@@ -32268,12 +33139,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/tokens/{token_id}/rotate": {
@@ -34142,6 +35008,17 @@
           }
         ]
       },
+      "ApiTokenSort": {
+        "type": "string",
+        "enum": [
+          "name",
+          "created_at",
+          "expires_at",
+          "last_used_at"
+        ],
+        "title": "ApiTokenSort",
+        "description": "What a person's tokens can be sorted by: fields of the response."
+      },
       "AttachMediaRequest": {
         "properties": {
           "target_type": {
@@ -34344,6 +35221,16 @@
             "size": 1048576
           }
         ]
+      },
+      "BackupSort": {
+        "type": "string",
+        "enum": [
+          "created_at",
+          "label",
+          "size"
+        ],
+        "title": "BackupSort",
+        "description": "What the backups can be sorted by: fields of the response."
       },
       "BrowserCheckResponse": {
         "properties": {
@@ -38631,6 +39518,19 @@
           }
         ]
       },
+      "ItemImportSort": {
+        "type": "string",
+        "enum": [
+          "created_at",
+          "filename",
+          "size",
+          "status",
+          "finished_at",
+          "expires_at"
+        ],
+        "title": "ItemImportSort",
+        "description": "What a person's uploaded files can be sorted by: fields of the response."
+      },
       "JobResponse": {
         "properties": {
           "job_key": {
@@ -38890,6 +39790,18 @@
             "status": "succeeded"
           }
         ]
+      },
+      "JobRunSort": {
+        "type": "string",
+        "enum": [
+          "created_at",
+          "scheduled_for",
+          "status",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "JobRunSort",
+        "description": "What a job's runs can be sorted by: fields of the response."
       },
       "KeptEntityResponse": {
         "properties": {
@@ -40244,6 +41156,26 @@
             "user_agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0"
           }
         ]
+      },
+      "OwnDeviceSort": {
+        "type": "string",
+        "enum": [
+          "name",
+          "first_seen_at",
+          "last_seen_at"
+        ],
+        "title": "OwnDeviceSort",
+        "description": "What a person's devices can be sorted by: fields of the response."
+      },
+      "OwnSessionSort": {
+        "type": "string",
+        "enum": [
+          "created_at",
+          "last_seen_at",
+          "expires_at"
+        ],
+        "title": "OwnSessionSort",
+        "description": "What a person's sessions can be sorted by: fields of the response."
       },
       "PackCountsResponse": {
         "properties": {
@@ -41993,6 +42925,17 @@
           }
         ]
       },
+      "SessionSort": {
+        "type": "string",
+        "enum": [
+          "username",
+          "created_at",
+          "last_seen_at",
+          "expires_at"
+        ],
+        "title": "SessionSort",
+        "description": "What the active sessions can be sorted by: fields of the response."
+      },
       "SetOwnAvatarBody": {
         "properties": {
           "file": {
@@ -43203,6 +44146,16 @@
           }
         ]
       },
+      "UserExportSort": {
+        "type": "string",
+        "enum": [
+          "created_at",
+          "size",
+          "expires_at"
+        ],
+        "title": "UserExportSort",
+        "description": "What a person's exports can be sorted by: fields of the response."
+      },
       "UserResponse": {
         "properties": {
           "id": {
@@ -43324,6 +44277,19 @@
             "username": "alice"
           }
         ]
+      },
+      "UserSort": {
+        "type": "string",
+        "enum": [
+          "username",
+          "display_name",
+          "role",
+          "last_login_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserSort",
+        "description": "What the accounts can be sorted by: fields of the response."
       },
       "VerificationResponse": {
         "properties": {

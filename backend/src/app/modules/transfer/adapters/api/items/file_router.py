@@ -7,10 +7,17 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from urllib.parse import unquote
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.parameters import ImportFileId
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import (
+    ImportFileId,
+    NewestFirstPageParams,
+)
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -46,6 +53,7 @@ from app.modules.transfer.application.stored_imports import (
     InspectStoredImportQuery,
     InspectStoredItemImport,
     ItemImportQuery,
+    ItemImportSort,
     ItemImportView,
     ListItemImports,
     ListItemImportsQuery,
@@ -163,13 +171,24 @@ async def upload_item_import_file(
     "",
     response_model=list[ItemImportResponse],
     operation_id="list_item_import_files",
+    responses=paging_responses("Uploaded files"),
 )
 async def list_item_import_files(
+    request: Request,
+    response: Response,
     use_case: Annotated[ListItemImports, Depends(get_list_item_imports_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    page: Annotated[NewestFirstPageParams[ItemImportSort], Query()],
 ) -> list[ItemImportResponse]:
-    """List your uploaded files and their imports, newest first."""
-    return [_response(v) for v in await use_case.handle(ListItemImportsQuery(), actor)]
+    """List your uploaded files and their imports, newest first unless sorted."""
+    result = await use_case.handle(
+        ListItemImportsQuery(
+            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+        ),
+        actor,
+    )
+    set_page_headers(request, response, result)
+    return [_response(view) for view in result.items]
 
 
 @router.get(

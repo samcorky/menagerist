@@ -25,6 +25,7 @@ from app.modules.transfer.application.stored_imports import (
     InspectStoredImportQuery,
     InspectStoredItemImport,
     ItemImportQuery,
+    ItemImportSort,
     ItemImportView,
     ListItemImports,
     ListItemImportsQuery,
@@ -57,6 +58,7 @@ from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.job_queue import InMemoryJobQueue
+from app.shared_kernel.paging import SortOrder
 from app.shared_kernel.progress import ProgressSnapshot, RecordingProgress
 
 if TYPE_CHECKING:
@@ -330,7 +332,10 @@ async def test_the_list_is_the_person_s_own_newest_first(world: World) -> None:
     views = await ListItemImports(world.repos, world.guard).handle(
         ListItemImportsQuery(), ALICE
     )
-    assert [(v.item.id, v.ahead) for v in views] == [(newer.id, 0), (older.id, None)]
+    assert [(v.item.id, v.ahead) for v in views.items] == [
+        (newer.id, 0),
+        (older.id, None),
+    ]
 
 
 async def test_a_list_with_nothing_waiting_skips_the_queue(world: World) -> None:
@@ -339,7 +344,7 @@ async def test_a_list_with_nothing_waiting_skips_the_queue(world: World) -> None
     views = await ListItemImports(world.repos, world.guard).handle(
         ListItemImportsQuery(), ALICE
     )
-    assert [(v.item.id, v.ahead) for v in views] == [(item.id, None)]
+    assert [(v.item.id, v.ahead) for v in views.items] == [(item.id, None)]
 
 
 async def test_an_uploaded_file_shows_no_place(world: World) -> None:
@@ -539,3 +544,27 @@ async def test_pruning_an_ownerless_import_touches_no_file(world: World) -> None
     )
     assert removed == 1
     assert (ALICE.id, item.id) in world.store.files
+
+
+@pytest.mark.parametrize("order", list(SortOrder))
+@pytest.mark.parametrize("sort", list(ItemImportSort))
+async def test_the_list_pages_through_every_sort_key(
+    world: World, sort: ItemImportSort, order: SortOrder
+) -> None:
+    """Following `next` visits each uploaded file once, for every key."""
+    for _ in range(3):
+        await world.upload(ALICE)
+    await world.upload(BOB)
+    use_case = ListItemImports(world.repos, world.guard)
+
+    seen: list[uuid.UUID] = []
+    query = ListItemImportsQuery(limit=2, sort=sort, order=order)
+    while True:
+        page = await use_case.handle(query, ALICE)
+        assert page.total == 3
+        seen.extend(view.item.id for view in page.items)
+        if page.next is None:
+            break
+        query = ListItemImportsQuery(after=page.next, limit=2, sort=sort, order=order)
+
+    assert len(seen) == len(set(seen)) == 3

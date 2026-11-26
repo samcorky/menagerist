@@ -9,6 +9,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar
 
 import structlog
@@ -37,6 +38,13 @@ from app.modules.transfer.ports.unit_of_work import TransferRepos, TransferUnitO
 from app.shared_kernel.access import Access, Requires, System
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler, QueryHandler, UseCase
+from app.shared_kernel.paging import (
+    Page,
+    PagedQuery,
+    SortOrder,
+    page_rows,
+    timestamp_value,
+)
 from app.shared_kernel.progress import ProgressSnapshot, failure_reason
 
 if TYPE_CHECKING:
@@ -180,9 +188,22 @@ class ItemImportQuery:
     import_id: uuid.UUID
 
 
-@dataclass(frozen=True, kw_only=True)
-class ListItemImportsQuery:
-    """Every file the person has uploaded and not yet removed."""
+class ItemImportSort(StrEnum):
+    """What a person's uploaded files can be sorted by: fields of the response."""
+
+    CREATED_AT = "created_at"
+    FILENAME = "filename"
+    SIZE = "size"
+    STATUS = "status"
+    FINISHED_AT = "finished_at"
+    EXPIRES_AT = "expires_at"
+
+
+@dataclass(kw_only=True)
+class ListItemImportsQuery(PagedQuery[ItemImportSort]):
+    """The files the person has uploaded and not removed, newest first unless told."""
+
+    order: SortOrder = SortOrder.DESC
 
 
 class GetItemImport(QueryHandler[TransferRepos, ItemImportQuery, ItemImportView]):
@@ -202,7 +223,7 @@ class GetItemImport(QueryHandler[TransferRepos, ItemImportQuery, ItemImportView]
 
 
 class ListItemImports(
-    QueryHandler[TransferRepos, ListItemImportsQuery, list[ItemImportView]]
+    QueryHandler[TransferRepos, ListItemImportsQuery, Page[ItemImportView]]
 ):
     """Return the person's uploaded files, newest first."""
 
@@ -210,15 +231,32 @@ class ListItemImports(
 
     async def _handle(
         self, request: ListItemImportsQuery, actor: Actor
-    ) -> list[ItemImportView]:
-        """Read the imports, each waiting one with its place in the queue."""
+    ) -> Page[ItemImportView]:
+        """Read a page of the imports, each waiting one with its place in the queue."""
         items = await self._repos.imports.list_for_owner(scope=_own(actor))
         places = (
             await _places(self._repos)
             if any(i.status is ImportStatus.QUEUED for i in items)
             else {}
         )
-        return [ItemImportView(item=i, ahead=places.get(i.id)) for i in items]
+        views = [ItemImportView(item=i, ahead=places.get(i.id)) for i in items]
+        return page_rows(
+            views,
+            request.page_request(ItemImportSort.CREATED_AT),
+            id_of=lambda view: view.item.id,
+            values={
+                ItemImportSort.CREATED_AT: lambda v: timestamp_value(v.item.created_at),
+                ItemImportSort.FILENAME: lambda view: view.item.filename.lower(),
+                ItemImportSort.SIZE: lambda view: view.item.size,
+                ItemImportSort.STATUS: lambda view: str(view.item.status),
+                ItemImportSort.FINISHED_AT: lambda v: (
+                    None
+                    if v.item.finished_at is None
+                    else timestamp_value(v.item.finished_at)
+                ),
+                ItemImportSort.EXPIRES_AT: lambda v: timestamp_value(v.item.expires_at),
+            },
+        )
 
 
 class DeleteItemImport(CommandHandler[TransferUnitOfWork, ItemImportQuery, None]):
