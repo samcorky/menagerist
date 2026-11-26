@@ -1250,9 +1250,6 @@ QUERY_OVERRIDES: dict[tuple[str, str], str] = {
     ("/api/v1/collections", "q"): "alpha",  # collections match on their name
     ("/api/v1/node-types/{node_type_id}/attributes/{key}/values", "q"): "R",
     ("/api/v1/presets", "q"): "alpha",  # presets match on their label
-    # The deleted lists sort by when they were deleted, or by name.
-    ("/api/v1/nodes/deleted", "sort"): "name",
-    ("/api/v1/collections/deleted", "sort"): "name",
 }
 
 
