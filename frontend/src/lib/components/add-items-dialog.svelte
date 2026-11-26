@@ -5,11 +5,12 @@
 	import { addItemsToCollection, listNodes, type NodeResponse } from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
 	import { addItemsErrorMessage, describeAddResult } from '$lib/collections';
+	import { nextCursor, PAGE_LIMIT } from '$lib/paging';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 
 	const PAGE_SIZE = 50;
-	const MEMBER_PAGE_SIZE = 500;
+	const MEMBER_PAGE_SIZE = PAGE_LIMIT;
 	const MAX_MEMBER_IDS = 20_000;
 	const MAX_SELECTION = 500;
 
@@ -33,6 +34,7 @@
 	let results = $state<NodeResponse[]>([]);
 	let loading = $state(false);
 	let hasMore = $state(false);
+	let nextAfter: string | null = null;
 	let loadFailed = $state(false);
 	let memberIds = $state<ReadonlySet<string>>(new Set());
 	const selected = new SvelteMap<string, string>();
@@ -89,11 +91,12 @@
 			if (seq !== memberSeq) return;
 			if (result.error || !result.data) break;
 			for (const item of result.data) ids.add(item.id);
-			if (!/rel="next"/.test(result.response?.headers.get('link') ?? '')) {
+			const next = nextCursor(result.response?.headers.get('link'));
+			if (next === null) {
 				complete = true;
 				break;
 			}
-			after = result.data.at(-1)?.id;
+			after = next;
 		}
 		memberIds = ids;
 		membersPartial = !complete;
@@ -117,7 +120,8 @@
 			hasMore = false;
 		} else {
 			results = after ? [...results, ...result.data] : result.data;
-			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
+			nextAfter = nextCursor(result.response?.headers.get('link'));
+			hasMore = nextAfter !== null;
 		}
 		loading = false;
 	}
@@ -218,7 +222,7 @@
 								variant="ghost"
 								size="sm"
 								disabled={loading}
-								onclick={() => void fetchPage(q, results.at(-1)?.id)}
+								onclick={() => void fetchPage(q, nextAfter ?? undefined)}
 							>
 								{loading ? 'Loading…' : 'Load more'}
 							</Button>
