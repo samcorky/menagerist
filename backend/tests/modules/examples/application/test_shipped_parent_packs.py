@@ -15,6 +15,7 @@ from app.modules.examples.application.uninstall_example_pack import (
 )
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
@@ -106,9 +107,11 @@ def _install(world: World, pack_id: str) -> InstallExamplePack:
 
 async def _node_types(world: World) -> dict[str, str | None]:
     """Parent slug by type slug, for every live item type."""
-    types = await world.graph_repos.node_types.list(
-        after=None, limit=1000, scope=ContentFilter.everyone()
-    )
+    types = (
+        await world.graph_repos.node_types.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=1000)
+        )
+    ).items
     return {t.slug.value: t.parent for t in types}
 
 

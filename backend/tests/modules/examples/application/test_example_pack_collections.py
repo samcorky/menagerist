@@ -152,10 +152,9 @@ async def test_a_failing_collection_step_rolls_everything_back(
     )
     assert (
         await world.graph_repos.node_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.preset_repos.presets.list(
             scope=ContentFilter.everyone(), page=PageRequest(limit=10)

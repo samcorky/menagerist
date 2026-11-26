@@ -8836,7 +8836,7 @@
           "Node Types"
         ],
         "summary": "List Node Types",
-        "description": "List node types, paginated by id.\n\n**Requires permission:** `graph:type:read`",
+        "description": "List node types, by id unless sorted.\n\n**Requires permission:** `graph:type:read`",
         "operationId": "list_node_types",
         "security": [
           {
@@ -8855,16 +8855,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 512
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
               "title": "After"
             },
-            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
           },
           {
             "name": "limit",
@@ -8872,11 +8872,42 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
             },
             "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/NodeTypeSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
+              "default": "asc"
+            },
+            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
           }
         ],
         "responses": {
@@ -9839,7 +9870,7 @@
           "Node Types"
         ],
         "summary": "List Subtypes",
-        "description": "List the subtypes of an item type, paginated by id.\n\n**Requires permission:** `graph:type:read`",
+        "description": "List the subtypes of an item type, by id unless sorted.\n\n**Requires permission:** `graph:type:read`",
         "operationId": "list_subtypes",
         "security": [
           {
@@ -9870,16 +9901,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 512
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
               "title": "After"
             },
-            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
           },
           {
             "name": "limit",
@@ -9887,11 +9918,42 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
             },
             "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/NodeTypeSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
+              "default": "asc"
+            },
+            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
           }
         ],
         "responses": {
@@ -11637,7 +11699,7 @@
           "Edge Types"
         ],
         "summary": "List Edge Types",
-        "description": "List edge types, paginated by id.\n\n**Requires permission:** `graph:type:read`",
+        "description": "List edge types, by id unless sorted.\n\n**Requires permission:** `graph:type:read`",
         "operationId": "list_edge_types",
         "security": [
           {
@@ -11656,16 +11718,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 512
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
               "title": "After"
             },
-            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
           },
           {
             "name": "limit",
@@ -11673,11 +11735,42 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
             },
             "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EdgeTypeSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
+              "default": "asc"
+            },
+            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
           }
         ],
         "responses": {
@@ -37077,6 +37170,17 @@
           }
         ]
       },
+      "EdgeTypeSort": {
+        "type": "string",
+        "enum": [
+          "slug",
+          "label",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EdgeTypeSort",
+        "description": "What a list of connection types can be sorted by: fields of the response."
+      },
       "EntrySection": {
         "type": "string",
         "enum": [
@@ -39822,6 +39926,17 @@
             "updated_at": "2026-08-23T10:14:44.465954Z"
           }
         ]
+      },
+      "NodeTypeSort": {
+        "type": "string",
+        "enum": [
+          "slug",
+          "label",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NodeTypeSort",
+        "description": "What a list of item types can be sorted by: fields of the response."
       },
       "Overlap": {
         "type": "string",

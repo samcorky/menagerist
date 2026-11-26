@@ -1,5 +1,5 @@
-import uuid
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar
 
 import structlog
@@ -13,6 +13,7 @@ from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa:
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.paging import Cursor, Page, PageRequest, SortOrder
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -21,15 +22,26 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
+class EdgeTypeSort(StrEnum):
+    """What a list of connection types can be sorted by: fields of the response."""
+
+    SLUG = "slug"
+    LABEL = "label"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
 @dataclass(kw_only=True)
 class ListEdgeTypesQuery:
-    """Request to list edge types with keyset pagination."""
+    """Request to list edge types, by id unless `sort` says otherwise."""
 
-    after: uuid.UUID | None = None
+    after: Cursor | None = None
     limit: int = 50
+    sort: EdgeTypeSort | None = None
+    order: SortOrder = SortOrder.ASC
 
 
-class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, list[EdgeType]]):
+class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, Page[EdgeType]]):
     """List edge types with keyset pagination."""
 
     access: ClassVar[Access] = Content(GraphPermission.TYPE_READ)
@@ -43,13 +55,22 @@ class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, list[EdgeType]]
         super().__init__(repos, guard)
         self._choice_lists = choice_lists
 
-    async def _handle(self, query: ListEdgeTypesQuery, actor: Actor) -> list[EdgeType]:
-        """Return a page of non-deleted edge types ordered by id."""
-        result = await self._repos.edge_types.list(
-            scope=self.scope(actor), after=query.after, limit=query.limit
+    async def _handle(self, query: ListEdgeTypesQuery, actor: Actor) -> Page[EdgeType]:
+        """Return a page of non-deleted edge types."""
+        page = await self._repos.edge_types.list(
+            scope=self.scope(actor),
+            page=PageRequest(
+                after=query.after,
+                limit=query.limit,
+                sort=None if query.sort is None else query.sort.value,
+                order=query.order,
+            ),
         )
-        logger.debug("edge types listed", count=len(result))
-        return [await self._resolved(edge_type) for edge_type in result]
+        logger.debug("edge types listed", count=len(page.items))
+        return Page(
+            items=[await self._resolved(edge_type) for edge_type in page.items],
+            next=page.next,
+        )
 
     async def _resolved(self, edge_type: EdgeType) -> EdgeType:
         """Fill in linked options, returning the same object if nothing changed."""

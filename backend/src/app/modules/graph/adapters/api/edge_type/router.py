@@ -18,8 +18,7 @@ from app.entrypoints.api.shared.http.http_headers import (
 from app.entrypoints.api.shared.http.parameters import (
     EdgeTypeId,
     FieldKey,
-    PageAfter,
-    PageLimit,
+    PageParams,
     SubFieldKey,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -50,6 +49,7 @@ from app.modules.graph.application.delete_edge_type import (
 )
 from app.modules.graph.application.get_edge_type import GetEdgeType, GetEdgeTypeQuery
 from app.modules.graph.application.list_edge_types import (
+    EdgeTypeSort,
     ListEdgeTypes,
     ListEdgeTypesQuery,
 )
@@ -65,6 +65,7 @@ from app.modules.graph.domain.errors import (
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(
     prefix="/edge-types", tags=["Edge Types"], route_class=PermissionAwareRoute
@@ -129,19 +130,21 @@ async def list_edge_types(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: PageLimit = 50,
+    page: Annotated[PageParams[EdgeTypeSort], Query()],
 ) -> list[EdgeTypeResponse]:
-    """List edge types, paginated by id."""
-    edge_types = await use_case.handle(
-        ListEdgeTypesQuery(after=after, limit=limit + 1), actor
+    """List edge types, by id unless sorted."""
+    result = await use_case.handle(
+        ListEdgeTypesQuery(
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+        ),
+        actor,
     )
-    if len(edge_types) > limit:
-        response.headers["Link"] = link_next_header(
-            request, str(edge_types[limit - 1].id)
-        )
-
-    return [EdgeTypeResponse.from_domain(et) for et in edge_types[:limit]]
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
+    return [EdgeTypeResponse.from_domain(et) for et in result.items]
 
 
 @router.patch(

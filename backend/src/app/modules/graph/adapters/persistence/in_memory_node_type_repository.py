@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from app.shared_kernel.paging import page_rows, timestamp_value
+
 if TYPE_CHECKING:
     import builtins
     import uuid
@@ -7,6 +9,21 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.node_type import NodeType
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
+
+
+def _paged(types: builtins.list[NodeType], page: PageRequest) -> Page[NodeType]:
+    return page_rows(
+        types,
+        page,
+        id_of=lambda nt: nt.id,
+        values={
+            "slug": lambda nt: str(nt.slug).lower(),
+            "label": lambda nt: nt.label.lower(),
+            "created_at": lambda nt: timestamp_value(nt.created_at),
+            "updated_at": lambda nt: timestamp_value(nt.updated_at),
+        },
+    )
 
 
 class InMemoryNodeTypeRepository:
@@ -53,32 +70,31 @@ class InMemoryNodeTypeRepository:
             None,
         )
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[NodeType]:
-        """List non-deleted node types in `scope` ordered by id, after `after`."""
-        ordered = sorted(
-            (
-                nt
-                for nt in self._node_types.values()
-                if not nt.is_deleted and scope.covers(nt.owner_id)
-            ),
-            key=lambda nt: nt.id,
-        )
-        if after is not None:
-            ordered = [nt for nt in ordered if nt.id > after]
-        return ordered[:limit]
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[NodeType]:
+        """List non-deleted node types in `scope`, one page in the order `page` asks."""
+        live = [
+            nt
+            for nt in self._node_types.values()
+            if not nt.is_deleted and scope.covers(nt.owner_id)
+        ]
+        return _paged(live, page)
+
+    async def page_subtypes(
+        self, parent: str, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[NodeType]:
+        """One page of the non-deleted subtypes of the type with slug `parent`."""
+        subtypes = [
+            nt
+            for nt in self._node_types.values()
+            if nt.parent == parent and not nt.is_deleted and scope.covers(nt.owner_id)
+        ]
+        return _paged(subtypes, page)
 
     async def list_subtypes(
-        self,
-        parent: str,
-        *,
-        scope: ContentFilter,
-        after: uuid.UUID | None = None,
-        limit: int | None = None,
+        self, parent: str, *, scope: ContentFilter
     ) -> builtins.list[NodeType]:
-        """List the non-deleted subtypes of the type with slug `parent` in `scope`."""
-        ordered = sorted(
+        """List every non-deleted subtype of the type with slug `parent` in `scope`."""
+        return sorted(
             (
                 nt
                 for nt in self._node_types.values()
@@ -88,9 +104,6 @@ class InMemoryNodeTypeRepository:
             ),
             key=lambda nt: nt.id,
         )
-        if after is not None:
-            ordered = [nt for nt in ordered if nt.id > after]
-        return ordered if limit is None else ordered[:limit]
 
     async def list_deleted_before(
         self, cutoff: datetime, *, after: uuid.UUID | None, limit: int

@@ -8,6 +8,7 @@ from app.modules.transfer.domain.bundle import Bundle, BundleItemType
 from app.modules.transfer.domain.plan import ClashPolicy
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from tests.modules.conftest import Shared, Targets
@@ -41,7 +42,11 @@ async def _import(t: Targets, *item_types: BundleItemType) -> None:
 async def _parents(shared: Shared, actor: Actor) -> dict[str, str | None]:
     """Each of the person's item types by slug, with its parent's slug."""
     scope = ContentFilter(user_id=actor.id)
-    found = await shared.graph_repos.node_types.list(scope=scope, after=None, limit=50)
+    found = (
+        await shared.graph_repos.node_types.list(
+            scope=scope, page=PageRequest(limit=50)
+        )
+    ).items
     return {str(t.slug): t.parent for t in found}
 
 
@@ -80,9 +85,11 @@ async def test_exporting_a_subtype_brings_its_parent_so_the_file_stands_alone(
     await _import(alice, MEMO, POSTER)
     poster = next(
         t
-        for t in await shared.graph_repos.node_types.list(
-            scope=ContentFilter(user_id=ALICE.id), after=None, limit=50
-        )
+        for t in (
+            await shared.graph_repos.node_types.list(
+                scope=ContentFilter(user_id=ALICE.id), page=PageRequest(limit=50)
+            )
+        ).items
         if str(t.slug) == "poster"
     )
 

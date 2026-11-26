@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.edge_type import EdgeType
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 class EdgeTypeRepository(Protocol):
@@ -33,10 +34,15 @@ class EdgeTypeRepository(Protocol):
         """
         ...
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[EdgeType]:
-        """List non-deleted edge types in `scope` ordered by id."""
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[EdgeType]:
+        """List non-deleted edge types in `scope`, one page in the order `page` asks.
+
+        The sort keys are `slug`, `label` (ignoring case), `created_at` and
+        `updated_at`; with none, the order is by id.
+
+        Raises:
+            InvalidCursorError: `page.after` is from a different sort or order.
+        """
         ...
 
     async def list_deleted_before(

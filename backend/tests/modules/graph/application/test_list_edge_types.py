@@ -42,7 +42,7 @@ async def test_list_edge_types_returns_all() -> None:
     await edge_types.add(et2)
     use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
 
-    results = await use_case.handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)
+    results = (await use_case.handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)).items
 
     assert et1 in results
     assert et2 in results
@@ -59,7 +59,7 @@ async def test_list_edge_types_respects_limit() -> None:
         )
     use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
 
-    results = await use_case.handle(ListEdgeTypesQuery(limit=2), SYSTEM_ACTOR)
+    results = (await use_case.handle(ListEdgeTypesQuery(limit=2), SYSTEM_ACTOR)).items
 
     assert len(results) <= 2
 
@@ -74,6 +74,6 @@ async def test_list_edge_types_excludes_deleted() -> None:
     await edge_types.add(et)
     use_case = ListEdgeTypes(_make_repos(edge_types), InMemoryAccessGuard())
 
-    results = await use_case.handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)
+    results = (await use_case.handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)).items
 
     assert et not in results

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.shared_kernel.paging import (
+    MAX_PAGE_ROWS,
     Cursor,
     InvalidCursorError,
     Page,
@@ -281,3 +282,26 @@ def test_a_key_value_of_the_wrong_kind_is_refused_by_the_parsers() -> None:
         parse_timestamp(7)
     with pytest.raises(ValueError, match="Invalid isoformat"):
         parse_timestamp("yesterday")
+
+
+@pytest.mark.fast
+@pytest.mark.parametrize(
+    ("limit", "size"),
+    [(-5, 0), (0, 0), (7, 7), (MAX_PAGE_ROWS, MAX_PAGE_ROWS), (10**9, MAX_PAGE_ROWS)],
+)
+def test_a_page_never_returns_more_than_the_maximum_or_fewer_than_none(
+    limit: int, size: int
+) -> None:
+    """A huge or negative `limit` is clamped, so it cannot ask for every row."""
+    assert PageRequest(limit=limit).size == size
+
+
+@pytest.mark.fast
+def test_a_huge_limit_returns_a_page_of_at_most_the_maximum() -> None:
+    """The page is cut at the maximum and points to the rest."""
+    rows = _rows(*[str(n) for n in range(MAX_PAGE_ROWS + 5)])
+
+    page = _page(rows, PageRequest(limit=10**9))
+
+    assert len(page.items) == MAX_PAGE_ROWS
+    assert page.next is not None

@@ -73,10 +73,9 @@ async def _assert_nothing_left(world: World) -> None:
     )
     assert (
         await world.graph_repos.node_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.graph_repos.nodes.list(
             scope=ContentFilter.everyone(), after=None, limit=10
@@ -91,10 +90,9 @@ async def _assert_nothing_left(world: World) -> None:
     )
     assert (
         await world.graph_repos.edge_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.preset_repos.presets.list(
             scope=ContentFilter.everyone(), page=PageRequest(limit=10)
@@ -121,9 +119,11 @@ async def test_install_creates_everything_and_records_it(
     )
     assert (
         len(
-            await world.graph_repos.node_types.list(
-                after=None, limit=10, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.node_types.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+                )
+            ).items
         )
         == 2
     )
@@ -287,9 +287,11 @@ async def test_a_rollback_keeps_what_the_user_changed_and_says_so(
 
     async def edit_then_fail(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
         node_type = (
-            await world.graph_repos.node_types.list(
-                after=None, limit=10, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.node_types.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+                )
+            ).items
         )[0]
         node_type.label = "Renamed by me"
         await world.graph_repos.node_types.save(node_type)
@@ -300,9 +302,11 @@ async def test_a_rollback_keeps_what_the_user_changed_and_says_so(
     with pytest.raises(InstallFailedError, match="you had changed were kept"):
         await _use_case(world).handle(_COMMAND, world.actor)
 
-    remaining = await world.graph_repos.node_types.list(
-        after=None, limit=10, scope=ContentFilter.everyone()
-    )
+    remaining = (
+        await world.graph_repos.node_types.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
     assert [t.label for t in remaining] == ["Renamed by me"]
 
 

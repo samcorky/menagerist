@@ -103,10 +103,12 @@ async def _items(world: World, owner: uuid.UUID | None = None) -> list[Node]:
 
 async def _type_slugs(world: World, owner: uuid.UUID | None = None) -> set[str]:
     scope = ContentFilter.everyone() if owner is None else ContentFilter.of(owner)
-    types = await world.graph_repos.node_types.list(after=None, limit=50, scope=scope)
-    edge_types = await world.graph_repos.edge_types.list(
-        after=None, limit=50, scope=scope
-    )
+    types = (
+        await world.graph_repos.node_types.list(scope=scope, page=PageRequest(limit=50))
+    ).items
+    edge_types = (
+        await world.graph_repos.edge_types.list(scope=scope, page=PageRequest(limit=50))
+    ).items
     return {str(t.slug) for t in types} | {str(t.slug) for t in edge_types}
 
 
@@ -156,9 +158,11 @@ async def test_each_person_gets_their_own_items_collections_covers_and_types(
     )
     assert sorted(e.owner_id for e in edges) == [USER_A.id, USER_B.id]  # type: ignore[type-var]
     for person in (USER_A, USER_B):
-        owned = await a.graph_repos.node_types.list(
-            after=None, limit=50, scope=ContentFilter.of(person.id)
-        )
+        owned = (
+            await a.graph_repos.node_types.list(
+                scope=ContentFilter.of(person.id), page=PageRequest(limit=50)
+            )
+        ).items
         assert len(owned) == 3
         assert {t.owner_id for t in owned} == {person.id}
 
@@ -177,9 +181,11 @@ async def test_each_person_gets_their_own_choice_list(
     assert mine.id != theirs.id
     assert (mine.owner_id, theirs.owner_id) == (USER_A.id, USER_B.id)
     for person, expected in ((USER_A, mine), (USER_B, theirs)):
-        for node_type in await a.graph_repos.node_types.list(
-            after=None, limit=50, scope=ContentFilter.of(person.id)
-        ):
+        for node_type in (
+            await a.graph_repos.node_types.list(
+                scope=ContentFilter.of(person.id), page=PageRequest(limit=50)
+            )
+        ).items:
             schema = node_type.attributes_schema or {}
             for prop in schema.get("properties", {}).values():
                 link = prop.get("x-menagerist", {}).get("list")
@@ -413,14 +419,18 @@ async def test_rows_reowned_to_the_installer_uninstall_cleanly(
     ):
         asset.owner_id = USER_A.id
         await system.media_repos.assets.save(asset)
-    for node_type in await system.graph_repos.node_types.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    ):
+    for node_type in (
+        await system.graph_repos.node_types.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items:
         node_type.owner_id = USER_A.id
         await system.graph_repos.node_types.save(node_type)
-    for edge_type in await system.graph_repos.edge_types.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    ):
+    for edge_type in (
+        await system.graph_repos.edge_types.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items:
         edge_type.owner_id = USER_A.id
         await system.graph_repos.edge_types.save(edge_type)
     for installation in await system.runs.list_active(scope=ContentFilter.everyone()):

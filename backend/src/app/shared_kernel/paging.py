@@ -30,6 +30,10 @@ type CursorValue = str | int | float | bool | None
 
 CURSOR_VERSION = 1
 
+# The most rows one page returns, whatever `limit` asks for. Lists that cap `limit`
+# in the API stay under it; the few that never did cannot be asked for everything.
+MAX_PAGE_ROWS = 1000
+
 
 class SortOrder(StrEnum):
     """The direction of a list's `order` parameter."""
@@ -138,6 +142,11 @@ class PageRequest:
     order: SortOrder = SortOrder.ASC
 
     @property
+    def size(self) -> int:
+        """The rows to return: `limit`, kept between 0 and `MAX_PAGE_ROWS`."""
+        return max(0, min(self.limit, MAX_PAGE_ROWS))
+
+    @property
     def keys(self) -> tuple[str, ...]:
         """The sort keys, none when the list is in its default order."""
         return () if self.sort is None else (self.sort,)
@@ -218,8 +227,8 @@ def page_rows[T](
     if after is not None:
         resume = (*after.values, str(after.id))
         positioned = [p for p in positioned if _compare(p[0], resume, orders) > 0]
-    page = positioned[: request.limit]
-    if not page or len(positioned) <= request.limit:
+    page = positioned[: request.size]
+    if not page or len(positioned) <= request.size:
         return Page(items=[row for _, row in page])
     last_position, last_row = page[-1]
     return Page(

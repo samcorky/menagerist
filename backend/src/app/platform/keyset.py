@@ -134,13 +134,11 @@ async def keyset_page[Row, T](
         *(column.expr.label(f"_key{n}") for n, column in enumerate(sorted_by)),
         id_column.label("_id"),
     )
-    result = await session.execute(
-        labelled.order_by(*ordering).limit(request.limit + 1)
-    )
+    result = await session.execute(labelled.order_by(*ordering).limit(request.size + 1))
     rows = result.all()
-    kept = rows[: request.limit]
+    kept = rows[: request.size]
     items = [to_domain(row[0]) for row in kept]
-    if not kept or len(rows) <= request.limit:
+    if not kept or len(rows) <= request.size:
         return Page(items=items)
     last = kept[-1]
     return Page(

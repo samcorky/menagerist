@@ -586,3 +586,19 @@ async def test_keyset_page_puts_empty_values_last_in_both_directions(
 
     assert await names(SortOrder.ASC, 1) == ["C3", "C1", "C0", "C2"]
     assert await names(SortOrder.DESC, 3) == ["C1", "C3", "C2", "C0"]
+
+
+@pytest.mark.parametrize("limit", [-1, 0])
+async def test_list_a_limit_below_one_returns_no_rows_instead_of_failing(
+    db_session: AsyncSession, limit: int
+) -> None:
+    """The page size is clamped, so a negative limit is not sent to the database."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    await repo.add(_collection("A", slug="a"))
+
+    page = await repo.list(
+        scope=ContentFilter.everyone(), page=PageRequest(limit=limit)
+    )
+
+    assert page.items == []
+    assert page.next is None

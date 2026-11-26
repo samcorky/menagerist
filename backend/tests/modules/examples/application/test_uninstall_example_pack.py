@@ -76,16 +76,14 @@ async def _assert_empty(world: World) -> None:
     )
     assert (
         await world.graph_repos.node_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.graph_repos.edge_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.graph_repos.edges.list(
             after=None, limit=10, scope=ContentFilter.everyone()
@@ -152,9 +150,11 @@ async def test_reinstalling_after_removal_succeeds(make_world: MakeWorld) -> Non
     assert installation.status is RunStatus.INSTALLED
     assert (
         len(
-            await world.graph_repos.node_types.list(
-                after=None, limit=10, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.node_types.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+                )
+            ).items
         )
         == 2
     )
@@ -452,7 +452,9 @@ async def test_a_users_connection_of_the_pack_relationship_type_keeps_it(
         await world.graph_repos.edges.get(mine.id, scope=ContentFilter.everyone())
         is not None
     )
-    kept_types = await world.graph_repos.edge_types.list(
-        after=None, limit=10, scope=ContentFilter.everyone()
-    )
+    kept_types = (
+        await world.graph_repos.edge_types.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
     assert [str(t.slug) for t in kept_types] == ["demo-signed-by"]

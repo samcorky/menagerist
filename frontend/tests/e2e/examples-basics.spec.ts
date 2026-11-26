@@ -156,7 +156,7 @@ test('a clashing item type slug is shown before adding and creates nothing', asy
 
 	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as { name: string }[];
 	expect(nodes.some((n) => n.name === 'Night Drive')).toBe(false);
-	const types = (await (await request.get('/api/v1/node-types?limit=500')).json()) as {
+	const types = (await (await request.get('/api/v1/node-types?limit=100')).json()) as {
 		slug: string;
 	}[];
 	expect(types.some((t) => t.slug === 'music-record')).toBe(false);

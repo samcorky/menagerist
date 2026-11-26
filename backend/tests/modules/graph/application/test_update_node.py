@@ -26,6 +26,7 @@ from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 
@@ -412,10 +413,9 @@ async def test_update_node_clears_the_type_without_creating_one() -> None:
     assert result.attributes == {"year": 1979}
     assert (
         await repos.node_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     stored = await repos.nodes.get(node.id, scope=ContentFilter.everyone())
     assert stored is not None
     assert stored.type is None
@@ -550,10 +550,9 @@ async def test_update_node_clear_type_wins_over_a_type_in_the_same_command() -> 
     assert result.type is None
     assert (
         await repos.node_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
 
 
 async def _owned_node() -> tuple[UpdateNode, InMemoryNodeRepository, Node, Actor]:

@@ -23,6 +23,7 @@ from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.removal import KEEP_EDITED
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
@@ -68,9 +69,11 @@ async def _names(world: World) -> list[str]:
 
 
 async def _slugs(world: World) -> list[str]:
-    types = await world.graph_repos.node_types.list(
-        after=None, limit=10, scope=ContentFilter.everyone()
-    )
+    types = (
+        await world.graph_repos.node_types.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
     return sorted(str(t.slug) for t in types)
 
 
@@ -165,9 +168,11 @@ async def test_a_type_whose_slug_the_user_changed_is_not_adopted(
 ) -> None:
     """A renamed kept type is the user's; the pack gets a fresh one."""
     world = await _kept_world(make_world)
-    types = await world.graph_repos.node_types.list(
-        after=None, limit=10, scope=ContentFilter.everyone()
-    )
+    types = (
+        await world.graph_repos.node_types.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
     mine = types[0]
     mine.slug = "my-records"  # type: ignore[assignment]
     await world.graph_repos.node_types.save(mine)

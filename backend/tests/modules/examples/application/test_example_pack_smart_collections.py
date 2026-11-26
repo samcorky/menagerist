@@ -27,6 +27,7 @@ from app.modules.transfer.domain.removal import KEEP_EDITED
 from app.modules.transfer.domain.run import Outcome
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.examples.domain.pack import ExamplePack
@@ -121,10 +122,9 @@ async def test_a_failing_smart_collection_rolls_the_whole_install_back(
     assert await _item_count(world) == 0
     assert (
         await world.graph_repos.node_types.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.runs.get_active_for_bundle("demo", scope=ContentFilter.everyone())
         is None
