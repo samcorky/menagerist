@@ -388,6 +388,7 @@ ALLOWED: dict[Route, str] = {
     ("POST", "/api/v1/node-types"): VOCABULARY,
     ("PATCH", "/api/v1/node-types/{node_type_id}"): VOCABULARY,
     ("GET", "/api/v1/node-types/{node_type_id}/subtypes"): VOCABULARY,
+    ("POST", "/api/v1/node-types/{node_type_id}/parent/plan"): VOCABULARY,
     ("GET", "/api/v1/edge-types"): VOCABULARY,
     ("GET", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
     ("POST", "/api/v1/edge-types"): VOCABULARY,
@@ -474,6 +475,7 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
     "UpdateNodeRequest": lambda s: {"json": {"name": "Stolen"}},
     "DuplicateNodeRequest": lambda s: {"json": {"name": "Stolen copy"}},
     "PromoteExtraSchemaFieldRequest": lambda s: {"json": {"node_type_id": s.film}},
+    "ParentChangeRequest": lambda s: {"json": {"parent": None}},
     "NodeSearchRequest": lambda s: {
         "json": {
             "query": {

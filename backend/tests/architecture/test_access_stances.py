@@ -119,6 +119,7 @@ EXPECTED_CONTENT: frozenset[str] = frozenset(
         "graph.ListEdgeTypes",
         "graph.ListNodeTypes",
         "graph.ListSubtypes",
+        "graph.PlanParentChange",
         "graph.PurgeEdgeTypeAttribute",
         "graph.PurgeNodeTypeAttribute",
         "graph.UpdateEdgeType",

@@ -1783,3 +1783,23 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - A key both a parent and a subtype define keeps the parent's definition. The rules refuse that, so this only guards data that predates them.
 - A highlight on a subtype may name a field the parent later removes; such an entry is dropped when read (`normaliseHighlights`), as a dangling one already is.
 - The filter and query builder read the effective schema too, so a subtype's field choices include its parent's. Matching a parent's items across its subtypes is a separate slice (#768).
+
+## Attaching and detaching a parent: merge or keep, and nothing about an item changes (2026-11-25)
+
+**Decision:** Giving a type a parent, taking it away, or moving it to another is one operation that works out its effect on the fields before saving anything, and the person chooses what happens at a clash (#320, #775). `PATCH /node-types/{id}` takes `on_clash` (`refuse`, the default, or `merge`) and `on_detach` (`keep`, the default, or `drop`). `POST /node-types/{id}/parent/plan` takes the same body and answers what would happen without saving: `allowed`, `reason`, and the keys that clash, merge, conflict, are kept or are archived, with the number of items. The preview and the update share one pure function (`plan_parent_change`), so what is shown is what is done.
+
+**What each choice does:**
+
+- **Attach, clash, `refuse`:** the change is refused naming the fields, as before.
+- **Attach, clash, `merge`:** the parent's definition is used and the subtype's is dropped, with its place in `required` and the layout. A choice field's options become every option either side listed, in the parent's order then the subtype's new ones, so no stored value stops being a valid one. Only fields of the same kind merge (`field_kind`, shared with promoting a per-item field); a key defined as different kinds is refused even with `merge`.
+- **Detach, `keep`:** the parent's fields, required, layout and highlights are copied onto the type (its effective schema becomes its own), so it uses exactly what it used before.
+- **Detach, `drop`:** the parent's fields it lacks are added as archived fields, which are hidden and not validated but keep their values, so they can be restored.
+- **Move:** a detach then an attach in one transaction, so what is kept from the old parent can merge with the new one's.
+
+**Choices that are not obvious:**
+
+- Items are never rewritten. They store values by key against their type's slug, so a field's definition moving between the parent and the subtype changes nothing about an item; round-trip tests (attach, detach, attach again) check each item's values are unchanged and still valid.
+- A merge changes the parent, which other subtypes also use, so it only widens choices. It never removes an option or changes a kind.
+- `keep` is the default because it loses nothing; `drop` is the tidy choice and stays reversible.
+- The preview is a `POST` that changes nothing, so it can take a body of choices; it needs the same permission as the update, since it only previews what the person may do.
+- Naming the parent a type already has is not a move: no fields are touched, whatever the choices.

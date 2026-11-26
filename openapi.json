@@ -8644,6 +8644,13 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "List subtypes with the id from this response."
+              },
+              "PlanParentChange": {
+                "operationId": "plan_parent_change",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "Plan parent change with the id from this response."
               }
             }
           },
@@ -8928,6 +8935,13 @@
                   "node_type_id": "$response.body#/0/id"
                 },
                 "description": "List subtypes with the id from this response."
+              },
+              "PlanParentChange": {
+                "operationId": "plan_parent_change",
+                "parameters": {
+                  "node_type_id": "$response.body#/0/id"
+                },
+                "description": "Plan parent change with the id from this response."
               }
             }
           },
@@ -9166,6 +9180,13 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "List subtypes with the id from this response."
+              },
+              "PlanParentChange": {
+                "operationId": "plan_parent_change",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "Plan parent change with the id from this response."
               }
             }
           },
@@ -9413,6 +9434,13 @@
                   "node_type_id": "$response.body#/id"
                 },
                 "description": "List subtypes with the id from this response."
+              },
+              "PlanParentChange": {
+                "operationId": "plan_parent_change",
+                "parameters": {
+                  "node_type_id": "$response.body#/id"
+                },
+                "description": "Plan parent change with the id from this response."
               }
             }
           },
@@ -10015,6 +10043,242 @@
           }
         },
         "x-required-permission": "graph:type:read"
+      }
+    },
+    "/api/v1/node-types/{node_type_id}/parent/plan": {
+      "post": {
+        "tags": [
+          "v1",
+          "Node Types"
+        ],
+        "summary": "Plan Parent Change",
+        "description": "Preview giving an item type another parent, or none, without changing it.\n\nReports which fields would be merged, copied onto the type or archived, and\nwhether the change is allowed as asked. Nothing is saved. A clash or a field\ndefined as a different kind is reported with `allowed: false`, not as an error.\n\n**Requires permission:** `graph:type:write`",
+        "operationId": "plan_parent_change",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "node_type_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The item type's id.",
+              "title": "Node Type Id"
+            },
+            "description": "The item type's id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParentChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentChangePlanResponse"
+                },
+                "example": {
+                  "allowed": true,
+                  "archived": [],
+                  "clashes": [
+                    "condition"
+                  ],
+                  "conflicts": [],
+                  "items": 12,
+                  "kept": [],
+                  "merged": [
+                    "condition"
+                  ],
+                  "parent": "memorabilia"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a type cannot be a subtype of the named parent.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidParentTypeError",
+                  "status": 400,
+                  "detail": "Parent type 'memorabilia' not found",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Returned when a requested node type does not exist.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "NodeTypeNotFoundError",
+                  "status": 404,
+                  "detail": "NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/node-types/01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10/parent/plan"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:type:write"
       }
     },
     "/api/v1/node-types/{node_type_id}/attributes/{key}/usage": {
@@ -39240,6 +39504,170 @@
           }
         ]
       },
+      "ParentChangePlanResponse": {
+        "properties": {
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent",
+            "description": "The parent the type would have, or null."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous",
+            "description": "The parent it has now, or null."
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed",
+            "description": "Whether the change could be made as asked."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it could not, when it could not."
+          },
+          "clashes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Clashes",
+            "description": "Field keys both the type and the new parent define."
+          },
+          "merged": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Merged",
+            "description": "Keys whose own definition would give way to the parent's."
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conflicts",
+            "description": "Keys defined as different kinds of field, which cannot merge."
+          },
+          "kept": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kept",
+            "description": "The old parent's keys that would be copied onto the type."
+          },
+          "archived": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Archived",
+            "description": "The old parent's keys that would be archived on the type."
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items",
+            "description": "How many items of the type there are; none of their values change."
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowed",
+          "clashes",
+          "merged",
+          "conflicts",
+          "kept",
+          "archived",
+          "items"
+        ],
+        "title": "ParentChangePlanResponse",
+        "description": "What a change of a type's parent would do, without having done it.",
+        "examples": [
+          {
+            "allowed": true,
+            "archived": [],
+            "clashes": [
+              "condition"
+            ],
+            "conflicts": [],
+            "items": 12,
+            "kept": [],
+            "merged": [
+              "condition"
+            ],
+            "parent": "memorabilia"
+          }
+        ]
+      },
+      "ParentChangeRequest": {
+        "properties": {
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent",
+            "description": "The slug of the parent the type would have, or null for none. The parent it already has is no change."
+          },
+          "on_clash": {
+            "type": "string",
+            "enum": [
+              "refuse",
+              "merge"
+            ],
+            "title": "On Clash",
+            "description": "What to do when the new parent defines a field key the type does. `refuse` (the default) stops the change; `merge` uses the parent's definition, widening its choices to every option either lists, when both are the same kind of field.",
+            "default": "refuse"
+          },
+          "on_detach": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "drop"
+            ],
+            "title": "On Detach",
+            "description": "What to do with the fields the type inherited when it loses its parent. `keep` (the default) copies them onto the type; `drop` archives them, so values stay and the fields can be restored.",
+            "default": "keep"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ParentChangeRequest",
+        "description": "Request body for previewing a change of a type's parent.",
+        "examples": [
+          {
+            "on_clash": "merge",
+            "parent": "memorabilia"
+          }
+        ]
+      },
       "PermissionsResponse": {
         "properties": {
           "permissions": {
@@ -41591,6 +42019,26 @@
             ],
             "title": "Parent",
             "description": "The slug of the top-level type this is a subtype of, such as `memorabilia`; null for a type with no parent. A type with subtypes cannot have a parent."
+          },
+          "on_clash": {
+            "type": "string",
+            "enum": [
+              "refuse",
+              "merge"
+            ],
+            "title": "On Clash",
+            "description": "What to do when the new parent defines a field key the type does. `refuse` (the default) stops the change; `merge` uses the parent's definition, widening its choices to every option either lists, when both are the same kind of field.",
+            "default": "refuse"
+          },
+          "on_detach": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "drop"
+            ],
+            "title": "On Detach",
+            "description": "What to do with the fields the type inherited when it loses its parent. `keep` (the default) copies them onto the type; `drop` archives them, so values stay and the fields can be restored.",
+            "default": "keep"
           }
         },
         "additionalProperties": false,

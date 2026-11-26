@@ -576,3 +576,134 @@ def test_deleting_a_parent_with_subtypes_is_a_409_until_they_are_gone() -> None:
 
     assert client.delete(f"/api/v1/node-types/{sub['id']}").status_code == 204
     assert client.delete(f"/api/v1/node-types/{parent['id']}").status_code == 204
+
+
+def _choice_field(*options: str) -> dict[str, object]:
+    return {
+        "type": "string",
+        "enum": list(options),
+        "x-menagerist": {"kind": "choice"},
+    }
+
+
+def _clashing_pair(client: TestClient) -> tuple[dict[str, str], dict[str, str]]:
+    """A parent and a standalone type that both define `condition`."""
+    parent = client.post(
+        "/api/v1/node-types",
+        json={
+            "slug": "memorabilia",
+            "label": "Memorabilia",
+            "attributes_schema": {
+                "type": "object",
+                "properties": {"condition": _choice_field("Mint", "Good")},
+            },
+        },
+    ).json()
+    poster = client.post(
+        "/api/v1/node-types",
+        json={
+            "slug": "poster",
+            "label": "Poster",
+            "attributes_schema": {
+                "type": "object",
+                "properties": {
+                    "condition": _choice_field("Worn"),
+                    "width": {"type": "string"},
+                },
+            },
+        },
+    ).json()
+    return parent, poster
+
+
+def test_previewing_a_clash_reports_it_and_changes_nothing() -> None:
+    """The plan names the shared field; the type still has no parent afterwards."""
+    client = TestClient(_app_with_in_memory_graph())
+    _, poster = _clashing_pair(client)
+    url = f"/api/v1/node-types/{poster['id']}/parent/plan"
+
+    refused = client.post(url, json={"parent": "memorabilia"})
+    merged = client.post(url, json={"parent": "memorabilia", "on_clash": "merge"})
+
+    assert refused.status_code == 200
+    assert refused.json()["allowed"] is False
+    assert refused.json()["clashes"] == ["condition"]
+    assert "condition" in refused.json()["reason"]
+    assert merged.json()["allowed"] is True
+    assert merged.json()["merged"] == ["condition"]
+    assert merged.json()["reason"] is None
+    assert client.get(f"/api/v1/node-types/{poster['id']}").json()["parent"] is None
+
+
+def test_previewing_a_detach_lists_what_is_kept_or_archived() -> None:
+    """Removing the parent reports the fields it would copy or archive."""
+    client = TestClient(_app_with_in_memory_graph())
+    _, poster = _clashing_pair(client)
+    client.patch(
+        f"/api/v1/node-types/{poster['id']}",
+        json={"parent": "memorabilia", "on_clash": "merge"},
+    )
+    url = f"/api/v1/node-types/{poster['id']}/parent/plan"
+
+    keep = client.post(url, json={"parent": None}).json()
+    drop = client.post(url, json={"parent": None, "on_detach": "drop"}).json()
+
+    assert (keep["previous"], keep["parent"]) == ("memorabilia", None)
+    assert keep["kept"] == ["condition"]
+    assert drop["archived"] == ["condition"]
+
+
+def test_previewing_for_an_unknown_type_or_parent_is_refused() -> None:
+    """A missing type is a 404 and a parent that cannot be used is a 400."""
+    client = TestClient(_app_with_in_memory_graph())
+    _, poster = _clashing_pair(client)
+
+    unknown = client.post(
+        f"/api/v1/node-types/{uuid.uuid4()}/parent/plan", json={"parent": None}
+    )
+    no_parent = client.post(
+        f"/api/v1/node-types/{poster['id']}/parent/plan", json={"parent": "nothing"}
+    )
+
+    assert unknown.status_code == 404
+    assert no_parent.status_code == 400
+
+
+def test_patching_with_merge_widens_the_parents_choices() -> None:
+    """The same request the preview described is applied, parent included."""
+    client = TestClient(_app_with_in_memory_graph())
+    parent, poster = _clashing_pair(client)
+
+    refused = client.patch(
+        f"/api/v1/node-types/{poster['id']}", json={"parent": "memorabilia"}
+    )
+    merged = client.patch(
+        f"/api/v1/node-types/{poster['id']}",
+        json={"parent": "memorabilia", "on_clash": "merge"},
+    )
+
+    assert refused.status_code == 400
+    assert merged.status_code == 200
+    assert list(merged.json()["attributes_schema"]["properties"]) == ["width"]
+    widened = client.get(f"/api/v1/node-types/{parent['id']}").json()
+    options = widened["attributes_schema"]["properties"]["condition"]["enum"]
+    assert options == ["Mint", "Good", "Worn"]
+
+
+def test_patching_to_remove_a_parent_with_drop_archives_its_fields() -> None:
+    """`on_detach: drop` hides the inherited fields rather than copying them."""
+    client = TestClient(_app_with_in_memory_graph())
+    _, poster = _clashing_pair(client)
+    client.patch(
+        f"/api/v1/node-types/{poster['id']}",
+        json={"parent": "memorabilia", "on_clash": "merge"},
+    )
+
+    detached = client.patch(
+        f"/api/v1/node-types/{poster['id']}",
+        json={"parent": None, "on_detach": "drop"},
+    )
+
+    assert detached.json()["parent"] is None
+    condition = detached.json()["attributes_schema"]["properties"]["condition"]
+    assert condition["x-menagerist"]["archived"] is True
