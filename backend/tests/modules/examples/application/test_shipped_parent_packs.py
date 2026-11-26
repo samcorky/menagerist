@@ -46,6 +46,52 @@ _PACKS = {
 }
 
 
+# Packs that gained a parent type later (#788): pack id -> parent ref -> subtype refs.
+_REWORKED = {
+    "parts": {"part": {"resistor", "capacitor", "semiconductor"}},
+    "conventions": {"collectable": {"poster", "photo-print", "programme"}},
+    "movies": {"memorabilia": {"poster", "ticket-stub", "programme"}},
+}
+
+
+@pytest.mark.parametrize("pack_id", list(_REWORKED))
+async def test_a_reworked_pack_splits_its_type_into_subtypes(pack_id: str) -> None:
+    """The parent gains its subtypes, and every item of its family is a subtype's."""
+    pack = await FilePackCatalogue().get(pack_id)
+
+    assert pack is not None
+    for parent_ref, subtype_refs in _REWORKED[pack_id].items():
+        parent = next(t for t in pack.item_types if t.ref == parent_ref)
+        assert parent.parent is None
+        assert {t.ref for t in pack.item_types if t.parent == parent_ref} == (
+            subtype_refs
+        )
+        # Every subtype has an item; the parent may keep some that fit no subtype.
+        assert {i.type_ref for i in pack.items if i.type_ref in subtype_refs} == (
+            subtype_refs
+        )
+
+
+@pytest.mark.parametrize("pack_id", list(_REWORKED))
+async def test_a_reworked_pack_keeps_no_field_on_both_a_parent_and_a_subtype(
+    pack_id: str,
+) -> None:
+    """A subtype's own fields never repeat the parent's, so nothing is defined twice."""
+    pack = await FilePackCatalogue().get(pack_id)
+
+    assert pack is not None
+    by_ref = {t.ref: t for t in pack.item_types}
+    for subtype in pack.item_types:
+        if subtype.parent is None:
+            continue
+        own = set((subtype.attributes_schema or {}).get("properties", {}))
+        parent = by_ref[subtype.parent]
+        inherited = set((parent.attributes_schema or {}).get("properties", {}))
+        repeated = own & inherited
+        assert own
+        assert not repeated, f"{pack_id}: {subtype.ref} repeats {repeated}"
+
+
 def _install(world: World, pack_id: str) -> InstallExamplePack:
     return InstallExamplePack(
         world.uow,

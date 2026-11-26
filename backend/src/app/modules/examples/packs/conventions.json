@@ -1,6 +1,6 @@
 {
   "format": "menagerist-example-pack",
-  "version": 7,
+  "version": 8,
   "id": "conventions",
   "relationship_types": [
     {
@@ -43,7 +43,7 @@
       "icon": "image",
       "colour": "amber",
       "label": "Collectable",
-      "description": "A poster, print or programme you have collected, signed or not.",
+      "description": "Something you have collected, signed or not. What every kind shares lives here; posters, photo prints and programmes add their own.",
       "cover": {
         "style": "poster"
       },
@@ -51,19 +51,6 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "kind": {
-            "title": "Kind",
-            "type": "string",
-            "enum": [
-              "Poster",
-              "Photo print",
-              "Programme",
-              "Ticket"
-            ],
-            "x-menagerist": {
-              "kind": "choice"
-            }
-          },
           "size": {
             "title": "Size",
             "type": "string",
@@ -105,9 +92,6 @@
           "version": 1,
           "layout": [
             {
-              "key": "kind"
-            },
-            {
               "key": "size"
             },
             {
@@ -124,13 +108,153 @@
           "highlights": {
             "card": [
               {
-                "key": "kind"
-              },
-              {
                 "key": "condition"
               },
               {
                 "key": "framed"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "poster",
+      "slug": "conventions-poster",
+      "icon": "image",
+      "colour": "amber",
+      "label": "Poster",
+      "description": "A poster, from a cast poster to a convention exclusive.",
+      "parent": "collectable",
+      "cover": {
+        "style": "poster"
+      },
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "printing": {
+            "title": "Printing",
+            "type": "string",
+            "enum": [
+              "Official",
+              "Convention exclusive",
+              "Reprint"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "printing"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "printing"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "photo-print",
+      "slug": "conventions-photo-print",
+      "icon": "image",
+      "colour": "amber",
+      "label": "Photo print",
+      "description": "A print from a photoshoot, to be signed on the day.",
+      "parent": "collectable",
+      "cover": {
+        "style": "poster"
+      },
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "photographer": {
+            "title": "Photographer",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "finish": {
+            "title": "Finish",
+            "type": "string",
+            "enum": [
+              "Gloss",
+              "Matt",
+              "Lustre"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "photographer"
+            },
+            {
+              "key": "finish"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "finish"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "programme",
+      "slug": "conventions-programme",
+      "icon": "image",
+      "colour": "amber",
+      "label": "Programme",
+      "description": "An event programme, with the guest list and the running order.",
+      "parent": "collectable",
+      "cover": {
+        "style": "poster"
+      },
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pages": {
+            "title": "Pages",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "pages"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "pages"
               }
             ]
           }
@@ -509,15 +633,15 @@
     },
     {
       "ref": "chronicle-drive-poster",
-      "type": "collectable",
+      "type": "poster",
       "name": "Chronicle Drive maxi poster",
       "description": "Signed over several years at conventions across the country.",
       "attributes": {
-        "kind": "Poster",
         "size": "Maxi (61 x 91.5 cm)",
         "condition": "Very Good",
         "framed": true,
-        "notes": "Left space round the edge on purpose. Bottom right is still free."
+        "notes": "Left space round the edge on purpose. Bottom right is still free.",
+        "printing": "Official"
       },
       "tags": [
         "chronicle-drive"
@@ -525,14 +649,14 @@
     },
     {
       "ref": "wandering-archivist-poster",
-      "type": "collectable",
+      "type": "poster",
       "name": "The Wandering Archivist cast poster",
       "attributes": {
-        "kind": "Poster",
         "size": "A1",
         "condition": "Good",
         "framed": false,
-        "notes": "Rolled in a tube between conventions."
+        "notes": "Rolled in a tube between conventions.",
+        "printing": "Convention exclusive"
       },
       "tags": [
         "wandering-archivist"
@@ -540,13 +664,14 @@
     },
     {
       "ref": "delphine-okafor-print",
-      "type": "collectable",
+      "type": "photo-print",
       "name": "Delphine Okafor photoshoot print",
       "attributes": {
-        "kind": "Photo print",
         "size": "10 x 8 in",
         "condition": "Mint",
-        "framed": false
+        "framed": false,
+        "photographer": "Hollis Grant",
+        "finish": "Gloss"
       },
       "tags": [
         "wandering-archivist"
@@ -554,13 +679,13 @@
     },
     {
       "ref": "fan-fair-programme",
-      "type": "collectable",
+      "type": "programme",
       "name": "Northern Fan Fair 2019 programme",
       "description": "Not signed yet.",
       "attributes": {
-        "kind": "Programme",
         "condition": "Near Mint",
-        "framed": false
+        "framed": false,
+        "pages": 32
       }
     },
     {
