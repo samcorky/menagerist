@@ -9,7 +9,8 @@
 		rotateApiToken,
 		type ApiTokenResponse
 	} from '$lib/api/client';
-	import { PAGE_LIMIT, readPages } from '$lib/paging';
+	import PageNav from '$lib/components/page-nav.svelte';
+	import { PagedList } from '$lib/paged-list.svelte';
 	import { networkAwareError } from '$lib/api/errors';
 	import {
 		AREAS,
@@ -47,10 +48,27 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
-	let tokens = $state<ApiTokenResponse[]>([]);
-	let tokensLoading = $state(true);
-	let tokensError = $state<string | null>(null);
+	// A person's tokens are few, so they page ten at a time, with Previous and Next.
+	const TOKENS_PER_PAGE = 10;
+	const list = new PagedList<ApiTokenResponse, null>(
+		({ after }) => listApiTokens({ query: { after, limit: TOKENS_PER_PAGE } }),
+		{ mode: 'page' }
+	);
+	const tokens = $derived(list.rows);
+	const tokensLoading = $derived(list.loading);
+	const tokensError = $derived(
+		list.failed
+			? list.failure?.response
+				? networkAwareError(list.failure).title
+				: 'Could not load tokens.'
+			: null
+	);
 	let now = $state(new Date());
+	// The expiry text counts from when the page was read.
+	$effect(() => {
+		void list.rows;
+		now = new Date();
+	});
 
 	let grantable = $state<string[]>([]);
 	let grantableError = $state<string | null>(null);
@@ -121,25 +139,6 @@
 		preset = null;
 	}
 
-	async function loadTokens() {
-		tokensLoading = true;
-		tokensError = null;
-		try {
-			const read = await readPages((after) =>
-				listApiTokens({ query: { after, limit: PAGE_LIMIT } })
-			);
-			if (!read.ok) {
-				tokensError = networkAwareError(read.failure).title;
-			} else {
-				tokens = read.rows;
-				now = new Date();
-			}
-		} catch {
-			tokensError = 'Could not load tokens.';
-		}
-		tokensLoading = false;
-	}
-
 	async function loadGrantable() {
 		grantableError = null;
 		try {
@@ -156,7 +155,7 @@
 	}
 
 	$effect(() => {
-		void loadTokens();
+		void list.load(null);
 		void loadGrantable();
 	});
 
@@ -209,7 +208,8 @@
 			}
 			showSecret(result.data.name, result.data.token);
 			closeCreate();
-			void loadTokens();
+			// The newest token is first.
+			void list.load(null);
 		} catch {
 			createError = tokenErrorMessage({});
 		} finally {
@@ -245,7 +245,7 @@
 			}
 			showSecret(result.data.name, result.data.token);
 			closeRotate();
-			void loadTokens();
+			void list.refresh();
 		} catch {
 			rotateError = tokenErrorMessage({});
 		} finally {
@@ -263,7 +263,7 @@
 			} else {
 				toast.success('Token revoked');
 				revokeTarget = null;
-				await loadTokens();
+				await list.refresh();
 			}
 		} catch {
 			toast.error(tokenErrorMessage({}));
@@ -320,7 +320,7 @@
 			type="button"
 			variant="outline"
 			class="pointer-coarse:h-11"
-			onclick={() => void loadTokens()}
+			onclick={() => void list.retry()}
 		>
 			Retry
 		</Button>
@@ -448,6 +448,7 @@
 				{/each}
 			</ul>
 		{/if}
+		<PageNav {list} noun="token" />
 	{/if}
 </section>
 

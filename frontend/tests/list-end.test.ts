@@ -4,6 +4,7 @@ import {
 	endMessage,
 	listEndState,
 	loadAheadMargin,
+	pageRangeMessage,
 	LOAD_MORE_FAILED
 } from '$lib/list-end';
 
@@ -90,5 +91,22 @@ describe('endMessage', () => {
 describe('LOAD_MORE_FAILED', () => {
 	it('is plain, with no flavour and no jargon', () => {
 		expect(LOAD_MORE_FAILED).toBe("We couldn't load any more.");
+	});
+});
+
+describe('pageRangeMessage', () => {
+	it("places the page in the whole list, with the server's count", () => {
+		expect(pageRangeMessage(26, 50, 312, 'session', false)).toBe('26–50 of 312 sessions');
+		expect(pageRangeMessage(1, 25, 1204, 'user', false)).toBe('1–25 of 1,204 users');
+	});
+
+	it('places it without a count when the server sent none', () => {
+		expect(pageRangeMessage(26, 50, null, 'session', false)).toBe('26–50 sessions');
+	});
+
+	it('says how many there are when the list fits one page', () => {
+		expect(pageRangeMessage(1, 5, 5, 'token', true)).toBe('5 tokens');
+		expect(pageRangeMessage(1, 1, 1, 'token', true)).toBe('1 token');
+		expect(pageRangeMessage(1, 3, null, 'token', true)).toBe('3 tokens');
 	});
 });

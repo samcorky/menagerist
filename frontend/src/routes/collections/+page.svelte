@@ -35,6 +35,7 @@
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
+	import { PagedList } from '$lib/paged-list.svelte';
 	import { loadExampleIds } from '$lib/examples';
 	import { fetchItemFields, fetchSavedFields, type ItemField } from '$lib/item-fields';
 	import { fetchAllNodeTypes } from '$lib/node-types';
@@ -81,16 +82,18 @@
 		}
 	] as const;
 
-	let collections = $state<CollectionResponse[]>([]);
-	let loading = $state(true);
-	let loadFailed = $state(false);
-	let hasMore = $state(false);
-	// A later page that would not load: the list says so and offers Try again (#588).
-	let pageFailed = $state(false);
-	let exampleCollectionIds = $state<ReadonlySet<string>>(new Set());
-	let fetchSeq = 0;
 	let searchInput = $state('');
 	let q = $state('');
+	const list = new PagedList<CollectionResponse, { q: string }>(({ after, params }) =>
+		listCollections({ query: { after, limit: PAGE_SIZE, q: params.q || undefined } })
+	);
+	const collections = $derived(list.rows);
+	const loading = $derived(list.loading);
+	const loadFailed = $derived(list.failed);
+	const hasMore = $derived(list.hasMore);
+	// A later page that would not load: the list says so and offers Try again (#588).
+	const pageFailed = $derived(list.nextFailed);
+	let exampleCollectionIds = $state<ReadonlySet<string>>(new Set());
 
 	let dialogOpen = $state(false);
 	let name = $state('');
@@ -136,11 +139,7 @@
 	$effect(() => {
 		const urlQ = normaliseQuery(page.url.searchParams.get('q'));
 		if (!urlQ) return;
-		if (urlQ !== untrack(() => q)) {
-			collections = [];
-			hasMore = false;
-			q = urlQ;
-		}
+		if (urlQ !== untrack(() => q)) q = urlQ;
 		searchInput = urlQ;
 		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.delete('q');
@@ -156,56 +155,27 @@
 		const value = normaliseQuery(searchInput);
 		const timer = setTimeout(() => {
 			if (value === q) return;
-			collections = [];
-			hasMore = false;
 			q = value;
 		}, 300);
 		return () => clearTimeout(timer);
 	});
 
-	async function fetchPage(after?: string) {
-		const seq = ++fetchSeq;
-		loading = true;
-		if (!after) loadFailed = false;
-		pageFailed = false;
-		const result = await listCollections({
-			query: { after, limit: PAGE_SIZE, q: q || undefined }
-		});
-		if (seq !== fetchSeq) return;
-		if (result.error || !result.data) {
-			// A later page keeps `hasMore`, so Try again in the list's foot can resume it.
-			if (after) pageFailed = true;
-			else {
-				loadFailed = true;
-				hasMore = false;
-			}
-		} else {
-			collections = after ? [...collections, ...result.data] : result.data;
-			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-		}
-		loading = false;
-	}
-
+	// A new search starts the list again from its first page.
 	$effect(() => {
-		void fetchPage();
+		void list.load({ q });
 	});
 
 	// Coming back online, or Retry in the banner, reloads a list that had failed.
 	$effect(() => {
 		void offlineController.retryCount;
 		untrack(() => {
-			if (loadFailed) void fetchPage();
+			if (loadFailed) void list.retry();
 		});
 	});
 
 	$effect(() => {
 		void loadExampleIds().then((ids) => (exampleCollectionIds = ids.collections));
 	});
-
-	function loadMore() {
-		if (!hasMore || loading) return;
-		void fetchPage(collections.at(-1)?.id);
-	}
 
 	function resetDialog() {
 		name = '';
@@ -335,7 +305,7 @@
 			{/each}
 		</div>
 	{:else if loadFailed}
-		<LoadFailed what="your collections" onretry={() => void fetchPage()} />
+		<LoadFailed what="your collections" onretry={() => void list.retry()} />
 	{:else if collections.length > 0}
 		<ul class="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(20rem,1fr))]">
 			{#each collections as collection (collection.id)}
@@ -406,8 +376,9 @@
 		noun="collection"
 		lines={END_LINES}
 		lineKey="/collections"
-		onload={loadMore}
-		onretry={() => void fetchPage(collections.at(-1)?.id)}
+		total={list.total}
+		onload={() => void list.loadMore()}
+		onretry={() => void list.retry()}
 	/>
 </Page>
 
