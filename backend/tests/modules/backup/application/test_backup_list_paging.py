@@ -127,3 +127,23 @@ async def test_exports_page_through_every_sort_key(
         query = ListUserExportsQuery(after=page.next, limit=2, sort=sort, order=order)
 
     assert sorted(seen) == sorted(ids)
+
+
+async def test_backups_search_the_label_and_the_version() -> None:
+    """`q` ignores case and reads the label and the app version."""
+    store = InMemoryBackupStore()
+    nightly = replace(_summary("Nightly", 1, timedelta()), app_version="2026.11.4")
+    manual = replace(
+        _summary("Before upgrade", 1, timedelta()), app_version="2026.11.3"
+    )
+    for summary in (nightly, manual):
+        store.summaries[summary.id] = summary
+    use_case = ListBackups(store, InMemoryAccessGuard())
+
+    async def ids(q: str) -> list[UUID]:
+        page = await use_case.handle(ListBackupsQuery(q=q), SYSTEM_ACTOR)
+        return [item.id for item in page.items]
+
+    assert await ids("NIGHT") == [nightly.id]
+    assert await ids("11.3") == [manual.id]
+    assert await ids("zebra") == []

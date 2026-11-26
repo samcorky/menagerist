@@ -42,8 +42,8 @@ from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.paging import (
     Cursor as PageCursor,
     InvalidCursorError,
-    PagedQuery,
     PageRequest,
+    SearchedPagedQuery,
     SortOrder,
 )
 
@@ -75,11 +75,10 @@ _SMART_SORTS = {
 
 
 @dataclass(kw_only=True)
-class ListNodesQuery(PagedQuery[NodeSort]):
+class ListNodesQuery(SearchedPagedQuery[NodeSort]):
     """Request for a page of items, by id unless `sort` says otherwise."""
 
     type: str | None = None
-    q: str | None = None
     favourite: bool | None = None
     collection: uuid.UUID | None = None
 

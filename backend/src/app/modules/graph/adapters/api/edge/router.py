@@ -16,7 +16,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     link_header_responses,
     set_next_link,
 )
-from app.entrypoints.api.shared.http.parameters import EdgeId, PageParams
+from app.entrypoints.api.shared.http.parameters import EdgeId, SearchPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.graph.adapters.api.dependencies import (
@@ -137,7 +137,7 @@ async def list_edges(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    page: Annotated[PageParams[EdgeSort], Query()],
+    page: Annotated[SearchPageParams[EdgeSort], Query()],
     node_id: Annotated[
         uuid.UUID | None,
         Query(description="Keep connections to or from the item with this id."),
@@ -150,6 +150,7 @@ async def list_edges(
             limit=page.limit,
             sort=page.sort,
             order=page.order,
+            q=page.q,
             node_id=node_id,
         ),
         actor,

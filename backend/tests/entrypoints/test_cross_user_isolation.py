@@ -1251,6 +1251,9 @@ QUERY_OVERRIDES: dict[tuple[str, str], str] = {
     ("/api/v1/collections", "q"): "alpha",  # collections match on their name
     ("/api/v1/node-types/{node_type_id}/attributes/{key}/values", "q"): "R",
     ("/api/v1/presets", "q"): "alpha",  # presets match on their label
+    ("/api/v1/edges", "q"): "owns",  # connections match on their type
+    ("/api/v1/tokens", "q"): "alpha",  # tokens match on their name
+    ("/api/v1/users", "q"): "alice",  # accounts match on their username
     # These lists run by a key other than the id, so the cursor has to name it. The
     # tokens run newest first, so a date far ahead leaves every token after it.
     ("/api/v1/tokens", "after"): Cursor(

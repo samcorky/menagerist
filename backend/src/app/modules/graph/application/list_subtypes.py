@@ -15,7 +15,7 @@ from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa:
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Page, PagedQuery
+from app.shared_kernel.paging import Page, SearchedPagedQuery
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -25,7 +25,7 @@ logger = structlog.get_logger()
 
 
 @dataclass(kw_only=True)
-class ListSubtypesQuery(PagedQuery[NodeTypeSort]):
+class ListSubtypesQuery(SearchedPagedQuery[NodeTypeSort]):
     """Request for a page of a parent type's subtypes, by id unless `sort` says."""
 
     node_type_id: uuid.UUID
@@ -55,6 +55,7 @@ class ListSubtypes(QueryHandler[GraphRepos, ListSubtypesQuery, Page[NodeType]]):
             str(parent.slug),
             scope=scope,
             page=query.page_request(),
+            q=query.q,
         )
         logger.debug("subtypes listed", parent=str(parent.slug), count=len(page.items))
         return Page(

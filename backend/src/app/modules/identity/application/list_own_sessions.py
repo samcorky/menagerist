@@ -10,11 +10,12 @@ from app.shared_kernel.access import Access, OwnAccount
 from app.shared_kernel.cqrs import QueryHandler
 from app.shared_kernel.paging import (
     Page,
-    PagedQuery,
+    SearchedPagedQuery,
     SortOrder,
     page_rows,
     timestamp_value,
 )
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -30,7 +31,7 @@ class OwnSessionSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListOwnSessionsQuery(PagedQuery[OwnSessionSort]):
+class ListOwnSessionsQuery(SearchedPagedQuery[OwnSessionSort]):
     """Request to list active sessions of the calling user, newest first unless told."""
 
     order: SortOrder = SortOrder.DESC
@@ -80,7 +81,7 @@ class ListOwnSessions(
             if not s.is_idle(now, self._idle_timeout)
         ]
         return page_rows(
-            own,
+            [e for e in own if matches_text(query.q, e.session.client_platform)],
             query.page_request(OwnSessionSort.CREATED_AT),
             id_of=lambda entry: entry.session.id,
             values={

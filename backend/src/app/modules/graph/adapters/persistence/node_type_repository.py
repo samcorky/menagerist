@@ -7,6 +7,7 @@ from app.modules.graph.adapters.persistence.models import NodeTypeModel
 from app.modules.graph.domain.node_type import NodeType
 from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
+from app.platform.text_search import contains_any
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -133,7 +134,9 @@ class SqlAlchemyNodeTypeRepository:
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[NodeType]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[NodeType]:
         """List non-deleted node types in `scope`, one page in the order `page` asks."""
         logger.debug("listing node types", page=page)
         stmt = (
@@ -141,10 +144,15 @@ class SqlAlchemyNodeTypeRepository:
             .where(NodeTypeModel.deleted_at.is_(None))
             .where(owned_by(NodeTypeModel, scope.user_id))
         )
-        return await self._page(stmt, page)
+        return await self._page(stmt, page, q)
 
     async def page_subtypes(
-        self, parent: str, *, scope: ContentFilter, page: PageRequest
+        self,
+        parent: str,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        q: str | None = None,
     ) -> Page[NodeType]:
         """One page of the non-deleted subtypes of the type with slug `parent`."""
         stmt = (
@@ -153,11 +161,16 @@ class SqlAlchemyNodeTypeRepository:
             .where(NodeTypeModel.deleted_at.is_(None))
             .where(owned_by(NodeTypeModel, scope.user_id))
         )
-        return await self._page(stmt, page)
+        return await self._page(stmt, page, q)
 
     async def _page(
-        self, stmt: Select[NodeTypeModel], page: PageRequest
+        self, stmt: Select[NodeTypeModel], page: PageRequest, q: str | None
     ) -> Page[NodeType]:
+        match = contains_any(
+            q, NodeTypeModel.label, NodeTypeModel.slug, NodeTypeModel.description
+        )
+        if match is not None:
+            stmt = stmt.where(match)
         return await keyset_page(
             self._session,
             stmt,

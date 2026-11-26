@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -602,3 +603,21 @@ async def test_list_a_limit_below_one_returns_no_rows_instead_of_failing(
 
     assert page.items == []
     assert page.next is None
+
+
+async def test_list_deleted_q_matches_the_name(db_session: AsyncSession) -> None:
+    """`q` ignores case and accents and leaves out collections that are not deleted."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    gone = _collection("Café jazz")
+    gone.deleted_at = datetime.now(UTC)
+    other = _collection("Blues", slug="blues")
+    other.deleted_at = datetime.now(UTC)
+    live = _collection("Café live", slug="cafe-live")
+    for collection in (gone, other, live):
+        await repo.add(collection)
+
+    found = await repo.list_deleted(
+        scope=ContentFilter.everyone(), page=PageRequest(limit=10), q="CAFE"
+    )
+
+    assert [c.id for c in found.items] == [gone.id]

@@ -11,11 +11,12 @@ from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import QueryHandler
 from app.shared_kernel.paging import (
     Page,
-    PagedQuery,
+    SearchedPagedQuery,
     SortOrder,
     page_rows,
     timestamp_value,
 )
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     from app.modules.identity.domain.user import User
@@ -33,7 +34,7 @@ class SessionSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListSessionsQuery(PagedQuery[SessionSort]):
+class ListSessionsQuery(SearchedPagedQuery[SessionSort]):
     """Request to list active sessions, newest first, optionally of one user."""
 
     order: SortOrder = SortOrder.DESC
@@ -99,7 +100,18 @@ class ListSessions(
             if s.user_id in users_by_id
         ]
         return page_rows(
-            listings,
+            [
+                item
+                for item in listings
+                if matches_text(
+                    query.q,
+                    item.username,
+                    item.display_name,
+                    item.device_name,
+                    item.session.user_agent,
+                    item.session.client_ip,
+                )
+            ],
             query.page_request(SessionSort.CREATED_AT),
             id_of=lambda item: item.session.id,
             values={

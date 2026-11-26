@@ -227,3 +227,135 @@ async def test_users_page_through_every_sort_key(
         request = ListUsersQuery(after=page.next, limit=2, sort=sort, order=order)
 
     assert len(seen) == len(set(seen)) == 4
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_tokens_search_the_name(
+    cases: Cases,
+    world: World,
+    make_user: MakeUser,
+    actor_for: ActorFor,
+    issue_token: IssueToken,
+) -> None:
+    """`q` keeps the tokens whose name contains it, and the total counts only those."""
+    alice = make_user("alice")
+    await world.users.add(alice)
+    for name in ("Café backup", "Phone", "Backup 2"):
+        await issue_token(alice, name=name, days=30)
+
+    page = await cases.list_own_api_tokens.handle(
+        ListOwnApiTokensQuery(q="BACKUP"), actor_for(alice)
+    )
+
+    assert sorted(t.name for t in page.items) == ["Backup 2", "Café backup"]
+    assert page.total == 2
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_devices_and_own_sessions_search_what_the_person_would_call_them(
+    world: World, make_user: MakeUser
+) -> None:
+    """Devices match their name and platform; sessions their platform."""
+    alice = make_user("alice")
+    await world.users.add(alice)
+    laptop = Device.create(
+        user_id=alice.id, token_hash="laptop", now=NOW, ttl=TTL, platform="macOS"
+    )
+    laptop.name = "Work laptop"
+    phone = Device.create(
+        user_id=alice.id, token_hash="phone", now=NOW, ttl=TTL, platform="Android"
+    )
+    for device in (laptop, phone):
+        await world.devices.add(device)
+        await world.sessions.add(
+            Session.create(
+                user_id=alice.id,
+                token_hash=f"session-{device.token_hash}",
+                now=NOW,
+                ttl=TTL,
+                device_id=device.id,
+                client_platform=device.platform,
+            )
+        )
+    actor = Actor(id=alice.id, roles=frozenset({"member"}))
+
+    devices = await ListOwnDevices(_repos(world), get_access_guard()).handle(
+        ListOwnDevicesQuery(q="LAPTOP"), actor
+    )
+    by_platform = await ListOwnDevices(_repos(world), get_access_guard()).handle(
+        ListOwnDevicesQuery(q="android"), actor
+    )
+    sessions = await ListOwnSessions(_repos(world), get_access_guard()).handle(
+        ListOwnSessionsQuery(q="macos"), actor
+    )
+
+    assert [d.id for d in devices.items] == [laptop.id]
+    assert [d.id for d in by_platform.items] == [phone.id]
+    assert len(sessions.items) == 1
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_admin_sessions_search_the_user_the_device_and_where_from(
+    world: World, make_user: MakeUser
+) -> None:
+    """An administrator can find a session by who, what and where."""
+    people = {name: make_user(name) for name in ("alice", "bob")}
+    for person in people.values():
+        await world.users.add(person)
+    workstation = Device.create(
+        user_id=people["alice"].id, token_hash="ws", now=NOW, ttl=TTL
+    )
+    workstation.name = "Workstation"
+    await world.devices.add(workstation)
+    await world.sessions.add(
+        Session.create(
+            user_id=people["alice"].id,
+            token_hash="a",
+            now=NOW,
+            ttl=TTL,
+            device_id=workstation.id,
+            user_agent="Firefox on Linux",
+            client_ip="192.0.2.7",
+        )
+    )
+    await world.sessions.add(
+        Session.create(
+            user_id=people["bob"].id,
+            token_hash="b",
+            now=NOW,
+            ttl=TTL,
+            user_agent="Safari",
+            client_ip="198.51.100.9",
+        )
+    )
+    handler = ListSessions(_repos(world), get_access_guard())
+    admin = Actor(id=people["alice"].id, roles=frozenset({"admin"}))
+
+    async def usernames(q: str) -> list[str]:
+        page = await handler.handle(ListSessionsQuery(q=q), admin)
+        return [item.username for item in page.items]
+
+    assert await usernames("BOB") == ["bob"]
+    assert await usernames("firefox") == ["alice"]
+    assert await usernames("198.51") == ["bob"]
+    assert await usernames("WORKSTATION") == ["alice"]
+    assert await usernames("zebra") == []
+
+
+@time_machine.travel(NOW, tick=False)
+async def test_users_search_username_display_name_and_role(
+    cases: Cases, world: World, make_user: MakeUser, actor_for: ActorFor
+) -> None:
+    """Accounts are found by username, display name or role."""
+    admin = make_user("admin", role=Role.ADMIN)
+    await world.users.add(admin)
+    await world.users.add(make_user("alice", display_name="Álvaro Díaz"))
+    await world.users.add(make_user("bob"))
+
+    async def names(q: str) -> list[str]:
+        page = await cases.list_users.handle(ListUsersQuery(q=q), actor_for(admin))
+        return sorted(item.user.username for item in page.items)
+
+    assert await names("alvaro") == ["alice"]
+    assert await names("BOB") == ["bob"]
+    assert await names("admin") == ["admin"]

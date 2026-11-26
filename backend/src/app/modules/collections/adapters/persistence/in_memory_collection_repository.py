@@ -2,6 +2,7 @@ import unicodedata
 from typing import TYPE_CHECKING
 
 from app.shared_kernel.paging import page_rows, timestamp_value
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     import builtins
@@ -124,11 +125,11 @@ class InMemoryCollectionRepository:
         )
 
     async def list_deleted(
-        self, *, scope: ContentFilter, page: PageRequest
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
     ) -> Page[Collection]:
         """List soft-deleted collections in `scope`, one page as `page` asks."""
         return page_rows(
-            self._deleted_rows(scope),
+            [c for c in self._deleted_rows(scope) if matches_text(q, c.name)],
             page,
             id_of=lambda c: c.id,
             values={

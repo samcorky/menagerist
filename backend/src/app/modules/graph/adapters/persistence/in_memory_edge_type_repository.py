@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from app.shared_kernel.paging import page_rows, timestamp_value
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     import builtins
@@ -48,7 +49,9 @@ class InMemoryEdgeTypeRepository:
             None,
         )
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[EdgeType]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[EdgeType]:
         """List non-deleted edge types in `scope`, one page in the order `page` asks."""
         live = [
             et
@@ -56,7 +59,13 @@ class InMemoryEdgeTypeRepository:
             if not et.is_deleted and scope.covers(et.owner_id)
         ]
         return page_rows(
-            live,
+            [
+                et
+                for et in live
+                if matches_text(
+                    q, et.label, et.reverse_label, str(et.slug), et.description
+                )
+            ],
             page,
             id_of=lambda et: et.id,
             values={

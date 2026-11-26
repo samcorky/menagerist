@@ -240,3 +240,14 @@ def test_list_deleted_cursor_from_another_sort_or_unreadable_is_a_400(
 
     assert mismatched.status_code == 400
     assert unreadable.status_code == 400
+
+
+def test_list_deleted_searches_the_name(world: _World) -> None:
+    """`q` ignores case and accents."""
+    client = world.client
+    for name in ("Café jazz", "Blues"):
+        client.delete(f"{BASE}/{_create(client, name)}")
+
+    found = client.get(f"{BASE}/deleted", params={"q": "CAFE"}).json()
+
+    assert [row["name"] for row in found] == ["Café jazz"]

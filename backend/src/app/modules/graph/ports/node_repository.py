@@ -328,7 +328,7 @@ class NodeRepository(Protocol):
         ...
 
     async def list_deleted(
-        self, *, scope: ContentFilter, page: PageRequest
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
     ) -> Page[Node]:
         """List soft-deleted nodes in `scope`, one page in the order `page` asks.
 

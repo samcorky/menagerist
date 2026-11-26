@@ -9,11 +9,12 @@ from app.shared_kernel.access import Access, OwnAccount
 from app.shared_kernel.cqrs import QueryHandler
 from app.shared_kernel.paging import (
     Page,
-    PagedQuery,
+    SearchedPagedQuery,
     SortOrder,
     page_rows,
     timestamp_value,
 )
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -29,7 +30,7 @@ class ApiTokenSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListOwnApiTokensQuery(PagedQuery[ApiTokenSort]):
+class ListOwnApiTokensQuery(SearchedPagedQuery[ApiTokenSort]):
     """Request to list the calling user's active tokens, newest first unless told."""
 
     order: SortOrder = SortOrder.DESC
@@ -48,7 +49,7 @@ class ListOwnApiTokens(
         """Return a page of the actor's unexpired tokens."""
         tokens = await self._repos.tokens.list_for_user(actor.id, now=utc_now())
         return page_rows(
-            tokens,
+            [token for token in tokens if matches_text(query.q, token.name)],
             query.page_request(ApiTokenSort.CREATED_AT),
             id_of=lambda token: token.id,
             values={

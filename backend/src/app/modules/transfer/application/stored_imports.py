@@ -40,12 +40,13 @@ from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler, QueryHandler, UseCase
 from app.shared_kernel.paging import (
     Page,
-    PagedQuery,
+    SearchedPagedQuery,
     SortOrder,
     page_rows,
     timestamp_value,
 )
 from app.shared_kernel.progress import ProgressSnapshot, failure_reason
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -200,7 +201,7 @@ class ItemImportSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListItemImportsQuery(PagedQuery[ItemImportSort]):
+class ListItemImportsQuery(SearchedPagedQuery[ItemImportSort]):
     """The files the person has uploaded and not removed, newest first unless told."""
 
     order: SortOrder = SortOrder.DESC
@@ -241,7 +242,7 @@ class ListItemImports(
         )
         views = [ItemImportView(item=i, ahead=places.get(i.id)) for i in items]
         return page_rows(
-            views,
+            [view for view in views if matches_text(request.q, view.item.filename)],
             request.page_request(ItemImportSort.CREATED_AT),
             id_of=lambda view: view.item.id,
             values={

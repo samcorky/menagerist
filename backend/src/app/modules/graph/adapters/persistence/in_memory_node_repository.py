@@ -16,6 +16,7 @@ from app.modules.graph.domain import reach as reach_rules
 from app.modules.graph.domain.query import ItemFieldUse, SearchHit, TypeCount
 from app.modules.graph.domain.reach import Reached
 from app.shared_kernel.paging import Page, page_rows, timestamp_value
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     import builtins
@@ -636,11 +637,11 @@ class InMemoryNodeRepository:
         return next((n for n in self._deleted_rows(scope) if n.id == node_id), None)
 
     async def list_deleted(
-        self, *, scope: ContentFilter, page: PageRequest
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
     ) -> Page[Node]:
         """List soft-deleted nodes in `scope`, one page in the order `page` asks."""
         return page_rows(
-            self._deleted_rows(scope),
+            [n for n in self._deleted_rows(scope) if matches_text(q, n.name, n.type)],
             page,
             id_of=lambda n: n.id,
             values={

@@ -19,7 +19,7 @@ from app.entrypoints.api.shared.http.http_headers import (
 )
 from app.entrypoints.api.shared.http.parameters import (
     FieldKey,
-    NewestFirstPageParams,
+    NewestFirstSearchPageParams,
     NodeId,
     PageAfter,
     PageLimit,
@@ -380,7 +380,7 @@ async def list_deleted_nodes(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    page: Annotated[NewestFirstPageParams[DeletedNodeSort], Query()],
+    page: Annotated[NewestFirstSearchPageParams[DeletedNodeSort], Query()],
 ) -> list[DeletedNodeResponse]:
     """List your deleted items, newest deleted first unless `sort` or `order` say.
 
@@ -393,6 +393,7 @@ async def list_deleted_nodes(
             limit=page.limit,
             sort=page.sort,
             order=page.order,
+            q=page.q,
         ),
         actor,
     )

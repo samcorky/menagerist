@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from app.shared_kernel.paging import page_rows, timestamp_value
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     import builtins
@@ -15,9 +16,9 @@ if TYPE_CHECKING:
 type EdgeStore = dict[uuid.UUID, Edge]
 
 
-def _paged(edges: builtins.list[Edge], page: PageRequest) -> Page[Edge]:
+def _paged(edges: builtins.list[Edge], page: PageRequest, q: str | None) -> Page[Edge]:
     return page_rows(
-        edges,
+        [edge for edge in edges if matches_text(q, edge.type)],
         page,
         id_of=lambda edge: edge.id,
         values={
@@ -82,12 +83,19 @@ class InMemoryEdgeRepository:
             ordered = [edge for edge in ordered if edge.id > after]
         return ordered[:limit]
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[Edge]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[Edge]:
         """List non-deleted edges in `scope`, one page in the order `page` asks."""
-        return _paged(list(self._visible(scope)), page)
+        return _paged(list(self._visible(scope)), page, q)
 
     async def page_for_node(
-        self, node_id: uuid.UUID, *, scope: ContentFilter, page: PageRequest
+        self,
+        node_id: uuid.UUID,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        q: str | None = None,
     ) -> Page[Edge]:
         """One page of the non-deleted edges where `node_id` is source or target."""
         touching = [
@@ -95,7 +103,7 @@ class InMemoryEdgeRepository:
             for edge in self._visible(scope)
             if edge.source_id == node_id or edge.target_id == node_id
         ]
-        return _paged(touching, page)
+        return _paged(touching, page, q)
 
     async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""

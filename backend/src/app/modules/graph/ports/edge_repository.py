@@ -36,7 +36,9 @@ class EdgeRepository(Protocol):
         """List non-deleted edge where `node_id` is the source or target."""
         ...
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[Edge]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[Edge]:
         """List non-deleted edges in `scope`, one page in the order `page` asks.
 
         The sort keys are `type` (ignoring case), `created_at` and `updated_at`;
@@ -48,7 +50,12 @@ class EdgeRepository(Protocol):
         ...
 
     async def page_for_node(
-        self, node_id: uuid.UUID, *, scope: ContentFilter, page: PageRequest
+        self,
+        node_id: uuid.UUID,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        q: str | None = None,
     ) -> Page[Edge]:
         """One page of the non-deleted edges where `node_id` is source or target.
 

@@ -386,3 +386,38 @@ async def test_page_for_node_pages_only_the_edges_touching_the_node(
 
     assert [e.id for e in page.items] == [mine.id]
     assert page.next is None
+
+
+async def test_list_and_page_for_node_filter_by_type_with_q(
+    db_session: AsyncSession,
+) -> None:
+    """`q` reads the connection's type, for every connection and for one item."""
+    nodes = SqlAlchemyNodeRepository(db_session)
+    repository = SqlAlchemyEdgeRepository(db_session)
+    hub = Node.create(owner_id=uuid.UUID(int=1), name="Hub")
+    other = Node.create(owner_id=uuid.UUID(int=1), name="Other")
+    third = Node.create(owner_id=uuid.UUID(int=1), name="Third")
+    for node in (hub, other, third):
+        await nodes.add(node)
+    owns = Edge.create(
+        owner_id=uuid.UUID(int=1), source_id=hub.id, target_id=other.id, type="Owns"
+    )
+    likes = Edge.create(
+        owner_id=uuid.UUID(int=1), source_id=other.id, target_id=third.id, type="likes"
+    )
+    for edge in (owns, likes):
+        await repository.add(edge)
+    scope = ContentFilter.everyone()
+    request = PageRequest(limit=100)
+
+    whole = await repository.list(scope=scope, page=request, q="OWN")
+    for_hub = await repository.page_for_node(
+        hub.id, scope=scope, page=request, q="like"
+    )
+    for_hub_owns = await repository.page_for_node(
+        hub.id, scope=scope, page=request, q="own"
+    )
+
+    assert [e.id for e in whole.items] == [owns.id]
+    assert for_hub.items == []
+    assert [e.id for e in for_hub_owns.items] == [owns.id]

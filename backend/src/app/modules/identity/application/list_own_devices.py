@@ -11,11 +11,12 @@ from app.shared_kernel.access import Access, OwnAccount
 from app.shared_kernel.cqrs import QueryHandler
 from app.shared_kernel.paging import (
     Page,
-    PagedQuery,
+    SearchedPagedQuery,
     SortOrder,
     page_rows,
     timestamp_value,
 )
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -31,7 +32,7 @@ class OwnDeviceSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListOwnDevicesQuery(PagedQuery[OwnDeviceSort]):
+class ListOwnDevicesQuery(SearchedPagedQuery[OwnDeviceSort]):
     """Request to list the calling user's signed-in devices, latest use first."""
 
     order: SortOrder = SortOrder.DESC
@@ -127,7 +128,15 @@ class ListOwnDevices(QueryHandler[IdentityRepos, ListOwnDevicesQuery, Page[OwnDe
             for entry in order
         ]
         return page_rows(
-            entries,
+            [
+                entry
+                for entry in entries
+                if matches_text(
+                    query.q,
+                    entry.device.name if entry.device else None,
+                    entry.device.platform if entry.device else None,
+                )
+            ],
             query.page_request(OwnDeviceSort.LAST_SEEN_AT),
             id_of=lambda entry: entry.id,
             values={

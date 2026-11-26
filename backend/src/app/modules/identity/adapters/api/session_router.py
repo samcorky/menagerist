@@ -7,7 +7,10 @@ from app.entrypoints.api.shared.http.http_headers import (
     paging_responses,
     set_page_headers,
 )
-from app.entrypoints.api.shared.http.parameters import NewestFirstPageParams, SessionId
+from app.entrypoints.api.shared.http.parameters import (
+    NewestFirstSearchPageParams,
+    SessionId,
+)
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.dependencies import (
@@ -55,7 +58,7 @@ async def list_sessions(
     response: Response,
     use_case: Annotated[ListSessions, Depends(get_list_sessions_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
-    page: Annotated[NewestFirstPageParams[SessionSort], Query()],
+    page: Annotated[NewestFirstSearchPageParams[SessionSort], Query()],
     user_id: Annotated[
         uuid.UUID | None, Query(description="Keep the sessions of this user.")
     ] = None,
@@ -67,6 +70,7 @@ async def list_sessions(
             limit=page.limit,
             sort=page.sort,
             order=page.order,
+            q=page.q,
             user_id=user_id,
         ),
         actor,

@@ -17,7 +17,7 @@ from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, Page, PagedQuery, PageRequest
+from app.shared_kernel.paging import Cursor, Page, PageRequest, SearchedPagedQuery
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
@@ -37,7 +37,7 @@ class CollectionSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListCollectionsQuery(PagedQuery[CollectionSort]):
+class ListCollectionsQuery(SearchedPagedQuery[CollectionSort]):
     """Request for a page of collections, optionally holding an item.
 
     Collections come by id unless `sort` says otherwise; `order` sets the
@@ -47,7 +47,6 @@ class ListCollectionsQuery(PagedQuery[CollectionSort]):
     """
 
     item_id: uuid.UUID | None = None
-    q: str | None = None
     kind: CollectionKind | None = None
 
 

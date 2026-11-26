@@ -85,6 +85,12 @@ class SearchPageParams[Sort: StrEnum](PageParams[Sort]):
     q: str | None = Field(None, max_length=200, description=PAGE_SEARCH_DESCRIPTION)
 
 
+class NewestFirstSearchPageParams[Sort: StrEnum](NewestFirstPageParams[Sort]):
+    """`NewestFirstPageParams` for a list with text to search, which adds `q`."""
+
+    q: str | None = Field(None, max_length=200, description=PAGE_SEARCH_DESCRIPTION)
+
+
 PageAfter = Annotated[uuid.UUID | None, Query(description=PAGE_AFTER_DESCRIPTION)]
 PageLimit = Annotated[int, Query(description=PAGE_LIMIT_DESCRIPTION)]
 
