@@ -173,6 +173,18 @@ async def test_a_field_only_one_subtype_defines_is_not_listed() -> None:
     assert "width" not in keys
 
 
+async def test_a_subtype_with_no_fields_does_not_stop_the_others_being_listed() -> None:
+    """A subtype with no schema defines nothing, so it is passed over."""
+    repos = _repos()
+    memo = await _family(repos)
+    await _type(repos, "plain", None, parent="memorabilia")
+
+    (shared,) = await _list(repos, memo)
+
+    assert shared.key == "condition"
+    assert shared.subtypes == ("poster", "print")
+
+
 async def test_a_subtype_that_keeps_the_key_as_another_kind_is_reported() -> None:
     """The list says which subtypes would stop the promotion."""
     repos = _repos()
