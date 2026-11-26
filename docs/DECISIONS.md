@@ -1914,3 +1914,11 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **The `kind` choice goes** where a subtype says the same thing. A field that only one subtype used moves down to it, and the shared ones stay up.
 - **Collections keep working** without change: "Running low", "Not signed yet" and "No poster yet" filter by the parent or by a field the parent has, which the family widening and the effective schema cover. The shipped smart-collection tests pass unchanged.
 - **Installs made before this** keep their single types; only new installs get the subtypes. Nothing migrates, since a pack's types are the user's once added.
+
+## Searching the item types shows a family together (2026-11-26)
+
+**Decision:** On the Item types page, a search that matches a parent type also lists its subtypes, and one that matches a subtype also lists its parent, so a subtype is never shown without its place in the family (#320, #791).
+
+- **Matching** is as before: the words in a type's name or slug, ignoring case. The rule is `matchTypes` in `lib/type-names.ts`, which keeps the order it is given; the list then puts each subtype after its parent as it does without a search.
+- **A parent that matches** brings all its subtypes. **A subtype that matches** brings its parent but not its siblings, since they did not match. A subtype whose parent is gone matches on its own.
+- **Limit:** like the rest of this page's search, it works on the types loaded so far (50 at a time), so a family split across pages is complete only once both pages have loaded. Searching on the server across every page is #792, with the other lists' search.
