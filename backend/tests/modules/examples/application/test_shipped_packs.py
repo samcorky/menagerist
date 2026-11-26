@@ -129,9 +129,11 @@ async def _live_counts(world: World) -> list[int]:
     ]
     counts.append(
         len(
-            await world.graph_repos.edges.list(
-                scope=ContentFilter.everyone(), after=None, limit=_LIMIT
-            )
+            (
+                await world.graph_repos.edges.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=_LIMIT)
+                )
+            ).items
         )
     )
     counts.append(

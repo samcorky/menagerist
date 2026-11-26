@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.edge import Edge
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 class EdgeRepository(Protocol):
@@ -35,10 +36,24 @@ class EdgeRepository(Protocol):
         """List non-deleted edge where `node_id` is the source or target."""
         ...
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[Edge]:
-        """List non-deleted edge ordered by id, starting after `after` if given."""
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[Edge]:
+        """List non-deleted edges in `scope`, one page in the order `page` asks.
+
+        The sort keys are `type` (ignoring case), `created_at` and `updated_at`;
+        with none, the order is by id.
+
+        Raises:
+            InvalidCursorError: `page.after` is from a different sort or order.
+        """
+        ...
+
+    async def page_for_node(
+        self, node_id: uuid.UUID, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Edge]:
+        """One page of the non-deleted edges where `node_id` is source or target.
+
+        Sorted and resumed as `list` is.
+        """
         ...
 
     async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:

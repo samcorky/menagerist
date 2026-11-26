@@ -39,6 +39,7 @@ from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
@@ -227,7 +228,11 @@ async def test_create_edges_stamps_owner_and_ignores_foreign_existing_edges() ->
 
 
 async def _all(repos: GraphRepos) -> list[Edge]:
-    return await repos.edges.list(scope=ContentFilter.everyone(), after=None, limit=50)
+    return (
+        await repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items
 
 
 async def test_get_edge_is_not_found_for_someone_else() -> None:
@@ -248,12 +253,14 @@ async def test_list_edges_returns_only_the_actors_connections() -> None:
     theirs = await _connection(repos, BOB)
     use_case = ListEdges(repos, POLICY)
 
-    assert await use_case.handle(ListEdgesQuery(), ALICE) == [mine]
-    assert await use_case.handle(ListEdgesQuery(), BOB) == [theirs]
-    assert await use_case.handle(ListEdgesQuery(node_id=mine.source_id), BOB) == []
-    assert await use_case.handle(ListEdgesQuery(node_id=mine.source_id), ALICE) == [
-        mine
-    ]
+    assert (await use_case.handle(ListEdgesQuery(), ALICE)).items == [mine]
+    assert (await use_case.handle(ListEdgesQuery(), BOB)).items == [theirs]
+    assert (
+        await use_case.handle(ListEdgesQuery(node_id=mine.source_id), BOB)
+    ).items == []
+    assert (
+        await use_case.handle(ListEdgesQuery(node_id=mine.source_id), ALICE)
+    ).items == [mine]
 
 
 async def test_update_edge_is_not_found_for_someone_else() -> None:

@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from app.shared_kernel.paging import page_rows, timestamp_value
+
 if TYPE_CHECKING:
     import builtins
     import uuid
@@ -7,9 +9,23 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.edge import Edge
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 type EdgeStore = dict[uuid.UUID, Edge]
+
+
+def _paged(edges: builtins.list[Edge], page: PageRequest) -> Page[Edge]:
+    return page_rows(
+        edges,
+        page,
+        id_of=lambda edge: edge.id,
+        values={
+            "type": lambda edge: edge.type.lower(),
+            "created_at": lambda edge: timestamp_value(edge.created_at),
+            "updated_at": lambda edge: timestamp_value(edge.updated_at),
+        },
+    )
 
 
 class InMemoryEdgeRepository:
@@ -66,17 +82,20 @@ class InMemoryEdgeRepository:
             ordered = [edge for edge in ordered if edge.id > after]
         return ordered[:limit]
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[Edge]:
-        """List non-deleted edge ordered by id, starting after `after` if given."""
-        ordered = sorted(
-            self._visible(scope),
-            key=lambda edge: edge.id,
-        )
-        if after is not None:
-            ordered = [edge for edge in ordered if edge.id > after]
-        return ordered[:limit]
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[Edge]:
+        """List non-deleted edges in `scope`, one page in the order `page` asks."""
+        return _paged(list(self._visible(scope)), page)
+
+    async def page_for_node(
+        self, node_id: uuid.UUID, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Edge]:
+        """One page of the non-deleted edges where `node_id` is source or target."""
+        touching = [
+            edge
+            for edge in self._visible(scope)
+            if edge.source_id == node_id or edge.target_id == node_id
+        ]
+        return _paged(touching, page)
 
     async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:
         """Return True if any non-deleted edges reference `type_slug`."""

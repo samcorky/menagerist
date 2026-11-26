@@ -166,9 +166,11 @@ async def _names(world: World) -> list[str]:
 
 
 async def _edge_pairs(world: World) -> set[tuple[str, str]]:
-    edges = await world.graph_repos.edges.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    )
+    edges = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items
     by_id = {
         n.id: n.name
         for n in await world.graph_repos.nodes.list(
@@ -190,9 +192,11 @@ async def _snapshot(world: World) -> tuple[list[str], int, int, int]:
             ).items
         ),
         len(
-            await world.graph_repos.edges.list(
-                after=None, limit=50, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.edges.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+                )
+            ).items
         ),
         len(world.collections.collections),
     )
@@ -452,9 +456,11 @@ async def test_a_kept_add_on_connection_keeps_the_base_item(
     await _install(world, "games")
     await _install(world, "extras")
     a = await _node(world, "Games A")
-    edges = await world.graph_repos.edges.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    )
+    edges = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items
     edge = next(e for e in edges if e.target_id == a.id)
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
@@ -507,9 +513,11 @@ async def test_an_add_ons_kept_entities_are_adopted_on_reinstall(
     x.name = "Mine"
     await world.graph_repos.nodes.save(x)
     a = await _node(world, "Games A")
-    edges = await world.graph_repos.edges.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    )
+    edges = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items
     edge = next(e for e in edges if e.target_id == a.id)
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
@@ -524,9 +532,11 @@ async def test_an_add_ons_kept_entities_are_adopted_on_reinstall(
     assert await _names(world) == ["Extra Y", "Games A", "Games B", "Mine"]
     assert (
         len(
-            await world.graph_repos.edges.list(
-                after=None, limit=50, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.edges.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+                )
+            ).items
         )
         == 3
     )

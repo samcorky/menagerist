@@ -153,9 +153,11 @@ async def test_each_person_gets_their_own_items_collections_covers_and_types(
     assert sorted(await _assets_by_owner(a), key=str) == sorted(
         [USER_A.id, USER_B.id], key=str
     )
-    edges = await a.graph_repos.edges.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    )
+    edges = (
+        await a.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items
     assert sorted(e.owner_id for e in edges) == [USER_A.id, USER_B.id]  # type: ignore[type-var]
     for person in (USER_A, USER_B):
         owned = (
@@ -347,9 +349,11 @@ async def test_an_add_on_needs_the_installers_own_base_pack(
 
     await _install(b, "games")
     await _install(b, "extras")
-    edges = await a.graph_repos.edges.list(
-        after=None, limit=50, scope=ContentFilter.of(USER_B.id)
-    )
+    edges = (
+        await a.graph_repos.edges.list(
+            scope=ContentFilter.of(USER_B.id), page=PageRequest(limit=50)
+        )
+    ).items
     (edge,) = edges
     target = await a.graph_repos.nodes.get(
         edge.target_id, scope=ContentFilter.of(USER_B.id)
@@ -409,9 +413,11 @@ async def test_rows_reowned_to_the_installer_uninstall_cleanly(
         assert node.owner_id == zero
         node.owner_id = USER_A.id
         await system.graph_repos.nodes.save(node)
-    for edge in await system.graph_repos.edges.list(
-        after=None, limit=50, scope=ContentFilter.everyone()
-    ):
+    for edge in (
+        await system.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+        )
+    ).items:
         edge.owner_id = USER_A.id
         await system.graph_repos.edges.save(edge)
     for asset in await system.media_repos.assets.list_by_status(

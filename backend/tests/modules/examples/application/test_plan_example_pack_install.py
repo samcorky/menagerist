@@ -210,9 +210,11 @@ async def test_a_kept_connection_between_kept_items_is_unchanged(
     """An edited connection keeps both its ends, so all three are taken back."""
     world = make_world()
     await _install(world)
-    [edge] = await world.graph_repos.edges.list(
-        after=None, limit=10, scope=ContentFilter.everyone()
-    )
+    [edge] = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+        )
+    ).items
     edge.attributes = {"note": "mine"}
     await world.graph_repos.edges.save(edge)
     await _uninstall(world)

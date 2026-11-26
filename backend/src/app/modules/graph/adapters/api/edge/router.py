@@ -16,7 +16,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     link_header_responses,
     link_next_header,
 )
-from app.entrypoints.api.shared.http.parameters import EdgeId, PageAfter, PageLimit
+from app.entrypoints.api.shared.http.parameters import EdgeId, PageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.graph.adapters.api.dependencies import (
@@ -38,11 +38,12 @@ from app.modules.graph.application.create_edge import CreateEdge
 from app.modules.graph.application.create_edges import CreateEdges
 from app.modules.graph.application.delete_edge import DeleteEdge, DeleteEdgeCommand
 from app.modules.graph.application.get_edge import GetEdge, GetEdgeQuery
-from app.modules.graph.application.list_edges import ListEdges, ListEdgesQuery
+from app.modules.graph.application.list_edges import EdgeSort, ListEdges, ListEdgesQuery
 from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.domain.errors import EdgeNotFoundError, NodeNotFoundError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(prefix="/edges", tags=["Edges"], route_class=PermissionAwareRoute)
 
@@ -137,20 +138,26 @@ async def list_edges(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: PageLimit = 50,
+    page: Annotated[PageParams[EdgeSort], Query()],
     node_id: Annotated[
         uuid.UUID | None,
         Query(description="Keep connections to or from the item with this id."),
     ] = None,
 ) -> list[EdgeResponse]:
-    """List edge, paginated by id and optionally filtered to one node."""
-    edges = await use_case.handle(
-        ListEdgesQuery(after=after, limit=limit + 1, node_id=node_id), actor
+    """List edges, by id unless sorted, optionally those of one item."""
+    result = await use_case.handle(
+        ListEdgesQuery(
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+            node_id=node_id,
+        ),
+        actor,
     )
-    if len(edges) > limit:
-        response.headers["Link"] = link_next_header(request, str(edges[limit - 1].id))
-    return [EdgeResponse.from_domain(edge) for edge in edges[:limit]]
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
+    return [EdgeResponse.from_domain(edge) for edge in result.items]
 
 
 @router.patch(

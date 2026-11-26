@@ -7392,7 +7392,7 @@
           "Edges"
         ],
         "summary": "List Edges",
-        "description": "List edge, paginated by id and optionally filtered to one node.\n\n**Requires permission:** `graph:item:read`",
+        "description": "List edges, by id unless sorted, optionally those of one item.\n\n**Requires permission:** `graph:item:read`",
         "operationId": "list_edges",
         "security": [
           {
@@ -7411,16 +7411,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 512
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
               "title": "After"
             },
-            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
           },
           {
             "name": "limit",
@@ -7428,11 +7428,42 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "description": "Most rows to return on this page.",
               "default": 50,
               "title": "Limit"
             },
             "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/EdgeSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
+              "default": "asc"
+            },
+            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
           },
           {
             "name": "node_id",
@@ -37030,6 +37061,16 @@
             "updated_at": "2026-08-23T10:14:44.465954Z"
           }
         ]
+      },
+      "EdgeSort": {
+        "type": "string",
+        "enum": [
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EdgeSort",
+        "description": "What a list of connections can be sorted by: fields of the response."
       },
       "EdgeTypeResponse": {
         "properties": {

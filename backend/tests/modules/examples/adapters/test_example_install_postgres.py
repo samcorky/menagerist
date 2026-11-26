@@ -683,7 +683,7 @@ def test_the_shipped_games_extras_add_on_end_to_end(
     items = {n["name"]: n["id"] for n in c.get("/api/v1/nodes?limit=200").json()}
     edges = {
         (e["source_id"], e["target_id"]): e["type"]
-        for e in c.get("/api/v1/edges?limit=200").json()
+        for e in c.get("/api/v1/edges?limit=100").json()
     }
     assert (
         edges[(items["Lantern Harbour: The Night Fair"], items["Lantern Harbour"])]
@@ -700,7 +700,7 @@ def test_the_shipped_games_extras_add_on_end_to_end(
     assert c.delete("/api/v1/examples/games-extras/installation").json()["kept"] == []
     assert c.delete("/api/v1/examples/games/installation").json()["kept"] == []
     assert c.get("/api/v1/nodes?limit=200").json() == []
-    assert c.get("/api/v1/edges?limit=200").json() == []
+    assert c.get("/api/v1/edges?limit=100").json() == []
     assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
 
 

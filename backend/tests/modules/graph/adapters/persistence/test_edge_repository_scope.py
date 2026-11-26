@@ -20,6 +20,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 from app.modules.graph.domain.edge import Edge
 from app.modules.graph.domain.node import Node
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Cursor, PageRequest
 
 if TYPE_CHECKING:
     from app.modules.graph.ports.edge_repository import EdgeRepository
@@ -77,7 +78,9 @@ async def _edge(
 
 
 async def _ids(repos: _Repos, scope: ContentFilter, **kwargs: Any) -> list[uuid.UUID]:  # noqa: ANN401
-    page = await repos.edges.list(scope=scope, after=None, limit=50, **kwargs)
+    page = (
+        await repos.edges.list(scope=scope, **kwargs, page=PageRequest(limit=50))
+    ).items
     return [e.id for e in page]
 
 
@@ -146,8 +149,12 @@ async def test_list_is_scoped_and_paginates_inside_the_scope(repos: _Repos) -> N
     assert set(await _ids(repos, B)) == {e.id for e in theirs}
     assert set(await _ids(repos, ALL)) == {e.id for e in [*mine, *theirs]}
 
-    first = await repos.edges.list(scope=A, after=None, limit=2)
-    rest = await repos.edges.list(scope=A, after=first[-1].id, limit=2)
+    first = (await repos.edges.list(scope=A, page=PageRequest(limit=2))).items
+    rest = (
+        await repos.edges.list(
+            scope=A, page=PageRequest(after=Cursor.after_id(first[-1].id), limit=2)
+        )
+    ).items
     assert [e.id for e in [*first, *rest]] == sorted(e.id for e in mine)
 
 

@@ -84,10 +84,9 @@ async def _assert_nothing_left(world: World) -> None:
     )
     assert (
         await world.graph_repos.edges.list(
-            after=None, limit=10, scope=ContentFilter.everyone()
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.graph_repos.edge_types.list(
             scope=ContentFilter.everyone(), page=PageRequest(limit=10)

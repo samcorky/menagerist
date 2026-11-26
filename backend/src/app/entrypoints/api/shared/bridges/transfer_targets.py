@@ -166,6 +166,7 @@ if TYPE_CHECKING:
     from app.modules.graph.domain.edge_type import Holder
     from app.modules.transfer.domain.tabular import FieldSpec
     from app.shared_kernel.access_guard import AccessGuard
+    from app.shared_kernel.paging import Cursor
 
 _PAGE = 1
 _EDGE_PAGE = 200
@@ -867,18 +868,18 @@ class GraphPackTarget:
         wanted = set(item_ids)
         edges: dict[uuid.UUID, Edge] = {}
         for item_id in item_ids:
-            after: uuid.UUID | None = None
+            after: Cursor | None = None
             while True:
                 page = await ListEdges(repos, self._access).handle(
                     ListEdgesQuery(node_id=item_id, after=after, limit=_EDGE_PAGE),
                     self._actor,
                 )
-                for edge in page:
+                for edge in page.items:
                     if edge.source_id in wanted and edge.target_id in wanted:
                         edges.setdefault(edge.id, edge)
-                if len(page) < _EDGE_PAGE:
+                if page.next is None:
                     break
-                after = page[-1].id
+                after = page.next
         return list(edges.values())
 
     async def create_item(self, spec: BundleItem, *, type_slug: str | None) -> Created:

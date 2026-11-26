@@ -67,9 +67,11 @@ async def _edges(world: World) -> set[tuple[str, str, str]]:
     }
     return {
         (nodes[e.source_id], nodes[e.target_id], e.type)
-        for e in await world.graph_repos.edges.list(
-            after=None, limit=500, scope=ContentFilter.everyone()
-        )
+        for e in (
+            await world.graph_repos.edges.list(
+                scope=ContentFilter.everyone(), page=PageRequest(limit=500)
+            )
+        ).items
     }
 
 
@@ -101,9 +103,11 @@ async def _live(world: World) -> int:
     items = await world.graph_repos.nodes.list(
         scope=ContentFilter.everyone(), after=None, limit=500
     )
-    edges = await world.graph_repos.edges.list(
-        scope=ContentFilter.everyone(), after=None, limit=500
-    )
+    edges = (
+        await world.graph_repos.edges.list(
+            scope=ContentFilter.everyone(), page=PageRequest(limit=500)
+        )
+    ).items
     return others + len(items) + len(edges) + len(world.collections.collections)
 
 
