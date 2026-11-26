@@ -51,7 +51,7 @@ A list returns a **bare JSON array**, and paging lives in headers, in the style 
 
 ### Sort, order and search
 
-A list route that pages declares all four of `after`, `limit`, `sort` and `order`, and adds `q` where it has text to search. `PageParams` in `entrypoints/api/shared/http/parameters.py` declares `after`, `limit` (`ge=1, le=100`, default 50) and `order`. A route subclasses it to add its own `sort` enum, and `q` where it searches, then takes `page: Annotated[ThatSubclass, Query()]`; FastAPI flattens the fields into ordinary query parameters, so the schema and generated client are the same as if each were declared on the route. A route with a different cap overrides `limit`.
+A list route that pages declares all four of `after`, `limit`, `sort` and `order`, and adds `q` where it has text to search. `PageParams` and `SearchPageParams` in `entrypoints/api/shared/http/parameters.py` declare `after`, `limit` (`ge=1, le=100`, default 50), `sort` and `order`, and `q` for the searchable form. They are generic over the route's sort enum, so a route takes `page: Annotated[SearchPageParams[CollectionSort], Query()]` and writes only that enum. FastAPI flattens the fields into ordinary query parameters, so the schema and generated client are the same as if each were declared on the route, and `page.sort` is typed as the enum. A route with a different cap subclasses the model and overrides `limit`.
 
 | Parameter | Meaning                                                                                                  |
 | --------- | -------------------------------------------------------------------------------------------------------- |
