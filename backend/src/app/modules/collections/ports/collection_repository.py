@@ -63,12 +63,12 @@ class CollectionRepository(Protocol):
         ...
 
     async def list_deleted(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> builtins.list[Collection]:
-        """List soft-deleted collections in `scope`, newest deleted first.
+        self, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Collection]:
+        """List soft-deleted collections in `scope`, one page in the order `page` asks.
 
-        Ties break by id. `after` is the id of the last row of the previous
-        page; one no longer in Recently deleted yields an empty page.
+        The sort keys are `deleted_at` and `name` (ignoring case); with none, the
+        order is by id. The deleted list asks for `deleted_at`, newest first.
         """
         ...
 

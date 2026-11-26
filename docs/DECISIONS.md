@@ -1977,3 +1977,11 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **A list filtered after paging** (collections holding an item) fetches only as many rows as the page still needs, so the last batch's cursor is the cursor of the last row kept, and it checks that a later row passes the filter before giving a `next`, so the last page never points to an empty one.
 - **Empty values sort last in both directions,** with a single keyset condition per key: `(v > k) OR v IS NULL` ascending, `(v < k) OR v IS NULL` descending, and `v IS NULL` with the id after it inside the empty tail.
 - **Mixed-direction sorts** are not indexed. Single-key sorts on large lists may want an index on the key and id; add one when a list needs it.
+
+## The recently deleted lists page by position, and an item's contents stay by id (2026-11-26)
+
+**Decision:** The recently deleted lists (`/nodes/deleted`, `/collections/deleted`) take `sort` (`deleted_at` or `name`) and `order` like every other list, defaulting to `deleted_at` with `order=desc`. An item's contents (`/nodes/{id}/contents`) takes neither, and stays paged by the id of the last item (#622).
+
+- **A cursor is a position, not a row.** The old deleted lists found where to resume by reading the cursor row's `deleted_at`, so a cursor whose row had been restored or purged gave an empty page. The shared cursor holds the value, so the next page continues past where the row was. The app follows the `Link` header's cursor (`nextCursor` in `recently-deleted.ts`) instead of sending the last row's id.
+- **The default is a sort, not no sort.** With no `sort` the list asks the repository for `deleted_at`, and the route's `order` defaults to `desc`, so a request with no parameters still lists the newest deletion first. `DeletedPageParams` carries that default.
+- **The contents cannot sort.** Items come from walking connections in (depth, id) order, in memory, not from a query that could order by a column. A positional id cursor is the honest cursor for that, so the paging lint rule skips the route.

@@ -45,14 +45,14 @@ describe('labels', () => {
 });
 
 describe('nextCursor', () => {
-	const rows = [{ id: 'a' }, { id: 'b' }];
-	it('returns the last id when a next link exists', () => {
-		expect(nextCursor('</x?after=b>; rel="next"', rows)).toBe('b');
+	it('returns the cursor the next link carries', () => {
+		expect(nextCursor('</x?limit=2&after=b>; rel="next"')).toBe('b');
+		expect(nextCursor('<http://h/x?after=eyJ2IjoxfQ>; rel="next"')).toBe('eyJ2IjoxfQ');
 	});
-	it('returns null without a next link or rows', () => {
-		expect(nextCursor(null, rows)).toBeNull();
-		expect(nextCursor('</x>; rel="prev"', rows)).toBeNull();
-		expect(nextCursor('</x>; rel="next"', [])).toBeNull();
+	it('returns null without a next link or a cursor', () => {
+		expect(nextCursor(null)).toBeNull();
+		expect(nextCursor('</x?after=a>; rel="prev"')).toBeNull();
+		expect(nextCursor('</x>; rel="next"')).toBeNull();
 	});
 });
 

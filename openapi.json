@@ -3571,7 +3571,7 @@
           "Nodes"
         ],
         "summary": "List Deleted Nodes",
-        "description": "List your deleted items, newest deleted first.\n\n`after` is the id of the last row of the previous page (the `Link` header\ncarries it). An id that has since been restored or purged gives an empty page.\n\n**Requires permission:** `graph:item:read`",
+        "description": "List your deleted items, newest deleted first unless `sort` or `order` say.\n\nAn item that has since been restored or purged does not stop the next page: the\n`Link` header's cursor holds the position, not the row.\n\n**Requires permission:** `graph:item:read`",
         "operationId": "list_deleted_nodes",
         "security": [
           {
@@ -3590,16 +3590,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 512
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
               "title": "After"
             },
-            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
           },
           {
             "name": "limit",
@@ -3614,6 +3614,35 @@
               "title": "Limit"
             },
             "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DeletedNodeSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest."
           }
         ],
         "responses": {
@@ -25117,7 +25146,7 @@
           "Collections"
         ],
         "summary": "List Deleted Collections",
-        "description": "List your deleted collections, newest deleted first.\n\n`after` is the id of the last row of the previous page (the `Link` header\ncarries it). An id that has since been restored or purged gives an empty page.\n\n**Requires permission:** `collections:collection:read`",
+        "description": "List your deleted collections, newest deleted first unless told.\n\nA collection that has since been restored or purged does not stop the next page:\nthe `Link` header's cursor holds the position, not the row.\n\n**Requires permission:** `collections:collection:read`",
         "operationId": "list_deleted_collections",
         "security": [
           {
@@ -25136,16 +25165,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 512
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
               "title": "After"
             },
-            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
           },
           {
             "name": "limit",
@@ -25160,6 +25189,35 @@
               "title": "Limit"
             },
             "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DeletedCollectionSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest.",
+              "default": "desc"
+            },
+            "description": "`desc` (the default) lists the most recently deleted first; `asc` the oldest."
           }
         ],
         "responses": {
@@ -36718,6 +36776,15 @@
           }
         ]
       },
+      "DeletedCollectionSort": {
+        "type": "string",
+        "enum": [
+          "deleted_at",
+          "name"
+        ],
+        "title": "DeletedCollectionSort",
+        "description": "What the deleted collections can be sorted by: fields of the response."
+      },
       "DeletedNodeResponse": {
         "properties": {
           "id": {
@@ -36771,6 +36838,15 @@
             "name": "Untitled capture"
           }
         ]
+      },
+      "DeletedNodeSort": {
+        "type": "string",
+        "enum": [
+          "deleted_at",
+          "name"
+        ],
+        "title": "DeletedNodeSort",
+        "description": "What the deleted items can be sorted by: fields of the response."
       },
       "DeviceNameResponse": {
         "properties": {

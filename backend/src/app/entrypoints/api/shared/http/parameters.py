@@ -35,6 +35,9 @@ PAGE_ORDER_DESCRIPTION = (
     "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is"
     + " left out, so `desc` alone lists the newest first."
 )
+PAGE_DELETED_ORDER_DESCRIPTION = (
+    "`desc` (the default) lists the most recently deleted first; `asc` the oldest."
+)
 PAGE_SEARCH_DESCRIPTION = (
     "Keep the rows whose text contains this, ignoring case and accents."
 )
@@ -53,6 +56,15 @@ class PageParams[Sort: StrEnum](BaseModel):
     limit: int = Field(50, ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)
     sort: Sort | None = Field(None, description=PAGE_SORT_DESCRIPTION)
     order: SortOrder = Field(SortOrder.ASC, description=PAGE_ORDER_DESCRIPTION)
+
+
+class DeletedPageParams[Sort: StrEnum](PageParams[Sort]):
+    """`PageParams` for a recently deleted list, which runs newest deletion first.
+
+    A route leaves `sort` out for the deletion time; `order` defaults to `desc`.
+    """
+
+    order: SortOrder = Field(SortOrder.DESC, description=PAGE_DELETED_ORDER_DESCRIPTION)
 
 
 class SearchPageParams[Sort: StrEnum](PageParams[Sort]):

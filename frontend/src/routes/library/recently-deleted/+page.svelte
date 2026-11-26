@@ -122,7 +122,7 @@
 				const total = Number(page.response?.headers.get('total-count'));
 				current.total =
 					Number.isFinite(total) && page.response?.headers.has('total-count') ? total : null;
-				current.cursor = nextCursor(page.response?.headers.get('link'), page.ids);
+				current.cursor = nextCursor(page.response?.headers.get('link'));
 			}
 		} catch {
 			current.error = 'Could not load the list. Check your connection and try again.';

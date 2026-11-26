@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import delete, func, select, tuple_
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.collections.adapters.persistence.models import CollectionModel
@@ -29,6 +29,12 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+
+# What `list_deleted` can sort by; the names are fields of the deleted response.
+_DELETED_SORT_COLUMNS = {
+    "deleted_at": timestamp_column(CollectionModel.deleted_at),
+    "name": text_column(CollectionModel.name),
+}
 
 # What `list` can sort by; the names are fields of the API's collection response.
 _SORT_COLUMNS = {
@@ -199,26 +205,17 @@ class SqlAlchemyCollectionRepository:
         return None if model is None else _to_domain(model)
 
     async def list_deleted(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> builtins.list[Collection]:
-        """List soft-deleted collections in `scope`, newest deleted first."""
-        stmt = (
-            select(CollectionModel)
-            .where(self._deleted(scope))
-            .order_by(CollectionModel.deleted_at.desc(), CollectionModel.id.desc())
-            .limit(limit)
+        self, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Collection]:
+        """List soft-deleted collections in `scope`, one page as `page` asks."""
+        return await keyset_page(
+            self._session,
+            select(CollectionModel).where(self._deleted(scope)),
+            id_column=CollectionModel.id,
+            columns=_DELETED_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
         )
-        if after is not None:
-            last = (
-                select(CollectionModel.deleted_at)
-                .where(CollectionModel.id == after, self._deleted(scope))
-                .scalar_subquery()
-            )
-            stmt = stmt.where(
-                tuple_(CollectionModel.deleted_at, CollectionModel.id)
-                < tuple_(last, after)
-            )
-        return [_to_domain(m) for m in (await self._session.execute(stmt)).scalars()]
 
     async def count_deleted(self, *, scope: ContentFilter) -> int:
         """Return the number of soft-deleted collections in `scope`."""

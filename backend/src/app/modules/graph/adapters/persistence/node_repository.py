@@ -16,7 +16,6 @@ from sqlalchemy import (
     select,
     text,
     true,
-    tuple_,
     update,
 )
 from sqlalchemy.dialects.postgresql import (
@@ -56,6 +55,7 @@ from app.modules.graph.domain.query import (
     walk_conditions,
 )
 from app.modules.graph.domain.reach import Reached
+from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
 
 if TYPE_CHECKING:
@@ -72,8 +72,15 @@ if TYPE_CHECKING:
     from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 logger = structlog.get_logger()
+
+# What `list_deleted` can sort by; the names are fields of the deleted item response.
+_DELETED_SORT_COLUMNS = {
+    "deleted_at": timestamp_column(NodeModel.deleted_at),
+    "name": text_column(NodeModel.name),
+}
 
 
 def _to_domain(model: NodeModel) -> Node:
@@ -731,26 +738,17 @@ class SqlAlchemyNodeRepository:
         return None if model is None else _to_domain(model)
 
     async def list_deleted(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> builtins.list[Node]:
-        """List soft-deleted nodes in `scope`, newest deleted first (ties by id)."""
-        stmt = (
-            select(NodeModel)
-            .where(self._deleted(scope))
-            .order_by(NodeModel.deleted_at.desc(), NodeModel.id.desc())
-            .limit(limit)
+        self, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[Node]:
+        """List soft-deleted nodes in `scope`, one page in the order `page` asks."""
+        return await keyset_page(
+            self._session,
+            select(NodeModel).where(self._deleted(scope)),
+            id_column=NodeModel.id,
+            columns=_DELETED_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
         )
-        if after is not None:
-            last = (
-                select(NodeModel.deleted_at)
-                .where(NodeModel.id == after, self._deleted(scope))
-                .scalar_subquery()
-            )
-            stmt = stmt.where(
-                tuple_(NodeModel.deleted_at, NodeModel.id) < tuple_(last, after)
-            )
-        result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars()]
 
     async def count_deleted(self, *, scope: ContentFilter) -> int:
         """Return the number of soft-deleted nodes in `scope`."""

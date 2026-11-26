@@ -3,6 +3,7 @@
 import asyncio
 import uuid
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from starlette.testclient import TestClient
@@ -217,3 +218,72 @@ def test_a_token_can_restore_but_never_purge(world: _World) -> None:
     assert world.client.get(f"{BASE}/deleted").status_code == 200
     assert world.client.post(f"{BASE}/{item}/restore").status_code == 200
     assert world.dependents.purged == []
+
+
+def _next_after(link: str) -> str:
+    """The `after` cursor a `Link` header value points to."""
+    url = link[link.index("<") + 1 : link.index(">")]
+    return parse_qs(urlparse(url).query)["after"][0]
+
+
+@pytest.mark.parametrize("order", ["asc", "desc"])
+@pytest.mark.parametrize("sort", ["deleted_at", "name"])
+def test_list_deleted_walks_every_sort_key_to_the_end(
+    world: _World, sort: str, order: str
+) -> None:
+    """Following `Link` visits each deleted row once, in the order the key gives."""
+    client = world.client
+    ids = {name: world.create(name) for name in ["b", "A", "c", "B", "a"]}
+    for item_id in ids.values():
+        client.delete(f"{BASE}/{item_id}")
+
+    everything = client.get(
+        f"{BASE}/deleted", params={"sort": sort, "order": order, "limit": 100}
+    ).json()
+    seen: list[dict[str, str]] = []
+    params: dict[str, str | int] = {"sort": sort, "order": order, "limit": 2}
+    while True:
+        response = client.get(f"{BASE}/deleted", params=params)
+        seen.extend(response.json())
+        if "Link" not in response.headers:
+            break
+        params = {**params, "after": _next_after(response.headers["Link"])}
+
+    assert [r["id"] for r in seen] == [r["id"] for r in everything]
+    assert {r["id"] for r in seen} == set(ids.values())
+    values = [r[sort].lower() if sort == "name" else r[sort] for r in seen]
+    assert values == sorted(values, reverse=order == "desc")
+
+
+def test_list_deleted_runs_newest_first_unless_ordered_otherwise(
+    world: _World,
+) -> None:
+    """With no parameters the most recently deleted comes first; `asc` reverses it."""
+    client = world.client
+    ids = [world.create(name) for name in ("x", "y", "z")]
+    for item_id in ids:
+        client.delete(f"{BASE}/{item_id}")
+
+    default = client.get(f"{BASE}/deleted").json()
+    oldest_first = client.get(f"{BASE}/deleted", params={"order": "asc"}).json()
+
+    assert [r["id"] for r in default] == ids[::-1]
+    assert [r["id"] for r in oldest_first] == ids
+
+
+def test_list_deleted_cursor_from_another_sort_or_unreadable_is_a_400(
+    world: _World,
+) -> None:
+    """The cursor has to match the request's sort and order, and be a cursor."""
+    client = world.client
+    for name in ("a", "b"):
+        client.delete(f"{BASE}/{world.create(name)}")
+    first = client.get(f"{BASE}/deleted", params={"sort": "name", "limit": 1})
+
+    mismatched = client.get(
+        f"{BASE}/deleted", params={"after": _next_after(first.headers["Link"])}
+    )
+    unreadable = client.get(f"{BASE}/deleted", params={"after": "nope"})
+
+    assert mismatched.status_code == 400
+    assert unreadable.status_code == 400

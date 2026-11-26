@@ -10,14 +10,13 @@ from pydantic import BaseModel
 import app.entrypoints.api
 import app.modules
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.http.parameters import PageParams, SearchPageParams
+from app.entrypoints.api.shared.http.parameters import PageParams
 from app.platform.request_model import RequestModel
 
 _COMPONENTS: dict[str, Any] = create_app().openapi()["components"]
 
-# Models that FastAPI flattens into query parameters. They are never a request or
-# response body, so there is no body to give an example of.
-_QUERY_MODELS: frozenset[type[BaseModel]] = frozenset({PageParams, SearchPageParams})
+# Paging models are flattened into query parameters by FastAPI. They are never a request
+# or response body, so there is no body to give an example of.
 
 
 def _api_models() -> list[type[BaseModel]]:
@@ -41,7 +40,7 @@ def _models_in(module_name: str) -> list[type[BaseModel]]:
         if isinstance(obj, type)
         and issubclass(obj, BaseModel)
         and obj.__module__ == module.__name__
-        and obj not in _QUERY_MODELS
+        and not issubclass(obj, PageParams)
     ]
 
 

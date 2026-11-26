@@ -19,9 +19,8 @@ from app.entrypoints.api.shared.http.http_headers import (
     link_next_header,
 )
 from app.entrypoints.api.shared.http.parameters import (
-    PAGE_LIMIT_DESCRIPTION,
+    DeletedPageParams,
     NodeId,
-    PageAfter,
     SearchPageParams,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -75,6 +74,7 @@ from app.modules.collections.application.list_collections import (
     ListCollectionsQuery,
 )
 from app.modules.collections.application.list_deleted_collections import (
+    DeletedCollectionSort,
     ListDeletedCollections,
     ListDeletedCollectionsQuery,
 )
@@ -263,23 +263,26 @@ async def list_deleted_collections(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: Annotated[int, Query(ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)] = 50,
+    page: Annotated[DeletedPageParams[DeletedCollectionSort], Query()],
 ) -> list[DeletedCollectionResponse]:
-    """List your deleted collections, newest deleted first.
+    """List your deleted collections, newest deleted first unless told.
 
-    `after` is the id of the last row of the previous page (the `Link` header
-    carries it). An id that has since been restored or purged gives an empty page.
+    A collection that has since been restored or purged does not stop the next page:
+    the `Link` header's cursor holds the position, not the row.
     """
     result = await use_case.handle(
-        ListDeletedCollectionsQuery(after=after, limit=limit + 1), actor
+        ListDeletedCollectionsQuery(
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+        ),
+        actor,
     )
-    if len(result.items) > limit:
-        response.headers["Link"] = link_next_header(
-            request, str(result.items[limit - 1].id)
-        )
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
     response.headers["Total-Count"] = str(result.total)
-    return [DeletedCollectionResponse.from_domain(c) for c in result.items[:limit]]
+    return [DeletedCollectionResponse.from_domain(c) for c in result.items]
 
 
 @router.get(

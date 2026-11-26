@@ -9,6 +9,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.domain.node import Node
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest, SortOrder
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,13 +44,19 @@ async def test_deleted_rows_list_newest_first_and_page_by_last_id(
     await _node(repo, "theirs", owner=BOB, deleted_ago=1)
     scope = ContentFilter.of(ALICE)
 
-    first = await repo.list_deleted(scope=scope, after=None, limit=2)
-    second = await repo.list_deleted(scope=scope, after=first[-1].id, limit=2)
-    third = await repo.list_deleted(scope=scope, after=second[-1].id, limit=2)
-    stale = await repo.list_deleted(scope=scope, after=uuid.uuid7(), limit=2)
+    pages = []
+    request = PageRequest(sort="deleted_at", order=SortOrder.DESC, limit=2)
+    while True:
+        page = await repo.list_deleted(scope=scope, page=request)
+        pages.append(page)
+        if page.next is None:
+            break
+        request = PageRequest(
+            after=page.next, sort="deleted_at", order=SortOrder.DESC, limit=2
+        )
 
-    assert [n.id for n in first + second + third] == [r.id for r in rows]
-    assert stale == []
+    assert [n.id for page in pages for n in page.items] == [r.id for r in rows]
+    assert len(pages) == 3
     assert await repo.count_deleted(scope=scope) == 5
     assert await repo.count_deleted(scope=ContentFilter.of(BOB)) == 1
 

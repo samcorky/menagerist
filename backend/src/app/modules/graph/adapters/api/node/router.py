@@ -17,7 +17,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     link_next_header,
 )
 from app.entrypoints.api.shared.http.parameters import (
-    PAGE_LIMIT_DESCRIPTION,
+    DeletedPageParams,
     FieldKey,
     NodeId,
     PageAfter,
@@ -85,6 +85,7 @@ from app.modules.graph.application.duplicate_node import DuplicateNode
 from app.modules.graph.application.get_item_path import GetItemPath, GetItemPathQuery
 from app.modules.graph.application.get_node import GetNode, GetNodeQuery
 from app.modules.graph.application.list_deleted_nodes import (
+    DeletedNodeSort,
     ListDeletedNodes,
     ListDeletedNodesQuery,
 )
@@ -127,6 +128,7 @@ from app.modules.graph.domain.query import InvalidQueryError
 from app.modules.graph.domain.reach import InvalidReachDepthError, ReachTooLargeError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(prefix="/nodes", tags=["Nodes"], route_class=PermissionAwareRoute)
 
@@ -377,23 +379,26 @@ async def list_deleted_nodes(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: Annotated[int, Query(ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)] = 50,
+    page: Annotated[DeletedPageParams[DeletedNodeSort], Query()],
 ) -> list[DeletedNodeResponse]:
-    """List your deleted items, newest deleted first.
+    """List your deleted items, newest deleted first unless `sort` or `order` say.
 
-    `after` is the id of the last row of the previous page (the `Link` header
-    carries it). An id that has since been restored or purged gives an empty page.
+    An item that has since been restored or purged does not stop the next page: the
+    `Link` header's cursor holds the position, not the row.
     """
     result = await use_case.handle(
-        ListDeletedNodesQuery(after=after, limit=limit + 1), actor
+        ListDeletedNodesQuery(
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+        ),
+        actor,
     )
-    if len(result.items) > limit:
-        response.headers["Link"] = link_next_header(
-            request, str(result.items[limit - 1].id)
-        )
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
     response.headers["Total-Count"] = str(result.total)
-    return [DeletedNodeResponse.from_domain(n) for n in result.items[:limit]]
+    return [DeletedNodeResponse.from_domain(n) for n in result.items]
 
 
 @router.get(
