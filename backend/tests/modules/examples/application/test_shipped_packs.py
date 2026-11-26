@@ -225,6 +225,8 @@ async def test_pack_has_connections_and_items_for_every_type(pack_id: str) -> No
 
     assert pack.connections, f"{pack_id}: has no connections"
     used = {item.type_ref for item in pack.items}
+    # A parent type may hold no items of its own when its subtypes do.
+    used |= {kind.parent for kind in pack.item_types if kind.ref in used}
     for kind in pack.item_types:
         assert kind.ref in used, f"{pack_id}: item type '{kind.ref}' has no items"
 
@@ -342,6 +344,16 @@ async def test_pack_attributes_match_their_type_schemas(pack_id: str) -> None:
         }
         rel_schemas |= {
             f"{base_id}:{t.ref}": t.attributes_schema for t in base.relationship_types
+        }
+
+    # A subtype's items may set the fields it takes from its parent type.
+    parents = {t.ref: t.parent for t in pack.item_types if t.parent}
+    for ref, parent in parents.items():
+        own = item_schemas[ref] or {}
+        inherited = (item_schemas[parent] or {}).get("properties", {})
+        item_schemas[ref] = {
+            **own,
+            "properties": {**inherited, **own.get("properties", {})},
         }
 
     problems: list[str] = []

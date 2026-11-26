@@ -10,6 +10,7 @@ type Typed = {
 	slug: string;
 	icon?: string;
 	colour?: string;
+	parent?: string;
 	attributes_schema?: Schema;
 };
 type Pack = {
@@ -55,6 +56,26 @@ function typesByRef(pack: Pack, pick: (p: Pack) => Typed[] | undefined): Map<str
 		for (const t of pick(packsById.get(required) as Pack) ?? []) all.set(`${required}:${t.ref}`, t);
 	}
 	return all;
+}
+
+// A subtype's items may set the fields it takes from its parent type.
+function withParentFields(types: Map<string, Typed>, pack: Pack): Map<string, Typed> {
+	const merged = new Map(types);
+	for (const t of pack.item_types ?? []) {
+		const parent = t.parent ? types.get(t.parent) : undefined;
+		if (!parent) continue;
+		merged.set(t.ref, {
+			...t,
+			attributes_schema: {
+				...t.attributes_schema,
+				properties: {
+					...parent.attributes_schema?.properties,
+					...t.attributes_schema?.properties
+				}
+			}
+		});
+	}
+	return merged;
 }
 
 // The API fills a linked choice's `enum` from its list on read; do the same from the pack's preset.
@@ -115,7 +136,10 @@ describe('shipped example packs', () => {
 		});
 
 		it('only sets attributes its type defines', () => {
-			const itemTypes = typesByRef(pack, (p) => p.item_types);
+			const itemTypes = withParentFields(
+				typesByRef(pack, (p) => p.item_types),
+				pack
+			);
 			const relationshipTypes = typesByRef(pack, (p) => p.relationship_types);
 			const keysByItemType = new Map(
 				[...itemTypes].map(([ref, t]) => [ref, Object.keys(t.attributes_schema?.properties ?? {})])

@@ -1,0 +1,457 @@
+{
+  "format": "menagerist-example-pack",
+  "version": 8,
+  "id": "film-formats",
+  "relationship_types": [
+    {
+      "ref": "same-film-as",
+      "slug": "film-formats-same-film-as",
+      "label": "Same film as",
+      "description": "Two copies of one film in different formats.",
+      "directional": false,
+      "source_types": [
+        "film-formats-media"
+      ],
+      "target_types": [
+        "film-formats-media"
+      ]
+    }
+  ],
+  "item_types": [
+    {
+      "ref": "media",
+      "slug": "film-formats-media",
+      "icon": "film",
+      "colour": "red",
+      "label": "Film media",
+      "description": "Any way a film comes to you. The fields every format shares live here; each format adds its own.",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "year": {
+            "title": "Year",
+            "type": "string",
+            "pattern": "^[0-9]{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?$",
+            "x-menagerist": {
+              "kind": "partialdate"
+            }
+          },
+          "director": {
+            "title": "Director",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "edition": {
+            "title": "Edition",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "text"
+            }
+          },
+          "condition": {
+            "title": "Condition",
+            "type": "string",
+            "enum": [
+              "Sealed",
+              "Like new",
+              "Very good",
+              "Good",
+              "Fair",
+              "Poor"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string",
+            "x-menagerist": {
+              "kind": "longtext"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "title"
+            },
+            {
+              "key": "year"
+            },
+            {
+              "key": "director"
+            },
+            {
+              "key": "edition"
+            },
+            {
+              "key": "condition"
+            },
+            {
+              "key": "notes"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "director"
+              },
+              {
+                "key": "condition"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "laserdisc",
+      "slug": "film-formats-laserdisc",
+      "icon": "projector",
+      "colour": "red",
+      "label": "Laser Disc",
+      "description": "A twelve-inch Laser Disc.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "playback": {
+            "title": "Playback",
+            "type": "string",
+            "enum": [
+              "CAV",
+              "CLV"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "sides": {
+            "title": "Sides",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          },
+          "audio": {
+            "title": "Audio",
+            "type": "string",
+            "enum": [
+              "Analogue",
+              "Digital",
+              "Analogue and digital"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "playback"
+            },
+            {
+              "key": "sides"
+            },
+            {
+              "key": "audio"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "playback"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "dvd",
+      "slug": "film-formats-dvd",
+      "icon": "disc-3",
+      "colour": "red",
+      "label": "DVD",
+      "description": "A DVD.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "dvd_region": {
+            "title": "Region",
+            "type": "string",
+            "enum": [
+              "0",
+              "1",
+              "2",
+              "4"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "discs": {
+            "title": "Discs",
+            "type": "number",
+            "x-menagerist": {
+              "kind": "number"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "dvd_region"
+            },
+            {
+              "key": "discs"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "dvd_region"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "bluray",
+      "slug": "film-formats-bluray",
+      "icon": "disc-3",
+      "colour": "red",
+      "label": "Blu-ray",
+      "description": "A Blu-ray or 4K UHD disc.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "resolution": {
+            "title": "Resolution",
+            "type": "string",
+            "enum": [
+              "1080p",
+              "4K UHD"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "steelbook": {
+            "title": "Steelbook",
+            "type": "boolean",
+            "x-menagerist": {
+              "kind": "boolean"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "resolution"
+            },
+            {
+              "key": "steelbook"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "resolution"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "ref": "vhs",
+      "slug": "film-formats-vhs",
+      "icon": "tv",
+      "colour": "red",
+      "label": "VHS",
+      "description": "A videocassette.",
+      "parent": "media",
+      "attributes_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tv_standard": {
+            "title": "TV standard",
+            "type": "string",
+            "enum": [
+              "PAL",
+              "NTSC",
+              "SECAM"
+            ],
+            "x-menagerist": {
+              "kind": "choice"
+            }
+          },
+          "ex_rental": {
+            "title": "Ex-rental",
+            "type": "boolean",
+            "x-menagerist": {
+              "kind": "boolean"
+            }
+          }
+        },
+        "x-menagerist": {
+          "version": 1,
+          "layout": [
+            {
+              "key": "tv_standard"
+            },
+            {
+              "key": "ex_rental"
+            }
+          ],
+          "required": [],
+          "highlights": {
+            "card": [
+              {
+                "key": "tv_standard"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "items": [
+    {
+      "ref": "blade-runner-ld",
+      "type": "laserdisc",
+      "name": "Blade Runner (Laser Disc)",
+      "description": "The Criterion edition, in its box.",
+      "attributes": {
+        "title": "Blade Runner",
+        "year": "1982",
+        "director": "Ridley Scott",
+        "edition": "Criterion",
+        "condition": "Very good",
+        "playback": "CAV",
+        "sides": 4,
+        "audio": "Analogue and digital"
+      }
+    },
+    {
+      "ref": "alien-dvd",
+      "type": "dvd",
+      "name": "Alien (DVD)",
+      "description": "The director's cut with the commentary.",
+      "attributes": {
+        "title": "Alien",
+        "year": "1979",
+        "director": "Ridley Scott",
+        "edition": "Director's cut",
+        "condition": "Like new",
+        "dvd_region": "2",
+        "discs": 2
+      }
+    },
+    {
+      "ref": "heat-bluray",
+      "type": "bluray",
+      "name": "Heat (Blu-ray)",
+      "description": "The steelbook release.",
+      "attributes": {
+        "title": "Heat",
+        "year": "1995",
+        "director": "Michael Mann",
+        "condition": "Sealed",
+        "resolution": "4K UHD",
+        "steelbook": true
+      }
+    },
+    {
+      "ref": "ghostbusters-vhs",
+      "type": "vhs",
+      "name": "Ghostbusters (VHS)",
+      "description": "A rental tape from the corner shop, with the sticker still on.",
+      "attributes": {
+        "title": "Ghostbusters",
+        "year": "1984",
+        "director": "Ivan Reitman",
+        "condition": "Good",
+        "tv_standard": "PAL",
+        "ex_rental": true
+      }
+    },
+    {
+      "ref": "alien-bluray",
+      "type": "bluray",
+      "name": "Alien (Blu-ray)",
+      "description": "The 4K restoration.",
+      "attributes": {
+        "title": "Alien",
+        "year": "1979",
+        "director": "Ridley Scott",
+        "edition": "4K restoration",
+        "condition": "Like new",
+        "resolution": "4K UHD",
+        "steelbook": false
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "alien-dvd",
+      "to": "alien-bluray",
+      "type": "same-film-as"
+    }
+  ],
+  "collections": [
+    {
+      "ref": "all-film-media",
+      "name": "All film media",
+      "description": "Every disc and tape: filtering by Film media finds each format.",
+      "definition": {
+        "v": 1,
+        "where": {
+          "op": "and",
+          "children": [
+            {
+              "kind": "type",
+              "in": [
+                "film-formats-media"
+              ]
+            }
+          ]
+        },
+        "sort": [
+          {
+            "by": "name",
+            "dir": "asc"
+          }
+        ]
+      }
+    }
+  ]
+}
