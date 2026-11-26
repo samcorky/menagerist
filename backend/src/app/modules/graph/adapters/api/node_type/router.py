@@ -18,8 +18,8 @@ from app.entrypoints.api.shared.http.http_headers import (
 from app.entrypoints.api.shared.http.parameters import (
     FieldKey,
     NodeTypeId,
-    PageAfter,
     PageLimit,
+    PageParams,
     SubFieldKey,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -66,6 +66,7 @@ from app.modules.graph.application.list_attribute_values import (
 from app.modules.graph.application.list_node_types import (
     ListNodeTypes,
     ListNodeTypesQuery,
+    NodeTypeSort,
 )
 from app.modules.graph.application.list_shared_subtype_fields import (
     ListSharedSubtypeFields,
@@ -91,6 +92,7 @@ from app.modules.graph.domain.errors import (
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.paging import decode_cursor
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node_type import NodeType
@@ -168,19 +170,21 @@ async def list_node_types(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: PageLimit = 50,
+    page: Annotated[PageParams[NodeTypeSort], Query()],
 ) -> list[NodeTypeResponse]:
-    """List node types, paginated by id."""
-    node_types = await use_case.handle(
-        ListNodeTypesQuery(after=after, limit=limit + 1), actor
+    """List node types, by id unless sorted."""
+    result = await use_case.handle(
+        ListNodeTypesQuery(
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+        ),
+        actor,
     )
-    if len(node_types) > limit:
-        response.headers["Link"] = link_next_header(
-            request, str(node_types[limit - 1].id)
-        )
-
-    return [NodeTypeResponse.from_domain(nt) for nt in node_types[:limit]]
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
+    return [NodeTypeResponse.from_domain(nt) for nt in result.items]
 
 
 @router.get(
@@ -201,20 +205,22 @@ async def list_subtypes(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: PageLimit = 50,
+    page: Annotated[PageParams[NodeTypeSort], Query()],
 ) -> list[NodeTypeResponse]:
-    """List the subtypes of an item type, paginated by id."""
-    subtypes = await use_case.handle(
-        ListSubtypesQuery(node_type_id=node_type_id, after=after, limit=limit + 1),
+    """List the subtypes of an item type, by id unless sorted."""
+    result = await use_case.handle(
+        ListSubtypesQuery(
+            node_type_id=node_type_id,
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+        ),
         actor,
     )
-    if len(subtypes) > limit:
-        response.headers["Link"] = link_next_header(
-            request, str(subtypes[limit - 1].id)
-        )
-
-    return [NodeTypeResponse.from_domain(nt) for nt in subtypes[:limit]]
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
+    return [NodeTypeResponse.from_domain(nt) for nt in result.items]
 
 
 @router.get(

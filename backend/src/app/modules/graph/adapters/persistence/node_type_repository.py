@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 
 from app.modules.graph.adapters.persistence.models import NodeTypeModel
 from app.modules.graph.domain.node_type import NodeType
+from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
 from app.shared_kernel.slug import Slug
 
@@ -13,11 +14,21 @@ if TYPE_CHECKING:
     import uuid
     from datetime import datetime
 
+    from sqlalchemy import Select
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 logger = structlog.get_logger()
+
+# What `list` can sort by; the names are fields of the API's item type response.
+_SORT_COLUMNS = {
+    "slug": text_column(NodeTypeModel.slug),
+    "label": text_column(NodeTypeModel.label),
+    "created_at": timestamp_column(NodeTypeModel.created_at),
+    "updated_at": timestamp_column(NodeTypeModel.updated_at),
+}
 
 
 def _to_domain(model: NodeTypeModel) -> NodeType:
@@ -122,32 +133,44 @@ class SqlAlchemyNodeTypeRepository:
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[NodeType]:
-        """List non-deleted node types in `scope` ordered by id, after `after`."""
-        logger.debug("listing node types", after=after, limit=limit)
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[NodeType]:
+        """List non-deleted node types in `scope`, one page in the order `page` asks."""
+        logger.debug("listing node types", page=page)
         stmt = (
             select(NodeTypeModel)
             .where(NodeTypeModel.deleted_at.is_(None))
             .where(owned_by(NodeTypeModel, scope.user_id))
-            .order_by(NodeTypeModel.id)
-            .limit(limit)
         )
-        if after is not None:
-            stmt = stmt.where(NodeTypeModel.id > after)
-        result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars()]
+        return await self._page(stmt, page)
+
+    async def page_subtypes(
+        self, parent: str, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[NodeType]:
+        """One page of the non-deleted subtypes of the type with slug `parent`."""
+        stmt = (
+            select(NodeTypeModel)
+            .where(NodeTypeModel.parent == parent)
+            .where(NodeTypeModel.deleted_at.is_(None))
+            .where(owned_by(NodeTypeModel, scope.user_id))
+        )
+        return await self._page(stmt, page)
+
+    async def _page(
+        self, stmt: Select[NodeTypeModel], page: PageRequest
+    ) -> Page[NodeType]:
+        return await keyset_page(
+            self._session,
+            stmt,
+            id_column=NodeTypeModel.id,
+            columns=_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
+        )
 
     async def list_subtypes(
-        self,
-        parent: str,
-        *,
-        scope: ContentFilter,
-        after: uuid.UUID | None = None,
-        limit: int | None = None,
+        self, parent: str, *, scope: ContentFilter
     ) -> builtins.list[NodeType]:
-        """List the non-deleted subtypes of the type with slug `parent` in `scope`."""
+        """List every non-deleted subtype of the type with slug `parent` in `scope`."""
         stmt = (
             select(NodeTypeModel)
             .where(NodeTypeModel.parent == parent)
@@ -155,10 +178,6 @@ class SqlAlchemyNodeTypeRepository:
             .where(owned_by(NodeTypeModel, scope.user_id))
             .order_by(NodeTypeModel.id)
         )
-        if after is not None:
-            stmt = stmt.where(NodeTypeModel.id > after)
-        if limit is not None:
-            stmt = stmt.limit(limit)
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 

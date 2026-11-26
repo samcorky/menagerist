@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 
 from app.modules.graph.adapters.persistence.models import EdgeTypeModel
 from app.modules.graph.domain.edge_type import EdgeType
+from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
 from app.shared_kernel.slug import Slug
 
@@ -17,8 +18,17 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.edge_type import Holder
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 logger = structlog.get_logger()
+
+# What `list` can sort by; the names are fields of the API's connection type response.
+_SORT_COLUMNS = {
+    "slug": text_column(EdgeTypeModel.slug),
+    "label": text_column(EdgeTypeModel.label),
+    "created_at": timestamp_column(EdgeTypeModel.created_at),
+    "updated_at": timestamp_column(EdgeTypeModel.updated_at),
+}
 
 
 def _to_domain(model: EdgeTypeModel) -> EdgeType:
@@ -105,22 +115,22 @@ class SqlAlchemyEdgeTypeRepository:
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[EdgeType]:
-        """List non-deleted edge types in `scope` ordered by id, after `after`."""
-        logger.debug("listing edge types", after=after, limit=limit)
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[EdgeType]:
+        """List non-deleted edge types in `scope`, one page in the order `page` asks."""
+        logger.debug("listing edge types", page=page)
         stmt = (
             select(EdgeTypeModel)
             .where(EdgeTypeModel.deleted_at.is_(None))
             .where(owned_by(EdgeTypeModel, scope.user_id))
-            .order_by(EdgeTypeModel.id)
-            .limit(limit)
         )
-        if after is not None:
-            stmt = stmt.where(EdgeTypeModel.id > after)
-        result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars()]
+        return await keyset_page(
+            self._session,
+            stmt,
+            id_column=EdgeTypeModel.id,
+            columns=_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
+        )
 
     async def list_deleted_before(
         self, cutoff: datetime, *, after: uuid.UUID | None, limit: int

@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from app.modules.graph.domain.node_type import NodeType
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 class NodeTypeRepository(Protocol):
@@ -45,23 +46,32 @@ class NodeTypeRepository(Protocol):
         """Like `get`, but lock the type against concurrent item writes."""
         ...
 
-    async def list(
-        self, *, scope: ContentFilter, after: uuid.UUID | None, limit: int
-    ) -> list[NodeType]:
-        """List non-deleted node types in `scope` ordered by id, after `after`."""
+    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[NodeType]:
+        """List non-deleted node types in `scope`, one page in the order `page` asks.
+
+        The sort keys are `slug`, `label` (ignoring case), `created_at` and
+        `updated_at`; with none, the order is by id.
+
+        Raises:
+            InvalidCursorError: `page.after` is from a different sort or order.
+        """
+        ...
+
+    async def page_subtypes(
+        self, parent: str, *, scope: ContentFilter, page: PageRequest
+    ) -> Page[NodeType]:
+        """One page of the non-deleted subtypes of the type with slug `parent`.
+
+        Sorted and resumed as `list` is.
+        """
         ...
 
     async def list_subtypes(
-        self,
-        parent: str,
-        *,
-        scope: ContentFilter,
-        after: uuid.UUID | None = None,
-        limit: int | None = None,
+        self, parent: str, *, scope: ContentFilter
     ) -> builtins.list[NodeType]:
-        """List the non-deleted subtypes of the type with slug `parent` in `scope`.
+        """List every non-deleted subtype of the type with slug `parent` in `scope`.
 
-        Ordered by id, after `after`, and at most `limit` when one is given.
+        Ordered by id.
         """
         ...
 

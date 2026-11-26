@@ -106,14 +106,18 @@ async def _live_counts(world: World) -> list[int]:
     everyone = ContentFilter.everyone()
     counts = [
         len(
-            await world.graph_repos.node_types.list(
-                after=None, limit=_LIMIT, scope=everyone
-            )
+            (
+                await world.graph_repos.node_types.list(
+                    scope=everyone, page=PageRequest(limit=_LIMIT)
+                )
+            ).items
         ),
         len(
-            await world.graph_repos.edge_types.list(
-                after=None, limit=_LIMIT, scope=everyone
-            )
+            (
+                await world.graph_repos.edge_types.list(
+                    scope=everyone, page=PageRequest(limit=_LIMIT)
+                )
+            ).items
         ),
         len(
             (

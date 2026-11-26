@@ -77,14 +77,18 @@ async def _live(world: World) -> int:
     everyone = ContentFilter.everyone()
     others = (
         len(
-            await world.graph_repos.node_types.list(
-                after=None, limit=500, scope=everyone
-            )
+            (
+                await world.graph_repos.node_types.list(
+                    scope=everyone, page=PageRequest(limit=500)
+                )
+            ).items
         )
         + len(
-            await world.graph_repos.edge_types.list(
-                after=None, limit=500, scope=everyone
-            )
+            (
+                await world.graph_repos.edge_types.list(
+                    scope=everyone, page=PageRequest(limit=500)
+                )
+            ).items
         )
         + len(
             (

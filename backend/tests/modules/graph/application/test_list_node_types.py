@@ -38,7 +38,7 @@ async def test_list_node_types_returns_all() -> None:
     await node_types.add(book)
     use_case = ListNodeTypes(_make_repos(node_types), InMemoryAccessGuard())
 
-    results = await use_case.handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
+    results = (await use_case.handle(ListNodeTypesQuery(), SYSTEM_ACTOR)).items
 
     assert film in results
     assert book in results
@@ -55,7 +55,7 @@ async def test_list_node_types_respects_limit() -> None:
         )
     use_case = ListNodeTypes(_make_repos(node_types), InMemoryAccessGuard())
 
-    results = await use_case.handle(ListNodeTypesQuery(limit=3), SYSTEM_ACTOR)
+    results = (await use_case.handle(ListNodeTypesQuery(limit=3), SYSTEM_ACTOR)).items
 
     assert len(results) <= 3
 
@@ -68,7 +68,7 @@ async def test_list_node_types_excludes_deleted() -> None:
     await node_types.add(nt)
     use_case = ListNodeTypes(_make_repos(node_types), InMemoryAccessGuard())
 
-    results = await use_case.handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
+    results = (await use_case.handle(ListNodeTypesQuery(), SYSTEM_ACTOR)).items
 
     assert nt not in results
 
@@ -98,9 +98,11 @@ async def test_list_node_types_fills_in_linked_choice_options() -> None:
             """Return fixed options."""
             return ["Mint"]
 
-    results = await ListNodeTypes(
-        _make_repos(node_types), InMemoryAccessGuard(), _Options()
-    ).handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
+    results = (
+        await ListNodeTypes(
+            _make_repos(node_types), InMemoryAccessGuard(), _Options()
+        ).handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
+    ).items
 
     assert results[0].attributes_schema is not None
     assert results[0].attributes_schema["properties"]["condition"]["enum"] == ["Mint"]

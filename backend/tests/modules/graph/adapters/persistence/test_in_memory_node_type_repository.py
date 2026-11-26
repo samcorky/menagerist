@@ -6,6 +6,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 from app.modules.graph.domain.node_type import NodeType
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Cursor, PageRequest
 
 
 async def test_add_and_get_round_trips() -> None:
@@ -33,14 +34,20 @@ async def test_list_subtypes_returns_only_live_subtypes_in_scope() -> None:
         await repo.add(row)
 
     found = await repo.list_subtypes("memo", scope=ContentFilter.of(owner))
-    first = await repo.list_subtypes("memo", scope=ContentFilter.of(owner), limit=1)
-    rest = await repo.list_subtypes(
-        "memo", scope=ContentFilter.of(owner), after=poster.id
+    first = await repo.page_subtypes(
+        "memo", scope=ContentFilter.of(owner), page=PageRequest(limit=1)
+    )
+    rest = await repo.page_subtypes(
+        "memo",
+        scope=ContentFilter.of(owner),
+        page=PageRequest(after=Cursor.after_id(poster.id)),
     )
 
     assert [str(t.slug) for t in found] == ["poster", "figure"]
-    assert [str(t.slug) for t in first] == ["poster"]
-    assert [str(t.slug) for t in rest] == ["figure"]
+    assert [str(t.slug) for t in first.items] == ["poster"]
+    assert first.next is not None
+    assert [str(t.slug) for t in rest.items] == ["figure"]
+    assert rest.next is None
 
 
 async def test_get_returns_none_for_missing_id() -> None:
@@ -76,7 +83,9 @@ async def test_list_orders_by_id_ascending() -> None:
     for nt in reversed(types):
         await repo.add(nt)
 
-    result = await repo.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repo.list(scope=ContentFilter.everyone(), page=PageRequest(limit=10))
+    ).items
 
     assert result == sorted(types, key=lambda t: t.id)
 
@@ -96,7 +105,12 @@ async def test_list_respects_after_and_limit() -> None:
     for nt in types:
         await repo.add(nt)
 
-    page = await repo.list(after=types[0].id, limit=2, scope=ContentFilter.everyone())
+    page = (
+        await repo.list(
+            scope=ContentFilter.everyone(),
+            page=PageRequest(after=Cursor.after_id(types[0].id), limit=2),
+        )
+    ).items
 
     assert page == types[1:3]
 
@@ -138,7 +152,9 @@ async def test_list_excludes_soft_deleted() -> None:
     deleted.soft_delete()
     await repo.save(deleted)
 
-    result = await repo.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repo.list(scope=ContentFilter.everyone(), page=PageRequest(limit=10))
+    ).items
 
     assert result == [kept]
 

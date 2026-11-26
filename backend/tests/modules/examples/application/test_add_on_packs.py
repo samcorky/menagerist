@@ -44,6 +44,7 @@ from app.modules.transfer.domain.run import Outcome, Run, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.graph.domain.node import Node
@@ -182,9 +183,11 @@ async def _snapshot(world: World) -> tuple[list[str], int, int, int]:
     return (
         await _names(world),
         len(
-            await world.graph_repos.node_types.list(
-                after=None, limit=50, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.node_types.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+                )
+            ).items
         ),
         len(
             await world.graph_repos.edges.list(
@@ -431,9 +434,11 @@ async def test_removing_the_add_on_leaves_the_base_untouched(
     assert all(r.outcome is Outcome.OWNED for r in games.entities)
     assert (
         len(
-            await world.graph_repos.node_types.list(
-                after=None, limit=50, scope=ContentFilter.everyone()
-            )
+            (
+                await world.graph_repos.node_types.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=50)
+                )
+            ).items
         )
         == 1
     )

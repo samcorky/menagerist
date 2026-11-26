@@ -7,6 +7,7 @@ from fastapi import Depends
 from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.modules.graph.adapters.api.dependencies import get_graph_repos
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     import uuid
@@ -49,27 +50,27 @@ class GraphPresetUsage:
 
     async def _node_types(self, target: str) -> list[str]:
         found: list[str] = []
-        after: uuid.UUID | None = None
+        request = PageRequest(limit=_PAGE)
         while True:
-            page = await self._repos.node_types.list(
-                scope=self._scope, after=after, limit=_PAGE
-            )
-            found += [t.label for t in page if _references(t.attributes_schema, target)]
-            if len(page) < _PAGE:
+            page = await self._repos.node_types.list(scope=self._scope, page=request)
+            found += [
+                t.label for t in page.items if _references(t.attributes_schema, target)
+            ]
+            if page.next is None:
                 return found
-            after = page[-1].id
+            request = PageRequest(after=page.next, limit=_PAGE)
 
     async def _edge_types(self, target: str) -> list[str]:
         found: list[str] = []
-        after: uuid.UUID | None = None
+        request = PageRequest(limit=_PAGE)
         while True:
-            page = await self._repos.edge_types.list(
-                scope=self._scope, after=after, limit=_PAGE
-            )
-            found += [t.label for t in page if _references(t.attributes_schema, target)]
-            if len(page) < _PAGE:
+            page = await self._repos.edge_types.list(scope=self._scope, page=request)
+            found += [
+                t.label for t in page.items if _references(t.attributes_schema, target)
+            ]
+            if page.next is None:
                 return found
-            after = page[-1].id
+            request = PageRequest(after=page.next, limit=_PAGE)
 
 
 async def get_preset_usage(

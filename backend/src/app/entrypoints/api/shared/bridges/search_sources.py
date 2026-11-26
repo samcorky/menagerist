@@ -165,13 +165,13 @@ class ItemTypeSource:
     ) -> list[SearchHit]:
         """Return item types matching `query`."""
         hits: list[SearchHit] = []
-        after = None
+        after: Cursor | None = None
         seen = 0
         while seen < _TYPE_CAP:
             page = await self._use_case.handle(
                 ListNodeTypesQuery(after=after, limit=_TYPE_PAGE), actor
             )
-            seen += len(page)
+            seen += len(page.items)
             hits.extend(
                 SearchHit(
                     kind=self.kind,
@@ -179,12 +179,12 @@ class ItemTypeSource:
                     title=node_type.label,
                     description=node_type.description,
                 )
-                for node_type in page
+                for node_type in page.items
                 if _mentions(query, node_type.label, str(node_type.slug))
             )
-            if len(page) < _TYPE_PAGE:
+            if page.next is None:
                 break
-            after = page[-1].id
+            after = page.next
         return hits
 
 

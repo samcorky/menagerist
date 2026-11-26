@@ -1,3 +1,4 @@
+import uuid
 from typing import TYPE_CHECKING
 
 import pytest
@@ -9,6 +10,7 @@ from app.modules.graph.adapters.persistence.edge_type_repository import (
 from app.modules.graph.domain.edge_type import EdgeType
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest, SortOrder
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,3 +80,33 @@ async def test_live_edge_types_cannot_share_a_slug(db_session: AsyncSession) -> 
                 owner_id=SYSTEM_ACTOR.id, slug="signed-by", label="Duplicate"
             )
         )
+
+
+@pytest.mark.parametrize("order", list(SortOrder))
+@pytest.mark.parametrize("sort", [None, "slug", "label", "created_at", "updated_at"])
+async def test_list_cursors_visit_every_edge_type_once_in_order(
+    db_session: AsyncSession, sort: str | None, order: SortOrder
+) -> None:
+    """Following `next` never repeats a type or skips one, whatever the sort."""
+    repository = SqlAlchemyEdgeTypeRepository(db_session)
+    owner = uuid.uuid7()
+    for slug, label in [("b", "B"), ("a", "a"), ("c", "C"), ("d", "b"), ("e", "A")]:
+        await repository.add(EdgeType.create(owner_id=owner, slug=slug, label=label))
+    scope = ContentFilter.everyone()
+    everything = (
+        await repository.list(
+            scope=scope, page=PageRequest(sort=sort, order=order, limit=100)
+        )
+    ).items
+
+    seen: list[uuid.UUID] = []
+    request = PageRequest(sort=sort, order=order, limit=2)
+    while True:
+        page = await repository.list(scope=scope, page=request)
+        seen.extend(t.id for t in page.items)
+        if page.next is None:
+            break
+        request = PageRequest(after=page.next, sort=sort, order=order, limit=2)
+
+    assert seen == [t.id for t in everything]
+    assert len(set(seen)) == 5

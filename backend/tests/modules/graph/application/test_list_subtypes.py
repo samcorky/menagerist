@@ -22,6 +22,7 @@ from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.paging import Cursor
 
 
 def _repos() -> GraphRepos:
@@ -49,9 +50,11 @@ async def test_lists_the_subtypes_of_the_parent_by_id() -> None:
     await _add(repos, "figure", "memorabilia")
     await _add(repos, "vinyl", "music-media")
 
-    found = await ListSubtypes(repos, InMemoryAccessGuard()).handle(
-        ListSubtypesQuery(node_type_id=memorabilia.id), SYSTEM_ACTOR
-    )
+    found = (
+        await ListSubtypes(repos, InMemoryAccessGuard()).handle(
+            ListSubtypesQuery(node_type_id=memorabilia.id), SYSTEM_ACTOR
+        )
+    ).items
 
     assert [str(t.slug) for t in found] == ["poster", "figure"]
 
@@ -69,11 +72,15 @@ async def test_pages_with_after_and_limit() -> None:
         ListSubtypesQuery(node_type_id=memorabilia.id, limit=2), SYSTEM_ACTOR
     )
     rest = await use_case.handle(
-        ListSubtypesQuery(node_type_id=memorabilia.id, after=poster.id), SYSTEM_ACTOR
+        ListSubtypesQuery(
+            node_type_id=memorabilia.id, after=Cursor.after_id(poster.id)
+        ),
+        SYSTEM_ACTOR,
     )
 
-    assert [str(t.slug) for t in first] == ["poster", "figure"]
-    assert [str(t.slug) for t in rest] == ["figure", "mug"]
+    assert [str(t.slug) for t in first.items] == ["poster", "figure"]
+    assert first.next is not None
+    assert [str(t.slug) for t in rest.items] == ["figure", "mug"]
 
 
 async def test_a_type_with_no_subtypes_lists_none() -> None:
@@ -81,9 +88,11 @@ async def test_a_type_with_no_subtypes_lists_none() -> None:
     repos = _repos()
     book = await _add(repos, "book")
 
-    found = await ListSubtypes(repos, InMemoryAccessGuard()).handle(
-        ListSubtypesQuery(node_type_id=book.id), SYSTEM_ACTOR
-    )
+    found = (
+        await ListSubtypes(repos, InMemoryAccessGuard()).handle(
+            ListSubtypesQuery(node_type_id=book.id), SYSTEM_ACTOR
+        )
+    ).items
 
     assert found == []
 

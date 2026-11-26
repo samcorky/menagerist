@@ -92,9 +92,11 @@ async def test_list_edge_types_fills_in_linked_options() -> None:
         )
     )
 
-    results = await ListEdgeTypes(
-        _repos(edge_types), InMemoryAccessGuard(), _Options()
-    ).handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)
+    results = (
+        await ListEdgeTypes(
+            _repos(edge_types), InMemoryAccessGuard(), _Options()
+        ).handle(ListEdgeTypesQuery(), SYSTEM_ACTOR)
+    ).items
 
     assert results[0].attributes_schema is not None
     assert results[0].attributes_schema["properties"]["rating"]["enum"] == [

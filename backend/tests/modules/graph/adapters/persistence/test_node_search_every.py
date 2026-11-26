@@ -31,6 +31,7 @@ from app.modules.graph.application.prepare_query import prepare_query
 from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Page
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -146,8 +147,8 @@ async def _seed_memory() -> GraphRepos:
 
 
 class _NoTypes:
-    async def list(self, *, scope: Any, after: Any, limit: int) -> list[Any]:  # noqa: ANN401
-        return []
+    async def list(self, *, scope: Any, page: Any) -> Page[Any]:  # noqa: ANN401
+        return Page(items=[])
 
 
 async def _seed_postgres(session: AsyncSession) -> GraphRepos:

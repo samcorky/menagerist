@@ -131,7 +131,9 @@ async def test_list_reports_each_types_effective_schema() -> None:
     _, repos = _uow()
     await _memorabilia_and_poster(repos)
 
-    found = await ListNodeTypes(repos, GUARD).handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
+    found = (
+        await ListNodeTypes(repos, GUARD).handle(ListNodeTypesQuery(), SYSTEM_ACTOR)
+    ).items
 
     by_slug = {str(t.slug): t for t in found}
     assert by_slug["memorabilia"].effective_schema is None
@@ -150,7 +152,7 @@ async def test_subtypes_are_listed_with_their_effective_schema() -> None:
         ListSubtypesQuery(node_type_id=parent.id), SYSTEM_ACTOR
     )
 
-    assert list(found[0].effective_schema["properties"]) == ["year", "width"]  # type: ignore[index]
+    assert list(found.items[0].effective_schema["properties"]) == ["year", "width"]  # type: ignore[index]
 
 
 async def test_create_and_update_report_the_effective_schema_too() -> None:

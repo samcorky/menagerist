@@ -6,6 +6,7 @@ from app.modules.graph.adapters.persistence.in_memory_edge_type_repository impor
 from app.modules.graph.domain.edge_type import EdgeType
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Cursor, PageRequest
 
 
 async def test_add_and_get_round_trips() -> None:
@@ -55,7 +56,9 @@ async def test_list_orders_by_id_ascending() -> None:
     for et in reversed(types):
         await repo.add(et)
 
-    result = await repo.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repo.list(scope=ContentFilter.everyone(), page=PageRequest(limit=10))
+    ).items
 
     assert result == sorted(types, key=lambda t: t.id)
 
@@ -75,7 +78,12 @@ async def test_list_respects_after_and_limit() -> None:
     for et in types:
         await repo.add(et)
 
-    page = await repo.list(after=types[0].id, limit=2, scope=ContentFilter.everyone())
+    page = (
+        await repo.list(
+            scope=ContentFilter.everyone(),
+            page=PageRequest(after=Cursor.after_id(types[0].id), limit=2),
+        )
+    ).items
 
     assert page == types[1:3]
 
@@ -125,7 +133,9 @@ async def test_list_excludes_soft_deleted() -> None:
     deleted.soft_delete()
     await repo.save(deleted)
 
-    result = await repo.list(after=None, limit=10, scope=ContentFilter.everyone())
+    result = (
+        await repo.list(scope=ContentFilter.everyone(), page=PageRequest(limit=10))
+    ).items
 
     assert result == [kept]
 
