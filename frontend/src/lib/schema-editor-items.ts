@@ -73,6 +73,25 @@ export function schemaToArchived(schema: AttributesSchema | null): EditorField[]
 	);
 }
 
+/**
+ * The schema as the schema editor writes it back the moment it opens `schema`: the same fields,
+ * with the layout, version and highlights it keeps filled in. Opening an editor with this, not
+ * the stored schema, makes what the form holds when it opens equal to what it holds a moment
+ * later, so an untouched editor is not mistaken for a changed one. `list` is the highlight list
+ * the editor is given.
+ */
+export function settleSchema(
+	schema: AttributesSchema | null,
+	list: HighlightList = 'card'
+): AttributesSchema | null {
+	return itemsToSchema(
+		schemaToItems(schema, list),
+		readSchemaMeta(schema),
+		schemaToArchived(schema),
+		list
+	);
+}
+
 export function itemsToSchema(
 	items: EditorItem[],
 	baseMeta: SchemaMeta,

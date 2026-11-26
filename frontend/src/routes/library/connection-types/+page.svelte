@@ -33,6 +33,7 @@
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { describeLimits } from '$lib/connection-limits';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import { settleSchema } from '$lib/schema-editor-items';
 
 	const PAGE_SIZE = 50;
 
@@ -132,7 +133,8 @@
 		holder = et.holder;
 		sourceTypes = [...et.source_types];
 		targetTypes = [...et.target_types];
-		schema = (et.attributes_schema as AttributesSchema | null) ?? null;
+		// As the schema editor will write it, so opening the editor is not a change.
+		schema = settleSchema((et.attributes_schema as AttributesSchema | null) ?? null, 'connection');
 		editorOpen = true;
 		void readItemTypes();
 	}

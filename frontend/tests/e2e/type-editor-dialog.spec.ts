@@ -61,6 +61,71 @@ test('closing a changed editor asks before discarding', async ({ page }) => {
 	await expect(dialog).toBeHidden();
 });
 
+// A schema as the API holds it for a type made by a script: one plain field, none of the layout
+// or version the schema editor adds when it opens.
+const oneField = {
+	type: 'object',
+	properties: { rating: { type: 'string', title: 'Rating', 'x-menagerist': { kind: 'text' } } }
+};
+
+test('cancelling an untouched editor of a type with fields closes it without asking', async ({
+	page,
+	request
+}) => {
+	const label = uniqueName('Has a field');
+	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+	const made = await request.post('/api/v1/node-types', {
+		data: { slug, label, attributes_schema: oneField }
+	});
+	expect(made.status(), await made.text()).toBe(201);
+	const { id } = (await made.json()) as { id: string };
+
+	await page.goto('/library/item-types');
+	await row(page, label).getByRole('button', { name: 'Edit item type' }).click();
+	const dialog = page.getByRole('dialog', { name: 'Edit item type' });
+	await expect(dialog.getByLabel('Name')).toHaveValue(label);
+	// The schema editor has opened the field; give it time to settle before asking to leave.
+	await expect(dialog.getByLabel('Field label').first()).toHaveValue('Rating');
+	await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await expect(dialog).toBeHidden();
+	await expect(page.getByRole('group', { name: 'Discard changes?' })).toHaveCount(0);
+
+	// A real change to the same type still asks.
+	await row(page, label).getByRole('button', { name: 'Edit item type' }).click();
+	await expect(dialog.getByLabel('Field label').first()).toHaveValue('Rating');
+	await dialog.getByLabel('Name').fill(`${label} changed`);
+	await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await expect(dialog.getByRole('group', { name: 'Discard changes?' })).toBeVisible();
+	await dialog
+		.getByRole('group', { name: 'Discard changes?' })
+		.getByRole('button', { name: 'Discard', exact: true })
+		.click();
+	await expect(dialog).toBeHidden();
+	await request.delete(`/api/v1/node-types/${id}`);
+});
+
+test('cancelling an untouched editor of a relationship type with fields closes it without asking', async ({
+	page,
+	request
+}) => {
+	const label = uniqueName('Link with a field');
+	const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+	const made = await request.post('/api/v1/edge-types', {
+		data: { slug, label, attributes_schema: oneField }
+	});
+	expect(made.status(), await made.text()).toBe(201);
+	const { id } = (await made.json()) as { id: string };
+
+	await page.goto('/library/connection-types');
+	await row(page, label).getByRole('button', { name: 'Edit relationship type' }).click();
+	const dialog = page.getByRole('dialog', { name: 'Edit relationship type' });
+	await expect(dialog.getByLabel('Field label').first()).toHaveValue('Rating');
+	await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await expect(dialog).toBeHidden();
+	await expect(page.getByRole('group', { name: 'Discard changes?' })).toHaveCount(0);
+	await request.delete(`/api/v1/edge-types/${id}`);
+});
+
 test('New relationship type opens an editor in a dialog', async ({ page }) => {
 	const label = uniqueName('Dialog link');
 	await page.goto('/library/connection-types');
