@@ -12,7 +12,7 @@ from enum import StrEnum
 from typing import Annotated, ClassVar
 
 from fastapi import Header, Path, Query
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from app.shared_kernel.paging import (
     MAX_SORT_KEYS,
@@ -77,13 +77,24 @@ class PageParams[Sort: StrEnum](BaseModel):
         description=PAGE_ORDER_DESCRIPTION,
     )
 
-    @model_validator(mode="after")
-    def _keys_and_directions_agree(self) -> PageParams[Sort]:
-        if len(set(self.sort)) != len(self.sort):
-            raise ValueError("`sort` names a key twice")
-        if len(self.order) > max(len(self.sort), 1):
-            raise ValueError("`order` has more directions than `sort` has keys")
-        return self
+    # Field validators, not a model validator, so each error names its own parameter.
+    @field_validator("sort")
+    @classmethod
+    def _keys_are_distinct(cls, keys: list[Sort]) -> list[Sort]:
+        if len(set(keys)) != len(keys):
+            raise ValueError("A key can be named only once")
+        return keys
+
+    @field_validator("order")
+    @classmethod
+    def _no_more_directions_than_keys(
+        cls, directions: list[SortOrder], info: ValidationInfo
+    ) -> list[SortOrder]:
+        # `sort` is validated first; if it failed it has its own error and is absent.
+        keys = info.data.get("sort")
+        if keys is not None and len(directions) > max(len(keys), 1):
+            raise ValueError("There are more directions than `sort` has keys")
+        return directions
 
     @property
     def first_sort(self) -> Sort | None:

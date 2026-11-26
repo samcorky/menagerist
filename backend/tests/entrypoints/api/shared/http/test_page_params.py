@@ -119,20 +119,29 @@ def test_a_newest_first_list_gives_a_key_with_no_direction_desc() -> None:
 
 
 @pytest.mark.fast
+@pytest.mark.parametrize("path", ["/rows", "/newest"])
 @pytest.mark.parametrize(
-    "params",
+    ("params", "parameter"),
     [
-        [("sort", "name"), ("sort", "name")],
-        [("sort", "name"), ("order", "asc"), ("order", "desc")],
-        [("order", "asc"), ("order", "desc")],
-        [("sort", "name")] * 2 + [("sort", "created_at")] * 2,
+        ([("sort", "name"), ("sort", "name")], "sort"),
+        ([("sort", "name"), ("order", "asc"), ("order", "desc")], "order"),
+        ([("order", "asc"), ("order", "desc")], "order"),
+        ([("sort", "name")] * 2 + [("sort", "created_at")] * 2, "sort"),
+        ([("sort", "bogus")], "sort"),
+        ([("order", "sideways")], "order"),
     ],
 )
-def test_keys_must_be_distinct_and_directions_no_more_than_keys(
+def test_a_bad_key_or_direction_is_a_422_that_names_the_parameter(
+    path: str,
     params: list[tuple[str, str | int | float | bool | None]],
+    parameter: str,
 ) -> None:
-    """A repeated key, more directions than keys, or over three keys is a 422."""
-    assert TestClient(_app()).get("/rows", params=params).status_code == 422
+    """A repeated or unknown key, or more directions than keys, points at its field."""
+    response = TestClient(_app()).get(path, params=params)
+
+    assert response.status_code == 422
+    locations = [error["loc"] for error in response.json()["detail"]]
+    assert all(loc[:2] == ["query", parameter] for loc in locations)
 
 
 @pytest.mark.fast
