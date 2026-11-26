@@ -19,7 +19,7 @@ from app.entrypoints.api.shared.http.parameters import (
     FieldKey,
     NodeTypeId,
     PageLimit,
-    PageParams,
+    SearchPageParams,
     SubFieldKey,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -169,7 +169,7 @@ async def list_node_types(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    page: Annotated[PageParams[NodeTypeSort], Query()],
+    page: Annotated[SearchPageParams[NodeTypeSort], Query()],
 ) -> list[NodeTypeResponse]:
     """List node types, by id unless sorted."""
     result = await use_case.handle(
@@ -178,6 +178,7 @@ async def list_node_types(
             limit=page.limit,
             sort=page.sort,
             order=page.order,
+            q=page.q,
         ),
         actor,
     )
@@ -203,7 +204,7 @@ async def list_subtypes(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    page: Annotated[PageParams[NodeTypeSort], Query()],
+    page: Annotated[SearchPageParams[NodeTypeSort], Query()],
 ) -> list[NodeTypeResponse]:
     """List the subtypes of an item type, by id unless sorted."""
     result = await use_case.handle(
@@ -213,6 +214,7 @@ async def list_subtypes(
             limit=page.limit,
             sort=page.sort,
             order=page.order,
+            q=page.q,
         ),
         actor,
     )

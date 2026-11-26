@@ -12,7 +12,7 @@ from app.modules.collections.domain.collection import (
 )
 from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
-from app.platform.text_search import contains_pattern, unaccent_ilike
+from app.platform.text_search import contains_any, contains_pattern, unaccent_ilike
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
 
@@ -205,12 +205,16 @@ class SqlAlchemyCollectionRepository:
         return None if model is None else _to_domain(model)
 
     async def list_deleted(
-        self, *, scope: ContentFilter, page: PageRequest
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
     ) -> Page[Collection]:
         """List soft-deleted collections in `scope`, one page as `page` asks."""
+        stmt = select(CollectionModel).where(self._deleted(scope))
+        match = contains_any(q, CollectionModel.name)
+        if match is not None:
+            stmt = stmt.where(match)
         return await keyset_page(
             self._session,
-            select(CollectionModel).where(self._deleted(scope)),
+            stmt,
             id_column=CollectionModel.id,
             columns=_DELETED_SORT_COLUMNS,
             request=page,

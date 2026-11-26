@@ -133,3 +133,20 @@ def test_a_cursor_from_another_sort_or_an_unreadable_one_is_a_400() -> None:
 
     assert mismatched.status_code == 400
     assert unreadable.status_code == 400
+
+
+def test_connections_search_the_type() -> None:
+    """`q` keeps the connections whose type contains it, whole list or one item."""
+    client = TestClient(_app())
+    hub = _node(client, "hub")
+    _edges(client, hub)
+
+    whole = client.get(BASE, params={"q": "OWN", "limit": 100}).json()
+    one_item = client.get(
+        BASE, params={"q": "like", "node_id": hub, "limit": 100}
+    ).json()
+
+    assert {e["type"] for e in whole} == {"owns"}
+    assert len(whole) == 3
+    assert {e["type"] for e in one_item} == {"likes"}
+    assert len(one_item) == 2

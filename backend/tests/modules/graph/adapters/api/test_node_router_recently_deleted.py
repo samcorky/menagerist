@@ -287,3 +287,20 @@ def test_list_deleted_cursor_from_another_sort_or_unreadable_is_a_400(
 
     assert mismatched.status_code == 400
     assert unreadable.status_code == 400
+
+
+def test_list_deleted_searches_the_name_and_the_type(world: _World) -> None:
+    """`q` ignores case and accents; it reads the name and the type."""
+    client = world.client
+    cafe = world.create("Café table", type=None)
+    film = world.create("Alien")
+    world.create("Spoon")
+    for item_id in (cafe, film):
+        client.delete(f"{BASE}/{item_id}")
+    client.delete(f"{BASE}/{world.create('Gone spoon')}")
+
+    by_name = client.get(f"{BASE}/deleted", params={"q": "CAFE"}).json()
+    nothing = client.get(f"{BASE}/deleted", params={"q": "zebra"}).json()
+
+    assert [row["id"] for row in by_name] == [cafe]
+    assert nothing == []

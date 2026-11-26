@@ -194,6 +194,13 @@ class PagedQuery[Sort: StrEnum]:
         )
 
 
+@dataclass(kw_only=True)
+class SearchedPagedQuery[Sort: StrEnum](PagedQuery[Sort]):
+    """`PagedQuery` for a list with text to search: `q` keeps the rows containing it."""
+
+    q: str | None = None
+
+
 @dataclass(kw_only=True, frozen=True)
 class Page[T]:
     """One page of rows, and the cursor of the next page when there is one."""

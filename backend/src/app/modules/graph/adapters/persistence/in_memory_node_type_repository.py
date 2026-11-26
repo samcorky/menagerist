@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from app.shared_kernel.paging import page_rows, timestamp_value
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     import builtins
@@ -12,9 +13,11 @@ if TYPE_CHECKING:
     from app.shared_kernel.paging import Page, PageRequest
 
 
-def _paged(types: builtins.list[NodeType], page: PageRequest) -> Page[NodeType]:
+def _paged(
+    types: builtins.list[NodeType], page: PageRequest, q: str | None
+) -> Page[NodeType]:
     return page_rows(
-        types,
+        [nt for nt in types if matches_text(q, nt.label, str(nt.slug), nt.description)],
         page,
         id_of=lambda nt: nt.id,
         values={
@@ -70,17 +73,24 @@ class InMemoryNodeTypeRepository:
             None,
         )
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[NodeType]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[NodeType]:
         """List non-deleted node types in `scope`, one page in the order `page` asks."""
         live = [
             nt
             for nt in self._node_types.values()
             if not nt.is_deleted and scope.covers(nt.owner_id)
         ]
-        return _paged(live, page)
+        return _paged(live, page, q)
 
     async def page_subtypes(
-        self, parent: str, *, scope: ContentFilter, page: PageRequest
+        self,
+        parent: str,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        q: str | None = None,
     ) -> Page[NodeType]:
         """One page of the non-deleted subtypes of the type with slug `parent`."""
         subtypes = [
@@ -88,7 +98,7 @@ class InMemoryNodeTypeRepository:
             for nt in self._node_types.values()
             if nt.parent == parent and not nt.is_deleted and scope.covers(nt.owner_id)
         ]
-        return _paged(subtypes, page)
+        return _paged(subtypes, page, q)
 
     async def list_subtypes(
         self, parent: str, *, scope: ContentFilter

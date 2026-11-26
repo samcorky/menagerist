@@ -318,6 +318,25 @@
               "default": "desc"
             },
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -3882,6 +3901,25 @@
               "default": "desc"
             },
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -7734,6 +7772,25 @@
             "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
           },
           {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
+          },
+          {
             "name": "node_id",
             "in": "query",
             "required": false,
@@ -9207,6 +9264,25 @@
               "default": "asc"
             },
             "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -10253,6 +10329,25 @@
               "default": "asc"
             },
             "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -12070,6 +12165,25 @@
               "default": "asc"
             },
             "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -23350,6 +23464,25 @@
               "default": "desc"
             },
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -25623,6 +25756,25 @@
               "default": "desc"
             },
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -28679,6 +28831,25 @@
               "default": "desc"
             },
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -29623,6 +29794,25 @@
               "default": "desc"
             },
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -30275,6 +30465,25 @@
               "default": "asc"
             },
             "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {
@@ -32088,6 +32297,25 @@
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
           },
           {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
+          },
+          {
             "name": "user_id",
             "in": "query",
             "required": false,
@@ -32755,6 +32983,25 @@
               "default": "desc"
             },
             "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           }
         ],
         "responses": {

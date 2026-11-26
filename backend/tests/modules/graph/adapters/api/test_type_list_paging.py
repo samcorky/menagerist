@@ -162,3 +162,53 @@ def test_a_cursor_from_another_sort_or_an_unreadable_one_is_a_400(url: str) -> N
 
     assert mismatched.status_code == 400
     assert unreadable.status_code == 400
+
+
+def test_item_types_and_subtypes_search_label_slug_and_description() -> None:
+    """`q` ignores case and accents and reads label, slug and description."""
+    client = TestClient(_app())
+    parent = client.post(
+        "/api/v1/node-types", json={"slug": "memo", "label": "Memorabilia"}
+    ).json()
+    for slug, label, description in [
+        ("poster", "Café poster", None),
+        ("figure", "Figure", "A small CAFE statue"),
+        ("mug", "Mug", None),
+    ]:
+        body: dict[str, Any] = {"slug": slug, "label": label, "parent": "memo"}
+        if description:
+            body["description"] = description
+        assert client.post("/api/v1/node-types", json=body).status_code == 201
+
+    by_label = client.get("/api/v1/node-types", params={"q": "CAFE"}).json()
+    by_slug = client.get("/api/v1/node-types", params={"q": "ug"}).json()
+    subtypes = client.get(
+        f"/api/v1/node-types/{parent['id']}/subtypes", params={"q": "cafe"}
+    ).json()
+
+    assert sorted(t["slug"] for t in by_label) == ["figure", "poster"]
+    assert [t["slug"] for t in by_slug] == ["mug"]
+    assert sorted(t["slug"] for t in subtypes) == ["figure", "poster"]
+
+
+def test_connection_types_search_label_reverse_label_slug_and_description() -> None:
+    """Either direction's wording finds the type."""
+    client = TestClient(_app())
+    for slug, label, reverse, description in [
+        ("owns", "Owns", "Owned by", None),
+        ("likes", "Likes", None, "Taste, not ownership"),
+    ]:
+        body: dict[str, Any] = {"slug": slug, "label": label, "directional": True}
+        if reverse:
+            body["reverse_label"] = reverse
+        if description:
+            body["description"] = description
+        assert client.post("/api/v1/edge-types", json=body).status_code == 201
+
+    by_reverse = client.get("/api/v1/edge-types", params={"q": "owned"}).json()
+    by_description = client.get("/api/v1/edge-types", params={"q": "TASTE"}).json()
+    nothing = client.get("/api/v1/edge-types", params={"q": "zebra"}).json()
+
+    assert [t["slug"] for t in by_reverse] == ["owns"]
+    assert [t["slug"] for t in by_description] == ["likes"]
+    assert nothing == []

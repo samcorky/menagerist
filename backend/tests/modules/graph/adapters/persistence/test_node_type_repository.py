@@ -242,3 +242,36 @@ async def test_list_sorts_node_types_by_label_ignoring_case(
     )
 
     assert [t.label for t in page.items] == ["Apple", "banana", "cherry"]
+
+
+async def test_list_q_matches_label_slug_and_description_ignoring_case_and_accents(
+    db_session: AsyncSession,
+) -> None:
+    """The filter reads three columns, and applies to subtypes as well."""
+    repository = SqlAlchemyNodeTypeRepository(db_session)
+    owner = uuid.uuid7()
+    await repository.add(NodeType.create(owner_id=owner, slug="memo", label="Memo"))
+    by_label = NodeType.create(owner_id=owner, slug="a", label="Café", parent="memo")
+    by_slug = NodeType.create(owner_id=owner, slug="cafe-b", label="B")
+    by_description = NodeType.create(
+        owner_id=owner, slug="c", label="C", description="A small CAFÉ", parent="memo"
+    )
+    miss = NodeType.create(owner_id=owner, slug="d", label="D")
+    for node_type in (by_label, by_slug, by_description, miss):
+        await repository.add(node_type)
+    scope = ContentFilter.everyone()
+    request = PageRequest(limit=100)
+
+    found = await repository.list(scope=scope, page=request, q="CAFE")
+    subtypes = await repository.page_subtypes(
+        "memo", scope=scope, page=request, q="cafe"
+    )
+    blank = await repository.list(scope=scope, page=request, q="  ")
+
+    assert {t.id for t in found.items} == {
+        by_label.id,
+        by_slug.id,
+        by_description.id,
+    }
+    assert {t.id for t in subtypes.items} == {by_label.id, by_description.id}
+    assert len(blank.items) == 5

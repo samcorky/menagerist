@@ -13,7 +13,7 @@ from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa:
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Page, PagedQuery
+from app.shared_kernel.paging import Page, SearchedPagedQuery
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -32,7 +32,7 @@ class EdgeTypeSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListEdgeTypesQuery(PagedQuery[EdgeTypeSort]):
+class ListEdgeTypesQuery(SearchedPagedQuery[EdgeTypeSort]):
     """Request to list edge types, by id unless `sort` says otherwise."""
 
 
@@ -55,6 +55,7 @@ class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, Page[EdgeType]]
         page = await self._repos.edge_types.list(
             scope=self.scope(actor),
             page=query.page_request(),
+            q=query.q,
         )
         logger.debug("edge types listed", count=len(page.items))
         return Page(

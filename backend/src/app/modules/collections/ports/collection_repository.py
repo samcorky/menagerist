@@ -63,7 +63,7 @@ class CollectionRepository(Protocol):
         ...
 
     async def list_deleted(
-        self, *, scope: ContentFilter, page: PageRequest
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
     ) -> Page[Collection]:
         """List soft-deleted collections in `scope`, one page in the order `page` asks.
 

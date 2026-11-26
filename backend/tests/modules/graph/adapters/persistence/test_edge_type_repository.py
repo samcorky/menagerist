@@ -110,3 +110,30 @@ async def test_list_cursors_visit_every_edge_type_once_in_order(
 
     assert seen == [t.id for t in everything]
     assert len(set(seen)) == 5
+
+
+async def test_list_q_matches_either_label_the_slug_and_the_description(
+    db_session: AsyncSession,
+) -> None:
+    """Each searched column finds the type; `%` is read literally."""
+    repository = SqlAlchemyEdgeTypeRepository(db_session)
+    owner = uuid.uuid7()
+    owns = EdgeType.create(
+        owner_id=owner, slug="owns", label="Owns", reverse_label="Owned by"
+    )
+    likes = EdgeType.create(
+        owner_id=owner, slug="likes", label="Likes", description="Taste, 100% café"
+    )
+    for edge_type in (owns, likes):
+        await repository.add(edge_type)
+    scope = ContentFilter.everyone()
+
+    async def ids(q: str) -> set[uuid.UUID]:
+        page = await repository.list(scope=scope, page=PageRequest(limit=100), q=q)
+        return {t.id for t in page.items}
+
+    assert await ids("OWNED") == {owns.id}
+    assert await ids("kes") == {likes.id}
+    assert await ids("CAFE") == {likes.id}
+    assert await ids("100%") == {likes.id}
+    assert await ids("5%") == set()

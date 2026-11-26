@@ -8,6 +8,7 @@ from app.modules.graph.adapters.persistence.models import EdgeModel
 from app.modules.graph.domain.edge import Edge
 from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
+from app.platform.text_search import contains_any
 
 if TYPE_CHECKING:
     import builtins
@@ -137,13 +138,20 @@ class SqlAlchemyEdgeRepository:
         result = await self._session.execute(stmt)
         return [_to_domain(model) for model in result.scalars()]
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[Edge]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[Edge]:
         """List non-deleted edges in `scope`, one page in the order `page` asks."""
         logger.debug("listing edges", page=page)
-        return await self._page(select(EdgeModel).where(_in_scope(scope)), page)
+        return await self._page(select(EdgeModel).where(_in_scope(scope)), page, q)
 
     async def page_for_node(
-        self, node_id: uuid.UUID, *, scope: ContentFilter, page: PageRequest
+        self,
+        node_id: uuid.UUID,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        q: str | None = None,
     ) -> Page[Edge]:
         """One page of the non-deleted edges where `node_id` is source or target."""
         logger.debug("listing a page of edges for node", node_id=node_id)
@@ -151,9 +159,14 @@ class SqlAlchemyEdgeRepository:
             _in_scope(scope),
             or_(EdgeModel.source_id == node_id, EdgeModel.target_id == node_id),
         )
-        return await self._page(stmt, page)
+        return await self._page(stmt, page, q)
 
-    async def _page(self, stmt: Select[EdgeModel], page: PageRequest) -> Page[Edge]:
+    async def _page(
+        self, stmt: Select[EdgeModel], page: PageRequest, q: str | None
+    ) -> Page[Edge]:
+        match = contains_any(q, EdgeModel.type)
+        if match is not None:
+            stmt = stmt.where(match)
         return await keyset_page(
             self._session,
             stmt,

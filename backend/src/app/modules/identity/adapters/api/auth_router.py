@@ -14,7 +14,10 @@ from app.entrypoints.api.shared.http.http_headers import (
     paging_responses,
     set_page_headers,
 )
-from app.entrypoints.api.shared.http.parameters import NewestFirstPageParams, SessionId
+from app.entrypoints.api.shared.http.parameters import (
+    NewestFirstSearchPageParams,
+    SessionId,
+)
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.cookies import (
@@ -413,7 +416,7 @@ async def list_own_devices(
     use_case: Annotated[ListOwnDevices, Depends(get_list_own_devices_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
     current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
-    page: Annotated[NewestFirstPageParams[OwnDeviceSort], Query()],
+    page: Annotated[NewestFirstSearchPageParams[OwnDeviceSort], Query()],
 ) -> list[OwnDeviceResponse]:
     """List the browsers you are signed in on, most recently used first unless sorted.
 
@@ -425,6 +428,7 @@ async def list_own_devices(
             limit=page.limit,
             sort=page.sort,
             order=page.order,
+            q=page.q,
             current_session_id=current_session_id,
         ),
         actor,
@@ -572,7 +576,7 @@ async def list_own_sessions(
     use_case: Annotated[ListOwnSessions, Depends(get_list_own_sessions_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
     current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
-    page: Annotated[NewestFirstPageParams[OwnSessionSort], Query()],
+    page: Annotated[NewestFirstSearchPageParams[OwnSessionSort], Query()],
 ) -> list[SessionResponse]:
     """List all active devices for the current user, newest first unless sorted."""
     result = await use_case.handle(
@@ -581,6 +585,7 @@ async def list_own_sessions(
             limit=page.limit,
             sort=page.sort,
             order=page.order,
+            q=page.q,
             current_session_id=current_session_id,
         ),
         actor,

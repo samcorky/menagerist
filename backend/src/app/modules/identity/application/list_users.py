@@ -9,7 +9,13 @@ from app.modules.identity.application.user_listing import UserListing
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Page, PagedQuery, page_rows, timestamp_value
+from app.shared_kernel.paging import (
+    Page,
+    SearchedPagedQuery,
+    page_rows,
+    timestamp_value,
+)
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -27,7 +33,7 @@ class UserSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListUsersQuery(PagedQuery[UserSort]):
+class ListUsersQuery(SearchedPagedQuery[UserSort]):
     """Request to list the accounts, by username unless told."""
 
 
@@ -51,7 +57,16 @@ class ListUsers(QueryHandler[IdentityRepos, ListUsersQuery, Page[UserListing]]):
             for user in users
         ]
         return page_rows(
-            listings,
+            [
+                item
+                for item in listings
+                if matches_text(
+                    query.q,
+                    item.user.username,
+                    item.user.display_name,
+                    str(item.user.role),
+                )
+            ],
             query.page_request(UserSort.USERNAME),
             id_of=lambda item: item.user.id,
             values={

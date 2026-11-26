@@ -7,6 +7,7 @@ from app.modules.graph.adapters.persistence.models import EdgeTypeModel
 from app.modules.graph.domain.edge_type import EdgeType
 from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
+from app.platform.text_search import contains_any
 from app.shared_kernel.slug import Slug
 
 if TYPE_CHECKING:
@@ -115,7 +116,9 @@ class SqlAlchemyEdgeTypeRepository:
         model = result.scalar_one_or_none()
         return _to_domain(model) if model else None
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[EdgeType]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[EdgeType]:
         """List non-deleted edge types in `scope`, one page in the order `page` asks."""
         logger.debug("listing edge types", page=page)
         stmt = (
@@ -123,6 +126,15 @@ class SqlAlchemyEdgeTypeRepository:
             .where(EdgeTypeModel.deleted_at.is_(None))
             .where(owned_by(EdgeTypeModel, scope.user_id))
         )
+        match = contains_any(
+            q,
+            EdgeTypeModel.label,
+            EdgeTypeModel.reverse_label,
+            EdgeTypeModel.slug,
+            EdgeTypeModel.description,
+        )
+        if match is not None:
+            stmt = stmt.where(match)
         return await keyset_page(
             self._session,
             stmt,

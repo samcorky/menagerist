@@ -57,6 +57,7 @@ from app.modules.graph.domain.query import (
 from app.modules.graph.domain.reach import Reached
 from app.platform.keyset import SortColumn, keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
+from app.platform.text_search import contains_any
 from app.shared_kernel.paging import Page, parse_text
 
 if TYPE_CHECKING:
@@ -802,12 +803,16 @@ class SqlAlchemyNodeRepository:
         return None if model is None else _to_domain(model)
 
     async def list_deleted(
-        self, *, scope: ContentFilter, page: PageRequest
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
     ) -> Page[Node]:
         """List soft-deleted nodes in `scope`, one page in the order `page` asks."""
+        stmt = select(NodeModel).where(self._deleted(scope))
+        match = contains_any(q, NodeModel.name, NodeModel.type)
+        if match is not None:
+            stmt = stmt.where(match)
         return await keyset_page(
             self._session,
-            select(NodeModel).where(self._deleted(scope)),
+            stmt,
             id_column=NodeModel.id,
             columns=_DELETED_SORT_COLUMNS,
             request=page,

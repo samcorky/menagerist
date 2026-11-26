@@ -46,7 +46,9 @@ class NodeTypeRepository(Protocol):
         """Like `get`, but lock the type against concurrent item writes."""
         ...
 
-    async def list(self, *, scope: ContentFilter, page: PageRequest) -> Page[NodeType]:
+    async def list(
+        self, *, scope: ContentFilter, page: PageRequest, q: str | None = None
+    ) -> Page[NodeType]:
         """List non-deleted node types in `scope`, one page in the order `page` asks.
 
         The sort keys are `slug`, `label` (ignoring case), `created_at` and
@@ -58,7 +60,12 @@ class NodeTypeRepository(Protocol):
         ...
 
     async def page_subtypes(
-        self, parent: str, *, scope: ContentFilter, page: PageRequest
+        self,
+        parent: str,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        q: str | None = None,
     ) -> Page[NodeType]:
         """One page of the non-deleted subtypes of the type with slug `parent`.
 

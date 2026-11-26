@@ -11,7 +11,10 @@ from app.entrypoints.api.shared.http.http_headers import (
     paging_responses,
     set_page_headers,
 )
-from app.entrypoints.api.shared.http.parameters import BackupId, NewestFirstPageParams
+from app.entrypoints.api.shared.http.parameters import (
+    BackupId,
+    NewestFirstSearchPageParams,
+)
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -137,12 +140,16 @@ async def list_backups(
     response: Response,
     use_case: Annotated[ListBackups, Depends(get_list_backups)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    page: Annotated[NewestFirstPageParams[BackupSort], Query()],
+    page: Annotated[NewestFirstSearchPageParams[BackupSort], Query()],
 ) -> list[BackupResponse]:
     """List committed instance archive summaries, newest first unless sorted."""
     result = await use_case.handle(
         ListBackupsQuery(
-            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+            q=page.q,
         ),
         actor,
     )

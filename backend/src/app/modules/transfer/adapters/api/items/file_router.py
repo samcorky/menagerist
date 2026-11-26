@@ -16,7 +16,7 @@ from app.entrypoints.api.shared.http.http_headers import (
 )
 from app.entrypoints.api.shared.http.parameters import (
     ImportFileId,
-    NewestFirstPageParams,
+    NewestFirstSearchPageParams,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
@@ -178,12 +178,16 @@ async def list_item_import_files(
     response: Response,
     use_case: Annotated[ListItemImports, Depends(get_list_item_imports_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    page: Annotated[NewestFirstPageParams[ItemImportSort], Query()],
+    page: Annotated[NewestFirstSearchPageParams[ItemImportSort], Query()],
 ) -> list[ItemImportResponse]:
     """List your uploaded files and their imports, newest first unless sorted."""
     result = await use_case.handle(
         ListItemImportsQuery(
-            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+            q=page.q,
         ),
         actor,
     )

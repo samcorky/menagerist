@@ -110,3 +110,22 @@ async def test_deleted_before_lists_oldest_first_for_every_owner(
     assert [n.id for n in both] == [oldest.id, older.id]
     assert await repo.count_deleted_before(cutoff) == 2
     assert await repo.count_deleted_before(oldest.deleted_at) == 0  # type: ignore[arg-type]
+
+
+async def test_deleted_rows_filter_by_name_or_type_with_q(
+    db_session: AsyncSession,
+) -> None:
+    """`q` reads the name and the type, ignoring case and accents, in scope."""
+    repo = SqlAlchemyNodeRepository(db_session)
+    scope = ContentFilter.of(ALICE)
+    by_name = await _node(repo, "Café table", deleted_ago=1)
+    typed = Node.create(owner_id=ALICE, name="Plain", type="cafe-menu")
+    typed.deleted_at = datetime.now(UTC) - timedelta(minutes=2)
+    await repo.add(typed)
+    await _node(repo, "Spoon", deleted_ago=3)
+    await _node(repo, "Café theirs", owner=BOB, deleted_ago=1)
+    await _node(repo, "Café live")
+
+    found = await repo.list_deleted(scope=scope, page=PageRequest(limit=10), q="CAFE")
+
+    assert {n.id for n in found.items} == {by_name.id, typed.id}

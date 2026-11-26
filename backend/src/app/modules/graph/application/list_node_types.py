@@ -13,7 +13,7 @@ from app.modules.graph.ports.choice_list_source import ChoiceListSource  # noqa:
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Page, PagedQuery
+from app.shared_kernel.paging import Page, SearchedPagedQuery
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
@@ -32,7 +32,7 @@ class NodeTypeSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListNodeTypesQuery(PagedQuery[NodeTypeSort]):
+class ListNodeTypesQuery(SearchedPagedQuery[NodeTypeSort]):
     """Request for a page of node types, by id unless `sort` says otherwise."""
 
 
@@ -56,6 +56,7 @@ class ListNodeTypes(QueryHandler[GraphRepos, ListNodeTypesQuery, Page[NodeType]]
         page = await self._repos.node_types.list(
             scope=scope,
             page=query.page_request(),
+            q=query.q,
         )
         logger.debug("node types listed", count=len(page.items))
         return Page(

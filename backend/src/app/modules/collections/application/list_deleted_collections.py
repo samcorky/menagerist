@@ -9,7 +9,7 @@ from app.modules.collections.domain.collection import Collection
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, PagedQuery, SortOrder
+from app.shared_kernel.paging import Cursor, SearchedPagedQuery, SortOrder
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,7 +25,7 @@ class DeletedCollectionSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListDeletedCollectionsQuery(PagedQuery[DeletedCollectionSort]):
+class ListDeletedCollectionsQuery(SearchedPagedQuery[DeletedCollectionSort]):
     """Request for a page of deleted collections, newest deleted first unless told."""
 
     order: SortOrder = SortOrder.DESC
@@ -57,6 +57,7 @@ class ListDeletedCollections(
         page = await self._repos.collections.list_deleted(
             scope=scope,
             page=query.page_request(DeletedCollectionSort.DELETED_AT),
+            q=query.q,
         )
         total = await self._repos.collections.count_deleted(scope=scope)
         logger.debug("deleted collections listed", count=len(page.items), total=total)

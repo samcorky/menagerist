@@ -8,11 +8,12 @@ from app.shared_kernel.access import Access, Requires
 from app.shared_kernel.cqrs import UseCase
 from app.shared_kernel.paging import (
     Page,
-    PagedQuery,
+    SearchedPagedQuery,
     SortOrder,
     page_rows,
     timestamp_value,
 )
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     from app.modules.backup.ports.backup_store import BackupStore
@@ -29,7 +30,7 @@ class BackupSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListBackupsQuery(PagedQuery[BackupSort]):
+class ListBackupsQuery(SearchedPagedQuery[BackupSort]):
     """List committed instance backup summaries, newest first unless told."""
 
     order: SortOrder = SortOrder.DESC
@@ -48,7 +49,11 @@ class ListBackups(UseCase[ListBackupsQuery, Page[BackupSummary]]):
         self, request: ListBackupsQuery, actor: Actor
     ) -> Page[BackupSummary]:
         return page_rows(
-            await self._store.list(),
+            [
+                item
+                for item in await self._store.list()
+                if matches_text(request.q, item.label, item.app_version)
+            ],
             request.page_request(BackupSort.CREATED_AT),
             id_of=lambda item: item.id,
             values={
