@@ -19,6 +19,7 @@
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { effectiveSchema } from '$lib/node-types';
+	import { inheritedFromParent } from '$lib/type-inheritance';
 	import BackButton from '$lib/components/back-button.svelte';
 	import TypePicker from '$lib/components/type-picker.svelte';
 	import TagsInput from '$lib/components/tags-input.svelte';
@@ -266,6 +267,10 @@
 					schema={nodeSchema}
 					supportsExtraFields={true}
 					nodeType={nodeTypes.find((nt) => nt.slug === selectedType)}
+					inheritedFrom={inheritedFromParent(
+						nodeTypes.find((nt) => nt.slug === selectedType),
+						nodeTypes
+					)}
 					serverErrors={attrServerErrors}
 				/>
 

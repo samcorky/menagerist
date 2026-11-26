@@ -144,6 +144,7 @@
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { effectiveSchema } from '$lib/node-types';
 	import { groupByFamily, typeNames } from '$lib/type-names';
+	import { appearanceOf } from '$lib/type-inheritance';
 	import { matchContext } from '$lib/search-context';
 
 	const EMPTY_LINES = [
@@ -1438,8 +1439,8 @@
 							schema={schemaOf(item.type)}
 							categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
 							categoryParent={typeName.parentOf(item.type)?.label}
-							typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
-							typeColour={itemTypes.find((t) => t.slug === item.type)?.colour}
+							typeIcon={appearanceOf(item.type, itemTypes).icon}
+							typeColour={appearanceOf(item.type, itemTypes).colour}
 							match={q ? matchContext(item, schemaOf(item.type), q) : null}
 							isExample={exampleItemIds.has(item.id)}
 						/>
@@ -1473,8 +1474,8 @@
 								schema={schemaOf(item.type)}
 								categoryLabel={itemTypes.find((t) => t.slug === item.type)?.label}
 								categoryParent={typeName.parentOf(item.type)?.label}
-								typeIcon={itemTypes.find((t) => t.slug === item.type)?.icon}
-								typeColour={itemTypes.find((t) => t.slug === item.type)?.colour}
+								typeIcon={appearanceOf(item.type, itemTypes).icon}
+								typeColour={appearanceOf(item.type, itemTypes).colour}
 								match={q ? matchContext(item, schemaOf(item.type), q) : null}
 								isExample={exampleItemIds.has(item.id)}
 							/>

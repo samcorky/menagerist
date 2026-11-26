@@ -45,7 +45,8 @@
 		nodeType,
 		onPromoted,
 		serverErrors = null,
-		only
+		only,
+		inheritedFrom
 	}: {
 		rows: AttributeRow[];
 		schema?: AttributesSchema | null;
@@ -58,6 +59,8 @@
 		serverErrors?: Record<string, string> | null;
 		/** Show just these fields of `schema`, flat and in this order, with nothing else (quick capture). */
 		only?: readonly string[];
+		/** The fields a subtype uses from its parent type, and the parent's name, for a quiet tag. */
+		inheritedFrom?: { keys: readonly string[]; label: string } | null;
 	} = $props();
 
 	let mergedSchema = $derived(mergeAttributeSchemas(schema, extraSchema));
@@ -348,6 +351,10 @@
 					class="ml-1.5 rounded border border-input px-1.5 text-xs text-muted-foreground"
 				>
 					This item only
+				</span>{/if}{#if inheritedFrom?.keys.includes(key)}<span
+					class="mt-1 block w-fit max-w-full truncate rounded border border-input px-1.5 text-xs text-muted-foreground"
+				>
+					From {inheritedFrom.label}
 				</span>{/if}
 		</span>
 		<div class="flex flex-1 flex-col gap-1">

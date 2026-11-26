@@ -64,6 +64,7 @@
 	import ItemPath from '$lib/components/item-path.svelte';
 	import { reachChoices } from '$lib/item-reach';
 	import { allowsItemType, fitsLimits, parentsByType } from '$lib/connection-limits';
+	import { appearanceOf, inheritedFromParent } from '$lib/type-inheritance';
 	import MediaGallery from '$lib/components/media-gallery.svelte';
 	import CoverPlaceholder from '$lib/components/cover-placeholder.svelte';
 	import NodeCover from '$lib/components/node-cover.svelte';
@@ -96,6 +97,8 @@
 	let edgeTypes = $state<EdgeTypeResponse[]>([]);
 	let nodeTypes = $state<NodeTypeResponse[]>([]);
 	const typeOfNode = $derived(nodeTypes.find((nt) => nt.slug === node?.type));
+	// A subtype is drawn with its parent's icon and colour until it sets its own.
+	const typeLook = $derived(appearanceOf(node?.type, nodeTypes));
 	// A connection type's limit on a parent type covers its subtypes.
 	const parentOfType = $derived(parentsByType(nodeTypes));
 	let settingType = $state(false);
@@ -723,8 +726,8 @@
 						>
 							<CoverPlaceholder
 								nodeId={node.id}
-								icon={typeOfNode?.icon}
-								colour={typeOfNode?.colour}
+								icon={typeLook.icon}
+								colour={typeLook.colour}
 								onuploaded={() => coverVersion++}
 							/>
 						</NodeCover>
@@ -853,6 +856,7 @@
 									supportsExtraFields={true}
 									nodeId={node?.id}
 									nodeType={nodeTypes.find((nt) => nt.slug === node?.type)}
+									inheritedFrom={inheritedFromParent(typeOfNode, nodeTypes)}
 									serverErrors={attributeServerErrors}
 									onPromoted={load}
 								/>

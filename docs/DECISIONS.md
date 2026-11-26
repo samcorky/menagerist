@@ -1862,3 +1862,18 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - The chevron is part of an item (`crumb`) rather than a character in its label, so it is a real icon in the combobox and chips, and a plain "›" only in text that cannot hold one (tooltips, a chip's words).
 - The trigger always shows the parent, even when the list row, under its heading, does not.
 - Every combobox draws its list through one component (`combobox-list.svelte`), so the single and multiple-choice pickers cannot drift: headings, a rule between groups, a subtype indented beneath its parent (`nested`), crumbs and counts are the same everywhere.
+
+## The item type editor makes and unmakes a subtype, asking only when fields are at stake (2026-11-25)
+
+**Decision:** The item type editor has an optional **Subtype of** select (a native select, being a fixed choice) listing the person's top-level types, with "None (a top-level item type)" to clear it (#320, #769). Picking a parent lists its fields read-only under "Fields from Memorabilia", each marked "From Memorabilia" in words, and says the subtype takes the parent's icon and colour until it sets its own. A type that has subtypes has the select disabled with the reason, since only one level is supported.
+
+- **Asking:** changing the parent of an existing type first previews the change (`POST /node-types/{id}/parent/plan`, #775) and only asks when something is at stake. A shared field of the same kind asks "Merge the shared fields?". Losing a parent that had fields asks to keep them on the type or hide them. A move can ask both. A shared field of different kinds only explains, since nothing can proceed. A change that touches no fields saves without a question.
+- **Wording:** the prompts speak of fields and items and never of "detach" or "clash". Taking a parent away is "Make Poster a top-level type", not "Remove Memorabilia", which reads as deleting it. Every prompt says items keep every value, and says so with the count when there are some.
+- **Icon and colour:** a subtype is drawn with its parent's until it sets its own, each separately (`appearanceOf`), in the list, the pickers, cards, the item page and the editor's preview. It is never stored on the subtype, so changing the parent's reaches every subtype that has not chosen its own.
+- **Item form:** a field a subtype gets from its parent carries a quiet "From Memorabilia" tag on its own line under the label. The item view and cards show nothing. The inherited keys are the effective schema's keys the type's own schema lacks, so no server change was needed.
+- **List:** the item types page orders each subtype under its parent, indented, and shows a parent's subtype count. Deleting a parent that has subtypes is refused at once with their names, rather than after the undo window.
+
+**Choices that are not obvious:**
+
+- The inherited fields are listed above the editor's own fields, not inside the schema editor, so they cannot be edited or reordered there by accident. They do not link to the parent: the editor is a dialog with unsaved edits, so leaving it needs a discard question the link would not answer.
+- The preview of a change uses the saved schema. A schema edited in the same save is checked again by the update itself, which refuses a clash the preview did not see, so the worst case is an error message and nothing saved.

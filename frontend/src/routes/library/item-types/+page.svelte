@@ -16,6 +16,7 @@
 		createNodeType,
 		updateNodeType,
 		deleteNodeType,
+		planParentChange,
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
@@ -39,6 +40,12 @@
 	import TypeIcon from '$lib/components/type-icon.svelte';
 	import SchemaEditor from '$lib/components/schema-editor.svelte';
 	import ItemTypeExtraDetails from '$lib/components/item-type-extra-details.svelte';
+	import ParentTypeField from '$lib/components/parent-type-field.svelte';
+	import ParentChangeDialog from '$lib/components/parent-change-dialog.svelte';
+	import { fetchAllNodeTypes } from '$lib/node-types';
+	import { parentChangeQuestion, type ParentChangeQuestion } from '$lib/parent-change';
+	import { appearanceOf } from '$lib/type-inheritance';
+	import { inFamilyOrder } from '$lib/type-names';
 	import type { AttributesSchema } from '$lib/schema-types';
 
 	const PAGE_SIZE = 50;
@@ -61,7 +68,17 @@
 	let schema = $state<AttributesSchema | null>(null);
 	let icon = $state<string | null>(null);
 	let colour = $state<string | null>(null);
+	// The slug of the type this one is a subtype of; `savedParent` is what it was when opened.
+	let parent = $state<string | null>(null);
+	let savedParent = $state<string | null>(null);
 	let saving = $state(false);
+	// Every type, for the "Subtype of" choices: the list above is paged.
+	let allTypes = $state<NodeTypeResponse[]>([]);
+	// A change of parent that needs an answer before it is saved.
+	let parentAsk = $state<Exclude<
+		ParentChangeQuestion,
+		{ kind: 'none' } | { kind: 'blocked' }
+	> | null>(null);
 	let query = $state('');
 
 	let confirmTarget = $state<NodeTypeResponse | null>(null);
@@ -129,6 +146,8 @@
 		schema = null;
 		icon = null;
 		colour = null;
+		parent = null;
+		savedParent = null;
 		editorOpen = true;
 	}
 
@@ -153,23 +172,47 @@
 		schema = (cat.attributes_schema as AttributesSchema | null) ?? null;
 		icon = cat.icon ?? null;
 		colour = cat.colour ?? null;
+		parent = cat.parent ?? null;
+		savedParent = cat.parent ?? null;
 		editorOpen = true;
 	}
 
-	async function handleSubmit(event: SubmitEvent) {
-		event.preventDefault();
+	const typeLabelOf = (slug: string | null) =>
+		(slug && allTypes.find((t) => t.slug === slug)?.label) || slug || '';
+
+	/** A field's name, from the type being edited or the parents it may be sharing with. */
+	function fieldLabel(key: string): string {
+		for (const type of [editingType, ...allTypes]) {
+			const title = (type?.effective_schema as AttributesSchema | null | undefined)?.properties?.[
+				key
+			]?.title;
+			if (title) return title;
+		}
+		return key;
+	}
+
+	/** Reload the lists after a change that can reach other types: a merge edits the parent. */
+	async function refreshTypes() {
+		const all = await fetchAllNodeTypes();
+		if (all) allTypes = all;
+		await fetchPage();
+	}
+
+	async function save(choice?: { onClash: 'merge'; onDetach: 'keep' | 'drop' }) {
+		const id = editingId;
 		saving = true;
-		if (editingId) {
-			const id = editingId;
+		if (id) {
 			const result = await updateNodeType({
 				path: { node_type_id: id },
-				// null removes an icon or colour; leaving the field out would keep it.
+				// null removes an icon, colour or parent; leaving the field out would keep it.
 				body: {
 					label,
 					description: description || null,
 					attributes_schema: schema,
 					icon,
-					colour
+					colour,
+					...(parent !== savedParent ? { parent } : {}),
+					...(choice ? { on_clash: choice.onClash, on_detach: choice.onDetach } : {})
 				}
 			});
 			if (result.error || !result.data) {
@@ -177,7 +220,9 @@
 			} else {
 				categories = categories.map((c) => (c.id === id ? result.data! : c));
 				editorOpen = false;
+				parentAsk = null;
 				toast.success('Item type updated');
+				if (parent !== savedParent) await refreshTypes();
 			}
 		} else {
 			const result = await createNodeType({
@@ -187,7 +232,8 @@
 					description: description || undefined,
 					attributes_schema: schema,
 					icon: icon ?? undefined,
-					colour: colour ?? undefined
+					colour: colour ?? undefined,
+					parent: parent ?? undefined
 				}
 			});
 			if (result.error || !result.data) {
@@ -196,9 +242,45 @@
 				categories = [result.data, ...categories];
 				editorOpen = false;
 				toast.success('Item type created');
+				if (parent) await refreshTypes();
+				else allTypes = [result.data, ...allTypes];
 			}
 		}
 		saving = false;
+	}
+
+	async function handleSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		// Changing the parent of a type that exists can merge fields or take some away, which is
+		// asked about first; the preview changes nothing and is the same rule the save applies.
+		if (editingId && parent !== savedParent) {
+			saving = true;
+			const preview = await planParentChange({
+				path: { node_type_id: editingId },
+				body: { parent }
+			});
+			if (preview.error || !preview.data) {
+				toast.error("Couldn't check the change", { description: errorMessage(preview.error) });
+				saving = false;
+				return;
+			}
+			const question = parentChangeQuestion(preview.data);
+			if (question.kind === 'blocked') {
+				toast.error("Can't change the parent type", {
+					description:
+						`${question.fields.map(fieldLabel).join(', ')} ${question.fields.length === 1 ? 'is' : 'are'} ` +
+						'a different kind of field on the parent. Change one of them to match first.'
+				});
+				saving = false;
+				return;
+			}
+			if (question.kind !== 'none') {
+				parentAsk = question;
+				saving = false;
+				return;
+			}
+		}
+		await save();
 	}
 
 	async function loadItemCounts() {
@@ -225,6 +307,14 @@
 	);
 
 	async function handleDelete(cat: NodeTypeResponse) {
+		const subtypes = allTypes.filter((t) => t.parent === cat.slug);
+		if (subtypes.length > 0) {
+			// A parent can only go once its subtypes have; say so instead of failing after the undo.
+			toast.error(`Can't delete ${cat.label}`, {
+				description: `It still has subtypes: ${subtypes.map((t) => t.label).join(', ')}. Delete them, or make them top-level types, first.`
+			});
+			return;
+		}
 		const inUse = await listNodes({ query: { type: cat.slug, limit: 1 } });
 		const hasItems = (inUse.data?.length ?? 0) > 0;
 
@@ -277,6 +367,9 @@
 
 	$effect(() => {
 		void fetchPage();
+		void fetchAllNodeTypes().then((all) => {
+			if (all) allTypes = all;
+		});
 		void loadExampleIds().then((ids) => (exampleTypeIds = ids.itemTypes));
 		void loadItemCounts();
 	});
@@ -348,16 +441,23 @@
 		{/if}
 		{#if shown.length > 0}
 			<ul class="divide-y rounded-xl border bg-card">
-				{#each shown as cat (cat.id)}
-					<li class="flex items-center gap-2 px-3 py-2 sm:gap-3">
+				{#each inFamilyOrder(shown) as cat (cat.id)}
+					{@const subtypeCount = categories.filter((c) => c.parent === cat.slug).length}
+					{@const look = appearanceOf(cat.slug, categories)}
+					{@const underParent = !!cat.parent && categories.some((c) => c.slug === cat.parent)}
+					<li
+						class="flex items-center gap-2 px-3 py-2 sm:gap-3 {underParent
+							? 'bg-muted/20 pl-6 sm:pl-10'
+							: ''}"
+					>
 						<Checkbox
 							aria-label="Select {cat.label}"
 							checked={selectedIds.has(cat.id)}
 							onCheckedChange={(on) => setSelected(cat.id, on)}
 						/>
 						<TypeIcon
-							icon={cat.icon}
-							colour={cat.colour}
+							icon={look.icon}
+							colour={look.colour}
 							boxed
 							class="size-8 rounded-lg text-base"
 						/>
@@ -365,6 +465,14 @@
 							<!-- On a phone the slug drops under the name so the name keeps the row's width. -->
 							<div class="flex flex-col items-start sm:flex-row sm:items-center sm:gap-2">
 								<span class="max-w-full font-medium wrap-break-word sm:truncate">{cat.label}</span>
+								{#if underParent}
+									<span class="sr-only">, a subtype of {typeLabelOf(cat.parent ?? null)}</span>
+								{/if}
+								{#if subtypeCount > 0}
+									<Badge variant="secondary" class="shrink-0">
+										{subtypeCount === 1 ? '1 subtype' : `${subtypeCount} subtypes`}
+									</Badge>
+								{/if}
 								{#if exampleTypeIds.has(cat.id)}
 									<Badge variant="outline" class="shrink-0 text-muted-foreground">Example</Badge>
 								{/if}
@@ -497,7 +605,7 @@
 	submitLabel={editingId ? 'Save' : 'Add item type'}
 	busyLabel={editingId ? 'Saving…' : 'Adding…'}
 	busy={saving}
-	value={{ label, description, schema, icon, colour }}
+	value={{ label, description, schema, icon, colour, parent }}
 	onSubmit={handleSubmit}
 	onClose={() => (editorOpen = false)}
 >
@@ -515,7 +623,12 @@
 		<Label for="cat-description">Description</Label>
 		<Textarea id="cat-description" bind:value={description} placeholder="Optional description" />
 	</div>
-	<TypeAppearanceFields bind:icon bind:colour />
+	<ParentTypeField bind:parent types={allTypes} editing={editingType} />
+	<TypeAppearanceFields
+		bind:icon
+		bind:colour
+		inherited={parent ? appearanceOf(parent, allTypes) : null}
+	/>
 	{#key schemaRevision}
 		<SchemaEditor
 			bind:schema
@@ -529,6 +642,18 @@
 		<ItemTypeExtraDetails type={editingType} onpromoted={handlePromoted} />
 	{/if}
 </TypeEditorDialog>
+
+<ParentChangeDialog
+	open={parentAsk !== null}
+	question={parentAsk}
+	typeLabel={label}
+	previousLabel={typeLabelOf(savedParent)}
+	parentLabel={typeLabelOf(parent)}
+	fieldLabels={fieldLabel}
+	busy={saving}
+	onconfirm={(choice) => void save(choice)}
+	oncancel={() => (parentAsk = null)}
+/>
 
 <ConfirmDialog
 	open={confirmTarget !== null}

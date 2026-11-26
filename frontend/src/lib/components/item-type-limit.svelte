@@ -5,6 +5,7 @@
 	import TypeIcon from '$lib/components/type-icon.svelte';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { groupTypeItems } from '$lib/type-picker';
+	import { appearanceOf } from '$lib/type-inheritance';
 
 	// One end of a connection type's limit: the item types it may join, or any item when empty.
 	let {
@@ -20,15 +21,15 @@
 	const id = $props.id();
 	// Parents head their subtypes in the list, and a chosen subtype shows with its parent.
 	const items = $derived(groupTypeItems(options));
-	const bySlug = $derived(new Map(options.map((o) => [o.slug, o])));
 	// A limit on a parent type covers its subtypes, which is worth saying once one is chosen.
 	const coversSubtypes = $derived(selected.some((slug) => options.some((o) => o.parent === slug)));
 </script>
 
-<!-- A type that no longer exists has no icon or colour, so it shows the generic one. -->
+<!-- A subtype shows its parent's icon and colour until it sets its own; a type that no longer
+exists has none, so it shows the generic one. -->
 {#snippet leading(item: ComboboxItem)}
-	{@const type = bySlug.get(item.value)}
-	<TypeIcon icon={type?.icon} colour={type?.colour} class="size-4 text-base" />
+	{@const look = appearanceOf(item.value, options)}
+	<TypeIcon icon={look.icon} colour={look.colour} class="size-4 text-base" />
 {/snippet}
 
 <div class="space-y-1.5">
