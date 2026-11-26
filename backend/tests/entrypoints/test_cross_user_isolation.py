@@ -389,6 +389,10 @@ ALLOWED: dict[Route, str] = {
     ("PATCH", "/api/v1/node-types/{node_type_id}"): VOCABULARY,
     ("GET", "/api/v1/node-types/{node_type_id}/subtypes"): VOCABULARY,
     ("POST", "/api/v1/node-types/{node_type_id}/parent/plan"): VOCABULARY,
+    ("GET", "/api/v1/node-types/{node_type_id}/subtypes/fields"): VOCABULARY,
+    ("POST", "/api/v1/node-types/{node_type_id}/subtypes/fields/{key}/promote"): (
+        VOCABULARY
+    ),
     ("GET", "/api/v1/edge-types"): VOCABULARY,
     ("GET", "/api/v1/edge-types/{edge_type_id}"): VOCABULARY,
     ("POST", "/api/v1/edge-types"): VOCABULARY,

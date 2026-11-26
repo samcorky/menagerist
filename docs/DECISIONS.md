@@ -1877,3 +1877,18 @@ The import page uploads the file once, as it is chosen, and follows the import's
 
 - The inherited fields are listed above the editor's own fields, not inside the schema editor, so they cannot be edited or reordered there by accident. They do not link to the parent: the editor is a dialog with unsaved edits, so leaving it needs a discard question the link would not answer.
 - The preview of a change uses the saved schema. A schema edited in the same save is checked again by the update itself, which refuses a clash the preview did not see, so the worst case is an error message and nothing saved.
+
+## A field several subtypes share can move up to the parent (2026-11-25)
+
+**Decision:** The parent type's editor lists the fields two or more of its subtypes each define the same way, and offers to add one to the parent (#320, #774). It is the counterpart of promoting a per-item field to its type, and reuses its rules for what counts as the same field.
+
+- **Routes:** `GET /node-types/{id}/subtypes/fields` lists the shared fields (key, name, kind, the subtypes that define it, and any that keep the key as another kind) and `POST /node-types/{id}/subtypes/fields/{key}/promote` moves one. Both are read and write the same way as the type's other routes.
+- **Same field** means the same key and the same kind, among the subtypes' live (not archived) fields. A field only one subtype defines is not listed.
+- **Promoting** adds the field to the parent and takes it off every subtype that defined it, in one transaction. Items are untouched: they store values by key, and a subtype still uses the field through its parent. A choice field gets every subtype's options, so no stored value stops being one; any other difference follows the definition most subtypes share. If any subtype required it, the parent now does, so it applies to them all. The subtype's place for it in the layout goes.
+- **Refused**, with the count, when some subtypes keep the key as another kind of field, since they could not sit beside the parent's. Also refused when a subtype has the key hidden (archived), naming it, since the hidden copy would clash. The list says which subtypes stop a field, and offers no action for it.
+- **The editor** shows the list quietly, never as a banner, like "Extra details on its items". After promoting, the open schema gets the field and its required flag so Save keeps them, and the subtypes are read again.
+
+**Choices that are not obvious:**
+
+- The promotion edits the types directly rather than through `UpdateNodeType`. Updating the parent first would be refused for clashing with the subtypes, and updating a subtype first could be refused for highlighting a field that is not defined yet. It checks the resulting schemas itself, all before anything is saved.
+- A field defined by a single subtype can be promoted through the route even though the list does not offer it, since moving it up is harmless.

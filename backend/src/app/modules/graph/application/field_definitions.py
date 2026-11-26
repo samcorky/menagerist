@@ -37,6 +37,41 @@ def with_every_option(
     return chosen
 
 
+def forget_fields(schema: dict[str, Any], keys: set[str]) -> None:
+    """Remove `keys` from the schema's required lists and its layout, in place.
+
+    The properties are left to the caller. A section in the layout stays even when
+    emptied, since it is the person's.
+    """
+    root_required = schema.get("required")
+    if isinstance(root_required, list):
+        schema["required"] = [k for k in root_required if k not in keys]
+        if not schema["required"]:
+            del schema["required"]
+    meta = schema.get(NAMESPACE)
+    if not isinstance(meta, dict):
+        return
+    required = meta.get("required")
+    if isinstance(required, list):
+        meta["required"] = [k for k in required if k not in keys]
+        if not meta["required"]:
+            del meta["required"]
+    layout = meta.get("layout")
+    if isinstance(layout, list):
+        meta["layout"] = _prune(layout, keys)
+
+
+def _prune(items: list[Any], keys: set[str]) -> list[Any]:
+    pruned: list[Any] = []
+    for item in items:
+        if isinstance(item, dict) and item.get("key") in keys:
+            continue
+        if isinstance(item, dict) and isinstance(item.get("items"), list):
+            item = {**item, "items": _prune(item["items"], keys)}
+        pruned.append(item)
+    return pruned
+
+
 def _direct(prop: dict[str, Any]) -> object:
     return prop.get("enum")
 

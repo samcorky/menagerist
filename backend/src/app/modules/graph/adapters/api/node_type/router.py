@@ -32,8 +32,10 @@ from app.modules.graph.adapters.api.dependencies import (
     get_get_node_type_use_case,
     get_list_attribute_values_use_case,
     get_list_node_types_use_case,
+    get_list_shared_subtype_fields_use_case,
     get_list_subtypes_use_case,
     get_plan_parent_change_use_case,
+    get_promote_subtype_field_use_case,
     get_purge_node_type_attribute_use_case,
     get_update_node_type_use_case,
 )
@@ -43,6 +45,8 @@ from app.modules.graph.adapters.api.node_type.schemas import (
     NodeTypeResponse,
     ParentChangePlanResponse,
     ParentChangeRequest,
+    PromotedSubtypeFieldResponse,
+    SharedSubtypeFieldResponse,
     UpdateNodeTypeRequest,
 )
 from app.modules.graph.application.count_node_type_attribute_usage import (
@@ -63,8 +67,16 @@ from app.modules.graph.application.list_node_types import (
     ListNodeTypes,
     ListNodeTypesQuery,
 )
+from app.modules.graph.application.list_shared_subtype_fields import (
+    ListSharedSubtypeFields,
+    ListSharedSubtypeFieldsQuery,
+)
 from app.modules.graph.application.list_subtypes import ListSubtypes, ListSubtypesQuery
 from app.modules.graph.application.plan_parent_change import PlanParentChange
+from app.modules.graph.application.promote_subtype_field import (
+    PromoteSubtypeField,
+    PromoteSubtypeFieldCommand,
+)
 from app.modules.graph.application.purge_node_type_attribute import (
     PurgeNodeTypeAttribute,
     PurgeNodeTypeAttributeCommand,
@@ -72,6 +84,7 @@ from app.modules.graph.application.purge_node_type_attribute import (
 from app.modules.graph.application.update_node_type import UpdateNodeType
 from app.modules.graph.domain.errors import (
     InvalidParentTypeError,
+    InvalidSchemaError,
     NodeTypeHasSubtypesError,
     NodeTypeNotFoundError,
     NodeTypeSlugConflictError,
@@ -202,6 +215,74 @@ async def list_subtypes(
         )
 
     return [NodeTypeResponse.from_domain(nt) for nt in subtypes[:limit]]
+
+
+@router.get(
+    "/{node_type_id}/subtypes/fields",
+    response_model=list[SharedSubtypeFieldResponse],
+    operation_id="list_shared_subtype_fields",
+    responses=error_response(
+        NodeTypeNotFoundError,
+        detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+    ),
+)
+async def list_shared_subtype_fields(
+    node_type_id: NodeTypeId,
+    use_case: Annotated[
+        ListSharedSubtypeFields, Depends(get_list_shared_subtype_fields_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> list[SharedSubtypeFieldResponse]:
+    """List the fields several subtypes of an item type each define themselves.
+
+    A field is listed when two or more subtypes define the same key as the same
+    kind of field. These are the fields that could move up to the parent item type
+    with the promote action. An item type with no subtypes lists none.
+    """
+    fields = await use_case.handle(
+        ListSharedSubtypeFieldsQuery(node_type_id=node_type_id), actor
+    )
+    return [SharedSubtypeFieldResponse.from_domain(f) for f in fields]
+
+
+@router.post(
+    "/{node_type_id}/subtypes/fields/{key}/promote",
+    response_model=PromotedSubtypeFieldResponse,
+    operation_id="promote_subtype_field",
+    responses={
+        **error_response(
+            NodeTypeNotFoundError,
+            detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
+        ),
+        **error_response(
+            InvalidSchemaError,
+            detail="1 subtype keeps Condition as a different kind of field. "
+            + "Change them to match first.",
+        ),
+    },
+)
+async def promote_subtype_field(
+    node_type_id: NodeTypeId,
+    key: FieldKey,
+    use_case: Annotated[
+        PromoteSubtypeField, Depends(get_promote_subtype_field_use_case)
+    ],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> PromotedSubtypeFieldResponse:
+    """Move a field the subtypes define up to their parent item type.
+
+    Every subtype that defines the key loses its own copy, in one change, and its
+    items keep their values. The definition most subtypes share is used, with the
+    choices of all of them, and it is required if any subtype required it. Refused
+    when some subtype keeps the key as another kind of field, or has it hidden.
+    """
+    promoted = await use_case.handle(
+        PromoteSubtypeFieldCommand(node_type_id=node_type_id, key=key), actor
+    )
+    return PromotedSubtypeFieldResponse(
+        subtypes=promoted.subtypes,
+        node_type=NodeTypeResponse.from_domain(promoted.node_type),
+    )
 
 
 @router.patch(

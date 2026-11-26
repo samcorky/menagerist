@@ -40,6 +40,8 @@
 	import TypeIcon from '$lib/components/type-icon.svelte';
 	import SchemaEditor from '$lib/components/schema-editor.svelte';
 	import ItemTypeExtraDetails from '$lib/components/item-type-extra-details.svelte';
+	import SubtypeSharedFields from '$lib/components/subtype-shared-fields.svelte';
+	import { readSchemaMeta, withSchemaMeta } from '$lib/schema-meta';
 	import ParentTypeField from '$lib/components/parent-type-field.svelte';
 	import ParentChangeDialog from '$lib/components/parent-change-dialog.svelte';
 	import { fetchAllNodeTypes } from '$lib/node-types';
@@ -163,6 +165,19 @@
 		const current = schema ?? (updated.attributes_schema as AttributesSchema);
 		schema = { ...current, properties: { ...current.properties, [key]: property } };
 		schemaRevision += 1;
+	}
+
+	// A field moved up from the subtypes is saved already, and may now be required of the parent:
+	// the open schema gets both, so Save keeps them, and the subtypes are read again as they lost it.
+	async function handleSubtypeFieldPromoted(updated: NodeTypeResponse, key: string) {
+		handlePromoted(updated, key);
+		if (schema && readSchemaMeta(updated.attributes_schema).required?.includes(key)) {
+			const required = readSchemaMeta(schema).required ?? [];
+			if (!required.includes(key))
+				schema = withSchemaMeta(schema, { required: [...required, key] });
+			schemaRevision += 1;
+		}
+		await refreshTypes();
 	}
 
 	function openEdit(cat: NodeTypeResponse) {
@@ -639,6 +654,11 @@
 		/>
 	{/key}
 	{#if editingType}
+		<SubtypeSharedFields
+			type={editingType}
+			types={allTypes}
+			onpromoted={handleSubtypeFieldPromoted}
+		/>
 		<ItemTypeExtraDetails type={editingType} onpromoted={handlePromoted} />
 	{/if}
 </TypeEditorDialog>

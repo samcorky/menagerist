@@ -12,6 +12,7 @@ from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
     from app.modules.graph.application.plan_parent_change import ParentChangePlan
+    from app.modules.graph.application.subtype_fields import SharedField
     from app.modules.graph.domain.node_type import NodeType
 
 NODE_TYPE_EXAMPLE: dict[str, Any] = {
@@ -293,6 +294,65 @@ class NodeTypeResponse(BaseModel):
             created_at=node_type.created_at,
             updated_at=node_type.updated_at,
         )
+
+
+class SharedSubtypeFieldResponse(BaseModel):
+    """A field several subtypes of an item type each define the same way."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "key": "condition",
+                    "label": "Condition",
+                    "kind": "choice",
+                    "subtypes": ["poster", "photo-print"],
+                    "differing": [],
+                }
+            ]
+        }
+    )
+
+    key: str = Field(description="The field's key.")
+    label: str = Field(description="Its name, from the definition most subtypes share.")
+    kind: str | None = Field(
+        default=None, description="The field kind, such as `text` or `choice`."
+    )
+    subtypes: list[str] = Field(
+        description="The slugs of the subtypes that define it as that kind."
+    )
+    differing: list[str] = Field(
+        description=(
+            "The slugs of subtypes that keep the key as another kind of field. "
+            + "While there are any, the field cannot be moved up."
+        )
+    )
+
+    @classmethod
+    def from_domain(cls, field: SharedField) -> SharedSubtypeFieldResponse:
+        """Build a response from a `SharedField`."""
+        return cls(
+            key=field.key,
+            label=field.label,
+            kind=field.kind,
+            subtypes=list(field.subtypes),
+            differing=list(field.differing),
+        )
+
+
+class PromotedSubtypeFieldResponse(BaseModel):
+    """What moving a field from the subtypes up to their parent changed."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"subtypes": 2, "node_type": NODE_TYPE_EXAMPLE}]
+        }
+    )
+
+    subtypes: int = Field(description="How many subtypes the field moved off.")
+    node_type: NodeTypeResponse = Field(
+        description="The parent item type, with the field."
+    )
 
 
 class AttributeValueCountResponse(BaseModel):

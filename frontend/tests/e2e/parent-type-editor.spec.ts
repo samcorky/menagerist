@@ -145,6 +145,51 @@ test('removing the parent keeps its fields on the type, or hides them, as chosen
 	expect(hiddenType.attributes_schema.properties.condition['x-menagerist'].archived).toBe(true);
 });
 
+test('a field several subtypes share is moved up to the parent from its editor', async ({
+	page,
+	request
+}) => {
+	const parent = await makeType(request, uniqueName('Memorabilia'), {
+		value: text('Value')
+	});
+	const poster = await makeType(
+		request,
+		uniqueName('Poster'),
+		{ condition: choice('Condition', 'Mint', 'Good'), width: text('Width') },
+		parent.slug
+	);
+	const print = await makeType(
+		request,
+		uniqueName('Print'),
+		{ condition: choice('Condition', 'Fair', 'Mint') },
+		parent.slug
+	);
+	const item = await makeItem(request, uniqueName('Alien one-sheet'), poster.slug);
+	await request.patch(`/api/v1/nodes/${item.id}`, {
+		data: { attributes: { condition: 'Good', width: '27 in' } }
+	});
+
+	const dialog = await openEditor(page, parent.label);
+	const shared = dialog.getByTestId('subtype-shared-fields');
+	await expect(shared).toContainText('Condition');
+	await expect(shared).toContainText(poster.label);
+	await expect(shared).toContainText(print.label);
+	await shared.getByRole('button', { name: `Add Condition to ${parent.label}` }).click();
+	const ask = page.getByRole('dialog', { name: `Add Condition to ${parent.label}?` });
+	await ask.getByRole('button', { name: 'Add field', exact: true }).click();
+	await expect(page.getByText(`Condition is now a field of ${parent.label}`)).toBeVisible();
+	await expect(shared).toHaveCount(0);
+
+	// Saved already: the parent defines it, the subtypes no longer do, and the item is unchanged.
+	const moved = await (await request.get(`/api/v1/node-types/${parent.id}`)).json();
+	expect(moved.attributes_schema.properties.condition.enum).toEqual(['Mint', 'Good', 'Fair']);
+	const below = await (await request.get(`/api/v1/node-types/${poster.id}`)).json();
+	expect(Object.keys(below.attributes_schema.properties)).toEqual(['width']);
+	expect(Object.keys(below.effective_schema.properties)).toContain('condition');
+	const after = await (await request.get(`/api/v1/nodes/${item.id}`)).json();
+	expect(after.attributes).toEqual({ condition: 'Good', width: '27 in' });
+});
+
 test('a parent cannot become a subtype or be deleted while it has subtypes', async ({
 	page,
 	request
