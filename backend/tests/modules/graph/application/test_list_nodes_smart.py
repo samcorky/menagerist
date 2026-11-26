@@ -34,6 +34,7 @@ from app.shared_kernel.paging import (
     Cursor,
     Cursor as PageCursor,
     InvalidCursorError,
+    SortBy,
     SortOrder,
 )
 
@@ -367,6 +368,22 @@ async def test_a_smart_collection_cannot_sort_by_type(world: World) -> None:
     with pytest.raises(ValidationError, match="name, created_at or updated_at"):
         await world.use_case.handle(
             ListNodesQuery(collection=collection, sort=NodeSort.TYPE), AS_ALICE
+        )
+
+
+async def test_a_smart_collection_sorts_by_one_key(world: World) -> None:
+    """The search engine orders by one key here, so a second key is refused."""
+    await world.item("Alien", rating=5)
+    collection = world.smart(_query(_rating("=", 5)))
+
+    with pytest.raises(ValidationError, match="one key"):
+        await world.use_case.handle(
+            ListNodesQuery(
+                collection=collection,
+                sort=NodeSort.NAME,
+                then_by=(SortBy(key=NodeSort.UPDATED_AT),),
+            ),
+            AS_ALICE,
         )
 
 

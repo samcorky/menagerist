@@ -14,6 +14,7 @@ from app.shared_kernel.paging import (
     Page,
     PagedQuery,
     PageRequest,
+    SortBy,
     SortOrder,
     decode_cursor,
     page_rows,
@@ -348,3 +349,160 @@ def test_a_page_of_rows_in_memory_knows_how_many_rows_there_were() -> None:
 
     assert first.total == second.total == 4
     assert _page([], PageRequest()).total == 0
+
+
+@dataclass(frozen=True)
+class Pair:
+    """A row with two keys to sort by, either of which may be empty."""
+
+    id: uuid.UUID
+    group: str | None
+    name: str | None
+
+
+def _pairs() -> list[Pair]:
+    data = [
+        ("x", "b"),
+        ("y", "a"),
+        ("x", "a"),
+        (None, "c"),
+        ("y", None),
+        ("x", "b"),
+        (None, None),
+        ("y", "a"),
+    ]
+    return [Pair(id=uuid.uuid7(), group=g, name=n) for g, n in data]
+
+
+def _pair_page(rows: list[Pair], request: PageRequest) -> Page[Pair]:
+    return page_rows(
+        rows,
+        request,
+        id_of=lambda row: row.id,
+        values={"group": lambda row: row.group, "name": lambda row: row.name},
+    )
+
+
+def _two_keys(first: SortOrder, second: SortOrder, **options: object) -> PageRequest:
+    return PageRequest(
+        sort="group",
+        order=first,
+        then_by=(("name", second),),
+        **options,  # type: ignore[arg-type]
+    )
+
+
+@pytest.mark.fast
+def test_each_key_sorts_in_its_own_direction_and_the_id_follows_the_last() -> None:
+    """Group ascending, then name descending, then id descending."""
+    rows = _pairs()
+
+    page = _pair_page(rows, _two_keys(SortOrder.ASC, SortOrder.DESC, limit=100))
+
+    assert [(r.group, r.name) for r in page.items] == [
+        ("x", "b"),
+        ("x", "b"),
+        ("x", "a"),
+        ("y", "a"),
+        ("y", "a"),
+        ("y", None),
+        (None, "c"),
+        (None, None),
+    ]
+    twins = [r.id for r in page.items if (r.group, r.name) == ("x", "b")]
+    assert twins == sorted(twins, reverse=True)
+    older_first = _pair_page(rows, _two_keys(SortOrder.DESC, SortOrder.ASC, limit=100))
+    twins = [r.id for r in older_first.items if (r.group, r.name) == ("y", "a")]
+    assert twins == sorted(twins)
+
+
+@pytest.mark.fast
+@pytest.mark.parametrize("second", list(SortOrder))
+@pytest.mark.parametrize("first", list(SortOrder))
+@pytest.mark.parametrize("limit", [1, 2, 3, 100])
+def test_following_the_cursors_of_two_keys_visits_every_row_once_in_order(
+    first: SortOrder, second: SortOrder, limit: int
+) -> None:
+    """Mixed directions and empty values never repeat a row or skip one."""
+    rows = _pairs()
+    everything = [
+        r.id for r in _pair_page(rows, _two_keys(first, second, limit=100)).items
+    ]
+
+    seen: list[uuid.UUID] = []
+    request = _two_keys(first, second, limit=limit)
+    while True:
+        page = _pair_page(rows, request)
+        seen.extend(r.id for r in page.items)
+        if page.next is None:
+            break
+        request = _two_keys(first, second, limit=limit, after=page.next)
+
+    assert seen == everything
+    assert sorted(seen) == sorted(r.id for r in rows)
+
+
+@pytest.mark.fast
+def test_a_cursor_carries_every_key_and_direction() -> None:
+    """The next cursor names both keys, both directions and both values."""
+    rows = _pairs()
+
+    page = _pair_page(rows, _two_keys(SortOrder.ASC, SortOrder.DESC, limit=2))
+
+    assert page.next is not None
+    assert page.next.sort == ("group", "name")
+    assert page.next.order == (SortOrder.ASC, SortOrder.DESC)
+    assert page.next.values == ("x", "b")
+
+
+@pytest.mark.fast
+@pytest.mark.parametrize(
+    "cursor",
+    [
+        Cursor(sort=("group",), order=(SortOrder.ASC,), values=("x",), id=uuid.uuid7()),
+        Cursor(
+            sort=("group", "name"),
+            order=(SortOrder.ASC, SortOrder.ASC),
+            values=("x", "b"),
+            id=uuid.uuid7(),
+        ),
+        Cursor(
+            sort=("name", "group"),
+            order=(SortOrder.ASC, SortOrder.DESC),
+            values=("b", "x"),
+            id=uuid.uuid7(),
+        ),
+    ],
+)
+def test_a_cursor_from_other_keys_or_directions_is_refused(cursor: Cursor) -> None:
+    """A page of two keys only resumes from a cursor of the same keys and directions."""
+    request = _two_keys(SortOrder.ASC, SortOrder.DESC, after=cursor)
+
+    with pytest.raises(InvalidCursorError):
+        _pair_page(_pairs(), request)
+
+
+@pytest.mark.fast
+def test_a_request_lists_its_keys_and_directions() -> None:
+    """With no key there is one direction, the id's; each key adds its own."""
+    assert PageRequest(order=SortOrder.DESC).orders == (SortOrder.DESC,)
+    assert PageRequest(sort="name").keys == ("name",)
+    request = _two_keys(SortOrder.DESC, SortOrder.ASC)
+    assert request.keys == ("group", "name")
+    assert request.orders == (SortOrder.DESC, SortOrder.ASC)
+
+
+@pytest.mark.fast
+def test_a_paged_query_passes_its_later_keys_to_the_request() -> None:
+    """`then_by` becomes key names with directions, after the first key."""
+    query = PagedQuery[_Key](
+        sort=_Key.NAME,
+        order=SortOrder.DESC,
+        then_by=(SortBy(key=_Key.CREATED_AT, order=SortOrder.ASC),),
+    )
+
+    assert query.page_request() == PageRequest(
+        sort="name",
+        order=SortOrder.DESC,
+        then_by=(("created_at", SortOrder.ASC),),
+    )

@@ -295,29 +295,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/BackupSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/BackupSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",
@@ -1480,29 +1481,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/UserExportSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/UserExportSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           }
         ],
         "responses": {
@@ -2525,29 +2527,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/NodeSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/NodeSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "type",
@@ -3878,29 +3881,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/DeletedNodeSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/DeletedNodeSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",
@@ -7747,29 +7751,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/EdgeSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/EdgeSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "q",
@@ -9241,29 +9246,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/NodeTypeSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/NodeTypeSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "q",
@@ -10306,29 +10312,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/NodeTypeSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/NodeTypeSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "q",
@@ -12142,29 +12149,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/EdgeTypeSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/EdgeTypeSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "q",
@@ -17192,29 +17200,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/PresetSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/PresetSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "q",
@@ -18602,29 +18611,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/JobRunSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/JobRunSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           }
         ],
         "responses": {
@@ -23441,29 +23451,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ItemImportSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ItemImportSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",
@@ -25369,29 +25380,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/CollectionSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CollectionSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "q",
@@ -25733,29 +25745,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/DeletedCollectionSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/DeletedCollectionSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",
@@ -28808,29 +28821,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/OwnDeviceSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/OwnDeviceSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",
@@ -29771,29 +29785,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/OwnSessionSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/OwnSessionSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",
@@ -30442,29 +30457,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/UserSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/UserSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
-              "default": "asc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
             "name": "q",
@@ -32272,29 +32288,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/SessionSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SessionSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",
@@ -32960,29 +32977,30 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/ApiTokenSort"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ApiTokenSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SortOrder",
-              "description": "`desc` (the default) lists the newest first; `asc` the oldest.",
-              "default": "desc"
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`.",
+              "title": "Order"
             },
-            "description": "`desc` (the default) lists the newest first; `asc` the oldest."
+            "description": "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give each `sort` its own direction, in the same order; a key with none is `desc`."
           },
           {
             "name": "q",

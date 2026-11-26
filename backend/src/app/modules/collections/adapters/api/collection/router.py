@@ -236,8 +236,9 @@ async def list_collections(
         ListCollectionsQuery(
             after=page.cursor,
             limit=page.limit,
-            sort=page.sort,
-            order=page.order,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
             item_id=item_id,
             q=page.q,
             kind=kind,
@@ -272,8 +273,9 @@ async def list_deleted_collections(
         ListDeletedCollectionsQuery(
             after=page.cursor,
             limit=page.limit,
-            sort=page.sort,
-            order=page.order,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
             q=page.q,
         ),
         actor,

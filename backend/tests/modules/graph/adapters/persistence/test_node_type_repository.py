@@ -275,3 +275,52 @@ async def test_list_q_matches_label_slug_and_description_ignoring_case_and_accen
     }
     assert {t.id for t in subtypes.items} == {by_label.id, by_description.id}
     assert len(blank.items) == 5
+
+
+@pytest.mark.parametrize("slug_order", list(SortOrder))
+@pytest.mark.parametrize("label_order", list(SortOrder))
+@pytest.mark.parametrize("limit", [1, 2, 100])
+async def test_list_sorts_by_two_keys_each_in_its_own_direction(
+    db_session: AsyncSession,
+    label_order: SortOrder,
+    slug_order: SortOrder,
+    limit: int,
+) -> None:
+    """Label then slug, in every pair of directions, resuming from each cursor."""
+    repository = SqlAlchemyNodeTypeRepository(db_session)
+    owner = uuid.uuid7()
+    pairs = [("b", "B"), ("a", "a"), ("c", "C"), ("d", "b"), ("e", "A"), ("f", "b")]
+    for slug, label in pairs:
+        await repository.add(NodeType.create(owner_id=owner, slug=slug, label=label))
+    scope = ContentFilter.everyone()
+
+    def request(**options: object) -> PageRequest:
+        return PageRequest(
+            sort="label",
+            order=label_order,
+            then_by=(("slug", slug_order),),
+            limit=limit,
+            **options,  # type: ignore[arg-type]
+        )
+
+    by_slug = sorted(pairs, key=lambda p: p[0], reverse=slug_order is SortOrder.DESC)
+    expected = [
+        slug
+        for slug, _ in sorted(
+            by_slug,
+            key=lambda p: p[1].lower(),
+            reverse=label_order is SortOrder.DESC,
+        )
+    ]
+
+    seen: list[str] = []
+    page = await repository.list(scope=scope, page=request())
+    while True:
+        seen.extend(str(t.slug) for t in page.items)
+        if page.next is None:
+            break
+        assert page.next.sort == ("label", "slug")
+        assert page.next.order == (label_order, slug_order)
+        page = await repository.list(scope=scope, page=request(after=page.next))
+
+    assert seen == expected

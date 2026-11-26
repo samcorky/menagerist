@@ -1,9 +1,10 @@
 """Keyset paging that every list shares: the cursor, a page, and the in-memory twin.
 
-A list is ordered by zero or more sort keys and finally by id, in the directions
-`order` gives (docs/API_STYLE.md, "Sort, order and search"). A cursor names the last
-row of a page, so the next page resumes after it: it holds the sort keys, their
-directions, the row's value for each key, and the row's id.
+A list is ordered by zero to `MAX_SORT_KEYS` sort keys and finally by id, each key in
+its own direction and the id in the direction of the last (docs/API_STYLE.md, "Sort,
+order and search"). A cursor names the last row of a page, so the next page resumes
+after it: it holds the sort keys, their directions, the row's value for each key, and
+the row's id.
 
 The SQL counterpart is `app.platform.keyset`; the two answer the same questions the
 same way, so an in-memory adapter and a SQL one list rows in the same order.
@@ -33,6 +34,9 @@ CURSOR_VERSION = 1
 # The most rows one page returns, whatever `limit` asks for. Lists that cap `limit`
 # in the API stay under it; the few that never did cannot be asked for everything.
 MAX_PAGE_ROWS = 1000
+
+# The most keys a list is sorted by at once, not counting the id.
+MAX_SORT_KEYS = 3
 
 
 class SortOrder(StrEnum):
@@ -140,6 +144,8 @@ class PageRequest:
     limit: int = 50
     sort: str | None = None
     order: SortOrder = SortOrder.ASC
+    # The keys after `sort`, each with its direction. Only meaningful with a `sort`.
+    then_by: tuple[tuple[str, SortOrder], ...] = ()
 
     @property
     def size(self) -> int:
@@ -149,7 +155,16 @@ class PageRequest:
     @property
     def keys(self) -> tuple[str, ...]:
         """The sort keys, none when the list is in its default order."""
-        return () if self.sort is None else (self.sort,)
+        if self.sort is None:
+            return ()
+        return (self.sort, *(key for key, _ in self.then_by))
+
+    @property
+    def orders(self) -> tuple[SortOrder, ...]:
+        """One direction per sort key, or the id's alone when there are no keys."""
+        if self.sort is None:
+            return (self.order,)
+        return (self.order, *(order for _, order in self.then_by))
 
     def check(self) -> None:
         """Refuse a cursor that came from a different `sort` or `order`.
@@ -159,7 +174,7 @@ class PageRequest:
         """
         after = self.after
         if after is not None and (
-            after.sort != self.keys or after.order != (self.order,)
+            after.sort != self.keys or after.order != self.orders
         ):
             raise InvalidCursorError(
                 "The page cursor is from a different sort or order."
@@ -167,21 +182,31 @@ class PageRequest:
 
     def next_after(self, last_id: uuid.UUID, values: tuple[CursorValue, ...]) -> Cursor:
         """The cursor that resumes after the row with `last_id` and `values`."""
-        return Cursor(sort=self.keys, order=(self.order,), values=values, id=last_id)
+        return Cursor(sort=self.keys, order=self.orders, values=values, id=last_id)
+
+
+@dataclass(kw_only=True, frozen=True)
+class SortBy[Sort: StrEnum]:
+    """A sort key after the first, with its own direction."""
+
+    key: Sort
+    order: SortOrder = SortOrder.ASC
 
 
 @dataclass(kw_only=True)
 class PagedQuery[Sort: StrEnum]:
     """The paging fields every list query shares; a list adds its own filters.
 
-    `Sort` is the enum of keys the list can sort by. A list that runs in another
-    order by default overrides `order`.
+    `Sort` is the enum of keys the list can sort by. `sort` and `order` are the first
+    key and its direction, and `then_by` the keys after it. A list that runs in
+    another order by default overrides `order`.
     """
 
     after: Cursor | None = None
     limit: int = 50
     sort: Sort | None = None
     order: SortOrder = SortOrder.ASC
+    then_by: tuple[SortBy[Sort], ...] = ()
 
     def page_request(self, default_sort: Sort | None = None) -> PageRequest:
         """This query as a `PageRequest`, sorted by `default_sort` if none is given."""
@@ -191,6 +216,7 @@ class PagedQuery[Sort: StrEnum]:
             limit=self.limit,
             sort=None if sort is None else sort.value,
             order=self.order,
+            then_by=tuple((by.key.value, by.order) for by in self.then_by),
         )
 
 
@@ -245,7 +271,8 @@ def page_rows[T, Key: str](
     """
     request.check()
     keys = request.keys
-    orders = (request.order,) * (len(keys) + 1)
+    # Each key in its own direction; the id follows the last of them.
+    orders = (*request.orders[: len(keys)], request.orders[-1])
 
     getters = {str(key): getter for key, getter in values.items()}
     positioned = [

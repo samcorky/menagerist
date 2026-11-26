@@ -71,7 +71,7 @@ def _cursor_value(value: object) -> CursorValue:
 
 def _after(
     cursor: Cursor,
-    descending: bool,
+    orders: tuple[SortOrder, ...],
     sorted_by: list[SortColumn],
     id_column: SQLColumnExpression[uuid.UUID],
 ) -> SQLColumnExpression[bool]:
@@ -86,15 +86,18 @@ def _after(
 
     clauses: list[SQLColumnExpression[bool]] = []
     same: list[SQLColumnExpression[bool]] = []
-    for column, value in zip(sorted_by, wanted, strict=True):
+    for column, value, order in zip(sorted_by, wanted, orders, strict=False):
         expr = column.expr
         if value is not None:
-            beyond = expr < value if descending else expr > value
+            beyond = expr < value if order is SortOrder.DESC else expr > value
             clauses.append(and_(*same, or_(beyond, expr.is_(None))))
             same.append(expr == value)
         else:
             same.append(expr.is_(None))
-    beyond_id = id_column < cursor.id if descending else id_column > cursor.id
+    # The id follows the last key's direction.
+    beyond_id = (
+        id_column < cursor.id if orders[-1] is SortOrder.DESC else id_column > cursor.id
+    )
     clauses.append(and_(*same, beyond_id))
     return or_(*clauses)
 
@@ -120,15 +123,19 @@ async def keyset_page[Row, T](
     """
     request.check()
     sorted_by = [columns[key] for key in request.keys]
-    descending = request.order is SortOrder.DESC
+    orders = request.orders
 
     if request.after is not None:
-        stmt = stmt.where(_after(request.after, descending, sorted_by, id_column))
+        stmt = stmt.where(_after(request.after, orders, sorted_by, id_column))
     ordering = [
-        (column.expr.desc() if descending else column.expr.asc()).nulls_last()
-        for column in sorted_by
+        (
+            column.expr.desc() if order is SortOrder.DESC else column.expr.asc()
+        ).nulls_last()
+        for column, order in zip(sorted_by, orders, strict=False)
     ]
-    ordering.append(id_column.desc() if descending else id_column.asc())
+    ordering.append(
+        id_column.desc() if orders[-1] is SortOrder.DESC else id_column.asc()
+    )
 
     labelled = stmt.add_columns(
         *(column.expr.label(f"_key{n}") for n, column in enumerate(sorted_by)),

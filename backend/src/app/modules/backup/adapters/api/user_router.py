@@ -124,7 +124,11 @@ async def list_user_exports(
     """List the caller's unexpired personal exports, newest first unless sorted."""
     result = await use_case.handle(
         ListUserExportsQuery(
-            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
         ),
         actor,
     )

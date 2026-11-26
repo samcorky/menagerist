@@ -69,8 +69,9 @@ async def list_users(
         ListUsersQuery(
             after=page.cursor,
             limit=page.limit,
-            sort=page.sort,
-            order=page.order,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
             q=page.q,
         ),
         actor,

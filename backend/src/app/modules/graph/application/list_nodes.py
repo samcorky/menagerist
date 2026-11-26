@@ -191,9 +191,12 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         """The search engine's ordering for a smart collection's list.
 
         Raises:
-            ValidationError: The sort is one the engine cannot give, or a direction
-                is asked for without saying what to sort by.
+            ValidationError: The sort is one the engine cannot give, it has more than
+                one key, or a direction is asked for without saying what to sort by.
         """
+        if query.then_by:
+            msg = "A smart collection sorts by one key."
+            raise ValidationError(msg)
         if query.sort is None:
             if query.order is SortOrder.DESC:
                 msg = "Say what to sort a smart collection by to list it newest first."
