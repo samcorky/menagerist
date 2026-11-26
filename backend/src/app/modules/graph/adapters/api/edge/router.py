@@ -14,7 +14,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
-    link_next_header,
+    set_next_link,
 )
 from app.entrypoints.api.shared.http.parameters import EdgeId, PageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -43,7 +43,6 @@ from app.modules.graph.application.update_edge import UpdateEdge
 from app.modules.graph.domain.errors import EdgeNotFoundError, NodeNotFoundError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(prefix="/edges", tags=["Edges"], route_class=PermissionAwareRoute)
 
@@ -147,7 +146,7 @@ async def list_edges(
     """List edges, by id unless sorted, optionally those of one item."""
     result = await use_case.handle(
         ListEdgesQuery(
-            after=None if page.after is None else decode_cursor(page.after),
+            after=page.cursor,
             limit=page.limit,
             sort=page.sort,
             order=page.order,
@@ -155,8 +154,7 @@ async def list_edges(
         ),
         actor,
     )
-    if result.next is not None:
-        response.headers["Link"] = link_next_header(request, result.next.encode())
+    set_next_link(request, response, result.next)
     return [EdgeResponse.from_domain(edge) for edge in result.items]
 
 

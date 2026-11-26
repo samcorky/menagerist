@@ -10,7 +10,7 @@ from app.modules.graph.domain.edge import Edge
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, Page, PageRequest, SortOrder
+from app.shared_kernel.paging import Page, PagedQuery
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -27,13 +27,9 @@ class EdgeSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListEdgesQuery:
+class ListEdgesQuery(PagedQuery[EdgeSort]):
     """Request for a page of edges, by id unless `sort` says, optionally of one node."""
 
-    after: Cursor | None = None
-    limit: int = 50
-    sort: EdgeSort | None = None
-    order: SortOrder = SortOrder.ASC
     node_id: uuid.UUID | None = None
 
 
@@ -45,12 +41,7 @@ class ListEdges(QueryHandler[GraphRepos, ListEdgesQuery, Page[Edge]]):
     async def _handle(self, query: ListEdgesQuery, actor: Actor) -> Page[Edge]:
         """Return a page of edges after `query.after`, up to `query.limit`."""
         scope = self.scope(actor)
-        request = PageRequest(
-            after=query.after,
-            limit=query.limit,
-            sort=None if query.sort is None else query.sort.value,
-            order=query.order,
-        )
+        request = query.page_request()
         if query.node_id is not None:
             page = await self._repos.edges.page_for_node(
                 query.node_id, scope=scope, page=request

@@ -9,7 +9,7 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, PageRequest, SortOrder
+from app.shared_kernel.paging import Cursor, PagedQuery, SortOrder
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,12 +25,9 @@ class DeletedNodeSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListDeletedNodesQuery:
+class ListDeletedNodesQuery(PagedQuery[DeletedNodeSort]):
     """Request for a page of deleted items, newest deleted first unless told."""
 
-    after: Cursor | None = None
-    limit: int = 50
-    sort: DeletedNodeSort | None = None
     order: SortOrder = SortOrder.DESC
 
 
@@ -55,15 +52,9 @@ class ListDeletedNodes(
     ) -> ListDeletedNodesResult:
         """Return a page of deleted items after `query.after`."""
         scope = self.scope(actor)
-        sort = query.sort or DeletedNodeSort.DELETED_AT
         page = await self._repos.nodes.list_deleted(
             scope=scope,
-            page=PageRequest(
-                after=query.after,
-                limit=query.limit,
-                sort=sort.value,
-                order=query.order,
-            ),
+            page=query.page_request(DeletedNodeSort.DELETED_AT),
         )
         total = await self._repos.nodes.count_deleted(scope=scope)
         logger.debug("deleted nodes listed", count=len(page.items), total=total)

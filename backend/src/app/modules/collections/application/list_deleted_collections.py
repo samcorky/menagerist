@@ -9,7 +9,7 @@ from app.modules.collections.domain.collection import Collection
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, PageRequest, SortOrder
+from app.shared_kernel.paging import Cursor, PagedQuery, SortOrder
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -25,12 +25,9 @@ class DeletedCollectionSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListDeletedCollectionsQuery:
+class ListDeletedCollectionsQuery(PagedQuery[DeletedCollectionSort]):
     """Request for a page of deleted collections, newest deleted first unless told."""
 
-    after: Cursor | None = None
-    limit: int = 50
-    sort: DeletedCollectionSort | None = None
     order: SortOrder = SortOrder.DESC
 
 
@@ -57,15 +54,9 @@ class ListDeletedCollections(
     ) -> ListDeletedCollectionsResult:
         """Return a page of deleted collections after `query.after`."""
         scope = self.scope(actor)
-        sort = query.sort or DeletedCollectionSort.DELETED_AT
         page = await self._repos.collections.list_deleted(
             scope=scope,
-            page=PageRequest(
-                after=query.after,
-                limit=query.limit,
-                sort=sort.value,
-                order=query.order,
-            ),
+            page=query.page_request(DeletedCollectionSort.DELETED_AT),
         )
         total = await self._repos.collections.count_deleted(scope=scope)
         logger.debug("deleted collections listed", count=len(page.items), total=total)

@@ -17,7 +17,7 @@ const col = (n: number, kind: 'manual' | 'smart' = 'manual') => ({
 });
 const page = (from: number, count: number, next: boolean) => ({
 	data: Array.from({ length: count }, (_, i) => col(from + i)),
-	response: new Response(null, { headers: next ? { link: '</x>; rel="next"' } : {} })
+	response: new Response(null, { headers: next ? { link: '</x?after=c1>; rel="next"' } : {} })
 });
 
 beforeEach(() => vi.resetAllMocks());
@@ -32,7 +32,7 @@ describe('fetchAllCollections', () => {
 		expect(all).toHaveLength(size + 2);
 		expect(listCollections.mock.calls.map(([o]) => o.query)).toEqual([
 			{ after: undefined, limit: size },
-			{ after: `id-${size - 1}`, limit: size }
+			{ after: 'c1', limit: size }
 		]);
 	});
 

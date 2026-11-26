@@ -1,21 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const { listNodes } = vi.hoisted(() => ({ listNodes: vi.fn() }));
-vi.mock('$lib/api/client', () => ({ listNodes }));
-import { fetchItems, nextCursor, PAGE_LIMIT } from '../src/lib/paging';
+import { describe, expect, it, vi } from 'vitest';
+import { nextCursor, readPages } from '../src/lib/paging';
 
 const rows = (from: number, count: number) =>
 	Array.from({ length: count }, (_, i) => ({ id: `n${from + i}` }));
 const page = (data: unknown[], next?: string) => ({
 	data,
-	response: {
-		headers: new Headers(
-			next ? { link: `</api/v1/nodes?limit=100&after=${next}>; rel="next"` } : {}
-		)
-	}
+	response: new Response(null, {
+		headers: next ? { link: `</api/v1/x?limit=100&after=${next}>; rel="next"` } : {}
+	})
 });
-
-beforeEach(() => listNodes.mockReset());
 
 describe('nextCursor', () => {
 	it('reads the cursor the next link carries, decoded', () => {
@@ -30,30 +23,39 @@ describe('nextCursor', () => {
 	});
 });
 
-describe('fetchItems', () => {
+describe('readPages', () => {
 	it('follows the next cursor a page at a time until there is none', async () => {
-		listNodes
+		const fetchPage = vi
+			.fn()
 			.mockResolvedValueOnce(page(rows(0, 100), 'c1'))
 			.mockResolvedValueOnce(page(rows(100, 40)));
-		const items = await fetchItems();
-		expect(items).toHaveLength(140);
-		expect(listNodes).toHaveBeenNthCalledWith(1, {
-			query: { after: undefined, limit: PAGE_LIMIT }
-		});
-		expect(listNodes).toHaveBeenNthCalledWith(2, { query: { after: 'c1', limit: PAGE_LIMIT } });
+		const read = await readPages(fetchPage);
+		expect(read.ok).toBe(true);
+		expect(read.rows).toHaveLength(140);
+		expect(fetchPage.mock.calls).toEqual([[undefined], ['c1']]);
 	});
 
-	it('stops at the most it was asked for', async () => {
-		listNodes.mockResolvedValue(page(rows(0, 100), 'more'));
-		const items = await fetchItems(250);
-		expect(items).toHaveLength(250);
-		expect(listNodes).toHaveBeenCalledTimes(3);
+	it('stops at the most rows it was asked for', async () => {
+		const fetchPage = vi.fn().mockResolvedValue(page(rows(0, 100), 'more'));
+		const read = await readPages(fetchPage, { maxRows: 250 });
+		expect(read.rows).toHaveLength(250);
+		expect(fetchPage).toHaveBeenCalledTimes(3);
 	});
 
-	it('keeps what it loaded when a later page fails', async () => {
-		listNodes
+	it('stops at the most pages it was asked for', async () => {
+		const fetchPage = vi.fn().mockResolvedValue(page(rows(0, 10), 'more'));
+		const read = await readPages(fetchPage, { maxPages: 2 });
+		expect(read).toMatchObject({ ok: true });
+		expect(read.rows).toHaveLength(20);
+	});
+
+	it('reports a failed page and keeps what was read before it', async () => {
+		const fetchPage = vi
+			.fn()
 			.mockResolvedValueOnce(page(rows(0, 100), 'c1'))
-			.mockResolvedValueOnce({ error: { detail: 'boom' }, data: undefined });
-		expect(await fetchItems()).toHaveLength(100);
+			.mockResolvedValueOnce({ error: { detail: 'boom' }, response: new Response(null) });
+		const read = await readPages(fetchPage);
+		expect(read.ok).toBe(false);
+		expect(read.rows).toHaveLength(100);
 	});
 });

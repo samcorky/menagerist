@@ -16,7 +16,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
-    link_next_header,
+    set_next_link,
 )
 from app.entrypoints.api.shared.http.parameters import (
     DeletedPageParams,
@@ -103,7 +103,6 @@ from app.modules.collections.domain.errors import (
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ConflictError, ValidationError
-from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(
     prefix="/collections", tags=["Collections"], route_class=PermissionAwareRoute
@@ -235,7 +234,7 @@ async def list_collections(
     """List collections with item counts, optionally only those an item is in."""
     result = await use_case.handle(
         ListCollectionsQuery(
-            after=None if page.after is None else decode_cursor(page.after),
+            after=page.cursor,
             limit=page.limit,
             sort=page.sort,
             order=page.order,
@@ -245,8 +244,7 @@ async def list_collections(
         ),
         actor,
     )
-    if result.next is not None:
-        response.headers["Link"] = link_next_header(request, result.next.encode())
+    set_next_link(request, response, result.next)
     return [CollectionResponse.from_domain(s) for s in result.items]
 
 
@@ -272,15 +270,14 @@ async def list_deleted_collections(
     """
     result = await use_case.handle(
         ListDeletedCollectionsQuery(
-            after=None if page.after is None else decode_cursor(page.after),
+            after=page.cursor,
             limit=page.limit,
             sort=page.sort,
             order=page.order,
         ),
         actor,
     )
-    if result.next is not None:
-        response.headers["Link"] = link_next_header(request, result.next.encode())
+    set_next_link(request, response, result.next)
     response.headers["Total-Count"] = str(result.total)
     return [DeletedCollectionResponse.from_domain(c) for c in result.items]
 

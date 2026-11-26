@@ -3,6 +3,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 
 import pytest
 
@@ -11,6 +12,7 @@ from app.shared_kernel.paging import (
     Cursor,
     InvalidCursorError,
     Page,
+    PagedQuery,
     PageRequest,
     SortOrder,
     decode_cursor,
@@ -305,3 +307,32 @@ def test_a_huge_limit_returns_a_page_of_at_most_the_maximum() -> None:
 
     assert len(page.items) == MAX_PAGE_ROWS
     assert page.next is not None
+
+
+class _Key(StrEnum):
+    NAME = "name"
+    CREATED_AT = "created_at"
+
+
+@pytest.mark.fast
+def test_a_paged_query_becomes_a_page_request() -> None:
+    """The paging fields carry over, with the sort as its key name."""
+    cursor = Cursor.after_id(uuid.uuid7())
+
+    request = PagedQuery[_Key](
+        after=cursor, limit=7, sort=_Key.NAME, order=SortOrder.DESC
+    ).page_request()
+
+    assert request == PageRequest(
+        after=cursor, limit=7, sort="name", order=SortOrder.DESC
+    )
+
+
+@pytest.mark.fast
+def test_a_paged_query_without_a_sort_uses_the_default_one_or_none() -> None:
+    """A list that sorts by something by default says so; the rest sort by id."""
+    query = PagedQuery[_Key]()
+
+    assert query.page_request().sort is None
+    assert query.page_request(_Key.CREATED_AT).sort == "created_at"
+    assert PagedQuery[_Key](sort=_Key.NAME).page_request(_Key.CREATED_AT).sort == "name"

@@ -30,8 +30,8 @@ describe('fetchAllNodeTypes', () => {
 		);
 		expect(listNodeTypes.mock.calls.map(([options]) => options.query)).toEqual([
 			{ after: undefined, limit: size },
-			{ after: `id-${size - 1}`, limit: size },
-			{ after: `id-${2 * size - 1}`, limit: size }
+			{ after: 'x', limit: size },
+			{ after: 'x', limit: size }
 		]);
 	});
 

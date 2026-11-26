@@ -17,7 +17,7 @@ from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, Page, PageRequest, SortOrder
+from app.shared_kernel.paging import Cursor, Page, PagedQuery, PageRequest
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
@@ -37,7 +37,7 @@ class CollectionSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListCollectionsQuery:
+class ListCollectionsQuery(PagedQuery[CollectionSort]):
     """Request for a page of collections, optionally holding an item.
 
     Collections come by id unless `sort` says otherwise; `order` sets the
@@ -46,10 +46,6 @@ class ListCollectionsQuery:
     it and smart ones whose definition matches it.
     """
 
-    after: Cursor | None = None
-    limit: int = 50
-    sort: CollectionSort | None = None
-    order: SortOrder = SortOrder.ASC
     item_id: uuid.UUID | None = None
     q: str | None = None
     kind: CollectionKind | None = None
@@ -98,12 +94,7 @@ class ListCollections(
         the last row looked at, and is given only when a later collection holds the
         item too, so the last page never points to an empty one.
         """
-        request = PageRequest(
-            after=query.after,
-            limit=query.limit,
-            sort=None if query.sort is None else query.sort.value,
-            order=query.order,
-        )
+        request = query.page_request()
         if query.item_id is None:
             return await self._repos.collections.list(
                 scope=scope, page=request, q=query.q, kind=query.kind
