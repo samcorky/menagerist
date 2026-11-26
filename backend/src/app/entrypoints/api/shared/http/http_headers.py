@@ -11,6 +11,9 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from starlette.requests import Request
+    from starlette.responses import Response
+
+    from app.shared_kernel.paging import Cursor
 
 
 def http_date(dt: datetime) -> str:
@@ -30,6 +33,14 @@ def link_next_header(request: Request, after_cursor: str) -> str:
     """RFC 8288 Link header value pointing to the next page."""
     next_url = str(request.url.include_query_params(after=after_cursor))
     return f'<{next_url}>; rel="next"'
+
+
+def set_next_link(
+    request: Request, response: Response, next_cursor: Cursor | None
+) -> None:
+    """Point the `Link` header at the next page, when there is one."""
+    if next_cursor is not None:
+        response.headers["Link"] = link_next_header(request, next_cursor.encode())
 
 
 # --- OpenAPI response-dict helpers (used in router decorator `responses=`) ---

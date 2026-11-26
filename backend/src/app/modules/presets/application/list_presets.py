@@ -9,7 +9,7 @@ from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, Page, PageRequest, SortOrder
+from app.shared_kernel.paging import Page, PagedQuery
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -27,13 +27,9 @@ class PresetSort(StrEnum):
 
 
 @dataclass(kw_only=True)
-class ListPresetsQuery:
+class ListPresetsQuery(PagedQuery[PresetSort]):
     """Request to list presets, optionally filtered by kind or a label search."""
 
-    after: Cursor | None = field(default=None)
-    limit: int = field(default=50)
-    sort: PresetSort | None = field(default=None)
-    order: SortOrder = field(default=SortOrder.ASC)
     kind: str | None = field(default=None)
     q: str | None = field(default=None)
 
@@ -47,12 +43,7 @@ class ListPresets(QueryHandler[PresetRepos, ListPresetsQuery, Page[Preset]]):
         """Return the page of presets matching `query`."""
         page = await self._repos.presets.list(
             scope=self.scope(actor),
-            page=PageRequest(
-                after=query.after,
-                limit=query.limit,
-                sort=None if query.sort is None else query.sort.value,
-                order=query.order,
-            ),
+            page=query.page_request(),
             kind=query.kind,
             q=query.q,
         )

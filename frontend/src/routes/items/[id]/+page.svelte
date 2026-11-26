@@ -26,7 +26,7 @@
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 	import { effectiveSchema, fetchAllNodeTypes } from '$lib/node-types';
-	import { fetchItems } from '$lib/paging';
+	import { fetchItems } from '$lib/fetch-items';
 	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { coreForProp } from '$lib/field-types';

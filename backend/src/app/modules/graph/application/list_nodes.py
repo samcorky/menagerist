@@ -42,6 +42,7 @@ from app.shared_kernel.errors import ValidationError
 from app.shared_kernel.paging import (
     Cursor as PageCursor,
     InvalidCursorError,
+    PagedQuery,
     PageRequest,
     SortOrder,
 )
@@ -74,13 +75,9 @@ _SMART_SORTS = {
 
 
 @dataclass(kw_only=True)
-class ListNodesQuery:
+class ListNodesQuery(PagedQuery[NodeSort]):
     """Request for a page of items, by id unless `sort` says otherwise."""
 
-    after: PageCursor | None = None
-    limit: int = 50
-    sort: NodeSort | None = None
-    order: SortOrder = SortOrder.ASC
     type: str | None = None
     q: str | None = None
     favourite: bool | None = None
@@ -188,12 +185,7 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
 
     @staticmethod
     def _page_request(query: ListNodesQuery) -> PageRequest:
-        return PageRequest(
-            after=query.after,
-            limit=query.limit,
-            sort=None if query.sort is None else query.sort.value,
-            order=query.order,
-        )
+        return query.page_request()
 
     @staticmethod
     def _smart_sort(query: ListNodesQuery) -> tuple[SortKey, ...]:

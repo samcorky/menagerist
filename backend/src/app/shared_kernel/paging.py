@@ -170,6 +170,30 @@ class PageRequest:
         return Cursor(sort=self.keys, order=(self.order,), values=values, id=last_id)
 
 
+@dataclass(kw_only=True)
+class PagedQuery[Sort: StrEnum]:
+    """The paging fields every list query shares; a list adds its own filters.
+
+    `Sort` is the enum of keys the list can sort by. A list that runs in another
+    order by default overrides `order`.
+    """
+
+    after: Cursor | None = None
+    limit: int = 50
+    sort: Sort | None = None
+    order: SortOrder = SortOrder.ASC
+
+    def page_request(self, default_sort: Sort | None = None) -> PageRequest:
+        """This query as a `PageRequest`, sorted by `default_sort` if none is given."""
+        sort = self.sort or default_sort
+        return PageRequest(
+            after=self.after,
+            limit=self.limit,
+            sort=None if sort is None else sort.value,
+            order=self.order,
+        )
+
+
 @dataclass(kw_only=True, frozen=True)
 class Page[T]:
     """One page of rows, and the cursor of the next page when there is one."""

@@ -15,6 +15,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_next_header,
+    set_next_link,
 )
 from app.entrypoints.api.shared.http.parameters import (
     DeletedPageParams,
@@ -129,7 +130,6 @@ from app.modules.graph.domain.query import InvalidQueryError
 from app.modules.graph.domain.reach import InvalidReachDepthError, ReachTooLargeError
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ValidationError
-from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(prefix="/nodes", tags=["Nodes"], route_class=PermissionAwareRoute)
 
@@ -389,15 +389,14 @@ async def list_deleted_nodes(
     """
     result = await use_case.handle(
         ListDeletedNodesQuery(
-            after=None if page.after is None else decode_cursor(page.after),
+            after=page.cursor,
             limit=page.limit,
             sort=page.sort,
             order=page.order,
         ),
         actor,
     )
-    if result.next is not None:
-        response.headers["Link"] = link_next_header(request, result.next.encode())
+    set_next_link(request, response, result.next)
     response.headers["Total-Count"] = str(result.total)
     return [DeletedNodeResponse.from_domain(n) for n in result.items]
 
@@ -680,7 +679,7 @@ async def list_nodes(
     """
     result = await use_case.handle(
         ListNodesQuery(
-            after=None if page.after is None else decode_cursor(page.after),
+            after=page.cursor,
             limit=page.limit,
             sort=page.sort,
             order=page.order,
@@ -691,8 +690,7 @@ async def list_nodes(
         ),
         actor,
     )
-    if result.next is not None:
-        response.headers["Link"] = link_next_header(request, result.next.encode())
+    set_next_link(request, response, result.next)
     response.headers["Total-Count"] = str(result.total)
     if result.total_capped:
         response.headers["Total-Count-Capped"] = "true"

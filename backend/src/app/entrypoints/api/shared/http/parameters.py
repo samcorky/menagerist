@@ -14,7 +14,7 @@ from typing import Annotated
 from fastapi import Header, Path, Query
 from pydantic import BaseModel, Field
 
-from app.shared_kernel.paging import SortOrder
+from app.shared_kernel.paging import Cursor, SortOrder, decode_cursor
 
 PAGE_AFTER_DESCRIPTION = (
     "Id of the last row of the previous page. Leave it out for the first page;"
@@ -56,6 +56,15 @@ class PageParams[Sort: StrEnum](BaseModel):
     limit: int = Field(50, ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)
     sort: Sort | None = Field(None, description=PAGE_SORT_DESCRIPTION)
     order: SortOrder = Field(SortOrder.ASC, description=PAGE_ORDER_DESCRIPTION)
+
+    @property
+    def cursor(self) -> Cursor | None:
+        """`after` read as a cursor, or None for the first page.
+
+        Raises:
+            InvalidCursorError: `after` is not a cursor.
+        """
+        return None if self.after is None else decode_cursor(self.after)
 
 
 class DeletedPageParams[Sort: StrEnum](PageParams[Sort]):

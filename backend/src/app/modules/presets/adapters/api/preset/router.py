@@ -13,7 +13,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
-    link_next_header,
+    set_next_link,
 )
 from app.entrypoints.api.shared.http.parameters import PresetId, SearchPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -48,7 +48,6 @@ from app.modules.presets.domain.errors import (
     PresetNotFoundError,
 )
 from app.shared_kernel.actor import Actor
-from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(
     prefix="/presets", tags=["Presets"], route_class=PermissionAwareRoute
@@ -117,7 +116,7 @@ async def list_presets(
     """List presets, by id unless sorted, optionally by kind or a label search."""
     result = await use_case.handle(
         ListPresetsQuery(
-            after=None if page.after is None else decode_cursor(page.after),
+            after=page.cursor,
             limit=page.limit,
             sort=page.sort,
             order=page.order,
@@ -126,8 +125,7 @@ async def list_presets(
         ),
         actor,
     )
-    if result.next is not None:
-        response.headers["Link"] = link_next_header(request, result.next.encode())
+    set_next_link(request, response, result.next)
     return [PresetResponse.from_domain(p) for p in result.items]
 
 

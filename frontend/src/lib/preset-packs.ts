@@ -1,4 +1,5 @@
 import { generateFieldKey } from '$lib/field-key';
+import { readPages } from '$lib/paging';
 import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 import { withPropMeta } from '$lib/schema-meta';
 import {
@@ -26,16 +27,11 @@ export function canEditOptions(preset: PresetResponse): boolean {
 
 /** Read every live preset of every kind, following the Link header's next cursor. */
 export async function fetchAllPresets(): Promise<PresetResponse[]> {
-	const all: PresetResponse[] = [];
-	let after: string | undefined;
-	for (;;) {
-		const result = await listPresets({ query: { after, limit: PAGE_SIZE } });
-		if (result.error || !result.data) throw result.error ?? new Error('Could not list presets');
-		all.push(...result.data);
-		const hasNext = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-		if (!hasNext || result.data.length === 0) return all;
-		after = result.data[result.data.length - 1].id;
-	}
+	const { rows, ok } = await readPages<PresetResponse>((after) =>
+		listPresets({ query: { after, limit: PAGE_SIZE } })
+	);
+	if (!ok) throw new Error('Could not list presets');
+	return rows;
 }
 
 /**

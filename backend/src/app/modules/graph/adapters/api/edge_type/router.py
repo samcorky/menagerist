@@ -13,7 +13,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
     link_header_responses,
-    link_next_header,
+    set_next_link,
 )
 from app.entrypoints.api.shared.http.parameters import (
     EdgeTypeId,
@@ -65,7 +65,6 @@ from app.modules.graph.domain.errors import (
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
-from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(
     prefix="/edge-types", tags=["Edge Types"], route_class=PermissionAwareRoute
@@ -135,15 +134,14 @@ async def list_edge_types(
     """List edge types, by id unless sorted."""
     result = await use_case.handle(
         ListEdgeTypesQuery(
-            after=None if page.after is None else decode_cursor(page.after),
+            after=page.cursor,
             limit=page.limit,
             sort=page.sort,
             order=page.order,
         ),
         actor,
     )
-    if result.next is not None:
-        response.headers["Link"] = link_next_header(request, result.next.encode())
+    set_next_link(request, response, result.next)
     return [EdgeTypeResponse.from_domain(et) for et in result.items]
 
 

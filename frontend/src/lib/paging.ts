@@ -1,5 +1,3 @@
-import { listNodes, type NodeResponse } from '$lib/api/client';
-
 /** The most rows a list returns in one page. */
 export const PAGE_LIMIT = 100;
 
@@ -15,20 +13,36 @@ export function nextCursor(link: string | null | undefined): string | null {
 	}
 }
 
+/** What a generated list call resolves to. */
+export interface PageResult<T> {
+	data?: T[];
+	error?: unknown;
+	response?: Response;
+}
+
+export interface PagesRead<T> {
+	rows: T[];
+	/** False when a page failed; `rows` then holds what was read before it. */
+	ok: boolean;
+}
+
 /**
- * Up to `max` items, a page at a time, following the Link header's cursor. A failed page ends
- * the read with what was loaded, so a screen that only needs names to show still works.
+ * Read a list a page at a time, following the Link header's cursor until there is no next page,
+ * `maxRows` rows are read, or `maxPages` pages have been.
  */
-export async function fetchItems(max = 500): Promise<NodeResponse[]> {
-	const items: NodeResponse[] = [];
+export async function readPages<T>(
+	fetchPage: (after: string | undefined) => Promise<PageResult<T>>,
+	{ maxRows = Infinity, maxPages = Infinity } = {}
+): Promise<PagesRead<T>> {
+	const rows: T[] = [];
 	let after: string | undefined;
-	while (items.length < max) {
-		const result = await listNodes({ query: { after, limit: PAGE_LIMIT } });
-		if (result.error || !result.data) break;
-		items.push(...result.data);
+	for (let page = 0; page < maxPages && rows.length < maxRows; page++) {
+		const result = await fetchPage(after);
+		if (result.error || !result.data) return { rows, ok: false };
+		rows.push(...result.data);
 		const next = nextCursor(result.response?.headers.get('link'));
 		if (next === null) break;
 		after = next;
 	}
-	return items.slice(0, max);
+	return { rows: rows.slice(0, maxRows), ok: true };
 }

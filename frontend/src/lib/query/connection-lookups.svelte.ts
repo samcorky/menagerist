@@ -1,5 +1,6 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { getNode, listEdgeTypes, listNodes } from '$lib/api/client';
+import { readPages } from '$lib/paging';
 import { connectionReferences, type ItemChoice, type RelationshipChoice } from './builder';
 import type { SummaryLookup } from './summary';
 import type { Query } from './types';
@@ -25,17 +26,12 @@ export class ConnectionLookups {
 		this.#loading = true;
 		this.relationshipsFailed = false;
 		try {
-			const all: RelationshipChoice[] = [];
-			let after: string | undefined;
-			for (let page = 0; page < MAX_EDGE_TYPE_PAGES; page++) {
-				const result = await listEdgeTypes({ query: { after, limit: EDGE_TYPES_PAGE_SIZE } });
-				if (result.error || !result.data) throw new Error('relationships');
-				all.push(...result.data);
-				const more = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-				if (!more || result.data.length === 0) break;
-				after = result.data[result.data.length - 1].id;
-			}
-			this.relationships = all;
+			const { rows, ok } = await readPages<RelationshipChoice>(
+				(after) => listEdgeTypes({ query: { after, limit: EDGE_TYPES_PAGE_SIZE } }),
+				{ maxPages: MAX_EDGE_TYPE_PAGES }
+			);
+			if (!ok) throw new Error('relationships');
+			this.relationships = rows;
 		} catch {
 			this.relationshipsFailed = true;
 		} finally {
