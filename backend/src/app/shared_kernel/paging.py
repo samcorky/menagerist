@@ -200,6 +200,8 @@ class Page[T]:
 
     items: list[T]
     next: Cursor | None = None
+    # How many rows matched before paging, when the helper that made the page knows.
+    total: int | None = None
 
 
 def _compare(
@@ -218,17 +220,18 @@ def _compare(
     return 0
 
 
-def page_rows[T](
+def page_rows[T, Key: str](
     rows: Sequence[T],
     request: PageRequest,
     *,
     id_of: Callable[[T], uuid.UUID],
-    values: Mapping[str, Callable[[T], CursorValue]],
+    values: Mapping[Key, Callable[[T], CursorValue]],
 ) -> Page[T]:
     """Order `rows`, resume after the cursor, and take one page: the in-memory twin.
 
-    `values` gives each sort key's value for a row. Rows with no value for a key
-    sort after the rest in either direction, and the id breaks ties.
+    `values` gives each sort key's value for a row, keyed by name or by the enum of
+    the list's keys. Rows with no value for a key sort after the rest in either
+    direction, and the id breaks ties. The page carries `total`, the rows given.
 
     Raises:
         InvalidCursorError: The cursor does not match the request's sort and order.
@@ -237,8 +240,9 @@ def page_rows[T](
     keys = request.keys
     orders = (request.order,) * (len(keys) + 1)
 
+    getters = {str(key): getter for key, getter in values.items()}
     positioned = [
-        ((*(values[key](row) for key in keys), str(id_of(row))), row) for row in rows
+        ((*(getters[key](row) for key in keys), str(id_of(row))), row) for row in rows
     ]
 
     def by_position(
@@ -253,11 +257,12 @@ def page_rows[T](
         positioned = [p for p in positioned if _compare(p[0], resume, orders) > 0]
     page = positioned[: request.size]
     if not page or len(positioned) <= request.size:
-        return Page(items=[row for _, row in page])
+        return Page(items=[row for _, row in page], total=len(rows))
     last_position, last_row = page[-1]
     return Page(
         items=[row for _, row in page],
         next=request.next_after(id_of(last_row), last_position[:-1]),
+        total=len(rows),
     )
 
 

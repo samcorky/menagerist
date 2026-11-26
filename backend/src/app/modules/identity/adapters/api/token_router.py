@@ -1,8 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
-from app.entrypoints.api.shared.http.parameters import TokenId
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import NewestFirstPageParams, TokenId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.dependencies import (
@@ -27,6 +31,7 @@ from app.modules.identity.application.list_grantable_permissions import (
     ListGrantablePermissionsQuery,
 )
 from app.modules.identity.application.list_own_api_tokens import (
+    ApiTokenSort,
     ListOwnApiTokens,
     ListOwnApiTokensQuery,
 )
@@ -106,17 +111,25 @@ async def list_grantable_permissions(
     "",
     response_model=list[ApiTokenResponse],
     operation_id="list_api_tokens",
-    responses=_UNAUTHENTICATED,
+    responses={**_UNAUTHENTICATED, **paging_responses("Active tokens")},
 )
 async def list_api_tokens(
+    request: Request,
     response: Response,
     use_case: Annotated[ListOwnApiTokens, Depends(get_list_own_api_tokens_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
+    page: Annotated[NewestFirstPageParams[ApiTokenSort], Query()],
 ) -> list[ApiTokenResponse]:
-    """List your active tokens, newest first. Secrets are never shown."""
+    """List your active tokens, newest first unless sorted. Secrets are never shown."""
     response.headers["Cache-Control"] = "private, no-store"
-    tokens = await use_case.handle(ListOwnApiTokensQuery(), actor)
-    return [ApiTokenResponse.from_domain(token) for token in tokens]
+    result = await use_case.handle(
+        ListOwnApiTokensQuery(
+            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+        ),
+        actor,
+    )
+    set_page_headers(request, response, result)
+    return [ApiTokenResponse.from_domain(token) for token in result.items]
 
 
 @router.post(

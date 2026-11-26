@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -10,7 +10,11 @@ from app.entrypoints.api.shared.http.cross_site import (
     CrossSiteRequestError,
     refuse_cross_site,
 )
-from app.entrypoints.api.shared.http.parameters import SessionId
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import NewestFirstPageParams, SessionId
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.identity.adapters.api.cookies import (
@@ -79,10 +83,12 @@ from app.modules.identity.application.list_device_name_suggestions import (
 from app.modules.identity.application.list_own_devices import (
     ListOwnDevices,
     ListOwnDevicesQuery,
+    OwnDeviceSort,
 )
 from app.modules.identity.application.list_own_sessions import (
     ListOwnSessions,
     ListOwnSessionsQuery,
+    OwnSessionSort,
 )
 from app.modules.identity.application.rename_own_device import (
     RenameOwnDevice,
@@ -394,20 +400,37 @@ async def change_password(
     operation_id="list_own_devices",
     tags=["Sessions"],
     responses={
-        200: {"content": {"application/json": {"example": [DEVICE_EXAMPLE]}}},
+        200: {
+            "content": {"application/json": {"example": [DEVICE_EXAMPLE]}},
+            **paging_responses("Devices")[200],
+        },
         **_UNAUTHENTICATED,
     },
 )
 async def list_own_devices(
+    request: Request,
+    response: Response,
     use_case: Annotated[ListOwnDevices, Depends(get_list_own_devices_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
     current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+    page: Annotated[NewestFirstPageParams[OwnDeviceSort], Query()],
 ) -> list[OwnDeviceResponse]:
-    """List the browsers you are signed in on, each with its active sessions."""
-    devices = await use_case.handle(
-        ListOwnDevicesQuery(current_session_id=current_session_id), actor
+    """List the browsers you are signed in on, most recently used first unless sorted.
+
+    Each comes with its active sessions.
+    """
+    result = await use_case.handle(
+        ListOwnDevicesQuery(
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+            current_session_id=current_session_id,
+        ),
+        actor,
     )
-    return [OwnDeviceResponse.from_own_device(d) for d in devices]
+    set_page_headers(request, response, result)
+    return [OwnDeviceResponse.from_own_device(d) for d in result.items]
 
 
 @me_router.delete(
@@ -541,19 +564,29 @@ async def adopt_device_name(
     response_model=list[SessionResponse],
     operation_id="list_own_sessions",
     tags=["Sessions"],
-    responses=_UNAUTHENTICATED,
+    responses={**_UNAUTHENTICATED, **paging_responses("Active sessions")},
 )
 async def list_own_sessions(
+    request: Request,
+    response: Response,
     use_case: Annotated[ListOwnSessions, Depends(get_list_own_sessions_use_case)],
     actor: Annotated[Actor, Depends(get_active_identity_actor)],
     current_session_id: Annotated[uuid.UUID, Depends(get_current_session_id)],
+    page: Annotated[NewestFirstPageParams[OwnSessionSort], Query()],
 ) -> list[SessionResponse]:
-    """List all active devices for the current user."""
-    sessions = await use_case.handle(
-        ListOwnSessionsQuery(current_session_id=current_session_id),
+    """List all active devices for the current user, newest first unless sorted."""
+    result = await use_case.handle(
+        ListOwnSessionsQuery(
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+            current_session_id=current_session_id,
+        ),
         actor,
     )
-    return [SessionResponse.from_own_session(s) for s in sessions]
+    set_page_headers(request, response, result)
+    return [SessionResponse.from_own_session(s) for s in result.items]
 
 
 @me_router.delete(

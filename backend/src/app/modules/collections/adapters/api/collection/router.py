@@ -19,7 +19,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     set_next_link,
 )
 from app.entrypoints.api.shared.http.parameters import (
-    DeletedPageParams,
+    NewestFirstPageParams,
     NodeId,
     SearchPageParams,
 )
@@ -261,7 +261,7 @@ async def list_deleted_collections(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    page: Annotated[DeletedPageParams[DeletedCollectionSort], Query()],
+    page: Annotated[NewestFirstPageParams[DeletedCollectionSort], Query()],
 ) -> list[DeletedCollectionResponse]:
     """List your deleted collections, newest deleted first unless told.
 

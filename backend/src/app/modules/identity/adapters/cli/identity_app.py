@@ -14,6 +14,7 @@ from app.platform.cli_output import Report
 from app.platform.config import get_identity_cli_settings
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.errors import DomainError
+from app.shared_kernel.paging import MAX_PAGE_ROWS
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -323,9 +324,10 @@ def list_accounts() -> Report:
         from app.shared_kernel.actor import SYSTEM_ACTOR
 
         async with get_session_factory()() as session:
-            return await ListUsers(build_identity_repos(session), _guard).handle(
-                ListUsersQuery(), SYSTEM_ACTOR
+            page = await ListUsers(build_identity_repos(session), _guard).handle(
+                ListUsersQuery(limit=MAX_PAGE_ROWS), SYSTEM_ACTOR
             )
+            return page.items
 
     rows = [
         {

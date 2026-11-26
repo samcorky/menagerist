@@ -65,9 +65,8 @@ async def test_create_verify_open_list_delete() -> None:
         VerifyBackupQuery(backup_id=summary.id), SYSTEM_ACTOR
     )
     assert report.findings == []
-    assert await ListBackups(store, guard).handle(ListBackupsQuery(), SYSTEM_ACTOR) == [
-        summary
-    ]
+    listed = await ListBackups(store, guard).handle(ListBackupsQuery(), SYSTEM_ACTOR)
+    assert listed.items == [summary]
     opened = await OpenBackup(store, guard).handle(
         OpenBackupQuery(backup_id=summary.id), SYSTEM_ACTOR
     )
@@ -270,7 +269,7 @@ async def test_open_finds_backup_among_other_summaries() -> None:
     summaries = await ListBackups(store, get_access_guard()).handle(
         ListBackupsQuery(), SYSTEM_ACTOR
     )
-    assert summaries == [second, first]
+    assert summaries.items == [second, first]
 
 
 async def test_duplicate_members_and_metadata_size_limit(

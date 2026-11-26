@@ -8,6 +8,7 @@
 		listUserExports,
 		type UserExportResponse
 	} from '$lib/api/client';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { formatDateTime } from '$lib/format-date';
 	import { wide } from '$lib/viewport.svelte';
@@ -39,9 +40,11 @@
 		loading = true;
 		loadError = null;
 		try {
-			const result = await listUserExports();
-			if (result.error || !result.data) loadError = networkAwareError(result).title;
-			else exports = result.data;
+			const read = await readPages((after) =>
+				listUserExports({ query: { after, limit: PAGE_LIMIT } })
+			);
+			if (!read.ok) loadError = networkAwareError(read.failure).title;
+			else exports = read.rows;
 		} catch {
 			loadError = 'Could not load exports.';
 		}

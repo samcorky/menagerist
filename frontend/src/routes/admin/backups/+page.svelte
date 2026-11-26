@@ -26,6 +26,7 @@
 		type BackupResponse,
 		type VerificationResponse
 	} from '$lib/api/client';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import { networkAwareError, uploadErrorMessage } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { formatDateTime } from '$lib/format-date';
@@ -81,15 +82,15 @@
 		loading = true;
 		loadFailed = false;
 		try {
-			const result = await listBackups();
-			if (result.error || !result.data) {
+			const read = await readPages((after) => listBackups({ query: { after, limit: PAGE_LIMIT } }));
+			if (!read.ok) {
 				loadFailed = true;
 				// A failed refresh keeps the list already shown; only an empty page shows LoadFailed.
 				if (backups.length > 0) {
-					const { title, description } = networkAwareError(result);
+					const { title, description } = networkAwareError(read.failure);
 					toast.error(title, { description });
 				}
-			} else backups = result.data;
+			} else backups = read.rows;
 		} catch {
 			loadFailed = true;
 			if (backups.length > 0) toast.error("Couldn't refresh the backups");

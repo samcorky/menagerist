@@ -96,10 +96,13 @@ test('an administrator creates, verifies, downloads, uploads and deletes a backu
 	}
 });
 
+const backupList = /\/api\/v1\/backups(\?.*)?$/;
+
 test('backup list failures can be retried and damaged uploads report an error', async ({
 	page
 }) => {
-	await page.route('**/api/v1/backups', (route) =>
+	// The list is read a page at a time, so the URL carries a query string.
+	await page.route(backupList, (route) =>
 		route.fulfill({
 			status: 503,
 			contentType: 'application/problem+json',
@@ -108,7 +111,7 @@ test('backup list failures can be retried and damaged uploads report an error', 
 	);
 	await page.goto('/admin/backups');
 	await expect(page.getByRole('alert')).toBeVisible();
-	await page.unroute('**/api/v1/backups');
+	await page.unroute(backupList);
 	await page.getByRole('button', { name: /Retry|Try again/ }).click();
 	await expect(page.getByRole('alert')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Upload backup', exact: true }).click();

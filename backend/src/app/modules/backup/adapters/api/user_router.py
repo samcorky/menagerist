@@ -1,10 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
-from app.entrypoints.api.shared.http.parameters import ExportId
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import ExportId, NewestFirstPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -39,6 +43,7 @@ from app.modules.backup.application.import_user_archive import (
 from app.modules.backup.application.list_user_exports import (
     ListUserExports,
     ListUserExportsQuery,
+    UserExportSort,
 )
 from app.modules.backup.application.open_user_export import (
     OpenUserExport,
@@ -93,6 +98,7 @@ async def export_user_data(
     operation_id="list_user_exports",
     responses={
         200: {
+            **paging_responses("Unexpired exports")[200],
             "links": {
                 "DownloadExport": {
                     "operationId": "download_user_export",
@@ -104,19 +110,26 @@ async def export_user_data(
                     "parameters": {"export_id": "$response.body#/0/id"},
                     "description": "Delete the newest export in this list.",
                 },
-            }
+            },
         }
     },
 )
 async def list_user_exports(
+    request: Request,
+    response: Response,
     use_case: Annotated[ListUserExports, Depends(get_list_user_exports)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    page: Annotated[NewestFirstPageParams[UserExportSort], Query()],
 ) -> list[UserExportResponse]:
-    """List the caller's unexpired personal exports, newest first."""
-    return [
-        UserExportResponse.from_export(export)
-        for export in await use_case.handle(ListUserExportsQuery(), actor)
-    ]
+    """List the caller's unexpired personal exports, newest first unless sorted."""
+    result = await use_case.handle(
+        ListUserExportsQuery(
+            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+        ),
+        actor,
+    )
+    set_page_headers(request, response, result)
+    return [UserExportResponse.from_export(export) for export in result.items]
 
 
 @router.get(

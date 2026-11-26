@@ -63,19 +63,17 @@ async def test_lists_newest_first_with_expiry() -> None:
 
     listed = await _lister(store).handle(ListUserExportsQuery(), actor)
 
-    assert [item.summary.id for item in listed] == [newer, older]
-    for item in listed:
+    assert [item.summary.id for item in listed.items] == [newer, older]
+    for item in listed.items:
         assert item.expires_at == item.summary.created_at + timedelta(hours=TTL_HOURS)
 
 
 async def test_lists_nothing_when_there_are_no_exports() -> None:
     """A caller with no exports gets an empty list."""
-    assert (
-        await _lister(InMemoryBackupStore()).handle(
-            ListUserExportsQuery(), Actor(id=uuid7())
-        )
-        == []
+    listed = await _lister(InMemoryBackupStore()).handle(
+        ListUserExportsQuery(), Actor(id=uuid7())
     )
+    assert listed.items == []
 
 
 async def test_list_is_scoped_to_the_callers_own_store() -> None:
@@ -87,7 +85,7 @@ async def test_list_is_scoped_to_the_callers_own_store() -> None:
 
     listed = await _lister(mine).handle(ListUserExportsQuery(), alice)
 
-    assert [item.summary.id for item in listed] == [own]
+    assert [item.summary.id for item in listed.items] == [own]
 
 
 async def test_expiry_boundary_and_lazy_removal() -> None:
@@ -99,7 +97,7 @@ async def test_expiry_boundary_and_lazy_removal() -> None:
 
     listed = await _lister(store).handle(ListUserExportsQuery(), actor)
 
-    assert [item.summary.id for item in listed] == [fresh]
+    assert [item.summary.id for item in listed.items] == [fresh]
     assert stale not in store.archives
 
 

@@ -404,12 +404,12 @@ async def test_devices_are_listed_with_their_sessions_newest_first(
         ListOwnDevicesQuery(current_session_id=current.session_id), _actor(alice.id)
     )
 
-    assert [(d.device is None, d.current) for d in listed] == [
+    assert [(d.device is None, d.current) for d in listed.items] == [
         (False, True),
         (False, False),
         (True, False),
     ]
-    assert [[s.session.id for s in d.sessions] for d in listed] == [
+    assert [[s.session.id for s in d.sessions] for d in listed.items] == [
         [current.session_id],
         [first.session_id],
         [legacy.id],
@@ -432,7 +432,7 @@ async def test_idle_sessions_are_left_out_of_the_devices_list(
         _repos(world), get_access_guard(), idle_timeout=timedelta(hours=1)
     ).handle(ListOwnDevicesQuery(), _actor(alice.id))
 
-    assert listed == []
+    assert listed.items == []
 
 
 async def test_several_sessions_on_one_device_are_grouped(
@@ -457,8 +457,11 @@ async def test_several_sessions_on_one_device_are_grouped(
         ListOwnDevicesQuery(), _actor(alice.id)
     )
 
-    assert len(listed) == 1
-    assert [s.session.id for s in listed[0].sessions] == [result.session_id, extra.id]
+    assert len(listed.items) == 1
+    assert [s.session.id for s in listed.items[0].sessions] == [
+        result.session_id,
+        extra.id,
+    ]
 
 
 # --- revoking a device --------------------------------------------------------

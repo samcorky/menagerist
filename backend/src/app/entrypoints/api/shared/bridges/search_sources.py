@@ -59,6 +59,7 @@ from app.modules.settings.application.list_settings import (
     ListSettingsQuery,
 )
 from app.platform.config import get_server_settings
+from app.shared_kernel.paging import MAX_PAGE_ROWS
 from app.shared_kernel.text import fold
 
 if TYPE_CHECKING:
@@ -273,7 +274,10 @@ class UserSource:
 
         Only an id, the names, the role and the picture version leave.
         """
-        listings = await self._use_case.handle(ListUsersQuery(), actor)
+        # An instance has few accounts: one page of the most a page holds has them all.
+        listings = (
+            await self._use_case.handle(ListUsersQuery(limit=MAX_PAGE_ROWS), actor)
+        ).items
         return [
             SearchHit(
                 kind=self.kind,

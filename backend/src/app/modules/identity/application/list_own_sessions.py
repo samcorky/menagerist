@@ -1,22 +1,39 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar
 
 from app.modules.identity.domain.session import Session
 from app.modules.identity.ports.unit_of_work import IdentityRepos
 from app.shared_kernel.access import Access, OwnAccount
 from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.paging import (
+    Page,
+    PagedQuery,
+    SortOrder,
+    page_rows,
+    timestamp_value,
+)
 
 if TYPE_CHECKING:
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
 
 
-@dataclass(kw_only=True, frozen=True)
-class ListOwnSessionsQuery:
-    """Request to list active sessions of the calling user."""
+class OwnSessionSort(StrEnum):
+    """What a person's sessions can be sorted by: fields of the response."""
 
+    CREATED_AT = "created_at"
+    LAST_SEEN_AT = "last_seen_at"
+    EXPIRES_AT = "expires_at"
+
+
+@dataclass(kw_only=True)
+class ListOwnSessionsQuery(PagedQuery[OwnSessionSort]):
+    """Request to list active sessions of the calling user, newest first unless told."""
+
+    order: SortOrder = SortOrder.DESC
     current_session_id: uuid.UUID | None = None
 
 
@@ -29,7 +46,7 @@ class OwnSession:
 
 
 class ListOwnSessions(
-    QueryHandler[IdentityRepos, ListOwnSessionsQuery, list[OwnSession]]
+    QueryHandler[IdentityRepos, ListOwnSessionsQuery, Page[OwnSession]]
 ):
     """List active sessions for the calling user, newest first."""
 
@@ -47,11 +64,11 @@ class ListOwnSessions(
 
     async def _handle(
         self, query: ListOwnSessionsQuery, actor: Actor
-    ) -> list[OwnSession]:
+    ) -> Page[OwnSession]:
         """Return the actor's active sessions marked with whether they are current."""
         now = datetime.now(UTC)
         sessions = await self._repos.sessions.list_for_user(actor.id, now=now)
-        return [
+        own = [
             OwnSession(
                 session=s,
                 current=(
@@ -62,3 +79,19 @@ class ListOwnSessions(
             for s in sessions
             if not s.is_idle(now, self._idle_timeout)
         ]
+        return page_rows(
+            own,
+            query.page_request(OwnSessionSort.CREATED_AT),
+            id_of=lambda entry: entry.session.id,
+            values={
+                OwnSessionSort.CREATED_AT: lambda e: timestamp_value(
+                    e.session.created_at
+                ),
+                OwnSessionSort.LAST_SEEN_AT: lambda e: timestamp_value(
+                    e.session.last_seen_at
+                ),
+                OwnSessionSort.EXPIRES_AT: lambda e: timestamp_value(
+                    e.session.expires_at
+                ),
+            },
+        )

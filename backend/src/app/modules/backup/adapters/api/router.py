@@ -1,13 +1,17 @@
 from datetime import UTC
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
 from app.entrypoints.api.shared.bridges.backup_setup_gate import first_run_restore_slot
 from app.entrypoints.api.shared.dependencies import get_current_actor
 from app.entrypoints.api.shared.http.cross_site import refuse_cross_site
-from app.entrypoints.api.shared.http.parameters import BackupId
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import BackupId, NewestFirstPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
     RATE_LIMITED_RESPONSE,
@@ -49,7 +53,11 @@ from app.modules.backup.application.get_restore_progress import (
     GetRestoreProgress,
     GetRestoreProgressQuery,
 )
-from app.modules.backup.application.list_backups import ListBackups, ListBackupsQuery
+from app.modules.backup.application.list_backups import (
+    BackupSort,
+    ListBackups,
+    ListBackupsQuery,
+)
 from app.modules.backup.application.open_backup import OpenBackup, OpenBackupQuery
 from app.modules.backup.application.prune_backups import PruneBackups
 from app.modules.backup.application.restore_on_first_run import (
@@ -122,17 +130,24 @@ async def create_backup(
     "",
     response_model=list[BackupResponse],
     operation_id="list_backups",
-    responses=ADMIN_RESPONSES,
+    responses={**ADMIN_RESPONSES, **paging_responses("Committed backups")},
 )
 async def list_backups(
+    request: Request,
+    response: Response,
     use_case: Annotated[ListBackups, Depends(get_list_backups)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    page: Annotated[NewestFirstPageParams[BackupSort], Query()],
 ) -> list[BackupResponse]:
-    """List committed instance archive summaries."""
-    return [
-        BackupResponse.model_validate(row)
-        for row in await use_case.handle(ListBackupsQuery(), actor)
-    ]
+    """List committed instance archive summaries, newest first unless sorted."""
+    result = await use_case.handle(
+        ListBackupsQuery(
+            after=page.cursor, limit=page.limit, sort=page.sort, order=page.order
+        ),
+        actor,
+    )
+    set_page_headers(request, response, result)
+    return [BackupResponse.model_validate(row) for row in result.items]
 
 
 @router.post(

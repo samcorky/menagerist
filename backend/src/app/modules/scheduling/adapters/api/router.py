@@ -1,9 +1,14 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
 from app.entrypoints.api.shared.dependencies import get_current_actor
+from app.entrypoints.api.shared.http.http_headers import (
+    paging_responses,
+    set_page_headers,
+)
+from app.entrypoints.api.shared.http.parameters import NewestFirstPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.scheduling.adapters.api.dependencies import (
@@ -20,6 +25,7 @@ from app.modules.scheduling.adapters.api.schemas import (
 from app.modules.scheduling.application.get_job_history import (
     GetJobHistory,
     GetJobHistoryQuery,
+    JobRunSort,
 )
 from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
 from app.modules.scheduling.application.preview_schedule import (
@@ -117,23 +123,33 @@ async def list_jobs(
     "/jobs/{job_key}/runs",
     response_model=list[JobRunResponse],
     operation_id="list_job_runs",
-    responses={**_FORBIDDEN, **_UNKNOWN_JOB},
+    responses={**_FORBIDDEN, **_UNKNOWN_JOB, **paging_responses("Recent runs")},
 )
 async def list_job_runs(
     job_key: Annotated[str, Path(description="The job's key, such as `backup`.")],
+    request: Request,
     response: Response,
     use_case: Annotated[GetJobHistory, Depends(get_job_history_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
-    limit: Annotated[
-        int, Query(ge=1, le=100, description="How many recent runs to return.")
-    ] = 20,
+    page: Annotated[NewestFirstPageParams[JobRunSort], Query()],
 ) -> list[JobRunResponse]:
-    """Show a job's recent runs, newest first."""
+    """Show a job's recent runs, newest first unless sorted.
+
+    History is kept to a bounded number of runs, which this pages through.
+    """
     response.headers["Cache-Control"] = "private, no-store"
-    runs = await use_case.handle(
-        GetJobHistoryQuery(job_key=job_key, limit=limit), actor
+    result = await use_case.handle(
+        GetJobHistoryQuery(
+            job_key=job_key,
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+        ),
+        actor,
     )
-    return [JobRunResponse.from_domain(run) for run in runs]
+    set_page_headers(request, response, result)
+    return [JobRunResponse.from_domain(run) for run in result.items]
 
 
 @router.post(

@@ -22,6 +22,7 @@ from app.modules.scheduling.adapters.platform.in_memory_schedule_source import (
 from app.modules.scheduling.application.get_job_history import (
     GetJobHistory,
     GetJobHistoryQuery,
+    JobRunSort,
 )
 from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
 from app.modules.scheduling.application.permissions import SchedulingPermission
@@ -31,6 +32,7 @@ from app.modules.scheduling.domain.registry import JobRegistry
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.errors import ForbiddenError, ValidationError
 from app.shared_kernel.jobs import JobDefinition, Lane, Overlap
+from app.shared_kernel.paging import SortOrder
 
 NOW = datetime(2026, 10, 26, 3, tzinfo=UTC)
 ADMIN = Actor(id=uuid7(), roles=frozenset({"admin"}))
@@ -156,8 +158,31 @@ async def test_history_is_scoped_to_registered_job_and_limit() -> None:
     query = GetJobHistory(
         build_in_memory_scheduling_repos(store).reader, get_access_guard(), registry
     )
-    assert len(await query.handle(GetJobHistoryQuery(job_key="x", limit=1), ADMIN)) == 1
+    one = await query.handle(GetJobHistoryQuery(job_key="x", limit=1), ADMIN)
+    assert len(one.items) == 1
     with pytest.raises(UnknownJobError):
         await query.handle(GetJobHistoryQuery(job_key="missing"), ADMIN)
     with pytest.raises(ValidationError):
         GetJobHistoryQuery(job_key="x", limit=0)
+
+
+@pytest.mark.parametrize("order", list(SortOrder))
+@pytest.mark.parametrize("sort", list(JobRunSort))
+async def test_history_sorts_by_every_key(sort: JobRunSort, order: SortOrder) -> None:
+    """Every key the history offers orders a run, in both directions."""
+    store = InMemorySchedulingStore()
+    registry = JobRegistry([JobDefinition(job_key="x")])
+    await RunJobNow(
+        create_in_memory_scheduling_uow(store), get_access_guard(), registry
+    ).handle(RunJobNowCommand(job_key="x", now=NOW), ADMIN)
+    query = GetJobHistory(
+        build_in_memory_scheduling_repos(store).reader, get_access_guard(), registry
+    )
+
+    page = await query.handle(
+        GetJobHistoryQuery(job_key="x", sort=sort, order=order), ADMIN
+    )
+
+    assert len(page.items) == 1
+    assert page.total == 1
+    assert page.next is None

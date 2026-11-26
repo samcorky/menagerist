@@ -187,6 +187,7 @@ from app.modules.transfer.domain.bundle import (
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Cursor, SortOrder
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 if TYPE_CHECKING:
@@ -1250,6 +1251,17 @@ QUERY_OVERRIDES: dict[tuple[str, str], str] = {
     ("/api/v1/collections", "q"): "alpha",  # collections match on their name
     ("/api/v1/node-types/{node_type_id}/attributes/{key}/values", "q"): "R",
     ("/api/v1/presets", "q"): "alpha",  # presets match on their label
+    # These lists run by a key other than the id, so the cursor has to name it. The
+    # tokens run newest first, so a date far ahead leaves every token after it.
+    ("/api/v1/tokens", "after"): Cursor(
+        sort=("created_at",),
+        order=(SortOrder.DESC,),
+        values=("2999-01-01T00:00:00.000000+00:00",),
+        id=uuid.UUID(int=1),
+    ).encode(),
+    ("/api/v1/users", "after"): Cursor(
+        sort=("username",), order=(SortOrder.ASC,), values=("",), id=uuid.UUID(int=1)
+    ).encode(),
 }
 
 

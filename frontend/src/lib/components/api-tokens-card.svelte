@@ -9,6 +9,7 @@
 		rotateApiToken,
 		type ApiTokenResponse
 	} from '$lib/api/client';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import { networkAwareError } from '$lib/api/errors';
 	import {
 		AREAS,
@@ -124,11 +125,13 @@
 		tokensLoading = true;
 		tokensError = null;
 		try {
-			const result = await listApiTokens();
-			if (result.error || !result.data) {
-				tokensError = networkAwareError(result).title;
+			const read = await readPages((after) =>
+				listApiTokens({ query: { after, limit: PAGE_LIMIT } })
+			);
+			if (!read.ok) {
+				tokensError = networkAwareError(read.failure).title;
 			} else {
-				tokens = result.data;
+				tokens = read.rows;
 				now = new Date();
 			}
 		} catch {

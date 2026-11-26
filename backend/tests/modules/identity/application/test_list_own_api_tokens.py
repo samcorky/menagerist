@@ -30,13 +30,17 @@ async def test_lists_own_unexpired_tokens_newest_first(
     await issue_token(bob, name="bobs")
 
     with time_machine.travel(NOW + timedelta(hours=2), tick=False):
-        listed = await cases.list_own_api_tokens.handle(
-            ListOwnApiTokensQuery(), actor_for(alice)
-        )
+        listed = (
+            await cases.list_own_api_tokens.handle(
+                ListOwnApiTokensQuery(), actor_for(alice)
+            )
+        ).items
     assert [t.id for t in listed] == [newer.token.id, short.token.id]
 
     with time_machine.travel(NOW + timedelta(days=2), tick=False):
-        later = await cases.list_own_api_tokens.handle(
-            ListOwnApiTokensQuery(), actor_for(alice)
-        )
+        later = (
+            await cases.list_own_api_tokens.handle(
+                ListOwnApiTokensQuery(), actor_for(alice)
+            )
+        ).items
     assert [t.id for t in later] == [newer.token.id]

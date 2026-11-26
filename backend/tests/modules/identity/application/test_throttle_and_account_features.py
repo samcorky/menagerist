@@ -489,7 +489,7 @@ async def test_list_and_update_report_the_lock_state(
 
     listed = {
         item.user.username: item.locked_until
-        for item in await cases.list_users.handle(ListUsersQuery(), admin_actor)
+        for item in (await cases.list_users.handle(ListUsersQuery(), admin_actor)).items
     }
     updated = await cases.update_user.handle(
         UpdateUserCommand(user_id=alice.id, display_name="Alice B"), admin_actor

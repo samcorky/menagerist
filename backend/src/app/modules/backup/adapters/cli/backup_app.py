@@ -32,6 +32,7 @@ from app.shared_kernel.access import Requires
 from app.shared_kernel.access_guard import DenyAllAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.errors import DomainError, ForbiddenError
+from app.shared_kernel.paging import MAX_PAGE_ROWS
 from app.shared_kernel.progress import NULL_PROGRESS, failure_reason
 
 if TYPE_CHECKING:
@@ -159,10 +160,12 @@ def create(*, label: str = "manual") -> dict[str, object]:
 def list_backups() -> Report:
     """List committed archives, newest first."""
     backups = _run(
-        ListBackups(_store(), _guard).handle(ListBackupsQuery(), SYSTEM_ACTOR)
+        ListBackups(_store(), _guard).handle(
+            ListBackupsQuery(limit=MAX_PAGE_ROWS), SYSTEM_ACTOR
+        )
     )
     return Report(
-        value=[asdict(item) for item in backups],
+        value=[asdict(item) for item in backups.items],
         title="Backups",
         empty="No backups yet.",
     )

@@ -22,6 +22,7 @@
 		revokeOwnSession,
 		revokeOtherSessions
 	} from '$lib/api/client';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import DeviceTitle from '$lib/components/device-title.svelte';
 	import AccountPicture from '$lib/components/account-picture.svelte';
@@ -114,11 +115,13 @@
 		sessionsLoading = true;
 		sessionsError = null;
 		try {
-			const result = await listOwnDevices();
-			if (result.error || !result.data) {
-				sessionsError = networkAwareError(result).title;
+			const read = await readPages((after) =>
+				listOwnDevices({ query: { after, limit: PAGE_LIMIT } })
+			);
+			if (!read.ok) {
+				sessionsError = networkAwareError(read.failure).title;
 			} else {
-				devices = result.data.map(deviceRow);
+				devices = read.rows.map(deviceRow);
 			}
 		} catch {
 			sessionsError = 'Could not load devices.';

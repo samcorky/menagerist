@@ -30,6 +30,7 @@
 		type Role,
 		type UserResponse
 	} from '$lib/api/client';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import {
@@ -104,11 +105,11 @@
 		loading = true;
 		loadFailed = false;
 		try {
-			const result = await listUsers();
-			if (result.error || !result.data) {
+			const read = await readPages((after) => listUsers({ query: { after, limit: PAGE_LIMIT } }));
+			if (!read.ok) {
 				loadFailed = true;
 			} else {
-				users = result.data;
+				users = read.rows;
 			}
 		} catch {
 			loadFailed = true;
@@ -143,17 +144,17 @@
 		userDevicesLoading = true;
 		userDevicesError = null;
 		try {
-			const [res, ownRes] = await Promise.all([
-				listSessions({ query: { user_id: userId } }),
-				listOwnSessions()
+			const [read, ownRead] = await Promise.all([
+				readPages((after) =>
+					listSessions({ query: { user_id: userId, after, limit: PAGE_LIMIT } })
+				),
+				readPages((after) => listOwnSessions({ query: { after, limit: PAGE_LIMIT } }))
 			]);
-			if (ownRes.data) {
-				currentSessionId = ownRes.data.find((s) => s.current)?.id ?? null;
-			}
-			if (res.error || !res.data) {
-				userDevicesError = networkAwareError(res).title;
+			currentSessionId = ownRead.rows.find((s) => s.current)?.id ?? null;
+			if (!read.ok) {
+				userDevicesError = networkAwareError(read.failure).title;
 			} else {
-				userDevices = res.data;
+				userDevices = read.rows;
 			}
 		} catch {
 			userDevicesError = 'Could not load devices.';

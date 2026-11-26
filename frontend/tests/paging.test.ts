@@ -57,5 +57,6 @@ describe('readPages', () => {
 		const read = await readPages(fetchPage);
 		expect(read.ok).toBe(false);
 		expect(read.rows).toHaveLength(100);
+		expect('failure' in read && read.failure.error).toEqual({ detail: 'boom' });
 	});
 });
