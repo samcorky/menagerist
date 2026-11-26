@@ -42,17 +42,7 @@ export function purgeDescription(name: string): string {
 	return `This permanently deletes ${name}. This cannot be undone.`;
 }
 
-/** The `after` cursor the Link header's next page carries, or null when there is no next page. */
-export function nextCursor(link: string | null | undefined): string | null {
-	const next = /<([^>]*)>\s*;\s*rel="next"/.exec(link ?? '');
-	const after = next && /[?&]after=([^&#]*)/.exec(next[1]);
-	if (!after) return null;
-	try {
-		return decodeURIComponent(after[1]);
-	} catch {
-		return null;
-	}
-}
+export { nextCursor } from '$lib/paging';
 
 /** A plain message for a failed restore or purge, keeping the server's wording for a 409. */
 export function deletedActionError(

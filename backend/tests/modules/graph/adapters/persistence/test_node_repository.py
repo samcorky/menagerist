@@ -8,6 +8,7 @@ from app.modules.graph.adapters.persistence.node_repository import (
 )
 from app.modules.graph.domain.node import Node
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest, SortOrder
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -863,3 +864,100 @@ async def test_count_with_limit_stops_at_the_limit(db_session: AsyncSession) -> 
     assert await repository.count(scope=scope, q="coin", limit=3) == 3
     assert await repository.count(scope=scope, q="coin", limit=9) == 5
     assert await repository.count(scope=scope, type="coin", limit=2) == 2
+
+
+async def _add_all(
+    repository: SqlAlchemyNodeRepository, rows: list[tuple[str, str | None]]
+) -> list[Node]:
+    owner = uuid.UUID(int=1)
+    nodes = [Node.create(owner_id=owner, name=n, type=t) for n, t in rows]
+    for node in nodes:
+        await repository.add(node)
+    return nodes
+
+
+async def test_page_sorts_by_name_ignoring_case_and_accents(
+    db_session: AsyncSession,
+) -> None:
+    """`name` orders by the folded name, as the search sort does; ties by id."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    await _add_all(
+        repository,
+        [
+            ("banana", "a"),
+            ("Apple", "a"),
+            ("Éclair", "a"),
+            ("apple", "a"),
+            ("date", "a"),
+        ],
+    )
+
+    found = await repository.page(
+        scope=ContentFilter.everyone(), page=PageRequest(sort="name")
+    )
+
+    assert [n.name for n in found.items] == [
+        "Apple",
+        "apple",
+        "banana",
+        "date",
+        "Éclair",
+    ]
+
+
+@pytest.mark.parametrize("order", list(SortOrder))
+@pytest.mark.parametrize("sort", [None, "name", "type", "created_at", "updated_at"])
+async def test_page_cursors_visit_every_node_once_in_order(
+    db_session: AsyncSession, sort: str | None, order: SortOrder
+) -> None:
+    """Following `next` never repeats an item or skips one, even with empty types."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    await _add_all(
+        repository,
+        [("b", "x"), ("a", None), ("c", "y"), ("d", "x"), ("e", None), ("f", "y")],
+    )
+    scope = ContentFilter.everyone()
+    everything = (
+        await repository.page(
+            scope=scope, page=PageRequest(sort=sort, order=order, limit=100)
+        )
+    ).items
+
+    seen: list[uuid.UUID] = []
+    request = PageRequest(sort=sort, order=order, limit=2)
+    while True:
+        found = await repository.page(scope=scope, page=request)
+        seen.extend(n.id for n in found.items)
+        if found.next is None:
+            break
+        request = PageRequest(after=found.next, sort=sort, order=order, limit=2)
+
+    assert seen == [n.id for n in everything]
+    assert len(set(seen)) == 6
+
+
+async def test_page_applies_the_filters_and_stays_in_scope(
+    db_session: AsyncSession,
+) -> None:
+    """`type`, `q` and `ids` narrow the page, and another owner's items never appear."""
+    repository = SqlAlchemyNodeRepository(db_session)
+    mine = await _add_all(
+        repository, [("Alien", "film"), ("Aliens", "film"), ("Dune", "book")]
+    )
+    theirs = Node.create(owner_id=uuid.UUID(int=2), name="Alien 3", type="film")
+    await repository.add(theirs)
+    scope = ContentFilter.of(uuid.UUID(int=1))
+
+    films = await repository.page(
+        scope=scope, page=PageRequest(sort="name"), type="film"
+    )
+    searched = await repository.page(scope=scope, page=PageRequest(), q="alien")
+    chosen = await repository.page(
+        scope=scope, page=PageRequest(), ids={mine[2].id, theirs.id}
+    )
+    none = await repository.page(scope=scope, page=PageRequest(), ids=set())
+
+    assert [n.name for n in films.items] == ["Alien", "Aliens"]
+    assert {n.name for n in searched.items} == {"Alien", "Aliens"}
+    assert [n.name for n in chosen.items] == ["Dune"]
+    assert none.items == []

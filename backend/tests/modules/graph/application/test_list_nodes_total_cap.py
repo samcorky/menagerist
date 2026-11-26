@@ -20,6 +20,7 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.paging import Cursor
 
 OWNER = uuid.UUID(int=1)
 
@@ -71,7 +72,8 @@ async def test_capped_search_still_pages_in_id_order() -> None:
 
     first = await use_case.handle(ListNodesQuery(q="coin", limit=3), SYSTEM_ACTOR)
     second = await use_case.handle(
-        ListNodesQuery(q="coin", limit=3, after=first.items[2].id), SYSTEM_ACTOR
+        ListNodesQuery(q="coin", limit=3, after=Cursor.after_id(first.items[2].id)),
+        SYSTEM_ACTOR,
     )
 
     ids = [n.id for n in first.items + second.items]

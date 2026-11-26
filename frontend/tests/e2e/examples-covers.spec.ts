@@ -13,6 +13,7 @@ import {
 	removeViaApi,
 	setOwnCover
 } from './examples-helpers';
+import { listAll } from './helpers';
 
 /**
  * Generated covers on example items. Serial, and every test cleans up through the API afterwards.
@@ -30,7 +31,7 @@ test('a film example shows a loaded cover and a person example shows none', asyn
 }) => {
 	await install(page, MOVIES);
 	const film = await nodeNamed(request, 'Cold Harbour');
-	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as ApiNode[];
+	const nodes = await listAll<ApiNode>(request, '/api/v1/nodes');
 	const person = nodes.find((n) => n.type === 'movies-person')!;
 
 	await page.goto(`/items/${film.id}`);

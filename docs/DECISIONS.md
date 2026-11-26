@@ -1985,3 +1985,14 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **A cursor is a position, not a row.** The old deleted lists found where to resume by reading the cursor row's `deleted_at`, so a cursor whose row had been restored or purged gave an empty page. The shared cursor holds the value, so the next page continues past where the row was. The app follows the `Link` header's cursor (`nextCursor` in `recently-deleted.ts`) instead of sending the last row's id.
 - **The default is a sort, not no sort.** With no `sort` the list asks the repository for `deleted_at`, and the route's `order` defaults to `desc`, so a request with no parameters still lists the newest deletion first. `DeletedPageParams` carries that default.
 - **The contents cannot sort.** Items come from walking connections in (depth, id) order, in memory, not from a query that could order by a column. A positional id cursor is the honest cursor for that, so the paging lint rule skips the route.
+
+## The items list sorts through the shared cursor, and a smart collection through the search engine (2026-11-26)
+
+**Decision:** `GET /nodes` takes `sort` (`name`, `type`, `created_at`, `updated_at`) and `order` through the shared keyset helper. A smart collection's list keeps going through the search engine, which orders by `name`, `created_at` or `updated_at`, and the route turns between the two cursors at the edge (#622).
+
+- **A new `page` on the repository, `list` unchanged.** Five internal callers (the collection bridge, the transfer targets, query preparation, the unused-type check and item reach) walk every item by id through `list`. They keep that; only the API takes the new method.
+- **The item name sorts ignoring case and accents,** as the search sort does, so a list and a search of the same items agree. The type sorts ignoring case, and an item without a type goes last in either direction.
+- **The two cursors stay separate.** The search engine's cursor is its sort values and an id, and the shared one is the same plus the sort and direction. The smart path checks the sort and direction against the request, checks that each value is the kind the sort compares with, and rebuilds the engine's cursor from the values. A forged one is a 400.
+- **A smart collection cannot sort by type,** because the engine has no such key, and it needs a `sort` to go with `order=desc`, because the engine's id tiebreak always ascends. Both are a 400 that says so. Sorting by custom fields stays in item search's query-body `sort`.
+- **No list returns more than 100 rows a page.** The few end-to-end specs and app screens that asked for 200 or 500 now follow `Link` (`listAll` in the specs, `fetchItems` and `fetchAllNodeTypes` in the app).
+- **The paging lint rule is an error.** The baseline is empty; the one exemption is an item's contents, which come in (depth, id) order.

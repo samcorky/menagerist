@@ -23,6 +23,7 @@ from app.modules.graph.domain.node import Node
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
+from app.shared_kernel.paging import Cursor
 
 
 def _make_repos(nodes: InMemoryNodeRepository) -> GraphRepos:
@@ -84,7 +85,8 @@ async def test_list_nodes_orders_by_id_and_paginates() -> None:
     assert first_page.items == expected_order[:2]
 
     second_page = await use_case.handle(
-        ListNodesQuery(after=first_page.items[-1].id, limit=2), SYSTEM_ACTOR
+        ListNodesQuery(after=Cursor.after_id(first_page.items[-1].id), limit=2),
+        SYSTEM_ACTOR,
     )
 
     assert second_page.items == expected_order[2:]
@@ -177,7 +179,9 @@ async def test_list_nodes_collection_paginates_with_restricted_total() -> None:
         ListNodesQuery(collection=collection_id, limit=2), SYSTEM_ACTOR
     )
     second = await use_case.handle(
-        ListNodesQuery(collection=collection_id, limit=2, after=first.items[-1].id),
+        ListNodesQuery(
+            collection=collection_id, limit=2, after=Cursor.after_id(first.items[-1].id)
+        ),
         SYSTEM_ACTOR,
     )
 

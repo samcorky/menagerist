@@ -680,7 +680,7 @@ def test_the_shipped_games_extras_add_on_end_to_end(
 
     assert added.status_code == 200, added.text
     assert added.json()["created"]["items"] == 5
-    items = {n["name"]: n["id"] for n in c.get("/api/v1/nodes?limit=200").json()}
+    items = {n["name"]: n["id"] for n in c.get("/api/v1/nodes?limit=100").json()}
     edges = {
         (e["source_id"], e["target_id"]): e["type"]
         for e in c.get("/api/v1/edges?limit=100").json()
@@ -699,7 +699,7 @@ def test_the_shipped_games_extras_add_on_end_to_end(
 
     assert c.delete("/api/v1/examples/games-extras/installation").json()["kept"] == []
     assert c.delete("/api/v1/examples/games/installation").json()["kept"] == []
-    assert c.get("/api/v1/nodes?limit=200").json() == []
+    assert c.get("/api/v1/nodes?limit=100").json() == []
     assert c.get("/api/v1/edges?limit=100").json() == []
     assert _media_state(postgres_sync_url, media_dir) == (0, 0, 0)
 

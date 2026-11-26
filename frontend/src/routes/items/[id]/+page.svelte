@@ -13,7 +13,6 @@
 		getNode,
 		listEdges,
 		listEdgeTypes,
-		listNodes,
 		updateEdge,
 		updateNode,
 		type EdgeResponse,
@@ -27,6 +26,7 @@
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 	import { effectiveSchema, fetchAllNodeTypes } from '$lib/node-types';
+	import { fetchItems } from '$lib/paging';
 	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { coreForProp } from '$lib/field-types';
@@ -229,7 +229,7 @@
 			await Promise.all([
 				getNode({ path: { node_id: nodeId } }),
 				listEdges({ query: { node_id: nodeId, limit: 100 } }),
-				listNodes({ query: { limit: 500 } }),
+				fetchItems(),
 				listEdgeTypes({ query: { limit: 100 } }),
 				fetchAllNodeTypes()
 			]);
@@ -251,7 +251,7 @@
 		description = node.description ?? '';
 		tags = node.tags;
 		edges = edgesResult.data ?? [];
-		otherNodes = (nodesResult.data ?? []).filter((candidate) => candidate.id !== nodeId);
+		otherNodes = nodesResult.filter((candidate) => candidate.id !== nodeId);
 		edgeTypes = edgeTypesResult.data ?? [];
 		nodeTypes = nodeTypesResult ?? [];
 		// nodeSchema is a $derived and hasn't reacted to the nodeTypes assignment above
