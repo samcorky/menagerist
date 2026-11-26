@@ -1,6 +1,8 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qs, urlparse
 
+import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
@@ -12,12 +14,14 @@ from app.modules.presets.adapters.api.dependencies import (
     get_preset_repos,
     get_preset_uow,
 )
+from app.modules.presets.adapters.api.preset.schemas import PresetResponse
 from app.modules.presets.adapters.persistence.in_memory_preset_repository import (
     InMemoryPresetRepository,
 )
 from app.modules.presets.adapters.persistence.unit_of_work import (
     create_in_memory_preset_uow,
 )
+from app.modules.presets.application.list_presets import PresetSort
 from app.modules.presets.ports.unit_of_work import PresetRepos
 
 if TYPE_CHECKING:
@@ -197,3 +201,92 @@ def test_presets_are_private_to_their_owner(as_user: Callable[..., None]) -> Non
     assert bob.patch(url, json={"label": "X"}).status_code == 404
     assert bob.delete(url).status_code == 404
     assert alice.get(url).json()["label"] == "Grades"
+
+
+def _create(client: TestClient, label: str, kind: str = "field") -> dict[str, Any]:
+    """Create a saved field or choice list and return its response body."""
+    definition: dict[str, Any] = (
+        {"options": ["Mint"]}
+        if kind == "choice_list"
+        else {"property": {"type": "string"}}
+    )
+    response = client.post(
+        "/api/v1/presets",
+        json={"kind": kind, "label": label, "definition": definition},
+    )
+    assert response.status_code == 201
+    body: dict[str, Any] = response.json()
+    return body
+
+
+def _next_after(link: str) -> str:
+    """The `after` cursor a `Link` header value points to."""
+    url = link[link.index("<") + 1 : link.index(">")]
+    return parse_qs(urlparse(url).query)["after"][0]
+
+
+@pytest.mark.parametrize("order", ["asc", "desc"])
+@pytest.mark.parametrize("sort", [key.value for key in PresetSort])
+def test_list_walks_every_sort_key_to_the_end_in_order(sort: str, order: str) -> None:
+    """Following `Link` visits each preset once, in the order the key gives."""
+    client = TestClient(_app_with_in_memory_presets())
+    labels = ["b", "A", "b", "c", "B", "a", "c"]
+    created = [
+        _create(client, label, "choice_list" if n % 2 else "field")
+        for n, label in enumerate(labels)
+    ]
+    base = "/api/v1/presets"
+    everything = client.get(
+        base, params={"sort": sort, "order": order, "limit": 100}
+    ).json()
+
+    seen: list[dict[str, Any]] = []
+    params: dict[str, Any] = {"sort": sort, "order": order, "limit": 2}
+    while True:
+        response = client.get(base, params=params)
+        seen.extend(response.json())
+        if "Link" not in response.headers:
+            break
+        params = {**params, "after": _next_after(response.headers["Link"])}
+
+    assert [p["id"] for p in seen] == [p["id"] for p in everything]
+    assert {p["id"] for p in seen} == {p["id"] for p in created}
+    assert len(seen) == len(created)
+
+    def key(preset: dict[str, Any]) -> str:
+        value: str = preset[sort]
+        return value.lower() if sort in {"label", "kind"} else value
+
+    values = [key(p) for p in seen]
+    assert values == sorted(values, reverse=order == "desc")
+
+
+def test_the_sort_keys_a_route_declares_are_fields_of_the_preset() -> None:
+    """The enum's keys are names in the response, so a client sorts by what it sees."""
+    assert {key.value for key in PresetSort} <= set(PresetResponse.model_fields)
+
+
+def test_list_q_ignores_case_and_accents() -> None:
+    """`q=cafe` finds a saved field labelled Café."""
+    client = TestClient(_app_with_in_memory_presets())
+    _create(client, "Café au lait")
+    _create(client, "Tea")
+
+    found = client.get("/api/v1/presets", params={"q": "CAFE"}).json()
+
+    assert [p["label"] for p in found] == ["Café au lait"]
+
+
+def test_list_a_cursor_from_another_sort_is_a_400() -> None:
+    """A label-sorted cursor does not resume an id-ordered list."""
+    client = TestClient(_app_with_in_memory_presets())
+    _create(client, "A")
+    _create(client, "B")
+    first = client.get("/api/v1/presets", params={"sort": "label", "limit": 1})
+
+    response = client.get(
+        "/api/v1/presets", params={"after": _next_after(first.headers["Link"])}
+    )
+
+    assert response.status_code == 400
+    assert client.get("/api/v1/presets", params={"after": "nope"}).status_code == 400

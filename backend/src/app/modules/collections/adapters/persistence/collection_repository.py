@@ -12,6 +12,7 @@ from app.modules.collections.domain.collection import (
 )
 from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
+from app.platform.text_search import contains_pattern, unaccent_ilike
 from app.shared_kernel.errors import ConflictError
 from app.shared_kernel.slug import Slug
 
@@ -22,7 +23,6 @@ if TYPE_CHECKING:
 
     from sqlalchemy import ColumnElement
     from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm import InstrumentedAttribute
 
     from app.shared_kernel.content_filter import ContentFilter
     from app.shared_kernel.paging import Page, PageRequest
@@ -30,29 +30,12 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-_LIKE_ESCAPE = "\\"
-
 # What `list` can sort by; the names are fields of the API's collection response.
 _SORT_COLUMNS = {
     "name": text_column(CollectionModel.name),
     "created_at": timestamp_column(CollectionModel.created_at),
     "updated_at": timestamp_column(CollectionModel.updated_at),
 }
-
-
-def _like_pattern(q: str) -> str:
-    """Return a contains-pattern for `q` with LIKE wildcards escaped."""
-    escaped = q.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
-    escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
-    return f"%{escaped}%"
-
-
-def _unaccent_ilike(
-    column_: InstrumentedAttribute[str] | InstrumentedAttribute[str | None],
-    pattern: str,
-) -> ColumnElement[bool]:
-    """Case- and accent-insensitive LIKE of `column_` against an escaped `pattern`."""
-    return func.unaccent(column_).ilike(func.unaccent(pattern), escape=_LIKE_ESCAPE)
 
 
 def _in_scope(scope: ContentFilter) -> ColumnElement[bool]:
@@ -182,10 +165,10 @@ class SqlAlchemyCollectionRepository:
             stmt = stmt.where(CollectionModel.kind == kind.value)
         needle = (q or "").strip()
         if needle:
-            pattern = _like_pattern(needle)
+            pattern = contains_pattern(needle)
             stmt = stmt.where(
-                _unaccent_ilike(CollectionModel.name, pattern)
-                | _unaccent_ilike(CollectionModel.description, pattern)
+                unaccent_ilike(CollectionModel.name, pattern)
+                | unaccent_ilike(CollectionModel.description, pattern)
             )
         return await keyset_page(
             self._session,

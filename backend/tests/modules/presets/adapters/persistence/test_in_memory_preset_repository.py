@@ -5,6 +5,7 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
 )
 from app.modules.presets.domain.preset import Preset
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import Cursor, PageRequest
 
 OWNER = uuid.uuid7()
 EVERYONE = ContentFilter.everyone()
@@ -49,9 +50,14 @@ async def test_list_orders_by_id_and_respects_after_and_limit() -> None:
     for p in [*presets, gone]:
         await repository.add(p)
 
-    page = await repository.list(scope=EVERYONE, after=None, limit=2)
+    page = (await repository.list(scope=EVERYONE, page=PageRequest(limit=2))).items
     assert [p.id for p in page] == sorted(p.id for p in presets)[:2]
-    rest = await repository.list(scope=EVERYONE, after=page[-1].id, limit=10)
+    rest = (
+        await repository.list(
+            scope=EVERYONE,
+            page=PageRequest(after=Cursor.after_id(page[-1].id), limit=10),
+        )
+    ).items
     assert [p.id for p in rest] == sorted(p.id for p in presets)[2:]
 
 
@@ -67,9 +73,11 @@ async def test_list_filters_by_kind() -> None:
     await repository.add(field)
     await repository.add(choice_list)
 
-    result = await repository.list(
-        scope=EVERYONE, after=None, limit=10, kind="choice_list"
-    )
+    result = (
+        await repository.list(
+            scope=EVERYONE, kind="choice_list", page=PageRequest(limit=10)
+        )
+    ).items
 
     assert [p.id for p in result] == [choice_list.id]
 
@@ -84,7 +92,9 @@ async def test_list_filters_by_label_search_case_insensitively() -> None:
     await repository.add(match)
     await repository.add(other)
 
-    result = await repository.list(scope=EVERYONE, after=None, limit=10, q="condition")
+    result = (
+        await repository.list(scope=EVERYONE, q="condition", page=PageRequest(limit=10))
+    ).items
 
     assert [p.id for p in result] == [match.id]
 
@@ -102,7 +112,9 @@ async def test_get_and_list_are_scoped_to_the_owner() -> None:
 
     assert await repository.get(mine.id, scope=scope) is mine
     assert await repository.get(theirs.id, scope=scope) is None
-    assert await repository.list(scope=scope, after=None, limit=10) == [mine]
+    assert (await repository.list(scope=scope, page=PageRequest(limit=10))).items == [
+        mine
+    ]
 
 
 async def test_claim_orphaned_assigns_ownerless_and_legacy_rows() -> None:

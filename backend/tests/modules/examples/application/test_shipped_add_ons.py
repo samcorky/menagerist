@@ -21,6 +21,7 @@ from app.modules.examples.domain.errors import (
 )
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, World
@@ -86,9 +87,11 @@ async def _live(world: World) -> int:
             )
         )
         + len(
-            await world.preset_repos.presets.list(
-                scope=ContentFilter.everyone(), after=None, limit=500
-            )
+            (
+                await world.preset_repos.presets.list(
+                    scope=ContentFilter.everyone(), page=PageRequest(limit=500)
+                )
+            ).items
         )
     )
     items = await world.graph_repos.nodes.list(

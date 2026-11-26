@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from app.modules.presets.domain.preset import Preset
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 class PresetRepository(Protocol):
@@ -28,12 +29,19 @@ class PresetRepository(Protocol):
         self,
         *,
         scope: ContentFilter,
-        after: uuid.UUID | None,
-        limit: int,
+        page: PageRequest,
         kind: str | None = None,
         q: str | None = None,
-    ) -> list[Preset]:
-        """List non-deleted presets in `scope` ordered by id, after `after` if given."""
+    ) -> Page[Preset]:
+        """List non-deleted presets in `scope`, one page in the order `page` asks.
+
+        The sort keys are `label` (ignoring case), `kind`, `created_at` and
+        `updated_at`; with none, the order is by id. A `q` keeps presets whose label
+        contains it, ignoring case and accents.
+
+        Raises:
+            InvalidCursorError: `page.after` is from a different sort or order.
+        """
         ...
 
     async def list_deleted_before(

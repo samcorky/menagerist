@@ -25,6 +25,7 @@ from app.modules.transfer.application.content_hash import preset_key
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 from app.shared_kernel.unit_of_work import InMemoryUnitOfWork
 
 _GRADES = {"options": ["Mint", "Good"]}
@@ -58,7 +59,9 @@ async def test_import_creates_new_presets_with_fresh_ids() -> None:
     )
 
     assert (result.created, result.skipped) == (1, 0)
-    stored = await repos.presets.list(scope=EVERYONE, after=None, limit=10)
+    stored = (
+        await repos.presets.list(scope=EVERYONE, page=PageRequest(limit=10))
+    ).items
     assert len(stored) == 1
     assert stored[0].owner_id == SYSTEM_ACTOR.id
     assert stored[0].label == "Condition grades"
@@ -73,7 +76,12 @@ async def test_import_skips_content_already_present() -> None:
 
     assert (first.created, first.skipped) == (1, 1)
     assert (second.created, second.skipped) == (0, 2)
-    assert len(await repos.presets.list(scope=EVERYONE, after=None, limit=10)) == 1
+    assert (
+        len(
+            (await repos.presets.list(scope=EVERYONE, page=PageRequest(limit=10))).items
+        )
+        == 1
+    )
 
 
 async def test_import_rejects_the_whole_pack_when_one_item_is_bad() -> None:
@@ -85,7 +93,9 @@ async def test_import_rejects_the_whole_pack_when_one_item_is_bad() -> None:
 
     with pytest.raises(InvalidPresetDefinitionError):
         await _importer(repos).handle(command, SYSTEM_ACTOR)
-    assert await repos.presets.list(scope=EVERYONE, after=None, limit=10) == []
+    assert (
+        await repos.presets.list(scope=EVERYONE, page=PageRequest(limit=10))
+    ).items == []
 
 
 async def test_import_rejects_more_presets_than_it_may_hold() -> None:

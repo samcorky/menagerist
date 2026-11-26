@@ -23,6 +23,7 @@ from app.modules.transfer.domain.removal import KEEP_EDITED, KEEP_IN_USE, KEEP_U
 from app.modules.transfer.domain.run import Outcome, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.transfer.ports.targets import RemoveResult
@@ -93,10 +94,9 @@ async def _assert_empty(world: World) -> None:
     )
     assert (
         await world.preset_repos.presets.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
 
 
 async def test_removes_everything_that_is_untouched(make_world: MakeWorld) -> None:
@@ -298,9 +298,11 @@ async def test_a_preset_another_type_uses_is_kept(make_world: MakeWorld) -> None
     """A preset the user's own type refers to is kept."""
     world = await _installed(make_world)
     preset = (
-        await world.preset_repos.presets.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
-        )
+        (
+            await world.preset_repos.presets.list(
+                scope=ContentFilter.everyone(), page=PageRequest(limit=10)
+            )
+        ).items
     )[0]
     mine = NodeType.create(owner_id=world.actor.id, slug="mine", label="Mine")
     mine.attributes_schema = {

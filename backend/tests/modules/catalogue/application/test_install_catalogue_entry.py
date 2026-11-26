@@ -50,7 +50,11 @@ async def _status(shared: Shared, actor: Actor, entry_id: str) -> EntryStatus:
 
 async def _mine(shared: Shared, actor: Actor) -> int:
     return len(
-        await ListPresets(shared.preset_repos, GUARD).handle(ListPresetsQuery(), actor)
+        (
+            await ListPresets(shared.preset_repos, GUARD).handle(
+                ListPresetsQuery(), actor
+            )
+        ).items
     )
 
 

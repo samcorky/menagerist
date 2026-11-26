@@ -12,6 +12,7 @@ from app.modules.transfer.application.content_hash import preset_key
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.cqrs import CommandHandler
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.presets.ports.preset_repository import PresetRepository
@@ -94,12 +95,12 @@ async def existing_hashes(
 ) -> dict[str, uuid.UUID]:
     """Map the content hash of every live preset in `scope` to its id."""
     hashes: dict[str, uuid.UUID] = {}
-    after: uuid.UUID | None = None
+    request = PageRequest(limit=_PAGE_SIZE)
     while True:
-        page = await repos.list(scope=scope, after=after, limit=_PAGE_SIZE)
-        for preset in page:
+        page = await repos.list(scope=scope, page=request)
+        for preset in page.items:
             digest = preset_key(preset.kind, preset.label, preset.definition)
             hashes[digest] = preset.id
-        if len(page) < _PAGE_SIZE:
+        if page.next is None:
             return hashes
-        after = page[-1].id
+        request = PageRequest(after=page.next, limit=_PAGE_SIZE)

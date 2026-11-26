@@ -64,6 +64,7 @@ from app.shared_kernel.text import fold
 if TYPE_CHECKING:
     from app.modules.search.ports.search_source import SearchSource
     from app.shared_kernel.actor import Actor
+    from app.shared_kernel.paging import Cursor
 
 # Item types and the two registries are small and have no text filter of their own,
 # so they are read whole, a page at a time, and filtered here.
@@ -204,13 +205,13 @@ class SavedFieldSource:
     ) -> list[SearchHit]:
         """Return the actor's saved fields matching `query`."""
         hits: list[SearchHit] = []
-        after = None
+        after: Cursor | None = None
         seen = 0
         while seen < _TYPE_CAP:
             page = await self._use_case.handle(
                 ListPresetsQuery(after=after, limit=_TYPE_PAGE), actor
             )
-            seen += len(page)
+            seen += len(page.items)
             hits.extend(
                 SearchHit(
                     kind=self.kind,
@@ -219,12 +220,12 @@ class SavedFieldSource:
                     description=preset.description,
                     group=preset.kind,
                 )
-                for preset in page
+                for preset in page.items
                 if _mentions(query, preset.label, preset.description)
             )
-            if len(page) < _TYPE_PAGE:
+            if page.next is None:
                 break
-            after = page[-1].id
+            after = page.next
         return hits
 
 

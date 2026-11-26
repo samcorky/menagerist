@@ -15,7 +15,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     link_header_responses,
     link_next_header,
 )
-from app.entrypoints.api.shared.http.parameters import PageAfter, PageLimit, PresetId
+from app.entrypoints.api.shared.http.parameters import PresetId, SearchPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.presets.adapters.api.dependencies import (
@@ -36,7 +36,11 @@ from app.modules.presets.application.delete_preset import (
     DeletePresetCommand,
 )
 from app.modules.presets.application.get_preset import GetPreset, GetPresetQuery
-from app.modules.presets.application.list_presets import ListPresets, ListPresetsQuery
+from app.modules.presets.application.list_presets import (
+    ListPresets,
+    ListPresetsQuery,
+    PresetSort,
+)
 from app.modules.presets.application.update_preset import UpdatePreset
 from app.modules.presets.domain.errors import (
     InvalidPresetDefinitionError,
@@ -44,6 +48,7 @@ from app.modules.presets.domain.errors import (
     PresetNotFoundError,
 )
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(
     prefix="/presets", tags=["Presets"], route_class=PermissionAwareRoute
@@ -104,24 +109,26 @@ async def list_presets(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: PageLimit = 50,
+    page: Annotated[SearchPageParams[PresetSort], Query()],
     kind: Annotated[
         str | None, Query(description="Keep saved fields of this field type.")
     ] = None,
-    q: Annotated[
-        str | None,
-        Query(description="Keep saved fields whose label contains this text."),
-    ] = None,
 ) -> list[PresetResponse]:
-    """List presets, paginated by id, optionally filtered by kind or a label search."""
-    presets = await use_case.handle(
-        ListPresetsQuery(after=after, limit=limit + 1, kind=kind, q=q), actor
+    """List presets, by id unless sorted, optionally by kind or a label search."""
+    result = await use_case.handle(
+        ListPresetsQuery(
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
+            kind=kind,
+            q=page.q,
+        ),
+        actor,
     )
-    if len(presets) > limit:
-        response.headers["Link"] = link_next_header(request, str(presets[limit - 1].id))
-
-    return [PresetResponse.from_domain(p) for p in presets[:limit]]
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
+    return [PresetResponse.from_domain(p) for p in result.items]
 
 
 @router.patch(

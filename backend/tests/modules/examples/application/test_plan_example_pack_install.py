@@ -26,6 +26,7 @@ from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.domain.plan import Plan, PlanAction
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
@@ -119,10 +120,9 @@ async def test_planning_writes_nothing(make_world: MakeWorld) -> None:
     )
     assert (
         await world.preset_repos.presets.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
 
 
 async def test_an_unknown_pack_is_not_found(make_world: MakeWorld) -> None:

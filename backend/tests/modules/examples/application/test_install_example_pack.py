@@ -22,6 +22,7 @@ from app.modules.transfer.domain.run import Run, RunStatus
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR, Actor
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from tests.modules.examples.conftest import MakeWorld, SamplePack, World
@@ -96,10 +97,9 @@ async def _assert_nothing_left(world: World) -> None:
     )
     assert (
         await world.preset_repos.presets.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
 
 
 async def test_install_creates_everything_and_records_it(
@@ -187,10 +187,9 @@ async def test_a_slug_clash_creates_nothing_and_names_the_slug(
     )
     assert (
         await world.preset_repos.presets.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
     assert (
         await world.graph_repos.nodes.list(
             scope=ContentFilter.everyone(), after=None, limit=10

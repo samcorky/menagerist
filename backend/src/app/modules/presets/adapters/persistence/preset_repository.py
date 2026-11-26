@@ -5,7 +5,9 @@ from sqlalchemy import delete, select
 
 from app.modules.presets.adapters.persistence.models import PresetModel
 from app.modules.presets.domain.preset import Preset
+from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
+from app.platform.text_search import contains_pattern, unaccent_ilike
 
 if TYPE_CHECKING:
     import builtins
@@ -15,8 +17,17 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 logger = structlog.get_logger()
+
+# What `list` can sort by; the names are fields of the API's preset response.
+_SORT_COLUMNS = {
+    "label": text_column(PresetModel.label),
+    "kind": text_column(PresetModel.kind),
+    "created_at": timestamp_column(PresetModel.created_at),
+    "updated_at": timestamp_column(PresetModel.updated_at),
+}
 
 
 def _to_domain(model: PresetModel) -> Preset:
@@ -84,28 +95,32 @@ class SqlAlchemyPresetRepository:
         self,
         *,
         scope: ContentFilter,
-        after: uuid.UUID | None,
-        limit: int,
+        page: PageRequest,
         kind: str | None = None,
         q: str | None = None,
-    ) -> list[Preset]:
-        """List non-deleted presets in `scope` ordered by id, after `after` if given."""
-        logger.debug("listing presets", after=after, limit=limit, kind=kind)
+    ) -> Page[Preset]:
+        """List non-deleted presets in `scope`, one page in the order `page` asks."""
+        logger.debug("listing presets", page=page, kind=kind)
         stmt = (
             select(PresetModel)
             .where(PresetModel.deleted_at.is_(None))
             .where(owned_by(PresetModel, scope.user_id))
-            .order_by(PresetModel.id)
-            .limit(limit)
         )
         if kind is not None:
             stmt = stmt.where(PresetModel.kind == kind)
-        if after is not None:
-            stmt = stmt.where(PresetModel.id > after)
-        if q is not None:
-            stmt = stmt.where(PresetModel.label.ilike(f"%{q}%"))
-        result = await self._session.execute(stmt)
-        return [_to_domain(model) for model in result.scalars()]
+        needle = (q or "").strip()
+        if needle:
+            stmt = stmt.where(
+                unaccent_ilike(PresetModel.label, contains_pattern(needle))
+            )
+        return await keyset_page(
+            self._session,
+            stmt,
+            id_column=PresetModel.id,
+            columns=_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
+        )
 
     async def list_deleted_before(
         self, cutoff: datetime, *, after: uuid.UUID | None, limit: int
