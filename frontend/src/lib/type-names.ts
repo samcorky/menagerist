@@ -24,6 +24,28 @@ export function inFamilyOrder<T extends NamedType>(types: readonly T[]): T[] {
 }
 
 /**
+ * The types a search shows, in the order given. A type matches when the words are in its name or
+ * its slug. A parent that matches brings its subtypes, and a subtype that matches brings its
+ * parent, so a subtype is never shown without its place in the family; the parent's other
+ * subtypes stay out. A blank search keeps every type.
+ */
+export function matchTypes<T extends NamedType>(types: readonly T[], query: string): T[] {
+	const text = query.trim().toLowerCase();
+	if (text === '') return [...types];
+	const present = new Set(types.map((type) => type.slug));
+	const matched = new Set(
+		types.filter((t) => `${t.label} ${t.slug}`.toLowerCase().includes(text)).map((t) => t.slug)
+	);
+	const shown = new Set(matched);
+	for (const type of types) {
+		if (!type.parent || !present.has(type.parent)) continue;
+		if (matched.has(type.parent)) shown.add(type.slug);
+		if (matched.has(type.slug)) shown.add(type.parent);
+	}
+	return types.filter((type) => shown.has(type.slug));
+}
+
+/**
  * Rows for item types (`options`, in the order given) split into groups for a select: the rows
  * whose type has no family come first with no heading, then one group per parent, headed by its
  * name, in the order each is first met. `isParent` marks the row for the parent type itself.

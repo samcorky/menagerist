@@ -116,6 +116,38 @@ test('a subtype`s items show its parent in the type row and keep just its name o
 	await expect(card.getByText(`, a subtype of ${parent.label}`)).toBeAttached();
 });
 
+test('searching the item types for a parent shows its subtypes, and for a subtype its parent', async ({
+	page,
+	request
+}) => {
+	const parent = await makeType(request, uniqueName('Memorabilia'), {});
+	const poster = await makeType(request, uniqueName('Poster'), {}, parent.slug);
+	const stub = await makeType(request, uniqueName('Stub'), {}, parent.slug);
+	// The search box only shows once the list is long enough to need it.
+	const others: string[] = [];
+	for (let i = 0; i < 8; i += 1) {
+		others.push((await makeType(request, uniqueName(`Other ${i}`), {})).label);
+	}
+
+	await page.goto('/library/item-types');
+	const search = page.getByPlaceholder('Search item types…');
+	// A subtype's row also names its parent for a screen reader, so find a row by its own checkbox.
+	const row = (label: string) =>
+		page.getByRole('checkbox', { name: `Select ${label}`, exact: true });
+
+	await search.fill(parent.label);
+	await expect(row(parent.label)).toHaveCount(1);
+	await expect(row(poster.label)).toHaveCount(1);
+	await expect(row(stub.label)).toHaveCount(1);
+	await expect(row(others[0])).toHaveCount(0);
+
+	await search.fill(poster.label);
+	await expect(row(poster.label)).toHaveCount(1);
+	await expect(row(parent.label)).toHaveCount(1);
+	// The parent's other subtype stays out: it did not match.
+	await expect(row(stub.label)).toHaveCount(0);
+});
+
 test('a parent with subtypes cannot be deleted, and the list of its subtypes shows them', async ({
 	request
 }) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupByFamily, inFamilyOrder, typeNames } from '$lib/type-names';
+import { groupByFamily, inFamilyOrder, matchTypes, typeNames } from '$lib/type-names';
 
 const names = typeNames([
 	{ slug: 'memorabilia', label: 'Memorabilia', parent: null },
@@ -109,5 +109,60 @@ describe('typeNames', () => {
 	it('answers for no type', () => {
 		expect(names.path(null)).toBe('');
 		expect(names.short(undefined)).toBe('');
+	});
+});
+
+describe('matchTypes', () => {
+	const t = (slug: string, label: string, parent?: string) => ({ slug, label, parent });
+	const types = [
+		t('film', 'Film'),
+		t('memorabilia', 'Memorabilia'),
+		t('poster', 'Poster', 'memorabilia'),
+		t('ticket-stub', 'Ticket stub', 'memorabilia'),
+		t('music', 'Music media'),
+		t('vinyl', 'Vinyl', 'music'),
+		t('lost', 'Lost', 'gone')
+	];
+	const slugs = (query: string) => matchTypes(types, query).map((x) => x.slug);
+
+	it('keeps every type for a blank search', () => {
+		expect(slugs('')).toEqual(types.map((x) => x.slug));
+		expect(slugs('   ')).toEqual(types.map((x) => x.slug));
+	});
+
+	it('finds a type by its label or its slug, ignoring case', () => {
+		expect(slugs('FILM')).toEqual(['film']);
+		expect(slugs('ticket-stub')).toEqual(['memorabilia', 'ticket-stub']);
+	});
+
+	it('brings the subtypes of a parent that matches', () => {
+		expect(slugs('memorabilia')).toEqual(['memorabilia', 'poster', 'ticket-stub']);
+	});
+
+	it('brings the parent of a subtype that matches, and only that subtype', () => {
+		expect(slugs('poster')).toEqual(['memorabilia', 'poster']);
+		expect(slugs('vinyl')).toEqual(['music', 'vinyl']);
+	});
+
+	it('lists a family once when both parent and subtype match', () => {
+		// "o" is in Memorabilia and in Poster, and in Lost, which has no family.
+		expect(slugs('o')).toEqual(['memorabilia', 'poster', 'ticket-stub', 'lost']);
+	});
+
+	it('keeps the order it was given', () => {
+		expect(matchTypes([...types].reverse(), 'memorabilia').map((x) => x.slug)).toEqual([
+			'ticket-stub',
+			'poster',
+			'memorabilia'
+		]);
+	});
+
+	it('leaves out a subtype whose parent is gone unless it matches itself', () => {
+		expect(slugs('lost')).toEqual(['lost']);
+		expect(slugs('gone')).toEqual([]);
+	});
+
+	it('finds nothing for a search nothing matches', () => {
+		expect(slugs('zzz')).toEqual([]);
 	});
 });

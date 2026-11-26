@@ -47,7 +47,7 @@
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { parentChangeQuestion, type ParentChangeQuestion } from '$lib/parent-change';
 	import { appearanceOf } from '$lib/type-inheritance';
-	import { inFamilyOrder } from '$lib/type-names';
+	import { inFamilyOrder, matchTypes } from '$lib/type-names';
 	import type { AttributesSchema } from '$lib/schema-types';
 
 	const PAGE_SIZE = 50;
@@ -313,13 +313,8 @@
 
 	// Searching only helps once the list is long enough to scan.
 	const SEARCH_FROM = 8;
-	const shown = $derived(
-		query.trim() === ''
-			? categories
-			: categories.filter((c) =>
-					`${c.label} ${c.slug}`.toLowerCase().includes(query.trim().toLowerCase())
-				)
-	);
+	// A parent that matches shows its subtypes, and a subtype that matches shows its parent.
+	const shown = $derived(matchTypes(categories, query));
 
 	async function handleDelete(cat: NodeTypeResponse) {
 		const subtypes = allTypes.filter((t) => t.parent === cat.slug);
