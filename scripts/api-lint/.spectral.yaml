@@ -73,6 +73,29 @@ rules:
   ibm-schema-description: error
   ibm-success-response-example: error
 
+  # --- Our own rules ------------------------------------------------------------------
+  # A list that pages (`after`) also takes `limit`, `sort` and `order` (docs/API_STYLE.md,
+  # "Sort, order and search"). A warning until every list route has been rolled over.
+  menagerist-list-paging-parameters:
+    description: A route that declares `after` must also declare `limit`, `sort` and `order`.
+    severity: warn
+    given: "$.paths[*].get.parameters"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          if:
+            contains:
+              type: object
+              required: [name]
+              properties:
+                name: { const: after }
+          then:
+            allOf:
+              - contains: { type: object, required: [name], properties: { name: { const: limit } } }
+              - contains: { type: object, required: [name], properties: { name: { const: sort } } }
+              - contains: { type: object, required: [name], properties: { name: { const: order } } }
+
 # Exceptions for single schemas or paths, so each rule still guards everything else.
 overrides:
   # Permissions are scope-style `module:resource:action` strings with snake_case

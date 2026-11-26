@@ -1951,3 +1951,15 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Matching** is as before: the words in a type's name or slug, ignoring case. The rule is `matchTypes` in `lib/type-names.ts`, which keeps the order it is given; the list then puts each subtype after its parent as it does without a search.
 - **A parent that matches** brings all its subtypes. **A subtype that matches** brings its parent but not its siblings, since they did not match. A subtype whose parent is gone matches on its own.
 - **Limit:** like the rest of this page's search, it works on the types loaded so far (50 at a time), so a family split across pages is complete only once both pages have loaded. Searching on the server across every page is #792, with the other lists' search.
+
+## One convention for paging, sorting and searching every list (2026-11-26)
+
+**Decision:** Every list route that pages takes `after`, `limit`, `sort` and `order`, and `q` where it has text to search. The rules are in [API_STYLE.md](API_STYLE.md#sort-order-and-search); this records the choices behind them (#619, #620).
+
+- **Default order stays `id` ascending.** Changing it to newest first would reorder every list for clients that rely on it. `order=desc` with no `sort` gives newest first, since ids are uuid7.
+- **No offsets, tables included.** A table pages with "next" and shows `Total-Count`. Offsets get slower with depth and skip or repeat rows when the list changes, and sort and search find a row faster than a page number.
+- **`sort` is an enum per route, so an unknown key is a 422,** like any other enum parameter such as `kind`. The issue suggested a 400, but a 400 here would be the one enum that answers differently, and the generated client gains a typed `sort` for free. An unreadable cursor, or one from a different `sort` or `order`, is a 400.
+- **Keys are response field names** (`name`, `created_at`, `updated_at` and each route's own), so a client sorts by what it sees. Custom fields stay in item search's query-body `sort`.
+- **Ties break on `id` in the direction of `order`, and empty values sort last in both directions.** That keeps one comparison for the cursor to resume from, instead of one per direction.
+- **`q` matches ignoring case and accents,** as collections and the main search do. The presets list still uses a plain case-insensitive match; it moves over when `q` is rolled out (#624).
+- **The lint rule `menagerist-list-paging-parameters` warns** while a route that pages lacks `limit`, `sort` or `order`. Its baseline counts the 10 routes that do not yet have them; the roll-out (#622, #623) lowers it to zero, and it becomes an error then.

@@ -4,12 +4,17 @@ Each alias carries the parameter's OpenAPI description, so a route declares
 `node_id: NodeId` instead of repeating it. Bounds stay with the route that
 needs them: `PageLimit` describes `limit` without capping it, and a route with
 a cap writes its own `Query(ge=..., le=..., description=PAGE_LIMIT_DESCRIPTION)`.
+The keys `sort` accepts differ per route, so a route that has not moved to
+`PageParams` declares its own enum for it with
+`Query(description=PAGE_SORT_DESCRIPTION)`.
 """
 
 import uuid
+from enum import StrEnum
 from typing import Annotated
 
 from fastapi import Header, Path, Query
+from pydantic import BaseModel, Field
 
 PAGE_AFTER_DESCRIPTION = (
     "Id of the last row of the previous page. Leave it out for the first page;"
@@ -17,8 +22,46 @@ PAGE_AFTER_DESCRIPTION = (
 )
 PAGE_LIMIT_DESCRIPTION = "Most rows to return on this page."
 
+PAGE_SORT_DESCRIPTION = (
+    "What to order the rows by. Leave it out to order by id, which is creation order."
+    + " Ties keep a fixed order."
+)
+PAGE_ORDER_DESCRIPTION = (
+    "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is"
+    + " left out, so `desc` alone lists the newest first."
+)
+PAGE_SEARCH_DESCRIPTION = (
+    "Keep the rows whose text contains this, ignoring case and accents."
+)
+
+
+class SortOrder(StrEnum):
+    """The direction of a list's `order` parameter."""
+
+    ASC = "asc"
+    DESC = "desc"
+
+
+class PageParams(BaseModel):
+    """The paging parameters every list route shares, as one query model.
+
+    A route subclasses it to add its own `sort` enum (and `q` where it has text to
+    search), and declares `page: Annotated[ThatSubclass, Query()]`. FastAPI flattens
+    the fields into separate query parameters, so the schema reads as if each were
+    declared on the route. A route with a different cap overrides `limit`.
+    """
+
+    after: uuid.UUID | None = Field(None, description=PAGE_AFTER_DESCRIPTION)
+    limit: int = Field(50, ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)
+    order: SortOrder = Field(SortOrder.ASC, description=PAGE_ORDER_DESCRIPTION)
+
+
 PageAfter = Annotated[uuid.UUID | None, Query(description=PAGE_AFTER_DESCRIPTION)]
 PageLimit = Annotated[int, Query(description=PAGE_LIMIT_DESCRIPTION)]
+PageOrder = Annotated[SortOrder, Query(description=PAGE_ORDER_DESCRIPTION)]
+PageSearch = Annotated[
+    str | None, Query(max_length=200, description=PAGE_SEARCH_DESCRIPTION)
+]
 
 NodeId = Annotated[uuid.UUID, Path(description="The item's id.")]
 EdgeId = Annotated[uuid.UUID, Path(description="The connection's id.")]
