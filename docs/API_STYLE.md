@@ -45,9 +45,28 @@ Every 4xx and 5xx body is RFC 9457 `application/problem+json` with `type`, `titl
 
 A list returns a **bare JSON array**, and paging lives in headers, in the style of GitHub's API:
 
-- Keyset pagination: `?after=<cursor>&limit=<n>`, ordered by `id`, never an offset. The cursor is opaque to clients.
-- `Link: <url>; rel="next"` (RFC 8288) is present while there is another page and absent on the last.
+- Keyset pagination: `?after=<cursor>&limit=<n>`, never an offset. The cursor is opaque to clients: pass back the one the `Link` header carries and read nothing into it.
+- `Link: <url>; rel="next"` (RFC 8288) is present while there is another page and absent on the last. The next URL repeats the request's other parameters, so `sort`, `order` and `q` carry on to every page.
 - `Total-Count` is the number of items matching the filters, with `Total-Count-Capped: true` when a search stopped counting at its cap and the number is a lower bound.
+
+### Sort, order and search
+
+A list route that pages declares all four of `after`, `limit`, `sort` and `order`, and adds `q` where it has text to search. `PageParams` and `SearchPageParams` in `entrypoints/api/shared/http/parameters.py` declare `after`, `limit` (`ge=1, le=100`, default 50), `sort` and `order`, and `q` for the searchable form. They are generic over the route's sort enum, so a route takes `page: Annotated[SearchPageParams[CollectionSort], Query()]` and writes only that enum. FastAPI flattens the fields into ordinary query parameters, so the schema and generated client are the same as if each were declared on the route, and `page.sort` is typed as the enum. A route with a different cap subclasses the model and overrides `limit`.
+
+| Parameter | Meaning                                                                                                  |
+| --------- | -------------------------------------------------------------------------------------------------------- |
+| `sort`    | One key from the route's own allow-list, declared as an enum so the generated client types it. Leaving it out sorts by `id`. |
+| `order`   | `asc` (the default) or `desc`. It applies to `sort`, or to `id` when `sort` is left out, so `order=desc` alone lists the newest first. |
+| `q`       | Keep the rows whose searchable text contains this, ignoring case and accents, the same matching as the main search. At most 200 characters. |
+
+- **Keys:** the name of the response field the list is ordered by, so a client sorts by what it sees. A route offers only the keys that carry meaning for it (typically `name`, `created_at`, `updated_at`, and the route's own, such as `slug` or `kind`), and documents them in the enum. Sorting by a custom field is only for item search, which has its own query-body `sort`.
+- **Default order:** `id` ascending, which is creation order because ids are uuid7. A route that lists something other than live rows in creation order says so on its own description: the recently deleted lists run newest deletion first.
+- **Ties and gaps:** every sort adds `id` as the final key, in the same direction as `order`, so rows with equal values keep a fixed order and a page never repeats or skips one. A row with no value for the key (an empty optional field) sorts after the rest in both directions.
+- **Text keys** compare ignoring case, using the database's collation.
+- **The cursor** for a sorted list holds the sort key, its last value and the id, so the next page resumes from that row. It is only valid with the same `sort` and `order` that produced it.
+- **When values change between pages** the cursor stays valid, and a row that was edited may be seen twice or missed. That is the usual keyset trade-off, and the price of never counting rows from the start.
+- **Errors:** an unknown `sort` or `order` is an unparseable request, so a 422 problem listing the accepted values, like any other enum parameter. A cursor that cannot be read, or that came from a different `sort` or `order`, is a 400 problem.
+- **No offsets, even for tables:** a table pages with "next" and shows `Total-Count`; it does not jump to page 3 of 12. Counting from the start is slow on a large list and wrong once rows change, and the sort and search controls find a row faster than the page number would.
 
 IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}`). We keep arrays because the headers carry everything the envelope would and the generated client stays simple. `ibm-no-array-responses` and `ibm-collection-array-property` follow from this and are off. Changing it later would be a breaking change to every list endpoint.
 
