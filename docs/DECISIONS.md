@@ -1761,3 +1761,25 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - Names: item type, parent type (has subtypes), subtype (has a parent), top-level type (no parent, used only where a subtype has to be told apart). "Kind" is not used, because the design guide reserves it for a field's kind.
 
 **Rationale:** Memorabilia with Poster, Photo print and Action figure, or Music media with Vinyl, CD and Cassette, share a base of fields and want to be listed together; a one-level parent covers that without the cost of a free tree, which no collector case here needed.
+
+## A subtype uses its parent's fields: the effective schema (2026-11-25)
+
+**Decision:** The server resolves what a subtype uses into an `effective_schema` on the item type's responses (`GET`, list, `POST`, `PATCH` and `GET /node-types/{id}/subtypes`), and item create and update validate against it (#320, #767). `attributes_schema` stays what the type itself defines, which the type editor edits; the frontend reads the effective one through `effectiveSchema()`. A type with no parent answers with its own schema as the effective one.
+
+**How a subtype's settings combine with its parent's** (`effective_schema` in `application/schema_meta.py`; an item always presents itself using its own type, resolved with inheritance):
+
+- **Fields:** the parent's first, then the subtype's own.
+- **Required:** the union.
+- **Layout:** the parent's sections, then the subtype's.
+- **Archived:** a flag on the field, so a parent's archived field stays archived on every subtype.
+- **Highlights:** each list (`card`, `connection`) is the parent's unless the subtype sets one of its own, which replaces it entirely, even when empty. A subtype may highlight an inherited field, so the highlight check (`check_meta_shape(..., inherited=...)`) sees the parent's fields. The limits stay 3 and 2.
+- **Anything else** (`$schema`, version): the subtype's, else the parent's.
+
+**Choices that are not obvious:**
+
+- The merge lives in `schema_meta.py` because that is the one module that reads `x-menagerist`, and it is one function so the server and the client cannot drift.
+- The type entity carries two derived values, `effective_schema` and `parent_updated_at`. They are never stored. A type with no parent comes back from the use cases as stored; only a subtype comes back as a copy carrying them.
+- The parent's last change is folded into the type's ETag (`etag_from_entity`'s `extra`), because a subtype's response changes when its parent gains a field while its own `updated_at` does not. Without it a cached subtype would be answered `304` with fields that are out of date.
+- A key both a parent and a subtype define keeps the parent's definition. The rules refuse that, so this only guards data that predates them.
+- A highlight on a subtype may name a field the parent later removes; such an entry is dropped when read (`normaliseHighlights`), as a dangling one already is.
+- The filter and query builder read the effective schema too, so a subtype's field choices include its parent's. Matching a parent's items across its subtypes is a separate slice (#768).

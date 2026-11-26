@@ -142,6 +142,7 @@
 		type ExampleFilter
 	} from '$lib/examples';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import { effectiveSchema } from '$lib/node-types';
 	import { matchContext } from '$lib/search-context';
 
 	const EMPTY_LINES = [
@@ -455,8 +456,7 @@
 	}
 
 	function schemaOf(slug: string | null | undefined): AttributesSchema | null {
-		const type = itemTypes.find((t) => t.slug === slug);
-		return (type?.attributes_schema as AttributesSchema | null | undefined) ?? null;
+		return effectiveSchema(itemTypes.find((t) => t.slug === slug));
 	}
 
 	// `id` is the address segment on the first load, then always the canonical id, so the ETag

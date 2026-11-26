@@ -1,10 +1,10 @@
 import uuid
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
 import structlog
 
-from app.modules.graph.application.choice_lists import resolve_choice_lists
+from app.modules.graph.application.parent_type import type_view
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.domain.errors import NodeTypeNotFoundError
 from app.modules.graph.domain.node_type import NodeType
@@ -51,9 +51,9 @@ class GetNodeType(QueryHandler[GraphRepos, GetNodeTypeQuery, NodeType]):
         if node_type is None:
             raise NodeTypeNotFoundError(f"NodeType {query.node_type_id} not found")
         logger.debug("node type fetched", node_type_id=query.node_type_id)
-        resolved = await resolve_choice_lists(
-            node_type.attributes_schema, self._choice_lists
+        return await type_view(
+            self._repos,
+            node_type,
+            scope=self.scope(actor),
+            choice_lists=self._choice_lists,
         )
-        if resolved is node_type.attributes_schema:
-            return node_type
-        return replace(node_type, attributes_schema=resolved)

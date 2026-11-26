@@ -6,6 +6,7 @@ import structlog
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.extra_schema_limits import check_extra_schema_limits
+from app.modules.graph.application.parent_type import resolve_effective_schema
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import (
     check_schema_definition,
@@ -90,7 +91,9 @@ class CreateNode(CommandHandler[GraphUnitOfWork, CreateNodeCommand, Node]):
                         )
                     )
                 else:
-                    type_schema = node_type.attributes_schema
+                    type_schema = await resolve_effective_schema(
+                        repos, node_type, scope=self.scope(actor)
+                    )
             schema = await resolve_choice_lists(
                 merge_attribute_schemas(type_schema, command.extra_schema),
                 self._choice_lists,

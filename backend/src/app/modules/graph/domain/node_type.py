@@ -1,6 +1,6 @@
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Final
 
@@ -74,6 +74,11 @@ class NodeType(Identifiable, Owned, SoftDeletable):
     icon: str | None = None
     colour: str | None = None
     parent: str | None = None
+    # Derived on read and never stored: the fields a subtype uses once its parent's
+    # join its own (`attributes_schema` stays what the type itself defines), and when
+    # the parent last changed, so a response's ETag follows a change to it.
+    effective_schema: dict[str, Any] | None = field(default=None, repr=False)
+    parent_updated_at: datetime | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         """Validate required fields after dataclass initialisation."""

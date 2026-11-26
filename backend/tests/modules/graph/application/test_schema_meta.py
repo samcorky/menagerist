@@ -198,6 +198,31 @@ def test_check_meta_shape_rejects_bad_highlights(highlights: object) -> None:
         check_meta_shape(_with_highlights(highlights))
 
 
+def test_a_subtype_may_highlight_a_field_it_inherits() -> None:
+    """With the parent's fields to hand, a highlight may name one of them."""
+    own = {
+        "properties": {"width": {"type": "string"}},
+        "x-menagerist": {"highlights": {"card": [{"key": "width"}, {"key": "cond"}]}},
+    }
+    inherited = {"cond": {"type": "string"}}
+
+    check_meta_shape(own, inherited=inherited)
+    with pytest.raises(InvalidSchemaError, match="unknown field 'cond'"):
+        check_meta_shape(own)
+
+
+def test_an_inherited_archived_field_cannot_be_highlighted() -> None:
+    """The archived rule follows the field, wherever it is defined."""
+    own = {
+        "properties": {"width": {"type": "string"}},
+        "x-menagerist": {"highlights": {"card": [{"key": "old"}]}},
+    }
+    inherited = {"old": {"type": "string", "x-menagerist": {"archived": True}}}
+
+    with pytest.raises(InvalidSchemaError, match="archived field 'old'"):
+        check_meta_shape(own, inherited=inherited)
+
+
 def test_check_meta_shape_rejects_highlights_without_properties() -> None:
     """A highlight cannot refer to a field when the schema has no properties."""
     with pytest.raises(InvalidSchemaError):

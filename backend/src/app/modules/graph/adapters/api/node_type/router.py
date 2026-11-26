@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Depends, Query
 from starlette.requests import Request
@@ -75,9 +75,18 @@ from app.modules.graph.domain.errors import (
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
 
+if TYPE_CHECKING:
+    from app.modules.graph.domain.node_type import NodeType
+
 router = APIRouter(
     prefix="/node-types", tags=["Node Types"], route_class=PermissionAwareRoute
 )
+
+
+def _etag_extra(node_type: NodeType) -> str | None:
+    """A subtype shows its parent's fields, so a change to the parent moves the tag."""
+    changed = node_type.parent_updated_at
+    return changed.isoformat() if changed is not None else None
 
 
 @router.post(
@@ -126,7 +135,7 @@ async def get_node_type(
     node_type = await use_case.handle(
         GetNodeTypeQuery(node_type_id=node_type_id), actor
     )
-    if earlier := cond.check_get(node_type):
+    if earlier := cond.check_get(node_type, _etag_extra(node_type)):
         return earlier
     return NodeTypeResponse.from_domain(node_type)
 
@@ -220,10 +229,10 @@ async def update_node_type(
     current = await get_usecase.handle(
         GetNodeTypeQuery(node_type_id=node_type_id), actor
     )
-    if earlier := cond.check_patch(current):
+    if earlier := cond.check_patch(current, _etag_extra(current)):
         return earlier
     node_type = await update_usecase.handle(payload.to_command(node_type_id), actor)
-    cond.set_response_etag(node_type)
+    cond.set_response_etag(node_type, _etag_extra(node_type))
     return NodeTypeResponse.from_domain(node_type)
 
 

@@ -78,6 +78,7 @@
 	import { Selection } from '$lib/selection.svelte';
 	import { leavesPage, SELECTION_FULL_MESSAGE } from '$lib/bulk-actions';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import { effectiveSchema } from '$lib/node-types';
 	import {
 		EXAMPLE_FILTER_LABELS,
 		loadExampleIds,
@@ -431,8 +432,7 @@
 	}
 
 	function schemaOf(slug: string | null | undefined): AttributesSchema | null {
-		const cat = allCategories.find((c) => c.slug === slug);
-		return (cat?.attributes_schema as AttributesSchema | null | undefined) ?? null;
+		return effectiveSchema(allCategories.find((c) => c.slug === slug));
 	}
 
 	function selectType(type: string | null) {

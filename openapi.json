@@ -38925,6 +38925,19 @@
             "title": "Attributes Schema",
             "description": "Its fields, as a JSON Schema."
           },
+          "effective_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Schema",
+            "description": "The fields items of this type use, as a JSON Schema: its parent's followed by its own. The same as `attributes_schema` for a type with no parent. Read-only; edit `attributes_schema`."
+          },
           "icon": {
             "anyOf": [
               {

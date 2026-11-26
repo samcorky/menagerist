@@ -33,7 +33,7 @@
 	import { captureFieldKeys } from '$lib/quick-capture';
 	import { rowsToAttributes, type AttributeRow } from '$lib/attribute-rows';
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
-	import type { AttributesSchema } from '$lib/schema-types';
+	import { effectiveSchema } from '$lib/node-types';
 	import { mergeAttributeSchemas } from '$lib/schema-meta';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -122,10 +122,7 @@
 				.catch(() => {});
 	});
 
-	const typeSchema = $derived(
-		(types.find((type) => type.slug === selectedType)?.attributes_schema as
-			AttributesSchema | null | undefined) ?? null
-	);
+	const typeSchema = $derived(effectiveSchema(types.find((type) => type.slug === selectedType)));
 	const captureKeys = $derived(captureFieldKeys(typeSchema));
 	// A field marked as taking barcodes, else one whose label looks like a code.
 	const defaultCodeField = $derived(defaultScanField(typeSchema));

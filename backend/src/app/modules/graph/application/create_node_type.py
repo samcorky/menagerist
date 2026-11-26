@@ -5,7 +5,11 @@ import jsonschema
 import structlog
 
 from app.modules.graph.application.choice_lists import check_list_refs, strip_list_enums
-from app.modules.graph.application.parent_type import check_can_be_subtype
+from app.modules.graph.application.parent_type import (
+    check_can_be_subtype,
+    parent_properties,
+    with_inherited,
+)
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.schema_meta import check_meta_shape
 from app.modules.graph.domain.errors import (
@@ -63,7 +67,6 @@ class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, Node
                 ).check_schema(command.attributes_schema)
             except jsonschema.SchemaError as exc:
                 raise InvalidSchemaError(str(exc.message)) from exc
-            check_meta_shape(command.attributes_schema)
             attributes_schema = strip_list_enums(command.attributes_schema)
             await check_list_refs(attributes_schema, self._choice_lists)
         else:
@@ -88,15 +91,21 @@ class CreateNodeType(CommandHandler[GraphUnitOfWork, CreateNodeTypeCommand, Node
                 colour=command.colour,
                 parent=command.parent,
             )
+            inherited = None
             if node_type.parent is not None:
-                await check_can_be_subtype(
+                parent_type = await check_can_be_subtype(
                     repos,
                     slug=str(node_type.slug),
                     schema=attributes_schema,
                     parent=node_type.parent,
                     scope=self.scope(actor),
                 )
+                inherited = parent_properties(parent_type)
+            # A subtype may highlight a field it inherits, so this needs the parent.
+            if attributes_schema is not None:
+                check_meta_shape(attributes_schema, inherited=inherited)
             await repos.node_types.add(node_type)
             await self._uow.commit()
+            created = await with_inherited(repos, node_type, scope=self.scope(actor))
         logger.info("node type created", node_type_id=node_type.id, slug=command.slug)
-        return node_type
+        return created

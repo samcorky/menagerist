@@ -18,6 +18,7 @@ NODE_TYPE_EXAMPLE: dict[str, Any] = {
     "label": "Film",
     "description": "A motion picture.",
     "attributes_schema": None,
+    "effective_schema": None,
     "icon": "clapperboard",
     "colour": "red",
     "parent": None,
@@ -136,6 +137,14 @@ class NodeTypeResponse(BaseModel):
     attributes_schema: dict[str, Any] | None = Field(
         description="Its fields, as a JSON Schema.", default=None
     )
+    effective_schema: dict[str, Any] | None = Field(
+        description=(
+            "The fields items of this type use, as a JSON Schema: its parent's "
+            + "followed by its own. The same as `attributes_schema` for a type with "
+            + "no parent. Read-only; edit `attributes_schema`."
+        ),
+        default=None,
+    )
     icon: str | None = Field(default=None, description=_ICON_DESCRIPTION)
     colour: str | None = Field(default=None, description=_COLOUR_DESCRIPTION)
     parent: str | None = Field(default=None, description=_PARENT_DESCRIPTION)
@@ -151,6 +160,11 @@ class NodeTypeResponse(BaseModel):
             label=node_type.label,
             description=node_type.description,
             attributes_schema=node_type.attributes_schema,
+            effective_schema=(
+                node_type.effective_schema
+                if node_type.effective_schema is not None
+                else node_type.attributes_schema
+            ),
             icon=node_type.icon,
             colour=node_type.colour,
             parent=node_type.parent,

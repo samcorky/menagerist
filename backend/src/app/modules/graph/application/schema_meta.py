@@ -5,6 +5,7 @@ everything else (layout, advisory `required`, archived fields, display hints).
 Nothing else in the backend reads `x-*` keywords directly.
 """
 
+import copy
 from typing import Any
 
 import jsonschema
@@ -134,6 +135,79 @@ def merge_attribute_schemas(
     if meta:
         merged[NAMESPACE] = meta
     return merged
+
+
+def _dedupe(*lists: object) -> list[Any]:
+    """The items of the lists in order, each once."""
+    seen: list[Any] = []
+    for items in lists:
+        for item in items if isinstance(items, list) else []:
+            if item not in seen:
+                seen.append(item)
+    return seen
+
+
+def effective_schema(
+    parent_schema: dict[str, Any] | None, own_schema: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    """Combine a parent type's schema with a subtype's own into what the subtype uses.
+
+    An item always presents itself using its own type resolved with inheritance:
+    the fields are the parent's then the subtype's, `required` is the union, the
+    `layout` is the parent's sections then the subtype's, and an archived field
+    stays archived (the flag is on the field). Each `highlights` list is the
+    parent's unless the subtype sets one of its own, which replaces it, even when
+    empty. Any other setting is the subtype's, else the parent's.
+
+    A key both define keeps the parent's definition: the type rules refuse that, so
+    this only guards stored data that predates them. Neither input is changed.
+    """
+    if parent_schema is None:
+        return own_schema
+    if own_schema is None:
+        return copy.deepcopy(parent_schema)
+    parent_props = parent_schema.get("properties")
+    own_props = own_schema.get("properties")
+    parent_props = parent_props if isinstance(parent_props, dict) else {}
+    own_props = own_props if isinstance(own_props, dict) else {}
+    merged: dict[str, Any] = {
+        key: value
+        for key, value in {**parent_schema, **own_schema}.items()
+        if key not in ("properties", "required", NAMESPACE)
+    }
+    merged["properties"] = {
+        **parent_props,
+        **{k: v for k, v in own_props.items() if k not in parent_props},
+    }
+    required = _dedupe(parent_schema.get("required"), own_schema.get("required"))
+    if required:
+        merged["required"] = required
+    meta = _effective_meta(_meta(parent_schema), _meta(own_schema))
+    if meta:
+        merged[NAMESPACE] = meta
+    return copy.deepcopy(merged)
+
+
+def _effective_meta(parent: dict[str, Any], own: dict[str, Any]) -> dict[str, Any]:
+    """The `x-menagerist` block of `effective_schema`."""
+    combined = {
+        key: value
+        for key, value in {**parent, **own}.items()
+        if key not in ("required", "layout", "highlights")
+    }
+    required = _dedupe(parent.get("required"), own.get("required"))
+    if required:
+        combined["required"] = required
+    layout = [*parent.get("layout", []), *own.get("layout", [])]
+    if layout:
+        combined["layout"] = layout
+    highlights = {
+        **(parent["highlights"] if isinstance(parent.get("highlights"), dict) else {}),
+        **(own["highlights"] if isinstance(own.get("highlights"), dict) else {}),
+    }
+    if highlights:
+        combined["highlights"] = highlights
+    return combined
 
 
 def validation_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -278,17 +352,23 @@ def _check_highlights(root: object, properties: object) -> None:
             _check_highlight_list(name, highlights[name], properties)
 
 
-def check_meta_shape(schema: dict[str, Any]) -> None:
+def check_meta_shape(
+    schema: dict[str, Any], *, inherited: dict[str, Any] | None = None
+) -> None:
     """Check that known `x-menagerist` members are correctly typed.
 
     Unknown members are allowed so newer clients stay forward compatible.
+    `inherited` is a parent type's properties: a subtype may highlight one of them.
 
     :raises InvalidSchemaError: when a known member has the wrong type or a
         highlight refers to a missing or archived field.
     """
     _check_root_meta(schema.get(NAMESPACE))
     properties = schema.get("properties")
-    _check_highlights(schema.get(NAMESPACE), properties)
+    own = properties if isinstance(properties, dict) else {}
+    _check_highlights(
+        schema.get(NAMESPACE), {**(inherited or {}), **own} if inherited else properties
+    )
     if not isinstance(properties, dict):
         return
     for key, prop in properties.items():

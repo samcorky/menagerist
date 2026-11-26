@@ -35,7 +35,7 @@
 		type StaticRoute
 	} from '$lib/palette-search';
 	import { matchContext } from '$lib/search-context';
-	import type { AttributesSchema } from '$lib/schema-types';
+	import { effectiveSchema } from '$lib/node-types';
 	import {
 		collectionsAtCap,
 		defaultHighlight,
@@ -244,7 +244,7 @@
 
 	function subtitle(item: Hit): string {
 		const type = typeOf(item);
-		const schema = (type?.attributes_schema as AttributesSchema | null | undefined) ?? null;
+		const schema = effectiveSchema(type);
 		const found = { name: item.title, description: item.description, attributes: item.attributes };
 		return resultSubtitle(type?.label ?? null, matchContext(found, schema, query));
 	}

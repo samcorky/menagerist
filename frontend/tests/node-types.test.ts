@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { listNodeTypes } = vi.hoisted(() => ({ listNodeTypes: vi.fn() }));
 vi.mock('$lib/api/client', () => ({ listNodeTypes }));
 
-import { fetchAllNodeTypes, NODE_TYPES_PAGE_SIZE } from '$lib/node-types';
+import { effectiveSchema, fetchAllNodeTypes, NODE_TYPES_PAGE_SIZE } from '$lib/node-types';
 
 const type = (n: number) => ({ id: `id-${n}`, slug: `type-${n}`, label: `Type ${n}` });
 const page = (from: number, count: number, next: boolean) => ({
@@ -46,5 +46,28 @@ describe('fetchAllNodeTypes', () => {
 			.mockResolvedValueOnce(page(0, NODE_TYPES_PAGE_SIZE, true))
 			.mockResolvedValueOnce({ error: { detail: 'boom' }, response: new Response(null) });
 		expect(await fetchAllNodeTypes()).toBeNull();
+	});
+});
+
+describe('effectiveSchema', () => {
+	const own = { type: 'object', properties: { width: { type: 'string' } } };
+	const joined = {
+		type: 'object',
+		properties: { condition: { type: 'string' }, width: { type: 'string' } }
+	};
+
+	it('is the fields a subtype uses, its parent`s and its own, when the server gives them', () => {
+		expect(effectiveSchema({ attributes_schema: own, effective_schema: joined })).toEqual(joined);
+	});
+
+	it('falls back to the type`s own fields when there is no effective schema', () => {
+		expect(effectiveSchema({ attributes_schema: own })).toEqual(own);
+		expect(effectiveSchema({ attributes_schema: own, effective_schema: null })).toEqual(own);
+	});
+
+	it('is null for a type with no fields, an unknown type or none at all', () => {
+		expect(effectiveSchema({ attributes_schema: null, effective_schema: null })).toBeNull();
+		expect(effectiveSchema(undefined)).toBeNull();
+		expect(effectiveSchema(null)).toBeNull();
 	});
 });

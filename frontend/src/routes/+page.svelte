@@ -53,6 +53,7 @@
 	import { loadItemTypes } from '$lib/palette-sources';
 	import { formatCount } from '$lib/query/items-page';
 	import type { AttributesSchema } from '$lib/schema-types';
+	import { effectiveSchema } from '$lib/node-types';
 	import { Button } from '$lib/components/ui/button/index.js';
 
 	const EMPTY_LINES = [
@@ -81,8 +82,8 @@
 	let examplesDismissed = $state(isExamplesBannerDismissed());
 
 	const typeBySlug = $derived(new Map(types.map((t) => [t.slug, t])));
-	const schemaOf = (slug: string | null | undefined) =>
-		(typeBySlug.get(slug ?? '')?.attributes_schema as AttributesSchema | null | undefined) ?? null;
+	const schemaOf = (slug: string | null | undefined): AttributesSchema | null =>
+		effectiveSchema(typeBySlug.get(slug ?? ''));
 
 	const items = $derived(stats?.status === 'ok' ? stats.data.items : null);
 	const isEmpty = $derived(items === 0);
