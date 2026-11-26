@@ -391,8 +391,9 @@ async def list_deleted_nodes(
         ListDeletedNodesQuery(
             after=page.cursor,
             limit=page.limit,
-            sort=page.sort,
-            order=page.order,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
             q=page.q,
         ),
         actor,
@@ -682,8 +683,9 @@ async def list_nodes(
         ListNodesQuery(
             after=page.cursor,
             limit=page.limit,
-            sort=page.sort,
-            order=page.order,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
             type=filters.type,
             q=filters.q,
             favourite=filters.favourite,

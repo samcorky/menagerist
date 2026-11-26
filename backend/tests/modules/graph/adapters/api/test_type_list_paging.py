@@ -212,3 +212,50 @@ def test_connection_types_search_label_reverse_label_slug_and_description() -> N
     assert [t["slug"] for t in by_reverse] == ["owns"]
     assert [t["slug"] for t in by_description] == ["likes"]
     assert nothing == []
+
+
+def test_a_list_sorts_by_two_keys_in_their_own_directions_across_pages() -> None:
+    """Repeated `sort` and `order` pair by position, and `Link` keeps all of them."""
+    client = TestClient(_app())
+    for slug, label in [("p", "Same"), ("q", "Same"), ("r", "Other"), ("s", "Same")]:
+        body = {"slug": slug, "label": label}
+        assert client.post("/api/v1/node-types", json=body).status_code == 201
+    params = [
+        ("sort", "label"),
+        ("sort", "slug"),
+        ("order", "asc"),
+        ("order", "desc"),
+        ("limit", "2"),
+    ]
+
+    pages = []
+    after: str | None = None
+    while True:
+        response = client.get(
+            "/api/v1/node-types",
+            params=[*params, *([("after", after)] if after else [])],
+        )
+        assert response.status_code == 200
+        pages.append([t["slug"] for t in response.json()])
+        if "Link" not in response.headers:
+            break
+        link = response.headers["Link"]
+        assert link.count("sort=") == 2
+        after = _next_after(link)
+
+    assert pages == [["r", "s"], ["q", "p"]]
+
+
+def test_a_cursor_from_one_key_does_not_resume_a_list_of_two() -> None:
+    """Changing the sort between pages is a 400, not a wrong page."""
+    client = TestClient(_app())
+    _make_node_types(client)
+    first = client.get("/api/v1/node-types", params={"sort": "label", "limit": 2})
+    cursor = _next_after(first.headers["Link"])
+
+    response = client.get(
+        "/api/v1/node-types",
+        params=[("sort", "label"), ("sort", "slug"), ("after", cursor)],
+    )
+
+    assert response.status_code == 400

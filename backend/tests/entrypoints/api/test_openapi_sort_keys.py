@@ -19,11 +19,13 @@ def _resolve(schema: dict[str, Any], node: dict[str, Any]) -> dict[str, Any]:
 
 
 def _enum_values(schema: dict[str, Any], node: dict[str, Any]) -> set[str]:
-    """The values of an enum parameter, whether optional (`anyOf` null) or not."""
+    """The values of an enum parameter: optional (`anyOf` null), or a list of them."""
     node = _resolve(schema, node)
     values: set[str] = set(node.get("enum", ()))
     for option in node.get("anyOf", ()):
         values |= _enum_values(schema, option)
+    if "items" in node:
+        values |= _enum_values(schema, node["items"])
     return values
 
 
@@ -65,10 +67,8 @@ def _schema(sort_values: list[str]) -> dict[str, Any]:
                             "name": "sort",
                             "in": "query",
                             "schema": {
-                                "anyOf": [
-                                    {"$ref": "#/components/schemas/RowSort"},
-                                    {"type": "null"},
-                                ]
+                                "type": "array",
+                                "items": {"$ref": "#/components/schemas/RowSort"},
                             },
                         }
                     ],

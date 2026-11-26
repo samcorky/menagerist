@@ -426,8 +426,9 @@ async def list_own_devices(
         ListOwnDevicesQuery(
             after=page.cursor,
             limit=page.limit,
-            sort=page.sort,
-            order=page.order,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
             q=page.q,
             current_session_id=current_session_id,
         ),
@@ -583,8 +584,9 @@ async def list_own_sessions(
         ListOwnSessionsQuery(
             after=page.cursor,
             limit=page.limit,
-            sort=page.sort,
-            order=page.order,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
             q=page.q,
             current_session_id=current_session_id,
         ),
