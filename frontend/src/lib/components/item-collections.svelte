@@ -11,6 +11,7 @@
 		type CollectionResponse
 	} from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
+	import { readPages } from '$lib/paging';
 	import {
 		MAX_COLLECTION_NAME_LENGTH,
 		addItemsErrorMessage,
@@ -54,18 +55,11 @@
 		item_id?: string;
 		kind?: 'manual';
 	}): Promise<CollectionResponse[] | null> {
-		const found: CollectionResponse[] = [];
-		let after: string | undefined;
-		for (let i = 0; i < MAX_PAGES; i++) {
-			const result = await listCollections({
-				query: { ...query, after, limit: PAGE_SIZE }
-			});
-			if (result.error || !result.data) return null;
-			found.push(...result.data);
-			if (!/rel="next"/.test(result.response?.headers.get('link') ?? '')) break;
-			after = result.data.at(-1)?.id;
-		}
-		return found;
+		const { rows, ok } = await readPages<CollectionResponse>(
+			(after) => listCollections({ query: { ...query, after, limit: PAGE_SIZE } }),
+			{ maxPages: MAX_PAGES }
+		);
+		return ok ? rows : null;
 	}
 
 	async function loadMemberOf(id: string) {
