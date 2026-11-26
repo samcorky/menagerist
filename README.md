@@ -80,7 +80,7 @@ Updating, rolling back, choosing an image tag, tuning the database and keeping y
 - **Make it yours.** Dark mode, a layout that works on a phone, and a quick-capture sheet (`Cmd/Ctrl+K`) to add an item from anywhere. Example packs (music, recipes, movies, comic-con posters, electronic parts, games) show how it fits together.
 - **Run it yourself.** One container plus Postgres. Local accounts, each seeing only their own items. Back up and restore from the command line or the admin page, with an automatic backup before each upgrade.
 
-The full list of field kinds is in [docs/field-types.md](docs/field-types.md#built-in-field-types-and-their-json-schema-shapes).
+The full list of field kinds is in [docs/field-types.md](docs/field-types.md#built-in-field-types-and-their-json-schema-shapes). Grouping related types under a parent type (Memorabilia with Poster and Photo print), and when to use one instead of a choice field or a smart collection, is in [docs/item-types.md](docs/item-types.md).
 
 ---
 
@@ -122,6 +122,7 @@ Want to run your own changes instead of the published image, or help develop Men
 
 | Document | Contents |
 |---|---|
+| [docs/item-types.md](docs/item-types.md) | Item types, parent types and subtypes, and when to use one instead of a choice field or a smart collection |
 | [docs/DEPLOYING.md](docs/DEPLOYING.md) | Updating, rolling back, image tags, host folders, database sizing, local overrides |
 | [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md) | What a reverse proxy must do, with Caddy and Traefik examples |
 | [docs/settings.md](docs/settings.md) | Every environment variable: type, default, allowed values (generated; see also [.env.example](.env.example)) |
