@@ -330,7 +330,7 @@ export async function removeExamplePacks(request: APIRequestContext) {
 		if (EXAMPLE_SLUG_PREFIXES.test(node.type ?? ''))
 			await deleteTolerantOfReset(request, `/api/v1/nodes/${node.id}`);
 	}
-	const types = await request.get('/api/v1/node-types?limit=500');
+	const types = await request.get('/api/v1/node-types?limit=100');
 	for (const type of (await types.json()) as { id: string; slug: string }[]) {
 		if (EXAMPLE_SLUG_PREFIXES.test(type.slug))
 			await deleteTolerantOfReset(request, `/api/v1/node-types/${type.id}`);
