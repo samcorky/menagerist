@@ -139,6 +139,8 @@ Start with an item name and Continue, not a large form. Infer the type, suggest/
 
 Choosing a type is one searchable picker everywhere (new item, Quick capture, and the item page while it has no type): the types you have items in come first under "In use" with their counts, the rest under "Other item types", and typing a name that matches nothing offers `Create "name"`, which creates and selects it in one step. Each type can have an icon and a colour (a fixed palette), set in the type editor with a search over the available icons, a name shown on hover or focus, and a dice button that picks both at random.
 
+**Subtypes.** An item type can be a subtype of another ("Poster" of "Memorabilia"), one level only. Wherever a type is shown where there is room, a subtype carries its parent before it with a small muted `ChevronRight` between ("Memorabilia › Poster"); in a card or a narrow row it is just "Poster", with the full name as its tooltip and "Poster, a subtype of Memorabilia" for a screen reader. Every picker and select that lists types draws one list: types with no family first, then each parent under its own name as the heading with its subtypes indented beneath it and a rule between groups, so the single and multiple-choice pickers look and behave the same. In the type editor the choice is "Subtype of", with the parent's fields shown read-only under "Fields from Memorabilia" and, on an item, tagged "From Memorabilia". Changing the parent asks only when fields are at stake ("Merge the shared fields?", "Make Action figure a top-level type?"), says what happens to each, and never changes an item's values. On the Item types page a parent shows its subtype count and its subtypes indented beneath it, and a search that matches one brings the other.
+
 Detect from the name on a best-effort basis. Prefill confident matches; show ambiguous suggestions inline for correction; fall back to a generic item when detection fails. Always allow changes and use category names, not internal identifiers. Detection never blocks progress.
 
 Incomplete data is better than blocking a save. Only information truly necessary for a record to exist (for example its name) may block creation; category “required” fields are advisory (§16a).
@@ -315,6 +317,7 @@ Authoritative for UI labels, copy, errors and empty states:
 | ------------------------- | ----------------------------------------------------------------------- |
 | Entity / Node / Record    | Item, Person, Place or the specific type                                |
 | Relationship / Edge       | Connection                                                              |
+| Parent (on an item type)  | Subtype of; parent type, subtype, top-level type (see §9a)              |
 | Metadata                  | Details / Information                                                   |
 | Schema                    | Suggested fields or category fields; hide implementation terminology    |
 | Graph                     | Connections for information; Explore for the advanced destination (§17) |

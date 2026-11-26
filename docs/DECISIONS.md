@@ -1915,6 +1915,26 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Collections keep working** without change: "Running low", "Not signed yet" and "No poster yet" filter by the parent or by a field the parent has, which the family widening and the effective schema cover. The shipped smart-collection tests pass unchanged.
 - **Installs made before this** keep their single types; only new installs get the subtypes. Nothing migrates, since a pack's types are the user's once added.
 
+## What other tools do with a hierarchy of types, and what Menagerist chose (2026-11-26)
+
+**Decision:** Parent types are one level deep, a subtype takes its parent's fields live, items may sit on the parent, and searching the parent includes its subtypes (#320, #773). This records what was compared. It was read from each project's public documentation on 2026-11-26; where a page said nothing, it says "not confirmed" instead of guessing, and it is a comparison of what was found, not a verdict on the tools.
+
+| Tool | What its documentation says | Hierarchy of types or categories | Child takes its parent's fields |
+| ---- | --------------------------- | -------------------------------- | ------------------------------- |
+| Tana | A supertag can extend another; the child gets the parent's template fields and content, can add its own, and cannot remove the inherited ones; fields added to the child do not appear on the parent | Yes | Yes |
+| InvenTree | Part categories are hierarchical, and a category's part list includes its sub-categories' parts; a template part has variants that reuse its information | Yes, for categories and for template and variant parts | Partly: a variant reuses its template's information, and the docs read did not list which fields |
+| Koillection | A collection holds items and can hold nested collections; templates add fields to items | Yes, for collections | Not confirmed |
+| Snipe-IT | An asset has a category and a model; a model carries a custom fieldset, and assets inherit from it | No parent categories mentioned | Not between types: a model passes fields to its assets |
+| Binner | The README lists nested category placement and custom fields | Appears so, with no detail given | Not confirmed |
+| Homebox | The README lists categories, locations, tags and custom fields on items | Not confirmed (the documentation site could not be read) | Not confirmed |
+
+- **What matched our need.** Tana's extended supertags and InvenTree's template and variant parts are the closest to a base that several kinds share. Both keep the base's fields in one place, which is what a collector wants for Memorabilia with Poster, Photo print and Programme.
+- **One level.** No collector case here needs a deeper tree, and each extra level makes inherited fields, the merge or keep choices, the family search and the grouped picker recursive (see "Parent types: an item type may be a subtype of another").
+- **A live link, not a copy.** A subtype's fields come from the parent as they are now (see "A subtype uses its parent's fields: the effective schema"), so a field added to the parent appears on every subtype and an item's values are never rewritten.
+- **Items on the parent.** An item may be of the parent type itself, as a loose ticket may be Memorabilia and no subtype. The tools above that say anything on this did not settle it for us, so this follows the collector case.
+- **Refusals.** A parent with subtypes cannot be deleted, and a subtype and its parent cannot define the same field key, so one key always has one meaning.
+- **Not compared:** how each tool searches a parent. Tana's documentation does not say whether a node tagged with a child appears in the parent's search; here a parent's search includes its subtypes (see "Searching by a parent type includes its subtypes").
+
 ## Searching the item types shows a family together (2026-11-26)
 
 **Decision:** On the Item types page, a search that matches a parent type also lists its subtypes, and one that matches a subtype also lists its parent, so a subtype is never shown without its place in the family (#320, #791).
