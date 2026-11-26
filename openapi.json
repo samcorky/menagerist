@@ -24616,16 +24616,16 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "uuid"
+                  "maxLength": 512
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one.",
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
               "title": "After"
             },
-            "description": "Id of the last row of the previous page. Leave it out for the first page; the `Link` header of each page carries the next one."
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
           },
           {
             "name": "limit",
@@ -24640,6 +24640,54 @@
               "title": "Limit"
             },
             "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CollectionSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first.",
+              "default": "asc"
+            },
+            "description": "`asc` (the default) or `desc`. It applies to `sort`, or to id when `sort` is left out, so `desc` alone lists the newest first."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
           },
           {
             "name": "item_id",
@@ -24659,25 +24707,6 @@
               "title": "Item Id"
             },
             "description": "Keep the collections this item is in: manual ones holding it and smart ones whose definition matches it. Each smart collection is checked, so pass `kind=manual` where smart ones are not wanted."
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 200
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Keep collections whose name or description contains this text.",
-              "title": "Q"
-            },
-            "description": "Keep collections whose name or description contains this text."
           },
           {
             "name": "kind",
@@ -35499,6 +35528,16 @@
           }
         ]
       },
+      "CollectionSort": {
+        "type": "string",
+        "enum": [
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CollectionSort",
+        "description": "What a list of collections can be sorted by: fields of the response."
+      },
       "ColumnMappingEntry": {
         "properties": {
           "column": {
@@ -41990,6 +42029,15 @@
             ]
           }
         ]
+      },
+      "SortOrder": {
+        "type": "string",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "SortOrder",
+        "description": "The direction of a list's `order` parameter."
       },
       "StageMediaBody": {
         "properties": {

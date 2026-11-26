@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from app.modules.collections.domain.collection import Collection, CollectionKind
     from app.shared_kernel.content_filter import ContentFilter
+    from app.shared_kernel.paging import Page, PageRequest
 
 
 class CollectionRepository(Protocol):
@@ -39,15 +40,19 @@ class CollectionRepository(Protocol):
         self,
         *,
         scope: ContentFilter,
-        after: uuid.UUID | None,
-        limit: int,
+        page: PageRequest,
         q: str | None = None,
         kind: CollectionKind | None = None,
-    ) -> list[Collection]:
-        """Return up to `limit` live collections in `scope`, ordered by id.
+    ) -> Page[Collection]:
+        """Return one page of live collections in `scope`, in the order `page` asks.
 
-        A non-blank `q` keeps collections whose name or description contains it,
-        ignoring case. A `kind` keeps only collections of that kind.
+        The sort keys are `name` (ignoring case), `created_at` and `updated_at`;
+        with none, the order is by id. A non-blank `q` keeps collections whose name
+        or description contains it, ignoring case and accents. A `kind` keeps only
+        collections of that kind.
+
+        Raises:
+            InvalidCursorError: `page.after` is from a different sort or order.
         """
         ...
 

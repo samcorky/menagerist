@@ -28,6 +28,7 @@ from app.modules.graph.application.prepare_query import prepare_query
 from app.modules.transfer.domain.bundle import BundleConnection
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.content_filter import ContentFilter
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.collections.ports.unit_of_work import CollectionsRepos
@@ -77,9 +78,11 @@ class Rig:
 
     async def collections(self) -> dict[str, tuple[CollectionKind, dict[str, object]]]:
         """Return kind and definition by collection name."""
-        found = await self.repos.collections.list(
-            scope=_EVERYONE, after=None, limit=100
-        )
+        found = (
+            await self.repos.collections.list(
+                scope=_EVERYONE, page=PageRequest(limit=100)
+            )
+        ).items
         return {c.name: (c.kind, c.definition or {}) for c in found}
 
     async def matches(self, name: str) -> list[str]:

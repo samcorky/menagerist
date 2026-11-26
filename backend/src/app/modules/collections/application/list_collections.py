@@ -1,5 +1,6 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from enum import StrEnum
 from typing import TYPE_CHECKING, ClassVar
 
 import structlog
@@ -16,6 +17,7 @@ from app.modules.collections.ports.item_lookup import ItemLookup  # noqa: TC001
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.paging import Cursor, Page, PageRequest, SortOrder
 
 if TYPE_CHECKING:
     from app.modules.collections.domain.collection import Collection
@@ -26,17 +28,28 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
+class CollectionSort(StrEnum):
+    """What a list of collections can be sorted by: fields of the response."""
+
+    NAME = "name"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
 @dataclass(kw_only=True)
 class ListCollectionsQuery:
-    """Request for a page of collections ordered by id, optionally holding an item.
+    """Request for a page of collections, optionally holding an item.
 
-    A `kind` keeps one kind only; the other kind is not loaded or counted.
-    `item_id` keeps the collections that item is in: manual ones holding it and
-    smart ones whose definition matches it.
+    Collections come by id unless `sort` says otherwise; `order` sets the
+    direction. A `kind` keeps one kind only; the other kind is not loaded or
+    counted. `item_id` keeps the collections that item is in: manual ones holding
+    it and smart ones whose definition matches it.
     """
 
-    after: uuid.UUID | None = None
+    after: Cursor | None = None
     limit: int = 50
+    sort: CollectionSort | None = None
+    order: SortOrder = SortOrder.ASC
     item_id: uuid.UUID | None = None
     q: str | None = None
     kind: CollectionKind | None = None
@@ -44,9 +57,10 @@ class ListCollectionsQuery:
 
 @dataclass(kw_only=True, frozen=True)
 class ListCollectionsResult:
-    """A page of collection summaries."""
+    """A page of collection summaries, and the cursor of the next page if any."""
 
     items: list[CollectionSummary]
+    next: Cursor | None = None
 
 
 class ListCollections(
@@ -67,28 +81,32 @@ class ListCollections(
     ) -> ListCollectionsResult:
         """Return a page of collections after `query.after`, up to `query.limit`."""
         scope = self.scope(actor)
-        collections = await self._page(query, scope)
+        page = await self._page(query, scope)
         summaries = [
-            await summarise(self._repos, self._items, c, scope) for c in collections
+            await summarise(self._repos, self._items, c, scope) for c in page.items
         ]
         logger.debug("collections listed", count=len(summaries))
-        return ListCollectionsResult(items=summaries)
+        return ListCollectionsResult(items=summaries, next=page.next)
 
     async def _page(
         self, query: ListCollectionsQuery, scope: ContentFilter
-    ) -> list[Collection]:
+    ) -> Page[Collection]:
         """Return up to `query.limit` collections, keeping only those holding the item.
 
         Filtering happens while paging so a page is never short just because
-        non-matching collections sat between matches.
+        non-matching collections sat between matches. The next cursor is the end of
+        the last row looked at, and is given only when a later collection holds the
+        item too, so the last page never points to an empty one.
         """
+        request = PageRequest(
+            after=query.after,
+            limit=query.limit,
+            sort=None if query.sort is None else query.sort.value,
+            order=query.order,
+        )
         if query.item_id is None:
             return await self._repos.collections.list(
-                scope=scope,
-                after=query.after,
-                limit=query.limit,
-                q=query.q,
-                kind=query.kind,
+                scope=scope, page=request, q=query.q, kind=query.kind
             )
         item_id = query.item_id
         holding = (
@@ -97,22 +115,52 @@ class ListCollections(
             else await self._repos.memberships.collection_ids_for(item_id, scope=scope)
         )
         found: list[Collection] = []
-        after = query.after
-        while len(found) < query.limit:
+        while True:
+            # Never ask for more rows than the page still needs, so the cursor of
+            # the last batch is the cursor of the last row kept.
             batch = await self._repos.collections.list(
                 scope=scope,
-                after=after,
-                limit=query.limit,
+                page=replace(request, limit=query.limit - len(found)),
                 q=query.q,
                 kind=query.kind,
             )
-            found.extend(
-                [c for c in batch if await self._holds(c, item_id, holding, scope)]
+            found.extend(await self._holding(batch.items, item_id, holding, scope))
+            if batch.next is None:
+                return Page(items=found)
+            request = replace(request, after=batch.next)
+            if len(found) == query.limit:
+                more = await self._any_holding(query, request, item_id, holding, scope)
+                return Page(items=found, next=request.after if more else None)
+
+    async def _any_holding(
+        self,
+        query: ListCollectionsQuery,
+        request: PageRequest,
+        item_id: uuid.UUID,
+        holding: set[uuid.UUID],
+        scope: ContentFilter,
+    ) -> bool:
+        """Whether any collection from `request` onwards holds the item."""
+        request = replace(request, limit=query.limit)
+        while True:
+            batch = await self._repos.collections.list(
+                scope=scope, page=request, q=query.q, kind=query.kind
             )
-            if len(batch) < query.limit:
-                break
-            after = batch[-1].id
-        return found[: query.limit]
+            if await self._holding(batch.items, item_id, holding, scope):
+                return True
+            if batch.next is None:
+                return False
+            request = replace(request, after=batch.next)
+
+    async def _holding(
+        self,
+        collections: list[Collection],
+        item_id: uuid.UUID,
+        holding: set[uuid.UUID],
+        scope: ContentFilter,
+    ) -> list[Collection]:
+        """The collections the item is in."""
+        return [c for c in collections if await self._holds(c, item_id, holding, scope)]
 
     async def _holds(
         self,

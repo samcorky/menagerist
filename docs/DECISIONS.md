@@ -1963,3 +1963,17 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Ties break on `id` in the direction of `order`, and empty values sort last in both directions.** That keeps one comparison for the cursor to resume from, instead of one per direction.
 - **`q` matches ignoring case and accents,** as collections and the main search do. The presets list still uses a plain case-insensitive match; it moves over when `q` is rolled out (#624).
 - **The lint rule `menagerist-list-paging-parameters` warns** while a route that pages lacks `limit`, `sort` or `order`. Its baseline counts the 10 routes that do not yet have them; the roll-out (#622, #623) lowers it to zero, and it becomes an error then.
+
+## How the list cursor and the shared keyset helpers work (2026-11-26)
+
+**Decision:** The cursor carries the last row's sort value as well as its id; a repository returns a `Page` holding the rows and the next cursor; and the keyset logic lives in two twin helpers, `shared_kernel/paging.py` (in memory) and `platform/keyset.py` (SQL). Collections is the reference route (#621).
+
+- **The cursor carries the value,** not just the id with a lookup of the row's current value, which the recently deleted lists did. A row that was deleted or edited between pages does not move or lose the position, and the page needs no second query. The cost is a longer cursor that is only good for the `sort` and `order` that made it.
+- **The cursor holds lists** (`s`, `o`, `k`), one entry per key, so sorting by several keys (#799) does not change its format.
+- **Not signed:** it conveys no authority, since the scope filter applies to every page. Values are type-checked against the key before they reach the database, so a forged cursor is a 400, not a 500.
+- **A bare id stays a valid cursor** for the default order. The frontend still pages collections by passing the last row's id, and links made before sorting existed keep working.
+- **Text keys sort by `lower(column)`, and the cursor value is read from the database,** as an extra column of the same query, not recomputed in Python. Python and PostgreSQL disagree on lower-casing some characters, and a cursor that differs from what the next comparison sees would repeat or skip a row. The in-memory twin lower-cases in Python, so the two can differ on such characters, but each is consistent with itself.
+- **The repository returns the next cursor,** from a `limit + 1` fetch inside the helper, so a router no longer fetches one extra row and builds the `Link` itself. The router sets `Link` from `result.next`.
+- **A list filtered after paging** (collections holding an item) fetches only as many rows as the page still needs, so the last batch's cursor is the cursor of the last row kept, and it checks that a later row passes the filter before giving a `next`, so the last page never points to an empty one.
+- **Empty values sort last in both directions,** with a single keyset condition per key: `(v > k) OR v IS NULL` ascending, `(v < k) OR v IS NULL` descending, and `v IS NULL` with the id after it inside the empty tail.
+- **Mixed-direction sorts** are not indexed. Single-key sorts on large lists may want an index on the key and id; add one when a list needs it.

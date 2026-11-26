@@ -22,6 +22,7 @@ from app.entrypoints.api.shared.http.parameters import (
     PAGE_LIMIT_DESCRIPTION,
     NodeId,
     PageAfter,
+    SearchPageParams,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
@@ -69,6 +70,7 @@ from app.modules.collections.application.get_collection import (
     GetCollectionQuery,
 )
 from app.modules.collections.application.list_collections import (
+    CollectionSort,
     ListCollections,
     ListCollectionsQuery,
 )
@@ -101,6 +103,7 @@ from app.modules.collections.domain.errors import (
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ConflictError, ValidationError
+from app.shared_kernel.paging import decode_cursor
 
 router = APIRouter(
     prefix="/collections", tags=["Collections"], route_class=PermissionAwareRoute
@@ -208,8 +211,7 @@ async def list_collections(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    after: PageAfter = None,
-    limit: Annotated[int, Query(ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)] = 50,
+    page: Annotated[SearchPageParams[CollectionSort], Query()],
     item_id: Annotated[
         uuid.UUID | None,
         Query(
@@ -218,15 +220,6 @@ async def list_collections(
                 + "smart ones whose definition matches it. Each smart collection is "
                 + "checked, so pass `kind=manual` where smart ones are not wanted."
             )
-        ),
-    ] = None,
-    q: Annotated[
-        str | None,
-        Query(
-            max_length=200,
-            description=(
-                "Keep collections whose name or description contains this text."
-            ),
         ),
     ] = None,
     kind: Annotated[
@@ -242,20 +235,19 @@ async def list_collections(
     """List collections with item counts, optionally only those an item is in."""
     result = await use_case.handle(
         ListCollectionsQuery(
-            after=after,
-            limit=limit + 1,
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
             item_id=item_id,
-            q=q,
+            q=page.q,
             kind=kind,
         ),
         actor,
     )
-    summaries = result.items
-    if len(summaries) > limit:
-        response.headers["Link"] = link_next_header(
-            request, str(summaries[limit - 1].collection.id)
-        )
-    return [CollectionResponse.from_domain(s) for s in summaries[:limit]]
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
+    return [CollectionResponse.from_domain(s) for s in result.items]
 
 
 @router.get(

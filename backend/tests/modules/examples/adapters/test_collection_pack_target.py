@@ -26,6 +26,7 @@ from app.modules.transfer.domain.entity_kind import EntityKind
 from app.modules.transfer.ports.targets import RemoveResult
 from app.shared_kernel.content_filter import ContentFilter
 from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.paging import PageRequest
 
 if TYPE_CHECKING:
     from app.modules.collections.ports.unit_of_work import CollectionsRepos
@@ -159,10 +160,9 @@ async def test_a_failed_item_add_leaves_no_collection_behind(
 
     assert (
         await rig.repos.collections.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
 
 
 async def test_an_item_on_a_live_collection_is_user_data(
@@ -247,10 +247,9 @@ async def test_a_definition_the_collections_check_refuses_creates_nothing(
 
     assert (
         await rig.repos.collections.list(
-            scope=ContentFilter.everyone(), after=None, limit=10
+            scope=ContentFilter.everyone(), page=PageRequest(limit=10)
         )
-        == []
-    )
+    ).items == []
 
 
 async def test_the_install_checker_is_the_one_the_collection_routes_use() -> None:

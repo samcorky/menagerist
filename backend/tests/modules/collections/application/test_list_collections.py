@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from app.modules.collections.application.list_collections import (
+    CollectionSort,
     ListCollections,
     ListCollectionsQuery,
 )
@@ -18,6 +19,7 @@ from app.modules.collections.domain.collection import (
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.paging import Cursor, SortOrder
 
 if TYPE_CHECKING:
     from tests.modules.collections.conftest import MakeCollection, World
@@ -67,7 +69,9 @@ async def test_list_pages_with_after_and_limit(
 
     first = await _handler(world).handle(ListCollectionsQuery(limit=2), SYSTEM_ACTOR)
     second = await _handler(world).handle(
-        ListCollectionsQuery(limit=2, after=first.items[-1].collection.id),
+        ListCollectionsQuery(
+            limit=2, after=Cursor.after_id(first.items[-1].collection.id)
+        ),
         SYSTEM_ACTOR,
     )
 
@@ -124,7 +128,9 @@ async def test_list_filter_fills_page_across_non_matching(
     )
     second = await _handler(world).handle(
         ListCollectionsQuery(
-            item_id=item_id, limit=2, after=first.items[-1].collection.id
+            item_id=item_id,
+            limit=2,
+            after=Cursor.after_id(first.items[-1].collection.id),
         ),
         SYSTEM_ACTOR,
     )
@@ -180,13 +186,17 @@ async def test_list_filter_matches_exact_multiple_of_batch(
     )
     second = await _handler(world).handle(
         ListCollectionsQuery(
-            item_id=item_id, limit=2, after=first.items[-1].collection.id
+            item_id=item_id,
+            limit=2,
+            after=Cursor.after_id(first.items[-1].collection.id),
         ),
         SYSTEM_ACTOR,
     )
     third = await _handler(world).handle(
         ListCollectionsQuery(
-            item_id=item_id, limit=2, after=second.items[-1].collection.id
+            item_id=item_id,
+            limit=2,
+            after=Cursor.after_id(second.items[-1].collection.id),
         ),
         SYSTEM_ACTOR,
     )
@@ -385,3 +395,82 @@ async def test_item_id_skips_a_smart_collection_with_no_definition(
     )
 
     assert result.items == []
+
+
+async def test_list_gives_the_next_cursor_only_when_more_follow(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """A full page that ends the list has no `next`; one with more behind it has."""
+    shelves = await _add_shelves(world, make_collection, 3)
+
+    first = await _handler(world).handle(ListCollectionsQuery(limit=2), SYSTEM_ACTOR)
+    assert first.next is not None
+    second = await _handler(world).handle(
+        ListCollectionsQuery(limit=2, after=first.next), SYSTEM_ACTOR
+    )
+
+    assert [s.collection for s in first.items] == shelves[:2]
+    assert [s.collection for s in second.items] == shelves[2:]
+    assert second.next is None
+
+
+async def test_list_sorts_by_a_key_and_a_direction(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """`sort` and `order` reach the repository, and the cursor resumes in that order."""
+    for name in ["banana", "Apple", "cherry"]:
+        await world.collections.add(make_collection(name=name))
+
+    first = await _handler(world).handle(
+        ListCollectionsQuery(limit=2, sort=CollectionSort.NAME, order=SortOrder.DESC),
+        SYSTEM_ACTOR,
+    )
+    assert first.next is not None
+    second = await _handler(world).handle(
+        ListCollectionsQuery(
+            limit=2, sort=CollectionSort.NAME, order=SortOrder.DESC, after=first.next
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert [s.collection.name for s in first.items] == ["cherry", "banana"]
+    assert [s.collection.name for s in second.items] == ["Apple"]
+
+
+async def test_list_filter_gives_next_only_when_a_later_collection_holds_the_item(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """The last page that holds the item does not point to an empty page."""
+    shelves = await _add_shelves(world, make_collection, 6)
+    item_id = uuid.uuid7()
+    for shelf in (shelves[0], shelves[2], shelves[5]):
+        await _hold(world, shelf, item_id)
+
+    first = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item_id, limit=2), SYSTEM_ACTOR
+    )
+    assert first.next is not None
+    second = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item_id, limit=2, after=first.next), SYSTEM_ACTOR
+    )
+
+    assert [s.collection for s in first.items] == [shelves[0], shelves[2]]
+    assert [s.collection for s in second.items] == [shelves[5]]
+    assert second.next is None
+
+
+async def test_list_filter_has_no_next_when_the_rest_do_not_hold_the_item(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """A full page followed only by other collections is the last page."""
+    shelves = await _add_shelves(world, make_collection, 5)
+    item_id = uuid.uuid7()
+    for shelf in shelves[:2]:
+        await _hold(world, shelf, item_id)
+
+    result = await _handler(world).handle(
+        ListCollectionsQuery(item_id=item_id, limit=2), SYSTEM_ACTOR
+    )
+
+    assert [s.collection for s in result.items] == shelves[:2]
+    assert result.next is None

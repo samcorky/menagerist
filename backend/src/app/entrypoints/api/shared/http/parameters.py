@@ -14,9 +14,16 @@ from typing import Annotated
 from fastapi import Header, Path, Query
 from pydantic import BaseModel, Field
 
+from app.shared_kernel.paging import SortOrder
+
 PAGE_AFTER_DESCRIPTION = (
     "Id of the last row of the previous page. Leave it out for the first page;"
     + " the `Link` header of each page carries the next one."
+)
+PAGE_CURSOR_DESCRIPTION = (
+    "Where the previous page ended. Leave it out for the first page; the `Link` header"
+    + " of each page carries the next one. Pass it back unchanged, with the same"
+    + " `sort` and `order`."
 )
 PAGE_LIMIT_DESCRIPTION = "Most rows to return on this page."
 
@@ -33,13 +40,6 @@ PAGE_SEARCH_DESCRIPTION = (
 )
 
 
-class SortOrder(StrEnum):
-    """The direction of a list's `order` parameter."""
-
-    ASC = "asc"
-    DESC = "desc"
-
-
 class PageParams[Sort: StrEnum](BaseModel):
     """The paging parameters every list route shares, as one query model.
 
@@ -49,7 +49,7 @@ class PageParams[Sort: StrEnum](BaseModel):
     the route. A route with a different cap subclasses it and overrides `limit`.
     """
 
-    after: uuid.UUID | None = Field(None, description=PAGE_AFTER_DESCRIPTION)
+    after: str | None = Field(None, max_length=512, description=PAGE_CURSOR_DESCRIPTION)
     limit: int = Field(50, ge=1, le=100, description=PAGE_LIMIT_DESCRIPTION)
     sort: Sort | None = Field(None, description=PAGE_SORT_DESCRIPTION)
     order: SortOrder = Field(SortOrder.ASC, description=PAGE_ORDER_DESCRIPTION)
