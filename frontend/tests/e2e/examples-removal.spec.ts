@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { createItem, createItemType, uniqueName } from './helpers';
+import { createItem, createItemType, listAll, uniqueName } from './helpers';
 import { MOVIES, MUSIC, exampleData, install, openItem, remove } from './examples-helpers';
 
 /** Shared example packs need serial removal specs. */
@@ -81,10 +81,10 @@ test('keeps an example item that has your own connection', async ({ page }) => {
 
 	await page.goto('/items');
 	await page.getByPlaceholder('Search your items…').fill('');
-	const firstExample = await page.request
-		.get('/api/v1/nodes?limit=500')
-		.then((r) => r.json() as Promise<{ id: string; name: string; type: string | null }[]>)
-		.then((nodes) => nodes.find((n) => n.type?.startsWith('movies-')));
+	const firstExample = await listAll<{ id: string; name: string; type: string | null }>(
+		page.request,
+		'/api/v1/nodes'
+	).then((nodes) => nodes.find((n) => n.type?.startsWith('movies-')));
 	expect(firstExample).toBeTruthy();
 	ownNames.push(firstExample!.name);
 

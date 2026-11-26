@@ -4,7 +4,6 @@
 		createEdges,
 		listEdgeTypes,
 		listNodes,
-		listNodeTypes,
 		type EdgeTypeResponse,
 		type NodeResponse,
 		type NodeTypeResponse
@@ -12,6 +11,7 @@
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { itemCount, unknownItemIds } from '$lib/bulk-actions';
 	import { allowsItemType, parentsByType } from '$lib/connection-limits';
+	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -68,8 +68,8 @@
 		void listEdgeTypes({ query: { limit: 100 } }).then((r) => {
 			types = r.data ?? [];
 		});
-		void listNodeTypes({ query: { limit: 200 } }).then((r) => {
-			itemTypes = r.data ?? [];
+		void fetchAllNodeTypes().then((all) => {
+			itemTypes = all ?? [];
 		});
 	});
 

@@ -18,6 +18,26 @@ import {
  * to name the browser, and the dialog would otherwise cover whatever the test does next. Call
  * it before the sign-in click in any test that is not about naming devices.
  */
+/**
+ * Every row of a list, following the `Link` header's cursor a page at a time. A list
+ * never holds more than 100 rows a page, so a spec reads them all this way.
+ */
+export async function listAll<T>(request: APIRequestContext, path: string): Promise<T[]> {
+	const rows: T[] = [];
+	let after: string | null = null;
+	for (;;) {
+		const separator = path.includes('?') ? '&' : '?';
+		const cursor = after === null ? '' : `&after=${encodeURIComponent(after)}`;
+		const response = await request.get(`${path}${separator}limit=100${cursor}`);
+		if (!response.ok()) throw new Error(`GET ${path} answered ${response.status()}`);
+		rows.push(...((await response.json()) as T[]));
+		const next = /<([^>]*)>\s*;\s*rel="next"/.exec(response.headers()['link'] ?? '');
+		const match = next && /[?&]after=([^&#]*)/.exec(next[1]);
+		if (!match) return rows;
+		after = decodeURIComponent(match[1]);
+	}
+}
+
 export async function skipDeviceNamePrompt(page: Page): Promise<void> {
 	await page.addLocatorHandler(page.getByRole('dialog', { name: 'Name this device' }), (dialog) =>
 		dialog.getByRole('button', { name: 'Not now' }).click()
@@ -325,8 +345,7 @@ async function deleteTolerantOfReset(request: APIRequestContext, url: string) {
 export async function removeExamplePacks(request: APIRequestContext) {
 	for (const id of EXAMPLE_PACK_IDS)
 		await deleteTolerantOfReset(request, `/api/v1/examples/${id}/installation`);
-	const nodes = await request.get('/api/v1/nodes?limit=500');
-	for (const node of (await nodes.json()) as { id: string; type: string | null }[]) {
+	for (const node of await listAll<{ id: string; type: string | null }>(request, '/api/v1/nodes')) {
 		if (EXAMPLE_SLUG_PREFIXES.test(node.type ?? ''))
 			await deleteTolerantOfReset(request, `/api/v1/nodes/${node.id}`);
 	}

@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page } from './fixtures';
-import { ownedData, removeExamplePacks, settleHistory } from './helpers';
+import { ownedData, listAll, removeExamplePacks, settleHistory } from './helpers';
 
 export const MUSIC = /^Music/;
 export const MOVIES = /^Movies/;
@@ -33,8 +33,7 @@ export function exampleData() {
 		await removeExamplePacks(request);
 		// Collections made here, including a kept example collection that was edited.
 		await owned.cleanUp(request);
-		const nodes = await request.get('/api/v1/nodes?limit=500');
-		for (const node of (await nodes.json()) as { id: string; name: string }[]) {
+		for (const node of await listAll<{ id: string; name: string }>(request, '/api/v1/nodes')) {
 			if (ownNames.includes(node.name)) await request.delete(`/api/v1/nodes/${node.id}`);
 		}
 		ownNames.length = 0;
@@ -104,7 +103,7 @@ export type ApiNode = { id: string; name: string; type: string | null };
 export type ApiMedia = { id: string; filename: string; attribute_key: string | null };
 
 export async function nodesNamed(request: APIRequestContext, name: string): Promise<ApiNode[]> {
-	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as ApiNode[];
+	const nodes = await listAll<ApiNode>(request, '/api/v1/nodes');
 	return nodes.filter((n) => n.name === name);
 }
 

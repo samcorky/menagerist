@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from './fixtures';
-import { ownedData, uniqueName } from './helpers';
+import { listAll, ownedData, uniqueName } from './helpers';
 
 /**
  * Importing a CSV into an item type: choose the file and type, match columns, preview, add.
@@ -11,10 +11,7 @@ let prefix = '';
 const edgeTypeIds: string[] = [];
 
 test.afterEach(async ({ request }) => {
-	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
-		id: string;
-		name: string;
-	}[];
+	const nodes = await listAll<{ id: string; name: string }>(request, '/api/v1/nodes');
 	for (const node of nodes.filter((n) => n.name.startsWith(prefix))) {
 		await request.delete(`/api/v1/nodes/${node.id}`);
 	}
@@ -275,10 +272,7 @@ test('a re-import keyed by ID adds only new rows and keeps deletions', async ({
 	await expect(page).toHaveURL(/\/items$/);
 
 	// A row deleted after importing stays out until it is brought back.
-	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
-		id: string;
-		name: string;
-	}[];
+	const nodes = await listAll<{ id: string; name: string }>(request, '/api/v1/nodes');
 	const prowse = nodes.find((n) => n.name === `${prefix} Prowse`)!;
 	expect((await request.delete(`/api/v1/nodes/${prowse.id}`)).ok()).toBeTruthy();
 
@@ -330,8 +324,7 @@ test('a column connects rows to items by name, once, and deletions stay deleted'
 		await page.getByLabel('Recognise rows already imported by').selectOption({ label: 'ID' });
 		await page.getByRole('button', { name: 'Preview' }).click();
 	};
-	const nodes = async () =>
-		(await (await request.get('/api/v1/nodes?limit=500')).json()) as { id: string; name: string }[];
+	const nodes = async () => listAll<{ id: string; name: string }>(request, '/api/v1/nodes');
 	const edgesOf = async (id: string) =>
 		(await (await request.get(`/api/v1/edges?node_id=${id}`)).json()) as Edge[];
 

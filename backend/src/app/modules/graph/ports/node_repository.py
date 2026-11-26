@@ -79,6 +79,27 @@ class NodeRepository(Protocol):
         """
         ...
 
+    async def page(
+        self,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        type: str | None = None,
+        q: str | None = None,
+        favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
+    ) -> Page[Node]:
+        """One page of non-deleted nodes, in the order `page` asks.
+
+        Filters as `list`. The sort keys are `name` (ignoring case and accents),
+        `type`, `created_at` and `updated_at`; with none, the order is by id.
+
+        Raises:
+            InvalidCursorError: `page.after` is from a different sort or order.
+        """
+        ...
+
     async def count(
         self,
         *,

@@ -15,7 +15,7 @@ from app.modules.graph.application.schema_meta import NAMESPACE
 from app.modules.graph.domain import reach as reach_rules
 from app.modules.graph.domain.query import ItemFieldUse, SearchHit, TypeCount
 from app.modules.graph.domain.reach import Reached
-from app.shared_kernel.paging import page_rows, timestamp_value
+from app.shared_kernel.paging import Page, page_rows, timestamp_value
 
 if TYPE_CHECKING:
     import builtins
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
-    from app.shared_kernel.paging import Page, PageRequest
+    from app.shared_kernel.paging import PageRequest
 
 
 def _sort_at(hit: SearchHit, *, index: int) -> str | float:
@@ -267,6 +267,41 @@ class InMemoryNodeRepository:
                 node for node in ordered if self._is_favourite(node, scope) == favourite
             ]
         return [self._viewed(node, scope) for node in ordered[:limit]]
+
+    async def page(
+        self,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        type: str | None = None,
+        q: str | None = None,
+        favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
+    ) -> Page[Node]:
+        """One page of non-deleted nodes, in the order `page` asks."""
+        found = [
+            node
+            for node in self._visible(scope)
+            if (ids is None or node.id in ids)
+            and (type is None or node.type == type)
+            and (q is None or text_matches(node, fold(q), attribute_search_exclusions))
+            and (favourite is None or self._is_favourite(node, scope) == favourite)
+        ]
+        paged = page_rows(
+            found,
+            page,
+            id_of=lambda node: node.id,
+            values={
+                "name": lambda node: fold(node.name),
+                "type": lambda node: None if node.type is None else node.type.lower(),
+                "created_at": lambda node: timestamp_value(node.created_at),
+                "updated_at": lambda node: timestamp_value(node.updated_at),
+            },
+        )
+        return Page(
+            items=[self._viewed(node, scope) for node in paged.items], next=paged.next
+        )
 
     async def count(
         self,

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './fixtures';
-import { uniqueName } from './helpers';
+import { listAll, uniqueName } from './helpers';
 import {
 	FAMILY_NIGHT_ITEMS,
 	GAMES,
@@ -83,9 +83,7 @@ test('removing a pack removes its collections and items', async ({ page, request
 	for (const { name } of GAME_COLLECTIONS) {
 		await expect(collectionCard(page, name)).toHaveCount(0);
 	}
-	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
-		type: string | null;
-	}[];
+	const nodes = await listAll<{ type: string | null }>(request, '/api/v1/nodes');
 	expect(nodes.some((n) => n.type?.startsWith('games-'))).toBe(false);
 });
 
@@ -123,10 +121,7 @@ test('an example item on your own collection is kept when the pack goes', async 
 }) => {
 	const own = await makeCollection(request, uniqueName('My games'));
 	await install(page, GAMES);
-	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as {
-		id: string;
-		name: string;
-	}[];
+	const nodes = await listAll<{ id: string; name: string }>(request, '/api/v1/nodes');
 	const orchard = nodes.find((n) => n.name === 'Pocket Orchard');
 	expect(orchard).toBeTruthy();
 	await addToCollection(request, own.id, [orchard!.id]);
@@ -149,8 +144,7 @@ test('reinstalling after keeping items adopts them instead of duplicating', asyn
 }) => {
 	const renamed = uniqueName('Edited night');
 	await installEditAndRemoveGames(page, renamed);
-	const list = async () =>
-		(await (await request.get('/api/v1/nodes?limit=500')).json()) as { name: string }[];
+	const list = async () => listAll<{ name: string }>(request, '/api/v1/nodes');
 	expect((await list()).filter((n) => n.name === 'Lantern Harbour')).toHaveLength(1);
 
 	await page.goto('/library/examples');

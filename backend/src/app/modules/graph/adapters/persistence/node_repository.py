@@ -55,8 +55,9 @@ from app.modules.graph.domain.query import (
     walk_conditions,
 )
 from app.modules.graph.domain.reach import Reached
-from app.platform.keyset import keyset_page, text_column, timestamp_column
+from app.platform.keyset import SortColumn, keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
+from app.shared_kernel.paging import Page, parse_text
 
 if TYPE_CHECKING:
     import builtins
@@ -64,7 +65,7 @@ if TYPE_CHECKING:
     import uuid
     from collections.abc import Mapping, Sequence
 
-    from sqlalchemy import ColumnElement, Result
+    from sqlalchemy import ColumnElement, Result, Select
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.sql import Executable
 
@@ -72,9 +73,21 @@ if TYPE_CHECKING:
     from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
     from app.shared_kernel.content_filter import ContentFilter
-    from app.shared_kernel.paging import Page, PageRequest
+    from app.shared_kernel.paging import PageRequest
 
 logger = structlog.get_logger()
+
+# What `page` can sort by; the names are fields of the API's item response. The name
+# folds case and accents like the search sort, so a list and a search agree.
+_SORT_COLUMNS = {
+    "name": SortColumn(
+        expr=func.lower(func.immutable_unaccent(NodeModel.name)).collate("C"),
+        parse=parse_text,
+    ),
+    "type": text_column(NodeModel.type),
+    "created_at": timestamp_column(NodeModel.created_at),
+    "updated_at": timestamp_column(NodeModel.updated_at),
+}
 
 # What `list_deleted` can sort by; the names are fields of the deleted item response.
 _DELETED_SORT_COLUMNS = {
@@ -256,6 +269,28 @@ class SqlAlchemyNodeRepository:
             return None
         return (await self._viewed([_to_domain(model)], scope))[0]
 
+    @staticmethod
+    def _filtered(
+        scope: ContentFilter,
+        *,
+        type: str | None,
+        q: str | None,
+        favourite: bool | None,
+        ids: collections.abc.Collection[uuid.UUID] | None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None,
+    ) -> Select[NodeModel]:
+        """The live nodes in `scope` that the list filters keep."""
+        stmt = select(NodeModel).where(_in_scope(scope))
+        if ids is not None:
+            stmt = stmt.where(_id_in(ids))
+        if type is not None:
+            stmt = stmt.where(NodeModel.type == type)
+        if q is not None:
+            stmt = stmt.where(search_clause(q, attribute_search_exclusions))
+        if favourite is not None:
+            stmt = stmt.where(favourite_clause(scope.user_id, favourite))
+        return stmt
+
     async def list(
         self,
         *,
@@ -272,25 +307,54 @@ class SqlAlchemyNodeRepository:
         logger.debug("listing nodes", after=after, limit=limit, type=type)
         if ids is not None and not ids:
             return []
-        stmt = (
-            select(NodeModel)
-            .where(_in_scope(scope))
-            .order_by(NodeModel.id)
-            .limit(limit)
+        stmt = self._filtered(
+            scope,
+            type=type,
+            q=q,
+            favourite=favourite,
+            ids=ids,
+            attribute_search_exclusions=attribute_search_exclusions,
         )
-        if ids is not None:
-            stmt = stmt.where(_id_in(ids))
-        if type is not None:
-            stmt = stmt.where(NodeModel.type == type)
+        stmt = stmt.order_by(NodeModel.id).limit(limit)
         if after is not None:
             stmt = stmt.where(NodeModel.id > after)
-        if q is not None:
-            stmt = stmt.where(search_clause(q, attribute_search_exclusions))
-        if favourite is not None:
-            stmt = stmt.where(favourite_clause(scope.user_id, favourite))
         await _jit_off_for_text(self._session, has_text=q is not None)
         result = await self._session.execute(stmt)
         return await self._viewed([_to_domain(m) for m in result.scalars()], scope)
+
+    async def page(
+        self,
+        *,
+        scope: ContentFilter,
+        page: PageRequest,
+        type: str | None = None,
+        q: str | None = None,
+        favourite: bool | None = None,
+        ids: collections.abc.Collection[uuid.UUID] | None = None,
+        attribute_search_exclusions: Mapping[str, Sequence[str]] | None = None,
+    ) -> Page[Node]:
+        """One page of non-deleted nodes, in the order `page` asks."""
+        logger.debug("paging nodes", page=page, type=type)
+        if ids is not None and not ids:
+            return Page(items=[])
+        stmt = self._filtered(
+            scope,
+            type=type,
+            q=q,
+            favourite=favourite,
+            ids=ids,
+            attribute_search_exclusions=attribute_search_exclusions,
+        )
+        await _jit_off_for_text(self._session, has_text=q is not None)
+        found = await keyset_page(
+            self._session,
+            stmt,
+            id_column=NodeModel.id,
+            columns=_SORT_COLUMNS,
+            request=page,
+            to_domain=_to_domain,
+        )
+        return Page(items=await self._viewed(found.items, scope), next=found.next)
 
     async def search(
         self,

@@ -2,6 +2,7 @@ import uuid
 from collections.abc import Callable  # noqa: TC003
 from dataclasses import dataclass, field, replace
 from datetime import date  # noqa: TC003
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
@@ -21,6 +22,7 @@ from app.modules.graph.domain.query import (
     InvalidQueryError,
     Query,
     ResolvedQuery,
+    SortKey,
     TextCondition,
     TypeCondition,
     TypeCount,
@@ -36,6 +38,13 @@ from app.shared_kernel.access import Access, Content
 
 # Needed at runtime: the CQRS signature test evaluates __init__ annotations.
 from app.shared_kernel.cqrs import QueryHandler
+from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.paging import (
+    Cursor as PageCursor,
+    InvalidCursorError,
+    PageRequest,
+    SortOrder,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -47,12 +56,31 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
+class NodeSort(StrEnum):
+    """What a list of items can be sorted by: fields of the response."""
+
+    NAME = "name"
+    TYPE = "type"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+# What the search engine can order a smart collection by.
+_SMART_SORTS = {
+    NodeSort.NAME: "name",
+    NodeSort.CREATED_AT: "created",
+    NodeSort.UPDATED_AT: "updated",
+}
+
+
 @dataclass(kw_only=True)
 class ListNodesQuery:
-    """Request for a page of node, ordered by id."""
+    """Request for a page of items, by id unless `sort` says otherwise."""
 
-    after: uuid.UUID | None = None
+    after: PageCursor | None = None
     limit: int = 50
+    sort: NodeSort | None = None
+    order: SortOrder = SortOrder.ASC
     type: str | None = None
     q: str | None = None
     favourite: bool | None = None
@@ -67,6 +95,7 @@ class ListNodesResult:
     total: int
     total_capped: bool = False
     covers: dict[uuid.UUID, str] = field(default_factory=dict)
+    next: PageCursor | None = None
 
 
 def _list_filters(query: ListNodesQuery) -> list[Condition]:
@@ -157,22 +186,75 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         where = _combine(resolved.query.where, _list_filters(query))
         return replace(resolved, query=Query(where=where))
 
+    @staticmethod
+    def _page_request(query: ListNodesQuery) -> PageRequest:
+        return PageRequest(
+            after=query.after,
+            limit=query.limit,
+            sort=None if query.sort is None else query.sort.value,
+            order=query.order,
+        )
+
+    @staticmethod
+    def _smart_sort(query: ListNodesQuery) -> tuple[SortKey, ...]:
+        """The search engine's ordering for a smart collection's list.
+
+        Raises:
+            ValidationError: The sort is one the engine cannot give, or a direction
+                is asked for without saying what to sort by.
+        """
+        if query.sort is None:
+            if query.order is SortOrder.DESC:
+                msg = "Say what to sort a smart collection by to list it newest first."
+                raise ValidationError(msg)
+            return ()
+        by = _SMART_SORTS.get(query.sort)
+        if by is None:
+            msg = "A smart collection sorts by name, created_at or updated_at."
+            raise ValidationError(msg)
+        return (SortKey(by=by, dir=query.order.value),)  # type: ignore[arg-type]
+
+    @staticmethod
+    def _smart_cursor(query: ListNodesQuery) -> Cursor | None:
+        """The search engine's cursor for `query.after`, checked against the sort."""
+        after = query.after
+        if after is None:
+            return None
+        numeric = query.sort in {NodeSort.CREATED_AT, NodeSort.UPDATED_AT}
+        for value in after.values:
+            if isinstance(value, bool) or not (
+                isinstance(value, int | float) if numeric else isinstance(value, str)
+            ):
+                msg = "The page cursor is not valid."
+                raise InvalidCursorError(msg)
+        return Cursor(sort_values=after.values, id=after.id)
+
     async def _list_smart(
         self,
         query: ListNodesQuery,
         definition: Mapping[str, Any],
         scope: ContentFilter,
     ) -> ListNodesResult:
-        """List a smart collection: its saved query AND the list filters, by id.
+        """List a smart collection: its saved query AND the list filters.
 
-        The saved sort is ignored so the id paging holds.
+        The saved sort is replaced by the list's own, by id unless `sort` is given.
         """
+        request = self._page_request(query)
+        request.check()
+        sort = self._smart_sort(query)
+        after = self._smart_cursor(query)
         combined = await self._smart_query(query, definition, scope)
         if combined is None:
             return ListNodesResult(items=[], total=0)
-        after = None if query.after is None else Cursor(sort_values=(), id=query.after)
+        combined = replace(combined, query=replace(combined.query, sort=sort))
         hits = await self._repos.nodes.search(
-            scope=scope, resolved=combined, after=after, limit=query.limit
+            scope=scope, resolved=combined, after=after, limit=request.size + 1
+        )
+        kept = hits[: request.size]
+        next_cursor = (
+            request.next_after(kept[-1].node.id, tuple(kept[-1].sort_values))
+            if kept and len(hits) > request.size
+            else None
         )
         cap = self._cap(query)
         counted = await self._repos.nodes.search_count(
@@ -182,7 +264,10 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         )
         total, capped = self._capped(counted, cap)
         return ListNodesResult(
-            items=[hit.node for hit in hits], total=total, total_capped=capped
+            items=[hit.node for hit in kept],
+            total=total,
+            total_capped=capped,
+            next=next_cursor,
         )
 
     async def count_exact(self, query: ListNodesQuery, scope: ContentFilter) -> int:
@@ -280,10 +365,9 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             await self._search_exclusions(scope) if query.q is not None else None
         )
         ids = None if source is None else source.ids
-        items = await self._repos.nodes.list(
+        page = await self._repos.nodes.page(
             scope=scope,
-            after=query.after,
-            limit=query.limit,
+            page=self._page_request(query),
             type=query.type,
             q=query.q,
             favourite=query.favourite,
@@ -302,7 +386,10 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         )
         total, capped = self._capped(counted, cap)
         result = await self._with_covers(
-            ListNodesResult(items=items, total=total, total_capped=capped), actor
+            ListNodesResult(
+                items=page.items, total=total, total_capped=capped, next=page.next
+            ),
+            actor,
         )
         logger.debug("nodes listed", count=len(result.items), total=result.total)
         return result

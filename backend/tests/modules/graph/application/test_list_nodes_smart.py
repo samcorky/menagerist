@@ -22,13 +22,20 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.application.count_nodes import CountNodes
-from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
+from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery, NodeSort
 from app.modules.graph.domain.errors import CollectionNotFoundError
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.node_type import NodeType
 from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.shared_kernel.access_guard import InMemoryAccessGuard
 from app.shared_kernel.actor import Actor
+from app.shared_kernel.errors import ValidationError
+from app.shared_kernel.paging import (
+    Cursor,
+    Cursor as PageCursor,
+    InvalidCursorError,
+    SortOrder,
+)
 
 ALICE = uuid.UUID(int=1)
 BOB = uuid.UUID(int=2)
@@ -182,11 +189,15 @@ async def test_pages_by_id_across_a_boundary(world: World) -> None:
         ListNodesQuery(collection=collection, limit=2), AS_ALICE
     )
     second = await world.use_case.handle(
-        ListNodesQuery(collection=collection, limit=2, after=first.items[-1].id),
+        ListNodesQuery(
+            collection=collection, limit=2, after=Cursor.after_id(first.items[-1].id)
+        ),
         AS_ALICE,
     )
     last = await world.use_case.handle(
-        ListNodesQuery(collection=collection, limit=2, after=second.items[-1].id),
+        ListNodesQuery(
+            collection=collection, limit=2, after=Cursor.after_id(second.items[-1].id)
+        ),
         AS_ALICE,
     )
 
@@ -304,3 +315,114 @@ async def test_count_exact_is_uncapped_and_scoped(world: World) -> None:
     assert await counter.handle(ListNodesQuery(collection=stale), AS_ALICE) == 0
     assert await counter.handle(ListNodesQuery(q="coin"), AS_ALICE) == 5
     assert await counter.handle(ListNodesQuery(q="coin"), AS_BOB) == 1
+
+
+async def _walk(
+    world: World, collection: uuid.UUID, sort: NodeSort, order: SortOrder
+) -> list[list[str]]:
+    """Follow `next` to the end, returning the names on each page."""
+    pages: list[list[str]] = []
+    after = None
+    while True:
+        result = await world.use_case.handle(
+            ListNodesQuery(
+                collection=collection, after=after, limit=2, sort=sort, order=order
+            ),
+            AS_ALICE,
+        )
+        pages.append([n.name for n in result.items])
+        if result.next is None:
+            return pages
+        after = result.next
+
+
+@pytest.mark.parametrize("order", list(SortOrder))
+@pytest.mark.parametrize(
+    "sort", [NodeSort.NAME, NodeSort.CREATED_AT, NodeSort.UPDATED_AT]
+)
+async def test_a_smart_collection_walks_every_sort_to_the_end(
+    world: World, sort: NodeSort, order: SortOrder
+) -> None:
+    """Following `next` visits each match once, in the order the key gives."""
+    for name in ["delta", "Alpha", "charlie", "bravo", "Echo"]:
+        await world.item(name, rating=5)
+    await world.item("Poor", rating=1)
+    collection = world.smart(_query(_rating("=", 5)))
+
+    pages = await _walk(world, collection, sort, order)
+    names = [n for page in pages for n in page]
+
+    assert len(names) == len(set(names)) == 5
+    assert len(pages) == 3
+    if sort is NodeSort.NAME:
+        expected = sorted(names, key=str.lower, reverse=order is SortOrder.DESC)
+        assert names == expected
+
+
+async def test_a_smart_collection_cannot_sort_by_type(world: World) -> None:
+    """The search engine has no type ordering, so the list says so."""
+    await world.item("Alien", rating=5)
+    collection = world.smart(_query(_rating("=", 5)))
+
+    with pytest.raises(ValidationError, match="name, created_at or updated_at"):
+        await world.use_case.handle(
+            ListNodesQuery(collection=collection, sort=NodeSort.TYPE), AS_ALICE
+        )
+
+
+async def test_a_smart_collection_needs_a_sort_to_list_newest_first(
+    world: World,
+) -> None:
+    """`order=desc` alone has no engine ordering to map to, so it is refused."""
+    await world.item("Alien", rating=5)
+    collection = world.smart(_query(_rating("=", 5)))
+
+    with pytest.raises(ValidationError, match="Say what to sort"):
+        await world.use_case.handle(
+            ListNodesQuery(collection=collection, order=SortOrder.DESC), AS_ALICE
+        )
+
+
+async def test_a_smart_collection_refuses_a_cursor_from_another_sort(
+    world: World,
+) -> None:
+    """The cursor has to match the sort that made it."""
+    for name in ["a", "b", "c"]:
+        await world.item(name, rating=5)
+    collection = world.smart(_query(_rating("=", 5)))
+    first = await world.use_case.handle(
+        ListNodesQuery(collection=collection, limit=1, sort=NodeSort.NAME), AS_ALICE
+    )
+    assert first.next is not None
+
+    with pytest.raises(InvalidCursorError):
+        await world.use_case.handle(
+            ListNodesQuery(collection=collection, after=first.next), AS_ALICE
+        )
+
+
+@pytest.mark.parametrize(
+    ("sort", "value"),
+    [
+        (NodeSort.NAME, 5.0),
+        (NodeSort.CREATED_AT, "yesterday"),
+        (NodeSort.UPDATED_AT, True),
+    ],
+)
+async def test_a_smart_collection_refuses_a_cursor_value_of_the_wrong_kind(
+    world: World, sort: NodeSort, value: object
+) -> None:
+    """A forged cursor value is a 400, not an error from the database."""
+    await world.item("a", rating=5)
+    collection = world.smart(_query(_rating("=", 5)))
+    forged = PageCursor(
+        sort=(sort.value,),
+        order=(SortOrder.ASC,),
+        values=(value,),  # type: ignore[arg-type]
+        id=uuid.uuid7(),
+    )
+
+    with pytest.raises(InvalidCursorError):
+        await world.use_case.handle(
+            ListNodesQuery(collection=collection, after=forged, sort=sort), AS_ALICE
+        )

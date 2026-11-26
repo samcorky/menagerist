@@ -3,6 +3,7 @@ import {
 	asUser,
 	createUserViaApi,
 	type E2EUser,
+	listAll,
 	openSearch,
 	removeExamplePacks,
 	searchPopup,
@@ -213,9 +214,7 @@ test('each user installs the same example pack and sees only their own copy', as
 		}
 
 		const idsOf = async (api: APIRequestContext) => {
-			const nodes = await json<{ id: string; type: string | null }[]>(
-				await api.get('/api/v1/nodes?limit=500')
-			);
+			const nodes = await listAll<{ id: string; type: string | null }>(api, '/api/v1/nodes');
 			return nodes.filter((n) => slugPrefix.test(n.type ?? '')).map((n) => n.id);
 		};
 		const idsA = await idsOf(a.request);

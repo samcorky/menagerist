@@ -22,6 +22,7 @@ from app.entrypoints.api.shared.http.parameters import (
     NodeId,
     PageAfter,
     PageLimit,
+    PageParams,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.http.rate_limit import (
@@ -97,7 +98,7 @@ from app.modules.graph.application.list_item_fields import (
     ListItemFields,
     ListItemFieldsQuery,
 )
-from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery
+from app.modules.graph.application.list_nodes import ListNodes, ListNodesQuery, NodeSort
 from app.modules.graph.application.promote_extra_schema_field import (
     PromoteExtraSchemaField,
     PromoteExtraSchemaFieldCommand,
@@ -670,14 +671,19 @@ async def list_nodes(
     request: Request,
     response: Response,
     filters: NodeFiltersDep,
-    after: PageAfter = None,
-    limit: PageLimit = 50,
+    page: Annotated[PageParams[NodeSort], Query()],
 ) -> list[NodeResponse]:
-    """List node, paginated by id."""
+    """List items, by id unless sorted.
+
+    A smart collection sorts by `name`, `created_at` or `updated_at`; sorting it
+    newest first needs a `sort` to go with `order=desc`.
+    """
     result = await use_case.handle(
         ListNodesQuery(
-            after=after,
-            limit=limit + 1,
+            after=None if page.after is None else decode_cursor(page.after),
+            limit=page.limit,
+            sort=page.sort,
+            order=page.order,
             type=filters.type,
             q=filters.q,
             favourite=filters.favourite,
@@ -685,17 +691,15 @@ async def list_nodes(
         ),
         actor,
     )
-    if len(result.items) > limit:
-        response.headers["Link"] = link_next_header(
-            request, str(result.items[limit - 1].id)
-        )
+    if result.next is not None:
+        response.headers["Link"] = link_next_header(request, result.next.encode())
     response.headers["Total-Count"] = str(result.total)
     if result.total_capped:
         response.headers["Total-Count-Capped"] = "true"
 
     return [
         NodeResponse.from_domain(node, cover_thumbnail_url=result.covers.get(node.id))
-        for node in result.items[:limit]
+        for node in result.items
     ]
 
 

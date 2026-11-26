@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { createItem, createItemType, uniqueName } from './helpers';
+import { createItem, createItemType, listAll, uniqueName } from './helpers';
 import { MUSIC, exampleData, install, openItem, remove } from './examples-helpers';
 
 /** Example packs are shared, so these specs stay serial. */
@@ -154,7 +154,7 @@ test('a clashing item type slug is shown before adding and creates nothing', asy
 	await preview.getByRole('button', { name: 'Cancel' }).click();
 	await expect(page.getByRole('button', { name: /^Add Music/ })).toBeVisible();
 
-	const nodes = (await (await request.get('/api/v1/nodes?limit=500')).json()) as { name: string }[];
+	const nodes = await listAll<{ name: string }>(request, '/api/v1/nodes');
 	expect(nodes.some((n) => n.name === 'Night Drive')).toBe(false);
 	const types = (await (await request.get('/api/v1/node-types?limit=100')).json()) as {
 		slug: string;
