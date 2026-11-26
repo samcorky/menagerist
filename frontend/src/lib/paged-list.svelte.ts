@@ -139,6 +139,15 @@ export class PagedList<T, P> {
 		return read === null ? Promise.resolve() : this.#read(read.index, read.after, read.start);
 	}
 
+	/**
+	 * How many rows the list holds, for a heading: the server's count, or the rows when they
+	 * all fit on one page; null when the list has more pages and the server sent no count.
+	 */
+	get count(): number | null {
+		if (this.total !== null) return this.total;
+		return this.pageIndex === 0 && !this.hasMore && !this.loading ? this.rows.length : null;
+	}
+
 	/** `page`: the first row's place in the whole list, from 1; null with no rows. */
 	get from(): number | null {
 		return this.rows.length === 0 ? null : this.#starts[this.pageIndex] + 1;

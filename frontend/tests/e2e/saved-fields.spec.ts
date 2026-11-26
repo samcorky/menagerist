@@ -74,3 +74,54 @@ test('Try it opens a live example under the row', async ({ page, request }) => {
 		await request.delete(`/api/v1/presets/${list.id}`);
 	}
 });
+
+test('a section with more than ten rows pages with Previous and Next, newest first', async ({
+	page,
+	request
+}) => {
+	test.setTimeout(120_000);
+	const prefix = uniqueName('Paged').replace(/\W+/g, '');
+	const ids: string[] = [];
+	try {
+		for (let n = 1; n <= 12; n++) {
+			const res = await request.post('/api/v1/presets', {
+				data: {
+					kind: 'choice_list',
+					label: `${prefix} ${String(n).padStart(2, '0')}`,
+					definition: { options: ['a', 'b'] }
+				}
+			});
+			expect(res.status(), await res.text()).toBe(201);
+			ids.push(((await res.json()) as { id: string }).id);
+		}
+
+		await page.goto('/library/saved-fields');
+		// Other specs share this database, so only the shape of the range is fixed.
+		const nav = page.getByRole('navigation', { name: 'Saved list pages' });
+		const range = nav.getByTestId('page-range');
+		const previous = nav.getByRole('button', { name: 'Previous' });
+		const next = nav.getByRole('button', { name: 'Next' });
+
+		await expect(range).toHaveText(/^1–10 (of \d+ )?saved lists$/);
+		// Newest first: the last one made leads, and the first one made is on a later page.
+		await expect(page.getByRole('listitem').filter({ hasText: `${prefix} 12` })).toBeVisible();
+		await expect(previous).toBeDisabled();
+		await expect(next).toBeEnabled();
+		const shots = process.env.SHOTS_DIR;
+		if (shots) {
+			await nav.scrollIntoViewIfNeeded();
+			await page.screenshot({ path: `${shots}/saved-fields-paged.png` });
+		}
+
+		await next.click();
+		await expect(range).toHaveText(/^11–\d+ (of \d+ )?saved lists$/);
+		await expect(page.getByRole('listitem').filter({ hasText: `${prefix} 12` })).toHaveCount(0);
+		await expect(previous).toBeEnabled();
+
+		await previous.click();
+		await expect(range).toHaveText(/^1–10 (of \d+ )?saved lists$/);
+		await expect(page.getByRole('listitem').filter({ hasText: `${prefix} 12` })).toBeVisible();
+	} finally {
+		for (const id of ids) await request.delete(`/api/v1/presets/${id}`);
+	}
+});

@@ -382,3 +382,26 @@ describe('PagedList, when a read goes wrong', () => {
 		expect(list.failure?.error).toBeInstanceOf(TypeError);
 	});
 });
+
+describe('PagedList.count', () => {
+	it("is the server's count when it sends one", async () => {
+		const list = new PagedList<Row, { q: string }>(route(5, 2).fetchPage, { mode: 'page' });
+		await list.load({ q: '' });
+		expect(list.count).toBe(5);
+	});
+
+	it('is the rows when they fit one page and the server sent no count', async () => {
+		const list = new PagedList<Row, { q: string }>(async () => page(rows(0, 3)), { mode: 'page' });
+		expect(list.count).toBeNull();
+		await list.load({ q: '' });
+		expect(list.count).toBe(3);
+	});
+
+	it('is unknown with more pages and no count from the server', async () => {
+		const list = new PagedList<Row, { q: string }>(async () => page(rows(0, 2), { next: 'c2' }), {
+			mode: 'page'
+		});
+		await list.load({ q: '' });
+		expect(list.count).toBeNull();
+	});
+});
