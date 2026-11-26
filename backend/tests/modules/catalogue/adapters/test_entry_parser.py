@@ -89,6 +89,30 @@ def test_an_item_type_may_carry_fields_an_icon_and_a_colour() -> None:
     )
 
 
+def test_an_item_type_may_name_a_parent_by_slug() -> None:
+    """The parent is another type in the entry; left out, there is none."""
+    data = _types_entry()
+    data["itemTypes"].append(
+        {"slug": "student", "label": "Student", "parent": "person"}
+    )
+
+    person, student = parse_entry(data).item_types
+
+    assert (person.parent, student.parent) == (None, "person")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [{"parent": 3}, {"parent": ""}, {"parent": "nobody"}, {"parent": "student"}],
+)
+def test_a_parent_that_cannot_be_used_is_rejected(change: dict[str, Any]) -> None:
+    """A parent is non-blank text naming a different type in the same entry."""
+    data = _types_entry()
+    data["itemTypes"].append({"slug": "student", "label": "Student", **change})
+    with pytest.raises(InvalidEntryError):
+        parse_entry(data)
+
+
 @pytest.mark.parametrize(
     "change", [{"attributesSchema": []}, {"icon": ""}, {"colour": 3}]
 )

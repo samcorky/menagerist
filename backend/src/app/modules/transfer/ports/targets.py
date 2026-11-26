@@ -151,15 +151,26 @@ class GraphTarget(Protocol):
         ...
 
     async def create_item_type(
-        self, spec: BundleItemType, presets: Mapping[str, uuid.UUID]
+        self,
+        spec: BundleItemType,
+        presets: Mapping[str, uuid.UUID],
+        *,
+        parent_slug: str | None = None,
     ) -> Created:
-        """Create the item type, resolving `$preset` markers with `presets`."""
+        """Create the item type, resolving `$preset` markers with `presets`.
+
+        `parent_slug` is the slug of the person's item type it becomes a subtype of;
+        `spec.parent` names that type by its ref in the bundle, which this cannot see.
+        """
         ...
 
     async def read_item_types(
         self, type_ids: Sequence[uuid.UUID]
     ) -> list[BundleItemType]:
         """Return the person's item types with `type_ids`, in order; `ref` is the id.
+
+        The parent of a subtype comes too, after those asked for, and the subtype's
+        `parent` is its id, so the file stands alone.
 
         A field that uses a saved list names it as a `$preset` marker whose ref is
         the list's id, so a bundle that holds the list can resolve it again.

@@ -34279,6 +34279,18 @@
             ],
             "title": "Colour",
             "description": "Its colour name."
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent",
+            "description": "The `ref` of the item type this is a subtype of, which is in the same file and is not itself a subtype; null for a top-level type."
           }
         },
         "additionalProperties": false,

@@ -851,14 +851,18 @@ class _Applier:
                 await self._made(kind, spec.ref, spec.label, created)
 
     async def item_types(self) -> None:
-        """Create the item types the plan marks `create`."""
-        for spec in self._bundle.item_types:
-            self._type_slugs[spec.ref] = spec.slug
+        """Create the item types the plan marks `create`, parents before subtypes."""
+        specs = self._bundle.item_types
+        self._type_slugs.update({spec.ref: spec.slug for spec in specs})
+        for spec in sorted(specs, key=lambda s: s.parent is not None):
             kind = EntityKind.ITEM_TYPE
             if (adoption := self._adoption(kind, spec.ref)) is not None:
                 await self._took_back(adoption, spec.ref, spec.label)
             elif self._creating(kind, spec.ref):
-                created = await self._graph.create_item_type(spec, self._preset_ids)
+                parent_slug = self._type_slugs[spec.parent] if spec.parent else None
+                created = await self._graph.create_item_type(
+                    spec, self._preset_ids, parent_slug=parent_slug
+                )
                 await self._made(kind, spec.ref, spec.label, created)
 
     async def items(self) -> None:

@@ -63,7 +63,9 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
     schema = _schema(row, "attributes_schema")
     description = _optional_text(row, "description")
     if table == "node_types":
-        entity: NodeType | EdgeType = NodeType.create(
+        # A backup from before parent types has no such column.
+        parent = _optional_text(row, "parent")
+        node_type = NodeType.create(
             owner_id=SYSTEM_ACTOR.id,
             slug=slug,
             label=label,
@@ -71,7 +73,11 @@ def _validate_type(table: str, row: Mapping[str, object]) -> None:
             attributes_schema=schema,
             icon=_optional_text(row, "icon"),
             colour=_optional_text(row, "colour"),
+            parent=parent,
         )
+        if node_type.parent != parent:
+            raise ValueError("parent must be normalised")
+        entity: NodeType | EdgeType = node_type
     else:
         directional = row["directional"]
         if not isinstance(directional, bool):

@@ -195,8 +195,8 @@ def test_a_version_two_file_carries_types() -> None:
     assert [(r.reverse_label, r.directional) for r in bundle.relationship_types] == [
         ("Written by", False)
     ]
-    # A file from before `holder` or the item type limits reads as holding nothing
-    # and limiting nothing, and says so when written.
+    # A file from before `holder`, the item type limits or `parent` reads as holding
+    # nothing, limiting nothing and having no parent, and says so when written.
     assert CODEC.encode(bundle) == {
         **data,
         "version": 3,
@@ -204,6 +204,7 @@ def test_a_version_two_file_carries_types() -> None:
             r | {"holder": "none", "source_types": [], "target_types": []}
             for r in data["relationship_types"]
         ],
+        "item_types": [t | {"parent": None} for t in data["item_types"]],
         "items": [],
         "connections": [],
         "collections": [],
@@ -241,6 +242,60 @@ def test_a_connection_types_item_type_limits_round_trip() -> None:
         ["book", "comic"],
         ["person"],
     )
+
+
+def _typed(*item_types: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "format": "menagerist-bundle",
+        "version": 3,
+        "presets": [],
+        "relationship_types": [],
+        "item_types": list(item_types),
+        "items": [],
+        "connections": [],
+        "collections": [],
+    }
+
+
+def test_an_item_types_parent_round_trips() -> None:
+    """`parent` is the ref of another type in the file, and is written back."""
+    data = _typed(
+        _type(ref="memo", slug="memo", label="Memo", parent=None),
+        _type(ref="poster", slug="poster", label="Poster", parent="memo"),
+    )
+
+    bundle = CODEC.decode(data)
+
+    assert [(t.ref, t.parent) for t in bundle.item_types] == [
+        ("memo", None),
+        ("poster", "memo"),
+    ]
+    written = CODEC.encode(bundle)["item_types"]
+    assert [(t["ref"], t["parent"]) for t in written] == [
+        ("memo", None),
+        ("poster", "memo"),
+    ]
+    again = CODEC.decode(CODEC.encode(bundle))
+    assert [(t.ref, t.parent) for t in again.item_types] == [
+        ("memo", None),
+        ("poster", "memo"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("parent", "message"),
+    [
+        (5, "parent must be text"),
+        ("Bad Ref", "parent must be lowercase"),
+        ("gone", "not in the file"),
+    ],
+)
+def test_a_malformed_or_unknown_parent_is_refused(parent: object, message: str) -> None:
+    """The parent must be text, a ref, and a type in the file."""
+    data = _typed(_type(ref="poster", slug="poster", label="Poster", parent=parent))
+
+    with pytest.raises(InvalidBundleError, match=message):
+        CODEC.decode(data)
 
 
 @pytest.mark.parametrize("limit", ["person", [1], {"a": "b"}])

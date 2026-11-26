@@ -83,6 +83,8 @@ def _item_types(value: object, where: str) -> tuple[BundleItemType, ...]:
                 ),
                 icon=_optional_text(item, "icon", where),
                 colour=_optional_text(item, "colour", where),
+                # A catalogue type's ref is its slug, so the parent is named by slug.
+                parent=_optional_text(item, "parent", where),
             )
         )
     return tuple(result)
