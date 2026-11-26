@@ -1834,3 +1834,16 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Backups:** rows are copied whole, so the column travels; a backup from before it has none, and reads as top-level. A restored row's parent must be text in normalised slug form.
 
 **Not checked on import:** whether a parent the person already has is itself a subtype, or shares a field key with the new subtype. That is the rule `CreateNodeType` applies, so the import stops with its message rather than repeating the check.
+
+## A connection type's limit on a parent type covers its subtypes (2026-11-25)
+
+**Decision:** An end limited to a parent item type accepts an item of that type or of any of its subtypes, and an end limited to a subtype accepts only that subtype (#320, #771). "Signed by" limited to Person takes a Collector subtype of Person; limited to Collector it does not take a plain Person. The server and the pickers apply the same rule.
+
+- **Server:** `CreateEdge` and `CreateEdges` check each item against the limit, and its type's parent when it has one (`check_item_types_fit` takes a slug-to-parent map). The map is read from the item type catalogue only when the connection type has a limit, and once per request, so a batch of many targets costs one read. The error message is unchanged: it names the limit the person set.
+- **Frontend:** `allowsItemType` and `fitsLimits` take the same map (`parentsByType`). The item page, bulk Connect and quick capture pass it. Bulk Connect no longer asks the server for a single allowed type when that type has subtypes, since that filter matches a type exactly.
+- **Editor:** the limit picker lists every type as before, and says a chosen parent covers its subtypes.
+
+**Choices that are not obvious:**
+
+- The limit stays what the person typed; nothing is expanded or stored. A subtype added to Person later is covered at once, and a limit never drifts from the types it names.
+- `EdgeType.fits` in the domain stays as it was: nothing uses it, and the domain cannot see other types, so the rule lives in the application layer where the types can be read.

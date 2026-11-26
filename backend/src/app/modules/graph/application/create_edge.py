@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import structlog
 
-from app.modules.graph.application._check_item_types import check_item_types_fit
+from app.modules.graph.application._check_item_types import (
+    check_item_types_fit,
+    load_type_parents,
+)
 from app.modules.graph.application._validate_attributes import validate_attributes
 from app.modules.graph.application.choice_lists import resolve_choice_lists
 from app.modules.graph.application.permissions import GraphPermission
@@ -78,7 +81,8 @@ class CreateEdge(CommandHandler[GraphUnitOfWork, CreateEdgeCommand, Edge]):
                     )
                 )
             else:
-                check_item_types_fit(edge_type, source, target)
+                parents = await load_type_parents(repos, edge_type, scope)
+                check_item_types_fit(edge_type, source, target, parents)
                 if edge_type.attributes_schema is not None:
                     schema = await resolve_choice_lists(
                         edge_type.attributes_schema, self._choice_lists

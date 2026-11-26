@@ -19,6 +19,8 @@
 	const id = $props.id();
 	const items = $derived(options.map((o) => ({ value: o.slug, label: o.label })));
 	const bySlug = $derived(new Map(options.map((o) => [o.slug, o])));
+	// A limit on a parent type covers its subtypes, which is worth saying once one is chosen.
+	const coversSubtypes = $derived(selected.some((slug) => options.some((o) => o.parent === slug)));
 </script>
 
 <!-- A type that no longer exists has no icon or colour, so it shows the generic one. -->
@@ -41,6 +43,12 @@
 		aria-describedby="{id}-hint"
 	/>
 	<p id="{id}-hint" class="text-xs text-muted-foreground">
-		{selected.length === 0 ? 'Any item.' : 'Only these item types.'}
+		{#if selected.length === 0}
+			Any item.
+		{:else if coversSubtypes}
+			Only these item types, and the subtypes of any that have them.
+		{:else}
+			Only these item types.
+		{/if}
 	</p>
 </div>

@@ -17,7 +17,7 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError, uploadErrorMessage } from '$lib/api/errors';
 	import { connectionBody, connectionChoices } from '$lib/capture-connection';
-	import { allowsItemType } from '$lib/connection-limits';
+	import { allowsItemType, parentsByType } from '$lib/connection-limits';
 	import * as Combobox from '$lib/components/ui/combobox/index.js';
 	import type { ComboboxItem } from '$lib/components/ui/combobox/index.js';
 	import TypePicker from '$lib/components/type-picker.svelte';
@@ -59,12 +59,13 @@
 	let searchSeq = 0;
 
 	// Only the readings the new item's type allows, and only items the other end allows.
-	const choices = $derived(connectionChoices(edgeTypes, selectedType));
+	const parentOfType = $derived(parentsByType(types));
+	const choices = $derived(connectionChoices(edgeTypes, selectedType, parentOfType));
 	const choice = $derived(choices.find((c) => c.key === connectionKey) ?? null);
 	const targetItems = $derived.by((): ComboboxItem[] => {
 		const out: ComboboxItem[] = connectTo ? [{ value: connectTo.id, label: connectTo.name }] : [];
 		for (const item of found)
-			if (item.id !== connectTo?.id && allowsItemType(choice?.pickedTypes, item.type))
+			if (item.id !== connectTo?.id && allowsItemType(choice?.pickedTypes, item.type, parentOfType))
 				out.push({ value: item.id, label: item.name });
 		return out;
 	});
@@ -85,7 +86,7 @@
 	// Changing the connection can leave the picked item outside what its other end allows.
 	$effect(() => {
 		const picked = connectTo ? found.find((n) => n.id === connectTo?.id) : undefined;
-		if (picked && !allowsItemType(choice?.pickedTypes, picked.type)) connectTo = null;
+		if (picked && !allowsItemType(choice?.pickedTypes, picked.type, parentOfType)) connectTo = null;
 	});
 
 	function searchTargets(text: string) {
