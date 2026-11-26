@@ -55,6 +55,17 @@ class PageParams[Sort: StrEnum](BaseModel):
     order: SortOrder = Field(SortOrder.ASC, description=PAGE_ORDER_DESCRIPTION)
 
 
+class UncappedPageParams[Sort: StrEnum](PageParams[Sort]):
+    """`PageParams` for a list that has always taken any `limit`.
+
+    The app asks the item type and connection type lists for 200 rows at once, so
+    capping them at 100 would break it. They move to `PageParams` once the app pages
+    them.
+    """
+
+    limit: int = Field(50, description=PAGE_LIMIT_DESCRIPTION)
+
+
 class SearchPageParams[Sort: StrEnum](PageParams[Sort]):
     """`PageParams` for a list with text to search, which adds `q`."""
 

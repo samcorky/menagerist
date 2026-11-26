@@ -6,7 +6,11 @@ from fastapi import FastAPI, Query
 from fastapi.testclient import TestClient
 
 # FastAPI reads the route's annotations at runtime, so these cannot be type-only.
-from app.entrypoints.api.shared.http.parameters import PageParams, SearchPageParams  # noqa: TC001
+from app.entrypoints.api.shared.http.parameters import (  # noqa: TC001
+    PageParams,
+    SearchPageParams,
+    UncappedPageParams,
+)
 from app.shared_kernel.paging import SortOrder
 
 
@@ -28,6 +32,11 @@ def _app() -> FastAPI:
             "order": page.order,
             "sort": page.sort,
         }
+
+    @app.get("/uncapped")
+    def list_uncapped(page: Annotated[UncappedPageParams[_Sort], Query()]) -> int:
+        limit: int = page.limit
+        return limit
 
     @app.get("/searchable")
     def search_rows(page: Annotated[SearchPageParams[_Sort], Query()]) -> str | None:
@@ -86,3 +95,12 @@ def test_a_searchable_list_also_takes_q() -> None:
         p["name"] for p in _app().openapi()["paths"]["/searchable"]["get"]["parameters"]
     }
     assert names == {"after", "limit", "sort", "order", "q"}
+
+
+@pytest.mark.fast
+def test_an_uncapped_list_takes_any_limit_as_it_always_has() -> None:
+    """The item type lists keep accepting 200 rows at once; the others stop at 100."""
+    client = TestClient(_app())
+
+    assert client.get("/uncapped", params={"limit": 200}).json() == 200
+    assert client.get("/rows", params={"limit": 200}).status_code == 422

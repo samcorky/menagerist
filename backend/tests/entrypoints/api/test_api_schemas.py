@@ -10,14 +10,20 @@ from pydantic import BaseModel
 import app.entrypoints.api
 import app.modules
 from app.entrypoints.api import create_app
-from app.entrypoints.api.shared.http.parameters import PageParams, SearchPageParams
+from app.entrypoints.api.shared.http.parameters import (
+    PageParams,
+    SearchPageParams,
+    UncappedPageParams,
+)
 from app.platform.request_model import RequestModel
 
 _COMPONENTS: dict[str, Any] = create_app().openapi()["components"]
 
 # Models that FastAPI flattens into query parameters. They are never a request or
 # response body, so there is no body to give an example of.
-_QUERY_MODELS: frozenset[type[BaseModel]] = frozenset({PageParams, SearchPageParams})
+_QUERY_MODELS: frozenset[type[BaseModel]] = frozenset(
+    {PageParams, SearchPageParams, UncappedPageParams}
+)
 
 
 def _api_models() -> list[type[BaseModel]]:

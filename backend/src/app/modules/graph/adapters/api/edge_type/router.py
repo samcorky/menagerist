@@ -18,8 +18,8 @@ from app.entrypoints.api.shared.http.http_headers import (
 from app.entrypoints.api.shared.http.parameters import (
     EdgeTypeId,
     FieldKey,
-    PageParams,
     SubFieldKey,
+    UncappedPageParams,
 )
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
@@ -130,7 +130,7 @@ async def list_edge_types(
     actor: Annotated[Actor, Depends(get_current_actor)],
     request: Request,
     response: Response,
-    page: Annotated[PageParams[EdgeTypeSort], Query()],
+    page: Annotated[UncappedPageParams[EdgeTypeSort], Query()],
 ) -> list[EdgeTypeResponse]:
     """List edge types, by id unless sorted."""
     result = await use_case.handle(
