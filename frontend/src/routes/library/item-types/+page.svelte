@@ -48,14 +48,15 @@
 	import { fetchAllNodeTypes } from '$lib/node-types';
 	import { parentChangeQuestion, type ParentChangeQuestion } from '$lib/parent-change';
 	import { appearanceOf } from '$lib/type-inheritance';
-	import { inFamilyOrder, matchTypes } from '$lib/type-names';
+	import { inFamilyOrder, withFamilies } from '$lib/type-names';
 	import type { AttributesSchema } from '$lib/schema-types';
 	import { settleSchema } from '$lib/schema-editor-items';
 
 	const PAGE_SIZE = 50;
 
-	const list = new PagedList<NodeTypeResponse, null>(({ after }) =>
-		listNodeTypes({ query: { after, limit: PAGE_SIZE } })
+	// The server matches, and the list pages through the matches.
+	const list = new PagedList<NodeTypeResponse, { q: string }>(({ after, params }) =>
+		listNodeTypes({ query: { after, limit: PAGE_SIZE, q: params.q || undefined } })
 	);
 	const categories = $derived(list.rows);
 	const loading = $derived(list.loading);
@@ -87,6 +88,7 @@
 		{ kind: 'none' } | { kind: 'blocked' }
 	> | null>(null);
 	let query = $state('');
+	let appliedQ = $state('');
 
 	let confirmTarget = $state<NodeTypeResponse | null>(null);
 	let deletingId = $state<string | null>(null);
@@ -192,7 +194,7 @@
 	async function refreshTypes() {
 		const all = await fetchAllNodeTypes();
 		if (all) allTypes = all;
-		await list.load(null);
+		await list.load({ q: appliedQ });
 	}
 
 	async function save(choice?: { onClash: 'merge'; onDetach: 'keep' | 'drop' }) {
@@ -295,8 +297,11 @@
 
 	// Searching only helps once the list is long enough to scan.
 	const SEARCH_FROM = 8;
-	// A parent that matches shows its subtypes, and a subtype that matches shows its parent.
-	const shown = $derived(matchTypes(categories, query));
+	// A parent that matches shows its subtypes, and a subtype that matches shows its parent. The
+	// families come from every type, not from the pages loaded so far.
+	const shown = $derived(appliedQ === '' ? categories : withFamilies(categories, allTypes));
+	// Where a type's family is looked up: every type once they have loaded.
+	const family = $derived(allTypes.length > 0 ? allTypes : categories);
 
 	async function handleDelete(cat: NodeTypeResponse) {
 		const subtypes = allTypes.filter((t) => t.parent === cat.slug);
@@ -358,12 +363,22 @@
 	}
 
 	$effect(() => {
-		void list.load(null);
 		void fetchAllNodeTypes().then((all) => {
 			if (all) allTypes = all;
 		});
 		void loadExampleIds().then((ids) => (exampleTypeIds = ids.itemTypes));
 		void loadItemCounts();
+	});
+
+	// What was typed, once it has settled: a new search starts the list again from its first page.
+	$effect(() => {
+		const value = query.trim();
+		const timer = setTimeout(() => (appliedQ = value), 300);
+		return () => clearTimeout(timer);
+	});
+
+	$effect(() => {
+		void list.load({ q: appliedQ });
 	});
 
 	// Coming back online, or Retry in the banner, reloads a list that had failed.
@@ -394,7 +409,7 @@
 		</IconButton>
 	</div>
 
-	{#if categories.length > SEARCH_FROM}
+	{#if query.trim() !== '' || hasMore || categories.length > SEARCH_FROM}
 		<Input type="search" bind:value={query} placeholder="Search item types…" class="sm:max-w-sm" />
 	{/if}
 
@@ -434,9 +449,9 @@
 		{#if shown.length > 0}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each inFamilyOrder(shown) as cat (cat.id)}
-					{@const subtypeCount = categories.filter((c) => c.parent === cat.slug).length}
-					{@const look = appearanceOf(cat.slug, categories)}
-					{@const underParent = !!cat.parent && categories.some((c) => c.slug === cat.parent)}
+					{@const subtypeCount = family.filter((c) => c.parent === cat.slug).length}
+					{@const look = appearanceOf(cat.slug, family)}
+					{@const underParent = !!cat.parent && shown.some((c) => c.slug === cat.parent)}
 					<li
 						class="flex items-center gap-2 px-3 py-2 sm:gap-3 {underParent
 							? 'bg-muted/20 pl-6 sm:pl-10'
@@ -563,13 +578,13 @@
 					</li>
 				{/each}
 			</ul>
-		{:else if query.trim() !== ''}
+		{:else if appliedQ !== '' && !loading}
 			<p class="py-8 text-center text-sm text-muted-foreground">
-				No item types match "{query.trim()}".
+				No item types match "{appliedQ}".
 			</p>
 		{/if}
 
-		{#if categories.length === 0 && !loading}
+		{#if categories.length === 0 && !loading && appliedQ === ''}
 			<div class="flex flex-col items-center gap-3 py-12 text-center">
 				<Tag class="size-10 text-muted-foreground/50" />
 				<div>
@@ -584,9 +599,9 @@
 		{loading}
 		{hasMore}
 		failed={pageFailed}
-		rows={categories.length}
+		rows={shown.length}
 		noun="item type"
-		total={list.total}
+		total={appliedQ === '' ? list.total : null}
 		onload={() => void list.loadMore()}
 		onretry={() => void list.retry()}
 	/>

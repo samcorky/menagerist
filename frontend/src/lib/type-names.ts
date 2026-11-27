@@ -24,25 +24,24 @@ export function inFamilyOrder<T extends NamedType>(types: readonly T[]): T[] {
 }
 
 /**
- * The types a search shows, in the order given. A type matches when the words are in its name or
- * its slug. A parent that matches brings its subtypes, and a subtype that matches brings its
- * parent, so a subtype is never shown without its place in the family; the parent's other
- * subtypes stay out. A blank search keeps every type.
+ * The types a search shows: the `matches` the server found, with their families from `all`, the
+ * complete set of types. A parent that matched brings its subtypes, and a subtype that matched
+ * brings its parent, so a subtype is never shown without its place in the family; the parent's
+ * other subtypes stay out. The matches come first, then what the families add; `inFamilyOrder`
+ * puts each family together. Matches the set does not have (it may still be loading) show as
+ * they are.
  */
-export function matchTypes<T extends NamedType>(types: readonly T[], query: string): T[] {
-	const text = query.trim().toLowerCase();
-	if (text === '') return [...types];
-	const present = new Set(types.map((type) => type.slug));
-	const matched = new Set(
-		types.filter((t) => `${t.label} ${t.slug}`.toLowerCase().includes(text)).map((t) => t.slug)
-	);
-	const shown = new Set(matched);
-	for (const type of types) {
-		if (!type.parent || !present.has(type.parent)) continue;
-		if (matched.has(type.parent)) shown.add(type.slug);
-		if (matched.has(type.slug)) shown.add(type.parent);
+export function withFamilies<T extends NamedType>(matches: readonly T[], all: readonly T[]): T[] {
+	const bySlug = new Map(all.map((type) => [type.slug, type]));
+	const matched = new Set(matches.map((type) => type.slug));
+	const shown = new Map(matches.map((type) => [type.slug, type]));
+	for (const type of all) {
+		if (!type.parent) continue;
+		if (matched.has(type.parent) && !shown.has(type.slug)) shown.set(type.slug, type);
+		const parent = bySlug.get(type.parent);
+		if (matched.has(type.slug) && parent && !shown.has(parent.slug)) shown.set(parent.slug, parent);
 	}
-	return types.filter((type) => shown.has(type.slug));
+	return [...shown.values()];
 }
 
 /**

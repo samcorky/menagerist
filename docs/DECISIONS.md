@@ -2059,3 +2059,12 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **A new sort starts from the first page.** A paged table reloads from its first page whenever the order changes, since the cursor only resumes the sort that made it.
 - **The default is the server's order,** shown with no arrow and `aria-sort="none"`, as the issue proposed; the sort is held in the page, not saved.
 - **Phones.** The tables show only on wide screens, so there is no header to click on a phone. A sort control for the cards can follow.
+
+## The Item types search asks the server, and adds each match's family from every type (2026-11-27)
+
+**Decision:** The Item types page passes what was typed to the list route as `q` (after a 300 ms pause) and pages through the matches. Each match is shown with its family: a parent brings its subtypes and a subtype brings its parent. The families come from the complete set of types the page already loads for its "Subtype of" choices, not from the pages read so far. Part of #792.
+
+- **The search no longer stops at what has scrolled in.** It matched over the rows loaded so far (50 at a time), so a type further down could not be found, and a parent and its subtypes on different pages showed the family split until the other page loaded. The server matches the label, slug and description, ignoring case and accents, like the other searches.
+- **Matching on the server, families from the complete set.** The server's `q` answers "which types match" and nothing about families. Adding a family flag to the route would have been a second query shape for one page; the page already holds every type (it needs them for the parent choices), so `withFamilies` adds the parent and subtypes from that set. The matches are shown as they are until the set has loaded.
+- **The page around the search had assumed the loaded rows were the whole list.** The search box hid itself once a search narrowed the rows below eight, "No item types yet" showed for a search with no matches, a subtype's count and colours were worked out from the loaded rows, and the foot counted the matches only. The box now stays while there is a search or more pages, the empty states tell a search with no matches from a library with no types, and the family is looked up in the complete set.
+- **Other lists.** Collections, Items, a collection's items and the add-items dialog already ask the server for `q`.
