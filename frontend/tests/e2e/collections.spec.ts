@@ -504,3 +504,43 @@ test.describe('collections page search', () => {
 		await expect(card(page, collection.name)).toBeVisible();
 	});
 });
+
+test('the Collections list can be put in the order a person picks, and keeps it on reload', async ({
+	page,
+	request
+}) => {
+	const word = uniqueName('Sortable');
+	// Made out of A to Z order, so each order below starts with a different one.
+	for (const name of ['Bravo', 'Alpha', 'Charlie'])
+		await makeCollection(request, `${word} ${name}`);
+
+	await page.goto('/collections');
+	await page.getByPlaceholder('Search your collections…').fill(word);
+	const order = async () =>
+		(await page.getByRole('link').filter({ hasText: word }).allInnerTexts()).map((text) =>
+			text.split('\n')[0].replace(`${word} `, '')
+		);
+	const sortBy = page.getByRole('combobox', { name: 'Sort by' });
+
+	await expect(sortBy).toHaveValue('oldest');
+	await expect.poll(order).toEqual(['Bravo', 'Alpha', 'Charlie']);
+
+	await sortBy.selectOption('name-asc');
+	await expect(page).toHaveURL(/sort=name-asc/);
+	await expect.poll(order).toEqual(['Alpha', 'Bravo', 'Charlie']);
+
+	await sortBy.selectOption('name-desc');
+	await expect.poll(order).toEqual(['Charlie', 'Bravo', 'Alpha']);
+
+	await sortBy.selectOption('newest');
+	await expect.poll(order).toEqual(['Charlie', 'Alpha', 'Bravo']);
+
+	// The order is in the address, so a reload keeps it.
+	await page.reload();
+	await expect(sortBy).toHaveValue('newest');
+	await page.getByPlaceholder('Search your collections…').fill(word);
+	await expect.poll(order).toEqual(['Charlie', 'Alpha', 'Bravo']);
+
+	await sortBy.selectOption('oldest');
+	await expect(page).not.toHaveURL(/sort=/);
+});

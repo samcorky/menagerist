@@ -12,6 +12,7 @@
 		createCollection,
 		listCollections,
 		type CollectionResponse,
+		type CollectionSort,
 		type NodeTypeResponse
 	} from '$lib/api/client';
 	import { networkAwareError } from '$lib/api/errors';
@@ -36,6 +37,9 @@
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { PagedList } from '$lib/paged-list.svelte';
+	import { COLLECTION_SORT_CHOICES, sortChoiceFor } from '$lib/list-sort-choices';
+	import { sortQuery, type TableSort } from '$lib/table-sort';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import { loadExampleIds } from '$lib/examples';
 	import { fetchItemFields, fetchSavedFields, type ItemField } from '$lib/item-fields';
 	import { fetchAllNodeTypes } from '$lib/node-types';
@@ -84,8 +88,17 @@
 
 	let searchInput = $state('');
 	let q = $state('');
-	const list = new PagedList<CollectionResponse, { q: string }>(({ after, params }) =>
-		listCollections({ query: { after, limit: PAGE_SIZE, q: params.q || undefined } })
+	// The order is in the address (`?sort=`), so it survives a reload and a link.
+	const sortChoice = $derived(
+		sortChoiceFor(COLLECTION_SORT_CHOICES, page.url.searchParams.get('sort'))
+	);
+	const list = new PagedList<
+		CollectionResponse,
+		{ q: string; sort: TableSort<CollectionSort> | null }
+	>(({ after, params }) =>
+		listCollections({
+			query: { after, limit: PAGE_SIZE, q: params.q || undefined, ...sortQuery(params.sort) }
+		})
 	);
 	const collections = $derived(list.rows);
 	const loading = $derived(list.loading);
@@ -160,10 +173,22 @@
 		return () => clearTimeout(timer);
 	});
 
-	// A new search starts the list again from its first page.
+	// A new search or order starts the list again from its first page.
 	$effect(() => {
-		void list.load({ q }, { keepRows: true });
+		void list.load({ q, sort: sortChoice.sort }, { keepRows: true });
 	});
+
+	function setSort(value: string) {
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		if (value === COLLECTION_SORT_CHOICES[0].value) params.delete('sort');
+		else params.set('sort', value);
+		const rest = params.toString();
+		void goto(resolve(rest ? `/collections?${rest}` : '/collections'), {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
+	}
 
 	// Coming back online, or Retry in the banner, reloads a list that had failed.
 	$effect(() => {
@@ -283,13 +308,26 @@
 	</div>
 
 	{#if showControls}
-		<input
-			bind:value={searchInput}
-			type="search"
-			placeholder="Search your collections…"
-			aria-label="Search your collections"
-			class="flex h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:h-8 sm:max-w-sm sm:text-sm pointer-coarse:h-11"
-		/>
+		<div class="flex flex-wrap items-center gap-2">
+			<input
+				bind:value={searchInput}
+				type="search"
+				placeholder="Search your collections…"
+				aria-label="Search your collections"
+				class="flex h-8 w-full min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:h-8 sm:max-w-sm sm:basis-auto sm:text-sm pointer-coarse:h-11"
+			/>
+			<NativeSelect.Root
+				size="sm"
+				class="shrink-0 max-sm:[&_select[data-size]]:h-11"
+				aria-label="Sort by"
+				value={sortChoice.value}
+				onchange={(e) => setSort(e.currentTarget.value)}
+			>
+				{#each COLLECTION_SORT_CHOICES as choice (choice.value)}
+					<NativeSelect.Option value={choice.value}>{choice.label}</NativeSelect.Option>
+				{/each}
+			</NativeSelect.Root>
+		</div>
 	{/if}
 
 	{#if loadingDisplay.show && collections.length === 0}
