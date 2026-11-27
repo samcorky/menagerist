@@ -52,6 +52,8 @@ export class PagedList<T, P> {
 	rows = $state<T[]>([]);
 	/** A page is being read. True until the first page has come back. */
 	loading = $state(true);
+	/** `append`: the read in flight is a further page, not the first page of a new load. */
+	loadingMore = $state(false);
 	/** The first page would not load: the whole list is the page-level failure. */
 	failed = $state(false);
 	/** Another page would not load: the rows shown stay, and `retry` tries it again. */
@@ -174,6 +176,7 @@ export class PagedList<T, P> {
 		if (this.#params === undefined) return;
 		const seq = ++this.#seq;
 		this.loading = true;
+		this.loadingMore = this.mode === 'append' && after !== undefined;
 		if (after === undefined) this.failed = false;
 		this.nextFailed = false;
 		this.failure = null;
@@ -209,6 +212,7 @@ export class PagedList<T, P> {
 			this.#accept(index, after, start, result);
 		}
 		this.loading = false;
+		this.loadingMore = false;
 	}
 
 	#accept(index: number, after: string | undefined, start: number, result: PageResult<T>): void {
@@ -221,8 +225,11 @@ export class PagedList<T, P> {
 			this.#cursors[index] = after;
 			this.#starts[index] = start;
 		}
-		this.#cursor = nextCursor(result.response?.headers.get('link'));
+		this.#cursor =
+			result.cursor !== undefined
+				? result.cursor
+				: nextCursor(result.response?.headers.get('link'));
 		this.hasMore = this.#cursor !== null;
-		this.total = totalOf(result.response);
+		this.total = result.total !== undefined ? result.total : totalOf(result.response);
 	}
 }

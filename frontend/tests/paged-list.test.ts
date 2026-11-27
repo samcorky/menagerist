@@ -199,6 +199,61 @@ describe('PagedList, appending', () => {
 	});
 });
 
+describe('PagedList, with a cursor and a total in the result', () => {
+	it('takes the next cursor and the count from the result, not from headers', async () => {
+		const calls: (string | undefined)[] = [];
+		const list = new PagedList<Row, null>(async ({ after }) => {
+			calls.push(after);
+			const second = after === 'c2';
+			return {
+				data: second ? rows(2, 1) : rows(0, 2),
+				cursor: second ? null : 'c2',
+				total: 3
+			};
+		});
+
+		await list.load(null);
+		expect([list.hasMore, list.total, list.rows.length]).toEqual([true, 3, 2]);
+
+		await list.loadMore();
+		expect(calls).toEqual([undefined, 'c2']);
+		expect([list.hasMore, list.total, list.rows.length]).toEqual([false, 3, 3]);
+	});
+
+	it('lets the result say there is no count, whatever a header says', async () => {
+		const list = new PagedList<Row, null>(async () => ({
+			data: rows(0, 1),
+			response: new Response(null, { headers: { 'total-count': '9' } }),
+			total: null
+		}));
+		await list.load(null);
+		expect(list.total).toBeNull();
+	});
+
+	it('says a further page is being read, and a new load is not one', async () => {
+		let release: () => void = () => {};
+		const list = new PagedList<Row, null>(async ({ after }) => {
+			if (after !== undefined) await new Promise<void>((resolve) => (release = resolve));
+			return {
+				data: rows(after === undefined ? 0 : 2, 2),
+				cursor: after === undefined ? 'c2' : null
+			};
+		});
+		await list.load(null);
+		expect(list.loadingMore).toBe(false);
+
+		const more = list.loadMore();
+		expect([list.loading, list.loadingMore]).toEqual([true, true]);
+		release();
+		await more;
+		expect([list.loading, list.loadingMore]).toEqual([false, false]);
+
+		const again = list.load(null, { keepRows: true });
+		expect([list.loading, list.loadingMore]).toEqual([true, false]);
+		await again;
+	});
+});
+
 describe('PagedList, in pages', () => {
 	const paged = (count: number, size: number) => {
 		const served = route(count, size);
