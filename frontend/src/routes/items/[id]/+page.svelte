@@ -13,6 +13,7 @@
 		getNode,
 		listEdges,
 		listEdgeTypes,
+		listNodes,
 		updateEdge,
 		updateNode,
 		type EdgeResponse,
@@ -191,12 +192,27 @@
 	let edgeTargetSearch = $state('');
 	let edgeTargetOpen = $state(false);
 	// Once a connection type is chosen, only items its target end allows are offered.
+	// The server matches the text over every item (name, description and field values, ignoring
+	// case and accents), not only the first few hundred this page loaded for naming connections.
+	let targetMatches = $state<NodeResponse[]>([]);
+	let targetSeq = 0;
+	$effect(() => {
+		if (!edgeTargetOpen) return;
+		const text = edgeTargetSearch.trim();
+		const timer = setTimeout(async () => {
+			const mine = ++targetSeq;
+			const result = await listNodes({ query: { limit: 50, q: text || undefined } });
+			if (mine !== targetSeq || result.error || !result.data) return;
+			targetMatches = result.data;
+		}, 200);
+		return () => clearTimeout(timer);
+	});
 	let filteredNodes = $derived(
-		otherNodes.filter(
+		targetMatches.filter(
 			(n) =>
+				n.id !== nodeId &&
 				!selectedTargets.some((t) => t.id === n.id) &&
-				allowsItemType(edgeTypesById.get(newEdgeType)?.target_types, n.type, parentOfType) &&
-				`${n.name} ${n.type ?? ''}`.toLowerCase().includes(edgeTargetSearch.toLowerCase())
+				allowsItemType(edgeTypesById.get(newEdgeType)?.target_types, n.type, parentOfType)
 		)
 	);
 
