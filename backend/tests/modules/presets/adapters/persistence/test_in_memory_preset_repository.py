@@ -99,6 +99,27 @@ async def test_list_filters_by_label_search_case_insensitively() -> None:
     assert [p.id for p in result] == [match.id]
 
 
+async def test_list_q_matches_the_description_too_ignoring_accents() -> None:
+    """`q` finds a preset by its description as well as its label."""
+    repository = InMemoryPresetRepository()
+    by_description = Preset.create(
+        owner_id=OWNER,
+        kind="field",
+        label="Grade",
+        description="How the Café copy looks",
+        definition={},
+    )
+    other = Preset.create(owner_id=OWNER, kind="field", label="Format", definition={})
+    await repository.add(by_description)
+    await repository.add(other)
+
+    result = (
+        await repository.list(scope=EVERYONE, q="CAFE", page=PageRequest(limit=10))
+    ).items
+
+    assert [p.id for p in result] == [by_description.id]
+
+
 async def test_get_and_list_are_scoped_to_the_owner() -> None:
     """Another person's preset is neither fetched nor listed."""
     repository = InMemoryPresetRepository()

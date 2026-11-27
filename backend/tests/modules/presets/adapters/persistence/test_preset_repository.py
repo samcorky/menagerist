@@ -302,3 +302,23 @@ async def test_list_q_ignores_accents_and_reads_wildcards_literally(
     assert await found("50%") == ["50% off"]
     assert await found("a_b") == ["a_b"]
     assert await found("   ") == ["Café au lait", "Tea", "50% off", "a_b", "axb"]
+
+
+async def test_list_q_matches_the_description_as_well_as_the_label(
+    db_session: AsyncSession,
+) -> None:
+    """A preset is found by what its description says, ignoring accents."""
+    repository = SqlAlchemyPresetRepository(db_session)
+    described = Preset.create(
+        owner_id=OWNER,
+        kind="field",
+        label="Grade",
+        description="How the Café copy looks",
+        definition={"property": {"type": "string"}},
+    )
+    await repository.add(described)
+    await repository.add(_preset("Format"))
+
+    page = await repository.list(scope=EVERYONE, page=PageRequest(), q="CAFE")
+
+    assert [p.label for p in page.items] == ["Grade"]

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from app.shared_kernel.paging import page_rows, timestamp_value
-from app.shared_kernel.text import fold
+from app.shared_kernel.text import matches_text
 
 if TYPE_CHECKING:
     import builtins
@@ -43,14 +43,13 @@ class InMemoryPresetRepository:
         q: str | None = None,
     ) -> Page[Preset]:
         """List non-deleted presets in `scope`, one page in the order `page` asks."""
-        needle = fold((q or "").strip())
         live = [
             p
             for p in self._presets.values()
             if not p.is_deleted
             and scope.covers(p.owner_id)
             and (kind is None or p.kind == kind)
-            and (not needle or needle in fold(p.label))
+            and matches_text(q, p.label, p.description)
         ]
         return page_rows(
             live,

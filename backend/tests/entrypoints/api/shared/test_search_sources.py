@@ -13,6 +13,7 @@ from app.entrypoints.api.shared.access_guard import get_access_guard
 from app.entrypoints.api.shared.bridges import search_sources
 from app.entrypoints.api.shared.bridges.search_sources import (
     ExamplePackSource,
+    ItemTypeSource,
     SavedFieldSource,
     UserSource,
 )
@@ -22,6 +23,21 @@ from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
 from app.modules.examples.application.list_example_packs import ListExamplePacks
 from app.modules.examples.domain.pack import ExamplePack
 from app.modules.examples.ports.unit_of_work import ExampleRepos
+from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
+    InMemoryEdgeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_edge_type_repository import (
+    InMemoryEdgeTypeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_repository import (
+    InMemoryNodeRepository,
+)
+from app.modules.graph.adapters.persistence.in_memory_node_type_repository import (
+    InMemoryNodeTypeRepository,
+)
+from app.modules.graph.application.list_node_types import ListNodeTypes
+from app.modules.graph.domain.node_type import NodeType
+from app.modules.graph.ports.unit_of_work import GraphRepos
 from app.modules.identity.adapters.persistence.in_memory_api_token_repository import (
     InMemoryApiTokenRepository,
 )
@@ -145,11 +161,58 @@ async def test_saved_fields_are_the_callers_own() -> None:
 
 async def test_saved_fields_are_read_in_pages(monkeypatch: pytest.MonkeyPatch) -> None:
     """A match beyond the first page is still found."""
-    monkeypatch.setattr(search_sources, "_TYPE_PAGE", 2)
+    monkeypatch.setattr(search_sources, "_MATCH_PAGE", 2)
     presets = [_preset(ALICE.id, f"Field {n}") for n in range(5)]
     source = await _saved_fields(*presets)
 
     hits = await source.find("field", 10, ALICE)
+
+    assert len(hits) == 5
+
+
+# --- Item types ---------------------------------------------------------------
+
+
+def _node_type(slug: str, label: str, description: str | None = None) -> NodeType:
+    return NodeType.create(
+        owner_id=ALICE.id, slug=slug, label=label, description=description
+    )
+
+
+async def _item_types(*node_types: NodeType) -> ItemTypeSource:
+    repos = GraphRepos(
+        nodes=InMemoryNodeRepository(),
+        edges=InMemoryEdgeRepository(),
+        node_types=InMemoryNodeTypeRepository(),
+        edge_types=InMemoryEdgeTypeRepository(),
+    )
+    for node_type in node_types:
+        await repos.node_types.add(node_type)
+    return ItemTypeSource(ListNodeTypes(repos, get_access_guard()))
+
+
+async def test_item_types_match_label_slug_and_description() -> None:
+    """Any of the three finds the type, ignoring case and accents."""
+    source = await _item_types(
+        _node_type("film", "Movie"),
+        _node_type("book", "Livre"),
+        _node_type("record", "Vinyl", description="Albums on a Café turntable"),
+    )
+
+    assert [h.title for h in await source.find("MOVIE", 10, ALICE)] == ["Movie"]
+    assert [h.ref for h in await source.find("book", 10, ALICE)] == ["book"]
+    assert [h.title for h in await source.find("cafe", 10, ALICE)] == ["Vinyl"]
+    assert await source.find("zeppelin", 10, ALICE) == []
+
+
+async def test_item_types_are_read_in_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A match beyond the first page is still found."""
+    monkeypatch.setattr(search_sources, "_MATCH_PAGE", 2)
+    source = await _item_types(
+        *[_node_type(f"type-{n}", f"Type {n}") for n in range(5)]
+    )
+
+    hits = await source.find("type", 10, ALICE)
 
     assert len(hits) == 5
 
@@ -239,6 +302,13 @@ async def test_an_administrator_finds_users_by_name_or_username() -> None:
         (SearchKind.USER, "Alice Émile", "@alice")
     ]
     assert [h.title for h in by_username] == ["Jo Smith"]
+
+
+async def test_an_administrator_finds_users_by_role_too() -> None:
+    """The accounts list matches the role as well, so the search is no narrower."""
+    source = await _users()
+
+    assert [h.title for h in await source.find("admin", 10, ADMIN)] == ["Jo Smith"]
 
 
 async def test_user_search_hit_carries_avatar_version() -> None:

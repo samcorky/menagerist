@@ -63,14 +63,32 @@ from app.shared_kernel.paging import MAX_PAGE_ROWS
 from app.shared_kernel.text import fold
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from app.modules.search.ports.search_source import SearchSource
     from app.shared_kernel.actor import Actor
-    from app.shared_kernel.paging import Cursor
+    from app.shared_kernel.paging import Cursor, Page
 
-# Item types and the two registries are small and have no text filter of their own,
-# so they are read whole, a page at a time, and filtered here.
-_TYPE_PAGE = 100
-_TYPE_CAP = 10_000
+# Item types and saved fields are few. The search wants every match, not the first
+# few in id order, since it ranks them itself and the best one may be the last. So
+# their list is asked for the matches (`q`) a page at a time, up to a cap.
+_MATCH_PAGE = 100
+_MATCH_CAP = 10_000
+
+
+async def _every_match[Row](
+    read: Callable[[Cursor | None], Awaitable[Page[Row]]],
+) -> list[Row]:
+    """Every row a list returns for a text search, read a page at a time up to a cap."""
+    rows: list[Row] = []
+    after: Cursor | None = None
+    while len(rows) < _MATCH_CAP:
+        page = await read(after)
+        rows.extend(page.items)
+        if page.next is None:
+            break
+        after = page.next
+    return rows
 
 
 def _mentions(query: str, *texts: str | None) -> bool:
@@ -154,7 +172,7 @@ class CollectionSource:
 
 
 class ItemTypeSource:
-    """Item types, read in full from the graph module and matched on label and slug."""
+    """Item types, matched by the graph module on label, slug and description."""
 
     kind = SearchKind.ITEM_TYPE
 
@@ -165,36 +183,24 @@ class ItemTypeSource:
         self, query: str, limit: int, actor: Actor, *, collection: str | None = None
     ) -> list[SearchHit]:
         """Return item types matching `query`."""
-        hits: list[SearchHit] = []
-        after: Cursor | None = None
-        seen = 0
-        while seen < _TYPE_CAP:
-            page = await self._use_case.handle(
-                ListNodeTypesQuery(after=after, limit=_TYPE_PAGE), actor
+        types = await _every_match(
+            lambda after: self._use_case.handle(
+                ListNodeTypesQuery(after=after, limit=_MATCH_PAGE, q=query), actor
             )
-            seen += len(page.items)
-            hits.extend(
-                SearchHit(
-                    kind=self.kind,
-                    ref=str(node_type.slug),
-                    title=node_type.label,
-                    description=node_type.description,
-                )
-                for node_type in page.items
-                if _mentions(query, node_type.label, str(node_type.slug))
+        )
+        return [
+            SearchHit(
+                kind=self.kind,
+                ref=str(node_type.slug),
+                title=node_type.label,
+                description=node_type.description,
             )
-            if page.next is None:
-                break
-            after = page.next
-        return hits
+            for node_type in types
+        ]
 
 
 class SavedFieldSource:
-    """Saved fields, field sets and choice lists, matched on name and description.
-
-    The presets are read in full, a page at a time, and filtered here: `ListPresets`
-    can only match a label, without folding accents.
-    """
+    """Saved fields, field sets and choice lists, matched on label and description."""
 
     kind = SearchKind.SAVED_FIELD
 
@@ -205,29 +211,21 @@ class SavedFieldSource:
         self, query: str, limit: int, actor: Actor, *, collection: str | None = None
     ) -> list[SearchHit]:
         """Return the actor's saved fields matching `query`."""
-        hits: list[SearchHit] = []
-        after: Cursor | None = None
-        seen = 0
-        while seen < _TYPE_CAP:
-            page = await self._use_case.handle(
-                ListPresetsQuery(after=after, limit=_TYPE_PAGE), actor
+        presets = await _every_match(
+            lambda after: self._use_case.handle(
+                ListPresetsQuery(after=after, limit=_MATCH_PAGE, q=query), actor
             )
-            seen += len(page.items)
-            hits.extend(
-                SearchHit(
-                    kind=self.kind,
-                    ref=str(preset.id),
-                    title=preset.label,
-                    description=preset.description,
-                    group=preset.kind,
-                )
-                for preset in page.items
-                if _mentions(query, preset.label, preset.description)
+        )
+        return [
+            SearchHit(
+                kind=self.kind,
+                ref=str(preset.id),
+                title=preset.label,
+                description=preset.description,
+                group=preset.kind,
             )
-            if page.next is None:
-                break
-            after = page.next
-        return hits
+            for preset in presets
+        ]
 
 
 class ExamplePackSource:
@@ -256,7 +254,7 @@ class ExamplePackSource:
 
 
 class UserSource:
-    """Accounts, matched on display name and username, for administrators only.
+    """Accounts, matched on username, display name and role, for administrators only.
 
     `ListUsers` refuses anyone without `identity:user:list`, which the search treats
     as "leave this kind out", so nobody else sees a hint that users are searched.
@@ -274,9 +272,11 @@ class UserSource:
 
         Only an id, the names, the role and the picture version leave.
         """
-        # An instance has few accounts: one page of the most a page holds has them all.
+        # An instance has few accounts: one page, the most a page holds, has them all.
         listings = (
-            await self._use_case.handle(ListUsersQuery(limit=MAX_PAGE_ROWS), actor)
+            await self._use_case.handle(
+                ListUsersQuery(q=query, limit=MAX_PAGE_ROWS), actor
+            )
         ).items
         return [
             SearchHit(
@@ -290,7 +290,6 @@ class UserSource:
                 ),
             )
             for listing in listings
-            if _mentions(query, listing.user.display_name, listing.user.username)
         ]
 
 
