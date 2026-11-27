@@ -82,6 +82,7 @@
 	let saving = $state(false);
 	// Every type, for the "Subtype of" choices: the list above is paged.
 	let allTypes = $state<NodeTypeResponse[]>([]);
+	let allLoaded = $state(false);
 	// A change of parent that needs an answer before it is saved.
 	let parentAsk = $state<Exclude<
 		ParentChangeQuestion,
@@ -140,9 +141,25 @@
 	// The schema editor reads its schema once; a new value here remounts it.
 	let schemaRevision = $state(0);
 
+	// Families are read from the complete set, so it follows every change to a row.
+	function setType(updated: NodeTypeResponse) {
+		list.rows = categories.map((c) => (c.id === updated.id ? updated : c));
+		allTypes = allTypes.map((c) => (c.id === updated.id ? updated : c));
+	}
+
+	function dropType(id: string) {
+		list.rows = categories.filter((c) => c.id !== id);
+		allTypes = allTypes.filter((c) => c.id !== id);
+	}
+
+	function restoreType(type: NodeTypeResponse) {
+		list.rows = [type, ...categories];
+		allTypes = [type, ...allTypes.filter((c) => c.id !== type.id)];
+	}
+
 	// A promoted field is saved already: add it to the open, unsaved schema too, so Save keeps it.
 	function handlePromoted(updated: NodeTypeResponse, key: string) {
-		list.rows = categories.map((c) => (c.id === updated.id ? updated : c));
+		setType(updated);
 		const property = (updated.attributes_schema as AttributesSchema | null)?.properties?.[key];
 		if (!property) return;
 		const current = schema ?? (updated.attributes_schema as AttributesSchema);
@@ -193,7 +210,10 @@
 	/** Reload the lists after a change that can reach other types: a merge edits the parent. */
 	async function refreshTypes() {
 		const all = await fetchAllNodeTypes();
-		if (all) allTypes = all;
+		if (all) {
+			allTypes = all;
+			allLoaded = true;
+		}
 		await list.load({ q: appliedQ });
 	}
 
@@ -217,7 +237,7 @@
 			if (result.error || !result.data) {
 				toast.error("Couldn't save changes", { description: errorMessage(result.error) });
 			} else {
-				list.rows = categories.map((c) => (c.id === id ? result.data! : c));
+				setType(result.data);
 				editorOpen = false;
 				parentAsk = null;
 				toast.success('Item type updated');
@@ -242,7 +262,7 @@
 				editorOpen = false;
 				toast.success('Item type created');
 				if (parent) await refreshTypes();
-				else allTypes = [result.data, ...allTypes];
+				else if (allLoaded) allTypes = [result.data, ...allTypes];
 			}
 		}
 		saving = false;
@@ -301,7 +321,7 @@
 	// families come from every type, not from the pages loaded so far.
 	const shown = $derived(appliedQ === '' ? categories : withFamilies(categories, allTypes));
 	// Where a type's family is looked up: every type once they have loaded.
-	const family = $derived(allTypes.length > 0 ? allTypes : categories);
+	const family = $derived(allLoaded ? allTypes : categories);
 
 	async function handleDelete(cat: NodeTypeResponse) {
 		const subtypes = allTypes.filter((t) => t.parent === cat.slug);
@@ -322,14 +342,14 @@
 		}
 
 		// No items - optimistic removal with undo window
-		list.rows = categories.filter((c) => c.id !== cat.id);
+		dropType(cat.id);
 
 		let undone = false;
 		const timerId = setTimeout(async () => {
 			if (undone) return;
 			const result = await deleteNodeType({ path: { node_type_id: cat.id } });
 			if (result.error) {
-				list.rows = [cat, ...categories];
+				restoreType(cat);
 				toast.error("Couldn't delete item type", { description: errorMessage(result.error) });
 			}
 		}, 5000);
@@ -340,7 +360,7 @@
 				onClick: () => {
 					undone = true;
 					clearTimeout(timerId);
-					list.rows = [cat, ...categories];
+					restoreType(cat);
 				}
 			},
 			duration: 5000
@@ -355,7 +375,7 @@
 		if (result.error) {
 			toast.error("Couldn't delete item type", { description: errorMessage(result.error) });
 		} else {
-			list.rows = categories.filter((c) => c.id !== cat.id);
+			dropType(cat.id);
 			toast.success('Item type deleted');
 		}
 		deletingId = null;
@@ -364,7 +384,10 @@
 
 	$effect(() => {
 		void fetchAllNodeTypes().then((all) => {
-			if (all) allTypes = all;
+			if (all) {
+				allTypes = all;
+				allLoaded = true;
+			}
 		});
 		void loadExampleIds().then((ids) => (exampleTypeIds = ids.itemTypes));
 		void loadItemCounts();
