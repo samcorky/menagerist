@@ -173,3 +173,30 @@ test('the Backups table asks the server for the order a header names', async ({
 		await request.delete(`/api/v1/backups/${id}`);
 	}
 });
+
+test('the exports on the Account page say how many there are and sort on the server', async ({
+	browser,
+	workerBaseURL,
+	workerSession
+}) => {
+	test.setTimeout(120_000);
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
+	const member = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'export-sort' });
+	await adminApi.dispose();
+	const person = await asUser(browser, member);
+	const { page } = person;
+	try {
+		const made = await person.request.post('/api/v1/me/exports');
+		expect(made.ok(), await made.text()).toBe(true);
+
+		await page.goto('/settings/account');
+		await expect(page.getByRole('heading', { name: 'Your data' })).toBeVisible();
+		// One export fits a page, so the foot says how many rather than a range.
+		await expect(
+			page.getByRole('navigation', { name: 'Export pages' }).getByTestId('page-range')
+		).toHaveText('1 export');
+		await headerAsksTheServer(page, 'Size', 'size');
+	} finally {
+		await person.context.close();
+	}
+});
