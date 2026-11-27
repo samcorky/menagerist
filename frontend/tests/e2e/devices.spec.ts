@@ -121,6 +121,11 @@ test('devices page ten at a time, and signing out the others works from any page
 
 		await expect(range).toHaveText('1–10 of 12 devices');
 		await expect(rows).toHaveCount(10);
+		const shots = process.env.SHOTS_DIR;
+		if (shots) {
+			await table.scrollIntoViewIfNeeded();
+			await page.screenshot({ path: `${shots}/devices-page-1.png` });
+		}
 
 		// A header sorts all twelve on the server, not only the page on screen.
 		await table.getByRole('button', { name: 'First signed in' }).click();
@@ -133,6 +138,7 @@ test('devices page ten at a time, and signing out the others works from any page
 		await nav.getByRole('button', { name: 'Next' }).click();
 		await expect(range).toHaveText('11–12 of 12 devices');
 		await expect(rows).toHaveCount(2);
+		if (shots) await page.screenshot({ path: `${shots}/devices-page-2.png` });
 
 		// The button needs no list of every device: the count says there are others.
 		await page.getByRole('button', { name: 'Sign out all other devices' }).click();
