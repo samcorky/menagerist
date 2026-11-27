@@ -40,18 +40,24 @@ describe('loadItemsPage', () => {
 	it('uses the item list when the filter has no conditions', async () => {
 		listNodes.mockResolvedValue({
 			data: [{ id: 'a' }],
-			response: respond(200, '</node?after=a>; rel="next"')
+			response: respond(200, '</node?after=c2>; rel="next"')
 		});
 		const page = await loadItemsPage({
 			filter: emptyQuery(),
 			basics: { type: 'film', q: 'alien' },
-			after: 'z'
+			cursor: 'z'
 		});
 		expect(listNodes).toHaveBeenCalledWith({
 			query: { after: 'z', limit: 50, type: 'film', q: 'alien' }
 		});
 		expect(searchNodes).not.toHaveBeenCalled();
-		expect(page).toMatchObject({ status: 'ok', items: [{ id: 'a' }], hasMore: true, total: null });
+		expect(page).toMatchObject({
+			status: 'ok',
+			items: [{ id: 'a' }],
+			hasMore: true,
+			cursor: 'c2',
+			total: null
+		});
 	});
 
 	it('searches with the page filters folded in when there are conditions', async () => {

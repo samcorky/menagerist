@@ -160,7 +160,7 @@
 	}
 
 	$effect(() => {
-		void list.load(sort);
+		void list.load(sort, { keepRows: true });
 	});
 
 	$effect(() => {
@@ -216,7 +216,7 @@
 			}
 			showSecret(result.data.name, result.data.token);
 			closeCreate();
-			void list.load(sort);
+			void list.load(sort, { keepRows: true });
 		} catch {
 			createError = tokenErrorMessage({});
 		} finally {
@@ -342,6 +342,7 @@
 			<DataTable
 				label="Personal access tokens"
 				{sort}
+				busy={tokensLoading}
 				onsort={(key) => (sort = nextSort(sort, key as ApiTokenSort))}
 				columns={[
 					{ label: 'Token', sortKey: 'name' },

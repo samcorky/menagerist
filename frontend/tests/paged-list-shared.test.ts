@@ -12,8 +12,9 @@ const sources = import.meta.glob(
 const PAGING = '../src/lib/paging.ts';
 
 /**
- * Pages that still page by hand, until they move onto `PagedList` with their sort controls
- * (#592, #610). Take a path off this list when it moves; never add one.
+ * Pages that keep their own paging state instead of a `PagedList`, until they move onto it
+ * with their sort controls (#592, #610). They read the server's cursor with `nextCursor`, as
+ * everything else does. Take a path off this list when it moves; never add one.
  */
 const BY_HAND = new Set([
 	'../src/routes/collections/[id]/+page.svelte',
@@ -39,16 +40,16 @@ describe('paged lists', () => {
 	});
 
 	it('reads the next page from the Link header in one place', () => {
-		expect(offenders(/rel="next"/, BY_HAND)).toEqual([]);
+		expect(offenders(/rel="next"/, new Set())).toEqual([]);
 	});
 
 	it("asks for the next page with the server's cursor, not the last row's id", () => {
-		expect(offenders(/\.at\(-1\)\?\.id/, new Set([...BY_HAND, ...POSITIONAL]))).toEqual([]);
+		expect(offenders(/\.at\(-1\)\?\.id/, POSITIONAL)).toEqual([]);
 	});
 
 	it('does not keep a list on the page-by-hand list once it has moved', () => {
 		for (const path of BY_HAND) {
-			expect(sources[path]).toMatch(/rel="next"|\.at\(-1\)\?\.id|PagedList/);
+			expect(sources[path]).toMatch(/nextCursor|PagedList|cursor/);
 		}
 		expect(Object.entries(sources).filter(([, s]) => /new PagedList/.test(s))).not.toHaveLength(0);
 	});

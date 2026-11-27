@@ -120,6 +120,8 @@
 	// Starts from the list the session already holds, so cards draw with their type's icon at once.
 	let allCategories = $state<NodeTypeResponse[]>(cachedItemTypes() ?? []);
 	let loading = $state(false);
+	// The read in flight is a further page, not a new search, sort or filter.
+	let loadingMore = $state(false);
 	let hasMore = $state(true);
 	let selectedType = $state<string | null>(null);
 	let fetchSeq = 0;
@@ -155,6 +157,15 @@
 	const canSelect = $derived(auth.can('graph:item:write'));
 	const rows = $derived(shownItems.filter((item) => !pendingDeletes.hidden.has(item.id)));
 	const rowIds = $derived(rows.map((item) => item.id));
+	// A search, sort or filter is being read while the old rows stay: they dim instead of vanishing.
+	const reloading = $derived(loading && !loadingMore && rows.length > 0);
+	// Select stays put while a search or sort reloads the list, so the toolbar does not jump; it
+	// goes only if the result that comes back is empty.
+	let hadRows = $state(false);
+	$effect(() => {
+		if (rows.length > 0) hadRows = true;
+	});
+	const showSelect = $derived(canSelect && (rows.length > 0 || (loading && hadRows)));
 
 	function pick(id: string) {
 		selection.enter();
@@ -162,7 +173,6 @@
 	}
 
 	async function reloadList() {
-		items = [];
 		hasMore = true;
 		cursor = null;
 		await fetchPage();
@@ -316,7 +326,6 @@
 		const urlQ = normaliseQuery(page.url.searchParams.get('q'));
 		if (!urlQ) return;
 		if (urlQ !== untrack(() => q)) {
-			items = [];
 			hasMore = true;
 			q = urlQ;
 		}
@@ -338,7 +347,6 @@
 		const typeParam = page.url.searchParams.get('type');
 		untrack(() => {
 			if (typeParam === selectedType) return;
-			items = [];
 			hasMore = true;
 			selectedType = typeParam;
 		});
@@ -348,7 +356,6 @@
 		const value = searchInput;
 		const timer = setTimeout(() => {
 			if (value === q) return;
-			items = [];
 			hasMore = true;
 			q = value;
 		}, 300);
@@ -363,12 +370,12 @@
 		}
 		pageFailed = false;
 		loading = true;
+		loadingMore = more;
 		const basics = { type: selectedType, q };
 		const result = await loadItemsPage({
 			filter,
 			basics,
-			after: more && !searching ? items.at(-1)?.id : undefined,
-			cursor: more && searching ? cursor : null
+			cursor: more ? cursor : null
 		});
 		if (seq !== fetchSeq) return;
 		if (result.status === 'ok') {
@@ -408,6 +415,7 @@
 			if (result.status === 'failed') loadFailed = true;
 		}
 		loading = false;
+		loadingMore = false;
 	}
 
 	// Quiet on failure: only the collection picker says so.
@@ -447,7 +455,6 @@
 
 	function selectType(type: string | null) {
 		if (selectedType === type) return;
-		items = [];
 		hasMore = true;
 		selectedType = type;
 		const params = new SvelteURLSearchParams(page.url.searchParams);
@@ -478,7 +485,6 @@
 	$effect(() => {
 		if (captureController.nodeCreationCount === 0) return;
 		untrack(() => {
-			items = [];
 			hasMore = true;
 			cursor = null;
 			void fetchPage();
@@ -489,7 +495,6 @@
 	$effect(() => {
 		void [selectedType, q, filterKey];
 		untrack(() => {
-			items = [];
 			hasMore = true;
 			cursor = null;
 			void fetchPage();
@@ -619,7 +624,7 @@
 					{/each}
 				</NativeSelect.Root>
 			{/if}
-			{#if canSelect && rows.length > 0}
+			{#if showSelect}
 				<Button
 					variant={selection.active ? 'secondary' : 'outline'}
 					class="max-sm:h-11"
@@ -752,7 +757,13 @@
 	{#if loadingDisplay.show && shownItems.length === 0}
 		<NodeSkeleton view={viewMode} count={8} />
 	{:else if viewMode === 'grid'}
-		<div data-slot="node-grid" class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
+		<div
+			data-slot="node-grid"
+			aria-busy={reloading}
+			class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2 transition-opacity {reloading
+				? 'opacity-60'
+				: ''}"
+		>
 			{#each rows as item (item.id)}
 				<NodeGridCard
 					{item}
@@ -771,7 +782,10 @@
 			{/each}
 		</div>
 	{:else}
-		<Item.Group class="max-w-5xl">
+		<Item.Group
+			class="max-w-5xl transition-opacity {reloading ? 'opacity-60' : ''}"
+			aria-busy={reloading}
+		>
 			{#each rows as item (item.id)}
 				<NodeCard
 					{item}

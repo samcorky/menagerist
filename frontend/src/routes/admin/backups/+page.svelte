@@ -321,7 +321,7 @@
 				what="the backups"
 				onretry={() => void load()}
 			/>{/if}
-		{#if loadingDisplay.show}
+		{#if loadingDisplay.show && backups.length === 0}
 			<div role="status" aria-label="Loading backups" class="space-y-3">
 				<Skeleton class="h-40 w-full" /><Skeleton class="h-40 w-full" />
 			</div>
@@ -336,6 +336,7 @@
 					<DataTable
 						label="Backups"
 						{sort}
+						busy={loading}
 						onsort={(key) => (sort = nextSort(sort, key as BackupSort))}
 						columns={[
 							{ label: 'Backup', sortKey: 'label' },

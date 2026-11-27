@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { nextCursor, type PageResult } from '$lib/paging';
 
 /** What the list asks its fetcher for: the page after `after` (the first when absent). */
@@ -72,6 +73,8 @@ export class PagedList<T, P> {
 	#cursors: (string | undefined)[] = [undefined];
 	#starts: number[] = [0];
 	#seq = 0;
+	// `load` kept the old rows: the cursors and starts are reset once the first page is in.
+	#restart = false;
 	// The read that failed while rows were shown, for `retry` to repeat.
 	#failedRead: { index: number; after: string | undefined; start: number } | null = null;
 
@@ -83,16 +86,25 @@ export class PagedList<T, P> {
 		this.mode = mode;
 	}
 
-	/** Start again from the first page for `params`, dropping the rows read so far. */
-	load(params: P): Promise<void> {
+	/**
+	 * Start again from the first page for `params`, dropping the rows read so far. With
+	 * `keepRows` the rows (and where they sit) stay on screen until the first page arrives and
+	 * replaces them, so a table that is sorted again does not empty and jump while it reloads.
+	 */
+	load(params: P, { keepRows = false }: { keepRows?: boolean } = {}): Promise<void> {
 		this.#params = params;
-		this.rows = [];
-		this.hasMore = false;
-		this.total = null;
-		this.pageIndex = 0;
 		this.#cursor = null;
-		this.#cursors = [undefined];
-		this.#starts = [0];
+		// Untracked: pages call `load` from an `$effect`, which must not depend on the rows it sets.
+		if (keepRows && untrack(() => this.rows.length) > 0) {
+			this.#restart = true;
+		} else {
+			this.rows = [];
+			this.hasMore = false;
+			this.total = null;
+			this.pageIndex = 0;
+			this.#cursors = [undefined];
+			this.#starts = [0];
+		}
 		return this.#read(0, undefined, 0);
 	}
 
@@ -173,7 +185,13 @@ export class PagedList<T, P> {
 			result = { error };
 		}
 		if (seq !== this.#seq) return;
+		if (this.#restart && !(result.error || !result.data)) {
+			this.#restart = false;
+			this.#cursors = [undefined];
+			this.#starts = [0];
+		}
 		if (result.error || !result.data) {
+			this.#restart = false;
 			this.failure = result;
 			// With nothing shown the whole list failed. Otherwise the rows stay, `hasMore` and
 			// the cursors are kept, and `retry` reads the page again.

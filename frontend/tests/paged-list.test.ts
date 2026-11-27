@@ -294,6 +294,55 @@ describe('PagedList, in pages', () => {
 		expect([list.from, list.to]).toEqual([null, null]);
 	});
 
+	it('keeps the rows on screen while it starts again, when asked to', async () => {
+		const { list, calls } = paged(5, 2);
+		await list.load({ q: '' });
+		await list.next();
+
+		const again = list.load({ q: 'x' }, { keepRows: true });
+		// Nothing has emptied or moved: the page is where it was until the new first page is in.
+		expect(list.rows.map((r) => r.id)).toEqual(['r2', 'r3']);
+		expect([list.pageIndex, list.from, list.to, list.loading]).toEqual([1, 3, 4, true]);
+		await again;
+
+		expect(list.rows.map((r) => r.id)).toEqual(['r0', 'r1']);
+		expect([list.pageIndex, list.from, list.to, list.loading]).toEqual([0, 1, 2, false]);
+		expect(calls.at(-1)).toEqual({ after: undefined, params: { q: 'x' } });
+		// The pages after it are read afresh: Next uses the new first page's cursor.
+		await list.next();
+		expect(list.rows.map((r) => r.id)).toEqual(['r2', 'r3']);
+		await list.previous();
+		expect(list.rows.map((r) => r.id)).toEqual(['r0', 'r1']);
+	});
+
+	it('shows the rows that were kept, with a retry, when the new first page fails', async () => {
+		let fail = false;
+		const served = route(5, 2);
+		const list = new PagedList<Row, { q: string }>(
+			async (request) => (fail ? (failure() as never) : served.fetchPage(request)),
+			{ mode: 'page' }
+		);
+		await list.load({ q: '' });
+
+		fail = true;
+		await list.load({ q: 'x' }, { keepRows: true });
+		expect(list.rows.map((r) => r.id)).toEqual(['r0', 'r1']);
+		expect([list.failed, list.nextFailed]).toEqual([false, true]);
+
+		fail = false;
+		await list.retry();
+		expect(list.nextFailed).toBe(false);
+		expect(list.rows.map((r) => r.id)).toEqual(['r0', 'r1']);
+	});
+
+	it('empties as usual when asked to keep rows but has none yet', async () => {
+		const { list } = paged(3, 2);
+		const first = list.load({ q: '' }, { keepRows: true });
+		expect(list.rows).toEqual([]);
+		await first;
+		expect(list.rows).toHaveLength(2);
+	});
+
 	it('reads the page shown again after a change, keeping its rows meanwhile', async () => {
 		let count = 5;
 		const fetchPage: Fetch = async ({ after }) => {

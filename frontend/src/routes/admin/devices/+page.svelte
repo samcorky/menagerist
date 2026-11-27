@@ -196,7 +196,7 @@
 		</Alert.Root>
 	{:else if loadFailed && sessions.length === 0}
 		<LoadFailed what="the active devices" onretry={() => void loadSessions()} />
-	{:else if loading}
+	{:else if loading && sessions.length === 0}
 		<div class="space-y-3">
 			<Skeleton class="h-16 w-full rounded-xl" />
 			<Skeleton class="h-16 w-full rounded-xl" />
@@ -208,6 +208,7 @@
 		{#if wide.current}
 			<DataTable
 				label="Active devices"
+				busy={loading}
 				columns={[
 					{ label: 'Person' },
 					{ label: 'Device' },

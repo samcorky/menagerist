@@ -64,6 +64,7 @@
 		readFilter,
 		withFilter
 	} from '$lib/query/items-page';
+	import { nextCursor } from '$lib/paging';
 	import {
 		NARROW_TOO_LARGE_MESSAGE,
 		linkedBlockReason,
@@ -180,6 +181,8 @@
 	let itemTypes = $state<NodeTypeResponse[]>([]);
 	let loading = $state(false);
 	let hasMore = $state(false);
+	// The server's cursor for the next page of a manual collection, from the `Link` header.
+	let pageCursor = $state<string | null>(null);
 	// A later page that would not load: the list's foot says so and offers Try again (#588).
 	let pageFailed = $state(false);
 	let itemsFailed = $state(false);
@@ -461,7 +464,6 @@
 		const value = searchInput;
 		const timer = setTimeout(() => {
 			if (value === q) return;
-			items = [];
 			hasMore = false;
 			q = value;
 		}, 300);
@@ -470,7 +472,6 @@
 
 	function selectType(slug: string) {
 		if (slug === selectedType) return;
-		items = [];
 		hasMore = false;
 		selectedType = slug;
 	}
@@ -556,7 +557,6 @@
 			if (urlQ !== appliedQ) {
 				appliedQ = urlQ;
 				if (urlQ !== q) {
-					items = [];
 					hasMore = false;
 					q = urlQ;
 				}
@@ -565,7 +565,6 @@
 			if (urlType !== appliedType) {
 				appliedType = urlType;
 				if (urlType !== selectedType) {
-					items = [];
 					hasMore = false;
 					selectedType = urlType;
 				}
@@ -685,6 +684,7 @@
 		if (!after) {
 			itemsFailed = false;
 			firstPageLoaded = false;
+			pageCursor = null;
 		}
 		const result = await listNodes({
 			query: {
@@ -708,7 +708,8 @@
 			}
 		} else {
 			items = after ? [...items, ...result.data] : result.data;
-			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
+			pageCursor = nextCursor(result.response?.headers.get('link'));
+			hasMore = pageCursor !== null;
 		}
 		if (!after) firstPageLoaded = true;
 		loading = false;
@@ -886,7 +887,7 @@
 
 	function nextPage() {
 		if (smart) void fetchSmart(true);
-		else void fetchPage(canonicalId, q, selectedType, items.at(-1)?.id);
+		else void fetchPage(canonicalId, q, selectedType, pageCursor ?? undefined);
 	}
 
 	function loadMore() {

@@ -713,7 +713,7 @@
 			</Card.Root>
 		{/if}
 
-		{#if loading}
+		{#if loading && users.length === 0}
 			{#if loadingDisplay.show}
 				<div class="space-y-3" role="status" aria-label="Loading accounts">
 					<Skeleton class="h-28 w-full rounded-xl" />
@@ -727,6 +727,7 @@
 				<DataTable
 					label="Users"
 					{sort}
+					busy={loading}
 					onsort={(key) => (sort = nextSort(sort, key as UserSort))}
 					columns={[
 						{ label: 'Person', sortKey: 'display_name' },
@@ -789,7 +790,11 @@
 					{/each}
 				</DataTable>
 			{:else}
-				<ul class="flex flex-col gap-3" aria-label="Users">
+				<ul
+					class="flex flex-col gap-3 transition-opacity {loading ? 'opacity-60' : ''}"
+					aria-label="Users"
+					aria-busy={loading}
+				>
 					{#each users as user (user.id)}
 						{@const isMe = user.id === auth.user?.id}
 						{@const locked = isLocked(user.locked_until)}

@@ -121,11 +121,11 @@
 		confirm = '';
 		toast.success('Password changed');
 		if (wasForced) await goto(resolve('/'));
-		else void list.load(sort);
+		else void list.load(sort, { keepRows: true });
 	}
 
 	$effect(() => {
-		if (!forced) void list.load(sort);
+		if (!forced) void list.load(sort, { keepRows: true });
 	});
 
 	// The current device is always one of the rows, so another exists when there is more than one.
@@ -181,7 +181,7 @@
 			} else {
 				toast.success('Other devices signed out');
 				confirmRevokeOthers = false;
-				await list.load(sort);
+				await list.load(sort, { keepRows: true });
 			}
 		} catch {
 			toast.error('Could not sign out other devices.');
@@ -384,6 +384,7 @@
 					<DataTable
 						label="Active devices"
 						{sort}
+						busy={sessionsLoading}
 						onsort={(key) => (sort = nextSort(sort, key as OwnDeviceSort))}
 						columns={[
 							{ label: 'Device', sortKey: 'name' },
