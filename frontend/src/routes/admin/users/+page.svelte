@@ -44,14 +44,11 @@
 	import { isLocked, lastSignIn, lockedLabel, renameDecision } from '$lib/users';
 	import AdminSessionCard from '$lib/components/admin-session-card.svelte';
 	import { renameUserDevice, withDeviceName } from '$lib/admin-device-name';
-	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
-	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
-	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import UserAvatar from '$lib/components/user-avatar.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
+	import ListTable from '$lib/components/list-table.svelte';
 	import HiddenUsername from '$lib/components/hidden-username.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -99,11 +96,6 @@
 	// Shown once, straight after an account is created or a password is reset.
 	let issued = $state<{ name: string; username: string; password: string } | null>(null);
 	let copied = $state(false);
-
-	const loadingDisplay = delayedLoading();
-	$effect(() => {
-		loadingDisplay.set(loading);
-	});
 
 	async function load() {
 		loading = true;
@@ -713,46 +705,104 @@
 			</Card.Root>
 		{/if}
 
-		{#if loading && users.length === 0}
-			{#if loadingDisplay.show}
-				<div class="space-y-3" role="status" aria-label="Loading accounts">
-					<Skeleton class="h-28 w-full rounded-xl" />
-					<Skeleton class="h-28 w-full rounded-xl" />
-				</div>
-			{/if}
-		{:else if loadFailed}
-			<LoadFailed what="the accounts" onretry={() => void load()} />
-		{:else}
-			{#if wide.current}
-				<DataTable
-					label="Users"
-					{sort}
-					busy={loading}
-					onsort={(key) => (sort = nextSort(sort, key as UserSort))}
-					columns={[
-						{ label: 'Person', sortKey: 'display_name' },
-						{ label: 'Role', sortKey: 'role' },
-						{ label: 'Status' },
-						{ label: 'Last sign-in', sortKey: 'last_login_at' },
-						{ label: 'Actions', end: true }
-					]}
-				>
-					{#each users as user (user.id)}
-						{@const isMe = user.id === auth.user?.id}
-						{@const locked = isLocked(user.locked_until)}
-						<Table.Row>
-							<Table.Cell>
-								{@render nameEditor(user, true)}
+		<ListTable
+			label="Users"
+			what="the accounts"
+			columns={[
+				{ label: 'Person', sortKey: 'display_name' },
+				{ label: 'Role', sortKey: 'role' },
+				{ label: 'Status' },
+				{ label: 'Last sign-in', sortKey: 'last_login_at' },
+				{ label: 'Actions', end: true }
+			]}
+			rows={users}
+			rowKey={(user) => user.id}
+			{loading}
+			failed={loadFailed && users.length === 0}
+			onretry={() => void load()}
+			empty="No accounts."
+			{sort}
+			onsort={(key) => (sort = nextSort(sort, key as UserSort))}
+			skeletonClass="h-28"
+		>
+			{#snippet row(user)}
+				{@const isMe = user.id === auth.user?.id}
+				{@const locked = isLocked(user.locked_until)}
+				<Table.Row>
+					<Table.Cell>
+						{@render nameEditor(user, true)}
+						<p class="text-sm text-muted-foreground">{user.username}</p>
+						{#if rowError?.id === user.id}
+							<p class="mt-1 text-sm text-destructive" role="alert">{rowError.message}</p>
+						{/if}
+					</Table.Cell>
+					<Table.Cell>
+						{#if canUpdate}
+							<div class="w-36">
+								<NativeSelect
+									class="[&_select]:min-h-9"
+									aria-label="Role for {user.username}"
+									disabled={rowBusy === user.id || isMe}
+									value={user.role}
+									onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
+								>
+									<NativeSelectOption value="member">Member</NativeSelectOption>
+									<NativeSelectOption value="admin">Administrator</NativeSelectOption>
+								</NativeSelect>
+							</div>
+							{#if isMe}
+								<p class="mt-1 text-xs text-muted-foreground">
+									You can't change your own role or disable yourself.
+								</p>
+							{/if}
+						{:else}
+							{user.role === 'admin' ? 'Administrator' : 'Member'}
+						{/if}
+					</Table.Cell>
+					<Table.Cell>
+						<div class="flex flex-wrap items-center gap-1.5">
+							{@render statusBadges(user, isMe, locked, false)}
+						</div>
+					</Table.Cell>
+					<Table.Cell class="text-muted-foreground">
+						<span title={lastSignIn(user.last_login_at).title}>
+							{lastSignIn(user.last_login_at).text}
+						</span>
+					</Table.Cell>
+					<Table.Cell>
+						<div class="flex flex-wrap items-center justify-end gap-1.5">
+							{@render rowActions(user, isMe, locked, true)}
+						</div>
+					</Table.Cell>
+				</Table.Row>
+			{/snippet}
+			{#snippet card(user)}
+				{@const isMe = user.id === auth.user?.id}
+				{@const locked = isLocked(user.locked_until)}
+				<Card.Root>
+					<Card.Content class="flex flex-col gap-3 p-4 sm:p-5">
+						<div class="flex flex-wrap items-start justify-between gap-2">
+							<div class="min-w-0 flex-1">
+								{@render nameEditor(user, false)}
 								<p class="text-sm text-muted-foreground">{user.username}</p>
-								{#if rowError?.id === user.id}
-									<p class="mt-1 text-sm text-destructive" role="alert">{rowError.message}</p>
-								{/if}
-							</Table.Cell>
-							<Table.Cell>
+							</div>
+							<div class="flex flex-wrap items-center gap-1.5">
+								{@render statusBadges(user, isMe, locked, true)}
+							</div>
+						</div>
+
+						<p class="text-xs text-muted-foreground">
+							Last sign-in: <span title={lastSignIn(user.last_login_at).title}>
+								{lastSignIn(user.last_login_at).text}
+							</span>
+						</p>
+
+						{#if canUpdate || canReset || canUnlock || canListSessions}
+							<div class="flex flex-wrap items-center gap-2 pt-1">
 								{#if canUpdate}
 									<div class="w-36">
 										<NativeSelect
-											class="[&_select]:min-h-9"
+											class="pointer-coarse:[&_select]:min-h-11"
 											aria-label="Role for {user.username}"
 											disabled={rowBusy === user.id || isMe}
 											value={user.role}
@@ -762,97 +812,24 @@
 											<NativeSelectOption value="admin">Administrator</NativeSelectOption>
 										</NativeSelect>
 									</div>
-									{#if isMe}
-										<p class="mt-1 text-xs text-muted-foreground">
-											You can't change your own role or disable yourself.
-										</p>
-									{/if}
-								{:else}
-									{user.role === 'admin' ? 'Administrator' : 'Member'}
 								{/if}
-							</Table.Cell>
-							<Table.Cell>
-								<div class="flex flex-wrap items-center gap-1.5">
-									{@render statusBadges(user, isMe, locked, false)}
-								</div>
-							</Table.Cell>
-							<Table.Cell class="text-muted-foreground">
-								<span title={lastSignIn(user.last_login_at).title}>
-									{lastSignIn(user.last_login_at).text}
-								</span>
-							</Table.Cell>
-							<Table.Cell>
-								<div class="flex flex-wrap items-center justify-end gap-1.5">
-									{@render rowActions(user, isMe, locked, true)}
-								</div>
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</DataTable>
-			{:else}
-				<ul
-					class="flex flex-col gap-3 transition-opacity {loading ? 'opacity-60' : ''}"
-					aria-label="Users"
-					aria-busy={loading}
-				>
-					{#each users as user (user.id)}
-						{@const isMe = user.id === auth.user?.id}
-						{@const locked = isLocked(user.locked_until)}
-						<li>
-							<Card.Root>
-								<Card.Content class="flex flex-col gap-3 p-4 sm:p-5">
-									<div class="flex flex-wrap items-start justify-between gap-2">
-										<div class="min-w-0 flex-1">
-											{@render nameEditor(user, false)}
-											<p class="text-sm text-muted-foreground">{user.username}</p>
-										</div>
-										<div class="flex flex-wrap items-center gap-1.5">
-											{@render statusBadges(user, isMe, locked, true)}
-										</div>
-									</div>
+								{@render rowActions(user, isMe, locked, false)}
+							</div>
+						{/if}
 
-									<p class="text-xs text-muted-foreground">
-										Last sign-in: <span title={lastSignIn(user.last_login_at).title}>
-											{lastSignIn(user.last_login_at).text}
-										</span>
-									</p>
+						{#if isMe && canUpdate}
+							<p class="text-xs text-muted-foreground">
+								You can't change your own role or disable yourself.
+							</p>
+						{/if}
 
-									{#if canUpdate || canReset || canUnlock || canListSessions}
-										<div class="flex flex-wrap items-center gap-2 pt-1">
-											{#if canUpdate}
-												<div class="w-36">
-													<NativeSelect
-														class="pointer-coarse:[&_select]:min-h-11"
-														aria-label="Role for {user.username}"
-														disabled={rowBusy === user.id || isMe}
-														value={user.role}
-														onchange={(e) => patch(user, { role: e.currentTarget.value as Role })}
-													>
-														<NativeSelectOption value="member">Member</NativeSelectOption>
-														<NativeSelectOption value="admin">Administrator</NativeSelectOption>
-													</NativeSelect>
-												</div>
-											{/if}
-											{@render rowActions(user, isMe, locked, false)}
-										</div>
-									{/if}
-
-									{#if isMe && canUpdate}
-										<p class="text-xs text-muted-foreground">
-											You can't change your own role or disable yourself.
-										</p>
-									{/if}
-
-									{#if rowError?.id === user.id}
-										<p class="text-sm text-destructive" role="alert">{rowError.message}</p>
-									{/if}
-								</Card.Content>
-							</Card.Root>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		{/if}
+						{#if rowError?.id === user.id}
+							<p class="text-sm text-destructive" role="alert">{rowError.message}</p>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/snippet}
+		</ListTable>
 	{/if}
 </Page>
 

@@ -4,6 +4,7 @@
 	import LoadFailed from '$lib/components/load-failed.svelte';
 	import PageNav from '$lib/components/page-nav.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
 	import { listTableState } from '$lib/list-table';
 	import type { PagedFoot } from '$lib/paged-list.svelte';
 	import type { TableSort } from '$lib/table-sort';
@@ -31,6 +32,7 @@
 		list,
 		noun,
 		skeletons = 2,
+		skeletonClass = 'h-20',
 		row,
 		card
 	}: {
@@ -56,6 +58,8 @@
 		noun?: string;
 		/** How many skeleton cards to draw on the first load. */
 		skeletons?: number;
+		/** The height class of each skeleton card; they are full width and rounded. */
+		skeletonClass?: string;
 		/** One `<Table.Row>` for the desktop table. */
 		row: Snippet<[T]>;
 		/** The content of one card for a phone, inside its `<li>`. */
@@ -63,16 +67,24 @@
 	} = $props();
 
 	const view = $derived(listTableState({ error: failed, loading, rows: rows.length }));
+
+	// §13a: a first load that is over in under 300ms never flashes a skeleton, or an empty state.
+	const skeletonDelay = delayedLoading();
+	$effect(() => {
+		skeletonDelay.set(view === 'loading');
+	});
 </script>
 
 {#if view === 'error'}
 	<LoadFailed {what} {onretry} />
 {:else if view === 'loading'}
-	<div class="space-y-3" role="status" aria-label="Loading {what}">
-		{#each Array.from({ length: skeletons }, (_, i) => i) as n (n)}
-			<Skeleton class="h-20 w-full rounded-xl" />
-		{/each}
-	</div>
+	{#if skeletonDelay.show}
+		<div class="space-y-3" role="status" aria-label="Loading {what}">
+			{#each Array.from({ length: skeletons }, (_, i) => i) as n (n)}
+				<Skeleton class="{skeletonClass} w-full rounded-xl" />
+			{/each}
+		</div>
+	{/if}
 {:else if view === 'empty'}
 	<p class="text-sm text-muted-foreground">{empty}</p>
 {:else}

@@ -17,21 +17,18 @@
 	import { describeDevice, formatRelativeTime, nameDevice } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
 	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
-	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
+	import ListTable from '$lib/components/list-table.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import DeviceTitle from '$lib/components/device-title.svelte';
 	import AdminSessionCard from '$lib/components/admin-session-card.svelte';
 	import { renameUserDevice, withDeviceName } from '$lib/admin-device-name';
-	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import UserAvatar from '$lib/components/user-avatar.svelte';
@@ -194,112 +191,103 @@
 				Only administrators with session management permissions can access this page.
 			</Alert.Description>
 		</Alert.Root>
-	{:else if loadFailed && sessions.length === 0}
-		<LoadFailed what="the active devices" onretry={() => void loadSessions()} />
-	{:else if loading && sessions.length === 0}
-		<div class="space-y-3">
-			<Skeleton class="h-16 w-full rounded-xl" />
-			<Skeleton class="h-16 w-full rounded-xl" />
-			<Skeleton class="h-16 w-full rounded-xl" />
-		</div>
-	{:else if sessions.length === 0}
-		<p class="text-sm text-muted-foreground">No active devices.</p>
 	{:else}
-		{#if wide.current}
-			<DataTable
-				label="Active devices"
-				busy={loading}
-				columns={[
-					{ label: 'Person' },
-					{ label: 'Device' },
-					{ label: 'Address' },
-					{ label: 'Signed in' },
-					{ label: 'Last active' },
-					{ label: 'Action', end: true }
-				]}
-			>
-				{#each sessions as session (session.id)}
-					{@const described = describeDevice({
-						userAgent: session.user_agent,
-						platform: session.client_platform,
-						mobile: session.client_mobile,
-						displayMode: session.display_mode
-					})}
-					<Table.Row>
-						<Table.Cell class="font-medium">
-							<div class="flex items-center gap-2">
-								<UserAvatar
-									userId={session.user_id}
-									displayName={session.display_name ?? session.username ?? ''}
-									avatarVersion={pictures.get(session.user_id)}
-									size="md"
-									decorative
-								/>
-								<div>
-									<div>{session.display_name}</div>
-									<div class="text-xs font-normal text-muted-foreground">@{session.username}</div>
-								</div>
+		<ListTable
+			label="Active devices"
+			what="the active devices"
+			columns={[
+				{ label: 'Person' },
+				{ label: 'Device' },
+				{ label: 'Address' },
+				{ label: 'Signed in' },
+				{ label: 'Last active' },
+				{ label: 'Action', end: true }
+			]}
+			rows={sessions}
+			rowKey={(session) => session.id}
+			{loading}
+			failed={loadFailed && sessions.length === 0}
+			onretry={() => void loadSessions()}
+			empty="No active devices."
+			skeletons={3}
+			skeletonClass="h-16"
+		>
+			{#snippet row(session)}
+				{@const described = describeDevice({
+					userAgent: session.user_agent,
+					platform: session.client_platform,
+					mobile: session.client_mobile,
+					displayMode: session.display_mode
+				})}
+				<Table.Row>
+					<Table.Cell class="font-medium">
+						<div class="flex items-center gap-2">
+							<UserAvatar
+								userId={session.user_id}
+								displayName={session.display_name ?? session.username ?? ''}
+								avatarVersion={pictures.get(session.user_id)}
+								size="md"
+								decorative
+							/>
+							<div>
+								<div>{session.display_name}</div>
+								<div class="text-xs font-normal text-muted-foreground">@{session.username}</div>
 							</div>
-						</Table.Cell>
-						<Table.Cell>
-							<div class="flex items-center gap-2">
-								<DeviceIcon kind={described.kind} class="size-4 shrink-0 text-muted-foreground" />
-								<DeviceTitle
-									{...nameDevice(session.device_name, described.label)}
-									name={session.device_name ?? null}
-									label={described.label}
-									userAgent={session.user_agent}
-									onsave={canRevoke && session.device_id
-										? (name) => saveName(session.device_id!, name)
-										: undefined}
-								/>
-							</div>
-						</Table.Cell>
-						<Table.Cell class="text-muted-foreground">{session.client_ip ?? '—'}</Table.Cell>
-						<Table.Cell class="text-muted-foreground">
-							{formatIsoDate(session.created_at.slice(0, 10), 'short')}
-						</Table.Cell>
-						<Table.Cell class="text-muted-foreground">
-							{formatRelativeTime(session.last_seen_at)}
-						</Table.Cell>
-						<Table.Cell class="text-right">
-							{#if session.id === currentSessionId}
-								<Badge variant="secondary">This device</Badge>
-							{:else if canRevoke}
-								<Button
-									type="button"
-									variant="outline"
-									class="h-9 px-3"
-									disabled={revokingId === session.id}
-									onclick={() => handleRevoke(session.id)}
-								>
-									{#if revokingId === session.id}
-										<Spinner class="size-4" />
-									{/if}
-									Sign out
-								</Button>
-							{/if}
-						</Table.Cell>
-					</Table.Row>
-				{/each}
-			</DataTable>
-		{:else}
-			<ul class="space-y-3 md:hidden" aria-label="Active devices">
-				{#each sessions as session (session.id)}
-					<li>
-						<AdminSessionCard
-							{session}
-							current={session.id === currentSessionId}
-							ownerPicture={pictures.get(session.user_id)}
-							revoking={revokingId === session.id}
-							onrevoke={canRevoke ? () => handleRevoke(session.id) : undefined}
-							onrename={canRevoke && session.device_id
-								? (name) => saveName(session.device_id!, name)
-								: undefined}
-						/>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+						</div>
+					</Table.Cell>
+					<Table.Cell>
+						<div class="flex items-center gap-2">
+							<DeviceIcon kind={described.kind} class="size-4 shrink-0 text-muted-foreground" />
+							<DeviceTitle
+								{...nameDevice(session.device_name, described.label)}
+								name={session.device_name ?? null}
+								label={described.label}
+								userAgent={session.user_agent}
+								onsave={canRevoke && session.device_id
+									? (name) => saveName(session.device_id!, name)
+									: undefined}
+							/>
+						</div>
+					</Table.Cell>
+					<Table.Cell class="text-muted-foreground">{session.client_ip ?? '—'}</Table.Cell>
+					<Table.Cell class="text-muted-foreground">
+						{formatIsoDate(session.created_at.slice(0, 10), 'short')}
+					</Table.Cell>
+					<Table.Cell class="text-muted-foreground">
+						{formatRelativeTime(session.last_seen_at)}
+					</Table.Cell>
+					<Table.Cell class="text-right">
+						{#if session.id === currentSessionId}
+							<Badge variant="secondary">This device</Badge>
+						{:else if canRevoke}
+							<Button
+								type="button"
+								variant="outline"
+								class="h-9 px-3"
+								disabled={revokingId === session.id}
+								onclick={() => handleRevoke(session.id)}
+							>
+								{#if revokingId === session.id}
+									<Spinner class="size-4" />
+								{/if}
+								Sign out
+							</Button>
+						{/if}
+					</Table.Cell>
+				</Table.Row>
+			{/snippet}
+			{#snippet card(session)}
+				<AdminSessionCard
+					{session}
+					current={session.id === currentSessionId}
+					ownerPicture={pictures.get(session.user_id)}
+					revoking={revokingId === session.id}
+					onrevoke={canRevoke ? () => handleRevoke(session.id) : undefined}
+					onrename={canRevoke && session.device_id
+						? (name) => saveName(session.device_id!, name)
+						: undefined}
+				/>
+			{/snippet}
+		</ListTable>
 	{/if}
 </Page>
