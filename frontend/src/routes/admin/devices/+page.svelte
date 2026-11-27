@@ -8,9 +8,11 @@
 		listUsers,
 		revokeSession,
 		type AdminSessionResponse,
+		type SessionSort,
 		type UserResponse
 	} from '$lib/api/client';
 	import { PAGE_LIMIT, readPages } from '$lib/paging';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
 	import { untrack } from 'svelte';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
@@ -36,6 +38,8 @@
 	let sessions = $state<AdminSessionResponse[]>([]);
 	let users = $state<UserResponse[]>([]);
 	let selectedUserId = $state<string>('');
+	// The server sorts, so the sessions are read again in the new order.
+	let sort = $state<TableSort<SessionSort> | null>(null);
 	// Each person's current picture, from the users list the filter already loads.
 	const pictures = $derived(new Map(users.map((u) => [u.id, u.avatar_version ?? null])));
 	let loading = $state(true);
@@ -78,6 +82,7 @@
 					listSessions({
 						query: {
 							...(selectedUserId ? { user_id: selectedUserId } : {}),
+							...sortQuery(sort),
 							after,
 							limit: PAGE_LIMIT
 						}
@@ -196,11 +201,11 @@
 			label="Active devices"
 			what="the active devices"
 			columns={[
-				{ label: 'Person' },
+				{ label: 'Person', sortKey: 'username' },
 				{ label: 'Device' },
 				{ label: 'Address' },
-				{ label: 'Signed in' },
-				{ label: 'Last active' },
+				{ label: 'Signed in', sortKey: 'created_at' },
+				{ label: 'Last active', sortKey: 'last_seen_at' },
 				{ label: 'Action', end: true }
 			]}
 			rows={sessions}
@@ -209,6 +214,8 @@
 			failed={loadFailed && sessions.length === 0}
 			onretry={() => void loadSessions()}
 			empty="No active devices."
+			{sort}
+			onsort={(key) => (sort = nextSort(sort, key as SessionSort))}
 			skeletons={3}
 			skeletonClass="h-16"
 		>

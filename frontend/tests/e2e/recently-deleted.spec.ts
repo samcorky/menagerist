@@ -129,3 +129,32 @@ test('another account sees nothing of it', async ({ browser, request, workerBase
 		await other.context.close();
 	}
 });
+
+test('a column header sorts the deleted items on the server', async ({ page, request }) => {
+	const suffix = uniqueName('s').replace(/\W+/g, '').toLowerCase();
+	// The database is shared, so the names put these four at the two ends of the A to Z order.
+	const names = [`Aaa ${suffix} b`, `Aaa ${suffix} a`, `Zzz ${suffix} b`, `Zzz ${suffix} a`];
+	for (const name of names) {
+		const item = await makeItem(request, name);
+		expect((await request.delete(`/api/v1/nodes/${item.id}`)).status()).toBe(204);
+	}
+
+	await openRecentlyDeleted(page, 'Items');
+	const table = page.getByRole('table', { name: 'Deleted items' });
+	const header = table.getByRole('columnheader', { name: 'Name' });
+	const order = async (prefix: string) =>
+		(
+			await table
+				.getByRole('row')
+				.filter({ hasText: `${prefix} ${suffix}` })
+				.allInnerTexts()
+		).map((text) => text.trim().split(/\s+/).slice(0, 3).join(' '));
+
+	await header.getByRole('button').click();
+	await expect(header).toHaveAttribute('aria-sort', 'ascending');
+	await expect.poll(() => order('Aaa')).toEqual([`Aaa ${suffix} a`, `Aaa ${suffix} b`]);
+
+	await header.getByRole('button').click();
+	await expect(header).toHaveAttribute('aria-sort', 'descending');
+	await expect.poll(() => order('Zzz')).toEqual([`Zzz ${suffix} b`, `Zzz ${suffix} a`]);
+});
