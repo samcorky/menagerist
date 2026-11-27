@@ -94,3 +94,60 @@ test('a user can sign out all other devices at once', async ({
 	await secondContext.close();
 	await thirdContext.close();
 });
+
+test('devices page ten at a time, and signing out the others works from any page', async ({
+	browser,
+	workerBaseURL,
+	workerSession
+}) => {
+	test.setTimeout(180_000);
+	const adminApi = await request.newContext(apiSessionOptions(workerBaseURL, workerSession));
+	const user = await createUserViaApi(adminApi, workerBaseURL, { prefix: 'devices-pages' });
+	await adminApi.dispose();
+
+	const first = await asUser(browser, user);
+	// Eleven more sign-ins, each a device of its own: twelve in all, so a second page of two.
+	for (let n = 0; n < 11; n++) {
+		await signInViaApi(workerBaseURL, user.username, user.password);
+	}
+
+	const { page } = first;
+	try {
+		await page.goto('/settings/account');
+		const table = page.getByRole('table', { name: 'Active devices' });
+		const rows = table.getByRole('row').filter({ has: page.getByRole('cell') });
+		const nav = page.getByRole('navigation', { name: 'Device pages' });
+		const range = nav.getByTestId('page-range');
+
+		await expect(range).toHaveText('1–10 of 12 devices');
+		await expect(rows).toHaveCount(10);
+		const shots = process.env.SHOTS_DIR;
+		if (shots) {
+			await table.scrollIntoViewIfNeeded();
+			await page.screenshot({ path: `${shots}/devices-page-1.png` });
+		}
+
+		// A header sorts all twelve on the server, not only the page on screen.
+		await table.getByRole('button', { name: 'First signed in' }).click();
+		await expect(table.getByRole('columnheader', { name: 'First signed in' })).toHaveAttribute(
+			'aria-sort',
+			'ascending'
+		);
+		await expect(range).toHaveText('1–10 of 12 devices');
+
+		await nav.getByRole('button', { name: 'Next' }).click();
+		await expect(range).toHaveText('11–12 of 12 devices');
+		await expect(rows).toHaveCount(2);
+		if (shots) await page.screenshot({ path: `${shots}/devices-page-2.png` });
+
+		// The button needs no list of every device: the count says there are others.
+		await page.getByRole('button', { name: 'Sign out all other devices' }).click();
+		await page.getByRole('button', { name: 'Sign out other devices' }).click();
+		await expect(page.getByText('Other devices signed out')).toBeVisible();
+		await expect(rows).toHaveCount(1);
+		await expect(range).toHaveText('1 device');
+		await expect(page.getByRole('button', { name: 'Sign out all other devices' })).toHaveCount(0);
+	} finally {
+		await first.context.close();
+	}
+});
