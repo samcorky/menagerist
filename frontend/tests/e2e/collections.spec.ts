@@ -149,6 +149,49 @@ test('searches inside a collection', async ({ page, request }) => {
 	await expect(page.getByText('Nothing matched "zzz-no-match-zzz"')).toBeVisible();
 });
 
+test("a collection's items can be put in the order a person picks, and keep it on reload", async ({
+	page,
+	request
+}) => {
+	const word = uniqueName('Ordered').replace(/\W+/g, '');
+	const collection = await makeCollection(request, `${word} set`);
+	// Added out of A to Z order, so each order below starts with a different one.
+	const items = [];
+	for (const name of ['Bravo', 'Alpha', 'Charlie'])
+		items.push(await makeItem(request, `${word} ${name}`));
+	await addToCollection(
+		request,
+		collection.id,
+		items.map((item) => item.id)
+	);
+
+	await page.goto(`/collections/${collection.id}`);
+	const order = async () =>
+		(await page.getByRole('link').filter({ hasText: word }).allInnerTexts()).map((text) =>
+			text.split('\n')[0].replace(`${word} `, '')
+		);
+	const sortBy = page.getByRole('combobox', { name: 'Sort by' });
+
+	await expect(sortBy).toHaveValue('oldest');
+	await expect.poll(order).toEqual(['Bravo', 'Alpha', 'Charlie']);
+
+	await sortBy.selectOption('name-asc');
+	await expect(page).toHaveURL(/sort=name-asc/);
+	await expect.poll(order).toEqual(['Alpha', 'Bravo', 'Charlie']);
+
+	await sortBy.selectOption('newest');
+	await expect.poll(order).toEqual(['Charlie', 'Alpha', 'Bravo']);
+
+	// The order is in the address, so a reload keeps it.
+	await page.reload();
+	await expect(sortBy).toHaveValue('newest');
+	await expect.poll(order).toEqual(['Charlie', 'Alpha', 'Bravo']);
+
+	await sortBy.selectOption('oldest');
+	await expect(page).not.toHaveURL(/sort=/);
+	await expect.poll(order).toEqual(['Bravo', 'Alpha', 'Charlie']);
+});
+
 test('filters a collection by item type', async ({ page, request }) => {
 	const collection = await makeCollection(request, uniqueName('Typed'));
 	const books = await makeItemType(request, uniqueName('Books'));

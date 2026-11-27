@@ -14,7 +14,7 @@ import { isFilterEmpty } from '$lib/query/tree';
 import { combineWithSaved, needsNarrowing, type NarrowBasics } from '$lib/query/narrow';
 import type { SummaryLookup } from '$lib/query/summary';
 import { runSearch, type SearchWarning } from '$lib/query/search';
-import type { Query } from '$lib/query/types';
+import type { Query, SortKey } from '$lib/query/types';
 import { describeItemCount, validateCollectionName } from '$lib/collections';
 import { mapWarnings, parseQueryPath, pathKey, type QueryTarget } from '$lib/query/warnings';
 
@@ -186,6 +186,11 @@ export async function loadSmartCollection(
 		limit?: number;
 		/** The page's own filters, ANDed onto the saved conditions (never saved by this). */
 		narrow?: { adhoc: Query; basics: NarrowBasics };
+		/**
+		 * An order for this view only, in place of the saved one (never saved by this). `undefined`
+		 * keeps the saved order; an empty list is the plain list, in creation order.
+		 */
+		sort?: SortKey[];
 	}
 ): Promise<SmartCollectionPage> {
 	const own = collection.warnings ?? [];
@@ -203,10 +208,11 @@ export async function loadSmartCollection(
 		};
 	}
 	const { narrow } = opts;
-	const sent =
+	const narrowed =
 		narrow && needsNarrowing(narrow.adhoc, narrow.basics)
 			? combineWithSaved(query, narrow.adhoc, narrow.basics)
 			: query;
+	const sent = opts.sort === undefined ? narrowed : { ...narrowed, sort: opts.sort };
 	if (!fitsLimits(sent)) {
 		return {
 			query,
