@@ -16,11 +16,7 @@ const PAGING = '../src/lib/paging.ts';
  * with their sort controls (#592, #610). They read the server's cursor with `nextCursor`, as
  * everything else does. Take a path off this list when it moves; never add one.
  */
-const BY_HAND = new Set([
-	'../src/routes/collections/[id]/+page.svelte',
-	'../src/lib/query/items-page.ts',
-	'../src/routes/items/+page.svelte'
-]);
+const BY_HAND = new Set(['../src/routes/collections/[id]/+page.svelte']);
 
 /** Pages a cursor by the id of the last row on purpose: an item's contents come in (depth, id) order. */
 const POSITIONAL = new Set(['../src/lib/components/item-contents.svelte']);

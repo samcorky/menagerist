@@ -36,8 +36,8 @@ describe('listEndState', () => {
 });
 
 describe('loadAheadMargin', () => {
-	it('loads about a screen and a half ahead', () => {
-		expect(loadAheadMargin(800)).toBe('1200px');
+	it('loads two and a half screens ahead', () => {
+		expect(loadAheadMargin(800)).toBe('2000px');
 	});
 
 	it('is always further ahead than the old 200px', () => {
@@ -47,8 +47,8 @@ describe('loadAheadMargin', () => {
 	});
 
 	it('falls back to a sensible margin for a height it cannot read', () => {
-		expect(loadAheadMargin(0)).toBe('1200px');
-		expect(loadAheadMargin(Number.NaN)).toBe('1200px');
+		expect(loadAheadMargin(0)).toBe('2000px');
+		expect(loadAheadMargin(Number.NaN)).toBe('2000px');
 	});
 });
 
