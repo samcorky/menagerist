@@ -8,7 +8,10 @@ from app.entrypoints.api.shared.http.http_headers import (
     paging_responses,
     set_page_headers,
 )
-from app.entrypoints.api.shared.http.parameters import NewestFirstPageParams
+from app.entrypoints.api.shared.http.parameters import (
+    NewestFirstPageParams,
+    SearchPageParams,
+)
 from app.entrypoints.api.shared.http.problem_response import error_response
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.scheduling.adapters.api.dependencies import (
@@ -27,7 +30,11 @@ from app.modules.scheduling.application.get_job_history import (
     GetJobHistoryQuery,
     JobRunSort,
 )
-from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
+from app.modules.scheduling.application.list_jobs import (
+    JobSort,
+    ListJobs,
+    ListJobsQuery,
+)
 from app.modules.scheduling.application.preview_schedule import (
     MAX_PREVIEW_RUNS,
     PreviewSchedule,
@@ -101,22 +108,36 @@ async def preview_schedule(
     "/jobs",
     response_model=list[JobResponse],
     operation_id="list_jobs",
-    responses={**_FORBIDDEN},
+    responses={**_FORBIDDEN, **paging_responses("Scheduled tasks")},
 )
 async def list_jobs(
+    request: Request,
     response: Response,
     use_case: Annotated[ListJobs, Depends(get_list_jobs_use_case)],
     actor: Annotated[Actor, Depends(get_current_actor)],
+    page: Annotated[SearchPageParams[JobSort], Query()],
 ) -> list[JobResponse]:
-    """List every scheduled job with its schedule, next run and current work."""
+    """List scheduled jobs with their schedule, next run and current work.
+
+    Ordered by title unless sorted. `q` keeps the jobs whose title or description
+    contains it. A job with no next run, or that has never run, sorts last.
+    """
     response.headers["Cache-Control"] = "private, no-store"
-    statuses = await use_case.handle(
+    result = await use_case.handle(
         ListJobsQuery(
-            now=datetime.now(UTC), timezone=get_server_settings().time_zone.key
+            after=page.cursor,
+            limit=page.limit,
+            sort=page.first_sort,
+            order=page.first_order,
+            then_by=page.then_by,
+            q=page.q,
+            now=datetime.now(UTC),
+            timezone=get_server_settings().time_zone.key,
         ),
         actor,
     )
-    return [JobResponse.from_domain(item) for item in statuses]
+    set_page_headers(request, response, result)
+    return [JobResponse.from_domain(item) for item in result.items]
 
 
 @router.get(

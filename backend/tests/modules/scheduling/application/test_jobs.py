@@ -24,7 +24,11 @@ from app.modules.scheduling.application.get_job_history import (
     GetJobHistoryQuery,
     JobRunSort,
 )
-from app.modules.scheduling.application.list_jobs import ListJobs, ListJobsQuery
+from app.modules.scheduling.application.list_jobs import (
+    JobSort,
+    ListJobs,
+    ListJobsQuery,
+)
 from app.modules.scheduling.application.permissions import SchedulingPermission
 from app.modules.scheduling.application.run_job_now import RunJobNow, RunJobNowCommand
 from app.modules.scheduling.domain.errors import RunNowNotAllowedError, UnknownJobError
@@ -114,9 +118,9 @@ async def test_status_lists_enabled_disabled_and_manual_jobs_without_writes() ->
     store = InMemorySchedulingStore()
     registry = JobRegistry(
         [
-            JobDefinition(job_key="enabled", schedule_key="enabled"),
-            JobDefinition(job_key="disabled", schedule_key="disabled"),
-            JobDefinition(job_key="manual"),
+            JobDefinition(job_key="enabled", schedule_key="enabled", title="A enabled"),
+            JobDefinition(job_key="disabled", schedule_key="disabled", title="B off"),
+            JobDefinition(job_key="manual", title="C manual"),
         ]
     )
     sources = InMemoryScheduleSource({"enabled": "0 3 * * *", "disabled": ""})
@@ -127,7 +131,7 @@ async def test_status_lists_enabled_disabled_and_manual_jobs_without_writes() ->
         sources,
         CronScheduleEvaluator(),
     )
-    statuses = await case.handle(ListJobsQuery(now=NOW, timezone="UTC"), ADMIN)
+    statuses = (await case.handle(_query(), ADMIN)).items
     assert [status.definition.job_key for status in statuses] == [
         "enabled",
         "disabled",
@@ -142,10 +146,115 @@ async def test_status_lists_enabled_disabled_and_manual_jobs_without_writes() ->
     await RunJobNow(
         create_in_memory_scheduling_uow(store), get_access_guard(), registry
     ).handle(RunJobNowCommand(job_key="enabled", now=NOW), ADMIN)
-    statuses = await case.handle(ListJobsQuery(now=NOW, timezone="UTC"), ADMIN)
+    statuses = (await case.handle(_query(), ADMIN)).items
     assert statuses[0].active_run is not None
     with pytest.raises(ForbiddenError):
-        await case.handle(ListJobsQuery(now=NOW, timezone="UTC"), MEMBER)
+        await case.handle(_query(), MEMBER)
+
+
+def _query(**fields: object) -> ListJobsQuery:
+    return ListJobsQuery(now=NOW, timezone="UTC", **fields)  # type: ignore[arg-type]
+
+
+async def _listing(*definitions: JobDefinition, schedules: dict[str, str]) -> ListJobs:
+    store = InMemorySchedulingStore()
+    return ListJobs(
+        build_in_memory_scheduling_repos(store).reader,
+        get_access_guard(),
+        JobRegistry(list(definitions)),
+        InMemoryScheduleSource(schedules),
+        CronScheduleEvaluator(),
+    )
+
+
+def _keys(page: object) -> list[str]:
+    return [status.definition.job_key for status in page.items]  # type: ignore[attr-defined]
+
+
+async def test_jobs_come_by_title_ignoring_case_unless_sorted() -> None:
+    """The default order is the title, so it does not depend on registration."""
+    case = await _listing(
+        JobDefinition(job_key="z", title="beta"),
+        JobDefinition(job_key="y", title="Alpha"),
+        JobDefinition(job_key="x", title="Charlie"),
+        schedules={},
+    )
+
+    assert _keys(await case.handle(_query(), ADMIN)) == ["y", "z", "x"]
+    desc = _query(sort=JobSort.TITLE, order=SortOrder.DESC)
+    assert _keys(await case.handle(desc, ADMIN)) == ["x", "z", "y"]
+
+
+async def test_a_job_with_no_next_run_sorts_last_in_either_direction() -> None:
+    """An unscheduled job has nothing to compare, so it follows the rest."""
+    case = await _listing(
+        JobDefinition(job_key="late", schedule_key="late", title="B"),
+        JobDefinition(job_key="soon", schedule_key="soon", title="C"),
+        JobDefinition(job_key="never", title="A"),
+        schedules={"late": "0 5 * * *", "soon": "0 4 * * *"},
+    )
+
+    asc = _query(sort=JobSort.NEXT_RUN_AT)
+    desc = _query(sort=JobSort.NEXT_RUN_AT, order=SortOrder.DESC)
+    assert _keys(await case.handle(asc, ADMIN)) == ["soon", "late", "never"]
+    assert _keys(await case.handle(desc, ADMIN)) == ["late", "soon", "never"]
+
+
+async def test_jobs_sort_by_when_they_last_ran_never_run_last() -> None:
+    """The last run's start orders them, and a job that never ran has none."""
+    store = InMemorySchedulingStore()
+    registry = JobRegistry(
+        [
+            JobDefinition(job_key="first", title="First"),
+            JobDefinition(job_key="second", title="Second"),
+            JobDefinition(job_key="idle", title="Idle"),
+        ]
+    )
+    for key, moment in (("second", NOW), ("first", NOW - timedelta(days=1))):
+        await RunJobNow(
+            create_in_memory_scheduling_uow(store), get_access_guard(), registry
+        ).handle(RunJobNowCommand(job_key=key, now=moment), ADMIN)
+    case = ListJobs(
+        build_in_memory_scheduling_repos(store).reader,
+        get_access_guard(),
+        registry,
+        InMemoryScheduleSource({}),
+        CronScheduleEvaluator(),
+    )
+
+    asc = _query(sort=JobSort.LAST_RUN)
+    desc = _query(sort=JobSort.LAST_RUN, order=SortOrder.DESC)
+    assert _keys(await case.handle(asc, ADMIN)) == ["first", "second", "idle"]
+    assert _keys(await case.handle(desc, ADMIN)) == ["second", "first", "idle"]
+
+
+async def test_q_keeps_the_jobs_whose_title_or_description_contains_it() -> None:
+    """Text matches the title and the description, ignoring case and accents."""
+    case = await _listing(
+        JobDefinition(job_key="a", title="Tidy up", description="Removes old files"),
+        JobDefinition(job_key="b", title="Café check", description="Looks at cafés"),
+        JobDefinition(job_key="c", title="Backup", description="Saves a copy"),
+        schedules={},
+    )
+
+    assert _keys(await case.handle(_query(q="CAFE"), ADMIN)) == ["b"]
+    assert _keys(await case.handle(_query(q="old files"), ADMIN)) == ["a"]
+    page = await case.handle(_query(q="zzz"), ADMIN)
+    assert (_keys(page), page.total) == ([], 0)
+
+
+async def test_jobs_are_paged_by_a_cursor_and_report_how_many_there_are() -> None:
+    """A small page names the next one, and the total counts every match."""
+    case = await _listing(
+        *[JobDefinition(job_key=f"j{n}", title=f"Job {n}") for n in range(5)],
+        schedules={},
+    )
+
+    first = await case.handle(_query(limit=2), ADMIN)
+    assert (_keys(first), first.total) == (["j0", "j1"], 5)
+    assert first.next is not None
+    second = await case.handle(_query(limit=2, after=first.next), ADMIN)
+    assert _keys(second) == ["j2", "j3"]
 
 
 async def test_history_is_scoped_to_registered_job_and_limit() -> None:

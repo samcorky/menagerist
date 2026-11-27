@@ -15,6 +15,7 @@ from app.entrypoints.api.shared.bridges.search_sources import (
     ExamplePackSource,
     ItemTypeSource,
     SavedFieldSource,
+    ScheduledTaskSource,
     UserSource,
 )
 from app.modules.examples.adapters.platform.in_memory_pack_catalogue import (
@@ -63,12 +64,27 @@ from app.modules.presets.adapters.persistence.in_memory_preset_repository import
 from app.modules.presets.application.list_presets import ListPresets
 from app.modules.presets.domain.preset import Preset
 from app.modules.presets.ports.unit_of_work import PresetRepos
+from app.modules.scheduling.adapters.persistence.in_memory_job_run_reader import (
+    InMemoryJobRunReader,
+)
+from app.modules.scheduling.adapters.persistence.in_memory_store import (
+    InMemorySchedulingStore,
+)
+from app.modules.scheduling.adapters.platform.cron_evaluator import (
+    CronScheduleEvaluator,
+)
+from app.modules.scheduling.adapters.platform.in_memory_schedule_source import (
+    InMemoryScheduleSource,
+)
+from app.modules.scheduling.application.list_jobs import ListJobs
+from app.modules.scheduling.domain.registry import JobRegistry
 from app.modules.search.domain.search_hit import SearchKind
 from app.modules.transfer.adapters.persistence.in_memory_run_repository import (
     InMemoryRunRepository,
 )
 from app.shared_kernel.actor import Actor
 from app.shared_kernel.errors import ForbiddenError
+from app.shared_kernel.jobs import JobDefinition
 
 ALICE = Actor(id=uuid.UUID(int=101), roles=frozenset({"member"}))
 BOB = Actor(id=uuid.UUID(int=102), roles=frozenset({"member"}))
@@ -215,6 +231,53 @@ async def test_item_types_are_read_in_pages(monkeypatch: pytest.MonkeyPatch) -> 
     hits = await source.find("type", 10, ALICE)
 
     assert len(hits) == 5
+
+
+# --- Scheduled tasks ----------------------------------------------------------
+
+
+def _tasks() -> ScheduledTaskSource:
+    registry = JobRegistry(
+        [
+            JobDefinition(
+                job_key="backup.create",
+                title="Back up everything",
+                description="Saves a full copy.",
+            ),
+            JobDefinition(
+                job_key="cafe.check", title="Café check", description="Looks at cafés"
+            ),
+        ]
+    )
+    return ScheduledTaskSource(
+        ListJobs(
+            InMemoryJobRunReader(InMemorySchedulingStore()),
+            get_access_guard(),
+            registry,
+            InMemoryScheduleSource({}),
+            CronScheduleEvaluator(),
+        )
+    )
+
+
+async def test_scheduled_tasks_match_the_title_and_the_description() -> None:
+    """Either one finds the task, ignoring case and accents, as before."""
+    source = _tasks()
+
+    by_title = await source.find("CAFE", 10, ADMIN)
+    by_description = await source.find("full copy", 10, ADMIN)
+
+    assert [(h.kind, h.ref) for h in by_title] == [
+        (SearchKind.SCHEDULED_TASK, "cafe.check")
+    ]
+    assert [h.ref for h in by_description] == ["backup.create"]
+    assert await source.find("zeppelin", 10, ADMIN) == []
+
+
+async def test_scheduled_tasks_are_for_those_who_may_read_them() -> None:
+    """A member is refused, so the search leaves the kind out."""
+    with pytest.raises(ForbiddenError):
+        await _tasks().find("backup", 10, ALICE)
 
 
 # --- Example packs ------------------------------------------------------------
