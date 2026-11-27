@@ -174,6 +174,7 @@ export default defineConfig({
 						'**/collections.spec.ts',
 						'**/create-item.spec.ts',
 						'**/connect-items.spec.ts',
+						'**/items-sort.spec.ts',
 						'**/quick-capture.spec.ts',
 						'**/*.mobile.spec.ts'
 					]
