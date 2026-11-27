@@ -24,9 +24,11 @@
 		verifyBackup,
 		deleteBackup,
 		type BackupResponse,
+		type BackupSort,
 		type VerificationResponse
 	} from '$lib/api/client';
 	import { PAGE_LIMIT, readPages } from '$lib/paging';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
 	import { networkAwareError, uploadErrorMessage } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { formatDateTime } from '$lib/format-date';
@@ -50,6 +52,8 @@
 	const canCreate = $derived(auth.can('backup:archive:create'));
 	const canDelete = $derived(auth.can('backup:archive:delete'));
 	let backups = $state.raw<BackupResponse[]>([]);
+	// The server sorts, so the list is read again in the new order.
+	let sort = $state<TableSort<BackupSort> | null>(null);
 	let loading = $state(true);
 	let loadFailed = $state(false);
 	let busy = $state<string | null>(null);
@@ -67,6 +71,7 @@
 	const loadingDisplay = delayedLoading();
 	$effect(() => loadingDisplay.set(loading));
 	$effect(() => {
+		void sort;
 		if (canRead) untrack(() => void load());
 		else loading = false;
 	});
@@ -82,7 +87,9 @@
 		loading = true;
 		loadFailed = false;
 		try {
-			const read = await readPages((after) => listBackups({ query: { after, limit: PAGE_LIMIT } }));
+			const read = await readPages((after) =>
+				listBackups({ query: { after, limit: PAGE_LIMIT, ...sortQuery(sort) } })
+			);
 			if (!read.ok) {
 				loadFailed = true;
 				// A failed refresh keeps the list already shown; only an empty page shows LoadFailed.
@@ -328,10 +335,12 @@
 				<div aria-busy={loading}>
 					<DataTable
 						label="Backups"
+						{sort}
+						onsort={(key) => (sort = nextSort(sort, key as BackupSort))}
 						columns={[
-							{ label: 'Backup' },
-							{ label: 'Created' },
-							{ label: 'Size' },
+							{ label: 'Backup', sortKey: 'label' },
+							{ label: 'Created', sortKey: 'created_at' },
+							{ label: 'Size', sortKey: 'size' },
 							{ label: 'Versions' },
 							{ label: 'Actions', end: true }
 						]}

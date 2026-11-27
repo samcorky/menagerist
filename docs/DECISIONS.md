@@ -2049,3 +2049,13 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Not for the items list.** Items count to a cap (1,000 for a text search) and say so in `Total-Count-Capped`, which is its own decision above, and the contents of an item are walked in memory. A list of collections filtered by `item_id` is filtered after the rows are read, so it has no total.
 - **The deleted lists count inside the page.** They counted all deleted rows in a second query that ignored `q`, so after `q` was added `Total-Count` no longer followed the filter. They now return the `Page` with its own total, and the result types that only carried the count are gone.
 - **Not breaking:** a new response header on six more routes, documented in the schema.
+
+## Tables sort on the server, from the column header (2026-11-27)
+
+**Decision:** A sortable column header in `DataTable` is a button that asks the list route for that order (`sort` and `order`), for every table, whether it pages or reads every row. Ascending, then descending, then the server's own order. Part of #610.
+
+- **The server, not the browser.** #610 suggested sorting in the browser where the whole list is loaded and on the server where it is not. A table that pages (the tokens, ten to a page) can only be sorted by the server, because a browser sort would reorder the page on screen and nothing else. The small tables that read every row could sort locally, but then each table would carry a comparison of names, dates and empty values that has to agree with the server's order for ties, and two code paths would do one job. One path costs a request per click on lists that are small.
+- **The route's own enum is the allow-list.** `sortKey` is typed against the generated sort enum of each list (`ApiTokenSort`, `UserSort`, `BackupSort`), so a column the route cannot sort by does not compile.
+- **A new sort starts from the first page.** A paged table reloads from its first page whenever the order changes, since the cursor only resumes the sort that made it.
+- **The default is the server's order,** shown with no arrow and `aria-sort="none"`, as the issue proposed; the sort is held in the page, not saved.
+- **Phones.** The tables show only on wide screens, so there is no header to click on a phone. A sort control for the cards can follow.

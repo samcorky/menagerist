@@ -7,9 +7,11 @@
 		listGrantablePermissions,
 		revokeApiToken,
 		rotateApiToken,
-		type ApiTokenResponse
+		type ApiTokenResponse,
+		type ApiTokenSort
 	} from '$lib/api/client';
 	import PageNav from '$lib/components/page-nav.svelte';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
 	import { PagedList } from '$lib/paged-list.svelte';
 	import { networkAwareError } from '$lib/api/errors';
 	import {
@@ -50,8 +52,11 @@
 
 	// A person's tokens are few, so they page ten at a time, with Previous and Next.
 	const TOKENS_PER_PAGE = 10;
-	const list = new PagedList<ApiTokenResponse, null>(
-		({ after }) => listApiTokens({ query: { after, limit: TOKENS_PER_PAGE } }),
+	// The server sorts, so every page is in order, not only the one on screen.
+	let sort = $state<TableSort<ApiTokenSort> | null>(null);
+	const list = new PagedList<ApiTokenResponse, TableSort<ApiTokenSort> | null>(
+		({ after, params }) =>
+			listApiTokens({ query: { after, limit: TOKENS_PER_PAGE, ...sortQuery(params) } }),
 		{ mode: 'page' }
 	);
 	const tokens = $derived(list.rows);
@@ -155,7 +160,10 @@
 	}
 
 	$effect(() => {
-		void list.load(null);
+		void list.load(sort);
+	});
+
+	$effect(() => {
 		void loadGrantable();
 	});
 
@@ -208,8 +216,7 @@
 			}
 			showSecret(result.data.name, result.data.token);
 			closeCreate();
-			// The newest token is first.
-			void list.load(null);
+			void list.load(sort);
 		} catch {
 			createError = tokenErrorMessage({});
 		} finally {
@@ -334,11 +341,13 @@
 		{#if wide.current}
 			<DataTable
 				label="Personal access tokens"
+				{sort}
+				onsort={(key) => (sort = nextSort(sort, key as ApiTokenSort))}
 				columns={[
-					{ label: 'Token' },
+					{ label: 'Token', sortKey: 'name' },
 					{ label: 'Access' },
-					{ label: 'Expires' },
-					{ label: 'Last used' },
+					{ label: 'Expires', sortKey: 'expires_at' },
+					{ label: 'Last used', sortKey: 'last_used_at' },
 					{ label: 'Actions', end: true }
 				]}
 			>
