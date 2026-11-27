@@ -88,6 +88,7 @@
 		type ExampleFilter
 	} from '$lib/examples';
 	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+	import { CUSTOM_SORT, SORT_CHOICES, sortChoiceOf, withSortChoice } from '$lib/query/sort-choices';
 	import { inFamilyOrder, typeNames } from '$lib/type-names';
 	import { appearanceOf } from '$lib/type-inheritance';
 	import { matchContext } from '$lib/search-context';
@@ -246,6 +247,14 @@
 			});
 		});
 	});
+
+	// The order is the sort the Filters dialog edits, so the two never disagree.
+	const sortChoice = $derived(sortChoiceOf(filter.sort));
+
+	function setSort(value: string) {
+		writer.startSession();
+		writer.write(withSortChoice(filter, value));
+	}
 
 	function openFilters(focus: Path | null) {
 		filtersFocus = focus;
@@ -564,7 +573,7 @@
 			placeholder="Search your items…"
 			class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto md:text-sm"
 		/>
-		<div class="ml-auto flex items-center gap-2">
+		<div class="ml-auto flex flex-wrap items-center justify-end gap-2">
 			<Button
 				variant="outline"
 				class="max-sm:h-11"
@@ -581,6 +590,20 @@
 					</Badge>
 				{/if}
 			</Button>
+			<NativeSelect.Root
+				size="sm"
+				class="shrink-0 max-sm:[&_select[data-size]]:h-11"
+				aria-label="Sort by"
+				value={sortChoice}
+				onchange={(e) => setSort(e.currentTarget.value)}
+			>
+				{#each SORT_CHOICES as choice (choice.value)}
+					<NativeSelect.Option value={choice.value}>{choice.label}</NativeSelect.Option>
+				{/each}
+				{#if sortChoice === CUSTOM_SORT}
+					<NativeSelect.Option value={CUSTOM_SORT} disabled>Custom sort</NativeSelect.Option>
+				{/if}
+			</NativeSelect.Root>
 			{#if showExampleFilter}
 				<NativeSelect.Root
 					size="sm"
