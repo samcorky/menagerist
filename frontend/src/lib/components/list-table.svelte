@@ -33,6 +33,7 @@
 		noun,
 		skeletons = 2,
 		skeletonClass = 'h-20',
+		itemProps,
 		row,
 		card
 	}: {
@@ -60,6 +61,8 @@
 		skeletons?: number;
 		/** The height class of each skeleton card; they are full width and rounded. */
 		skeletonClass?: string;
+		/** Attributes for a card's `<li>`, such as an `id` a link can scroll to. */
+		itemProps?: (item: T) => Record<string, unknown>;
 		/** One `<Table.Row>` for the desktop table. */
 		row: Snippet<[T]>;
 		/** The content of one card for a phone, inside its `<li>`. */
@@ -101,7 +104,7 @@
 			aria-busy={loading}
 		>
 			{#each rows as item (rowKey(item))}
-				<li>{@render card(item)}</li>
+				<li {...itemProps?.(item)}>{@render card(item)}</li>
 			{/each}
 		</ul>
 	{/if}

@@ -19,8 +19,6 @@
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
-	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
-	import { wide } from '$lib/viewport.svelte';
 	import { coreForProp } from '$lib/field-types';
 	import { explainCron } from '$lib/field-types/cron/explain';
 	import { formatDateTime } from '$lib/format-date';
@@ -49,7 +47,7 @@
 		type SettingValue
 	} from '$lib/settings-form';
 	import BackButton from '$lib/components/back-button.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
+	import ListTable from '$lib/components/list-table.svelte';
 	import ProgressBar from '$lib/components/progress-bar.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge/index.js';
@@ -95,12 +93,6 @@
 	let drafts = $state<Record<string, unknown>>({});
 	let draftErrors = $state<Record<string, string>>({});
 	let saving = $state<string | null>(null);
-
-	const loadingDisplay = delayedLoading();
-	$effect(() => {
-		loadingDisplay.set(loading);
-	});
-
 	const canRead = $derived(auth.can('scheduling:job:read'));
 	const canRun = $derived(auth.can('scheduling:job:run'));
 	const canEditSchedules = $derived(
@@ -662,92 +654,86 @@
 			</Button>
 		{/if}
 
-		{#if loading && jobs.length === 0}
-			{#if loadingDisplay.show}
-				<div class="space-y-3" aria-hidden="true">
-					<Skeleton class="h-16 w-full rounded-xl" />
-					<Skeleton class="h-16 w-full rounded-xl" />
-					<Skeleton class="h-16 w-full rounded-xl" />
-				</div>
-			{/if}
-		{:else if jobs.length === 0}
-			{#if !error}
-				<p class="text-sm text-muted-foreground">Nothing is set up to run in the background yet.</p>
-			{/if}
-		{:else}
-			{#if wide.current}
-				<DataTable
-					label="Scheduled tasks"
-					columns={[
-						{ label: 'Task' },
-						{ label: 'Schedule' },
-						{ label: 'Next run' },
-						{ label: 'Last run' },
-						{ label: 'Actions', end: true }
-					]}
-				>
-					{#each jobs as job (job.job_key)}
-						{@const setting = scheduleSetting(job)}
-						<Table.Row id={jobId(job.job_key)} tabindex={-1} class={markClass(job)}>
-							<Table.Head scope="row" class="h-auto max-w-xs px-4 py-3 align-top whitespace-normal">
-								<div class="font-medium">{job.title}</div>
-								{#if job.description}
-									<div class="mt-0.5 text-xs font-normal text-muted-foreground">
-										{job.description}
-									</div>
-								{/if}
-							</Table.Head>
-							<Table.Cell>
-								<div class="whitespace-pre-line">{scheduleLabel(job, explain)}</div>
-								{#if setting?.locked}
-									<div class="mt-0.5 text-xs text-muted-foreground">{lockedNote(setting)}</div>
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-muted-foreground">{nextRunLabel(job, formatWhen)}</Table.Cell>
-							<Table.Cell>{@render lastRun(job)}</Table.Cell>
-							<Table.Cell>{@render actions(job, true)}</Table.Cell>
+		{#if !(error && jobs.length === 0)}
+			<ListTable
+				label="Scheduled tasks"
+				what="the scheduled tasks"
+				onretry={() => void loadJobs(true)}
+				columns={[
+					{ label: 'Task' },
+					{ label: 'Schedule' },
+					{ label: 'Next run' },
+					{ label: 'Last run' },
+					{ label: 'Actions', end: true }
+				]}
+				rows={jobs}
+				rowKey={(job) => job.job_key}
+				{loading}
+				empty="Nothing is set up to run in the background yet."
+				skeletons={3}
+				skeletonClass="h-16"
+				itemProps={(job) => ({
+					id: jobId(job.job_key),
+					tabindex: -1,
+					class: 'rounded-xl outline-none'
+				})}
+			>
+				{#snippet row(job)}
+					{@const setting = scheduleSetting(job)}
+					<Table.Row id={jobId(job.job_key)} tabindex={-1} class={markClass(job)}>
+						<Table.Head scope="row" class="h-auto max-w-xs px-4 py-3 align-top whitespace-normal">
+							<div class="font-medium">{job.title}</div>
+							{#if job.description}
+								<div class="mt-0.5 text-xs font-normal text-muted-foreground">
+									{job.description}
+								</div>
+							{/if}
+						</Table.Head>
+						<Table.Cell>
+							<div class="whitespace-pre-line">{scheduleLabel(job, explain)}</div>
+							{#if setting?.locked}
+								<div class="mt-0.5 text-xs text-muted-foreground">{lockedNote(setting)}</div>
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-muted-foreground">{nextRunLabel(job, formatWhen)}</Table.Cell>
+						<Table.Cell>{@render lastRun(job)}</Table.Cell>
+						<Table.Cell>{@render actions(job, true)}</Table.Cell>
+					</Table.Row>
+					{#if panels[job.job_key]}
+						<Table.Row class="bg-muted/20 hover:bg-muted/20">
+							<Table.Cell colspan={5} class="py-4">{@render detail(job)}</Table.Cell>
 						</Table.Row>
-						{#if panels[job.job_key]}
-							<Table.Row class="bg-muted/20 hover:bg-muted/20">
-								<Table.Cell colspan={5} class="py-4">{@render detail(job)}</Table.Cell>
-							</Table.Row>
-						{/if}
-					{/each}
-				</DataTable>
-			{:else}
-				<ul class="space-y-3" aria-label="Scheduled tasks">
-					{#each jobs as job (job.job_key)}
-						{@const setting = scheduleSetting(job)}
-						<li id={jobId(job.job_key)} tabindex="-1" class="rounded-xl outline-none">
-							<Card.Root class={markClass(job)}>
-								<Card.Content class="flex flex-col gap-3 p-4">
-									<div class="space-y-0.5">
-										<h2 class="font-medium">{job.title}</h2>
-										{#if job.description}
-											<p class="text-xs text-muted-foreground">{job.description}</p>
-										{/if}
-									</div>
-									<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-										<dt class="text-muted-foreground">Schedule</dt>
-										<dd class="whitespace-pre-line">{scheduleLabel(job, explain)}</dd>
-										<dt class="text-muted-foreground">Next run</dt>
-										<dd>{nextRunLabel(job, formatWhen)}</dd>
-										<dt class="text-muted-foreground">Last run</dt>
-										<dd>{@render lastRun(job)}</dd>
-									</dl>
-									{#if setting?.locked}
-										<p class="text-xs text-muted-foreground">{lockedNote(setting)}</p>
-									{/if}
-									{@render actions(job, false)}
-									{#if panels[job.job_key]}
-										<div class="border-t pt-3">{@render detail(job)}</div>
-									{/if}
-								</Card.Content>
-							</Card.Root>
-						</li>
-					{/each}
-				</ul>
-			{/if}
+					{/if}
+				{/snippet}
+				{#snippet card(job)}
+					{@const setting = scheduleSetting(job)}
+					<Card.Root class={markClass(job)}>
+						<Card.Content class="flex flex-col gap-3 p-4">
+							<div class="space-y-0.5">
+								<h2 class="font-medium">{job.title}</h2>
+								{#if job.description}
+									<p class="text-xs text-muted-foreground">{job.description}</p>
+								{/if}
+							</div>
+							<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+								<dt class="text-muted-foreground">Schedule</dt>
+								<dd class="whitespace-pre-line">{scheduleLabel(job, explain)}</dd>
+								<dt class="text-muted-foreground">Next run</dt>
+								<dd>{nextRunLabel(job, formatWhen)}</dd>
+								<dt class="text-muted-foreground">Last run</dt>
+								<dd>{@render lastRun(job)}</dd>
+							</dl>
+							{#if setting?.locked}
+								<p class="text-xs text-muted-foreground">{lockedNote(setting)}</p>
+							{/if}
+							{@render actions(job, false)}
+							{#if panels[job.job_key]}
+								<div class="border-t pt-3">{@render detail(job)}</div>
+							{/if}
+						</Card.Content>
+					</Card.Root>
+				{/snippet}
+			</ListTable>
 		{/if}
 	{/if}
 </Page>
