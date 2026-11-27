@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { nextCursor, type PageResult } from '$lib/paging';
 
 /** What the list asks its fetcher for: the page after `after` (the first when absent). */
@@ -93,7 +94,8 @@ export class PagedList<T, P> {
 	load(params: P, { keepRows = false }: { keepRows?: boolean } = {}): Promise<void> {
 		this.#params = params;
 		this.#cursor = null;
-		if (keepRows && this.rows.length > 0) {
+		// Untracked: pages call `load` from an `$effect`, which must not depend on the rows it sets.
+		if (keepRows && untrack(() => this.rows.length) > 0) {
 			this.#restart = true;
 		} else {
 			this.rows = [];
