@@ -4,6 +4,7 @@
 	import { ArrowLeftRight, Download, Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
 	import ListFoot from '$lib/components/list-foot.svelte';
+	import { PagedList } from '$lib/paged-list.svelte';
 	import { untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
@@ -37,12 +38,15 @@
 
 	const PAGE_SIZE = 50;
 
-	let relTypes = $state<EdgeTypeResponse[]>([]);
-	let loading = $state(false);
-	let hasMore = $state(true);
-	let loadFailed = $state(false);
+	const list = new PagedList<EdgeTypeResponse, null>(({ after }) =>
+		listEdgeTypes({ query: { after, limit: PAGE_SIZE } })
+	);
+	const relTypes = $derived(list.rows);
+	const loading = $derived(list.loading);
+	const hasMore = $derived(list.hasMore);
+	const loadFailed = $derived(list.failed);
 	// A later page that would not load: the list says so and offers Try again (#588).
-	let pageFailed = $state(false);
+	const pageFailed = $derived(list.nextFailed);
 
 	// One editor serves both creating (editingId null) and editing.
 	let editorOpen = $state(false);
@@ -84,30 +88,6 @@
 		} finally {
 			exportingId = null;
 		}
-	}
-
-	async function fetchPage(after?: string) {
-		loading = true;
-		if (!after) loadFailed = false;
-		pageFailed = false;
-		const result = await listEdgeTypes({ query: { after, limit: PAGE_SIZE } });
-		if (result.error || !result.data) {
-			// A later page keeps `hasMore`, so Try again in the list's foot can resume it.
-			if (after) pageFailed = true;
-			else {
-				loadFailed = true;
-				hasMore = false;
-			}
-		} else {
-			relTypes = after ? [...relTypes, ...result.data] : result.data;
-			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-		}
-		loading = false;
-	}
-
-	function loadMore() {
-		if (!hasMore || loading) return;
-		void fetchPage(relTypes.at(-1)?.id);
 	}
 
 	function openCreate() {
@@ -160,7 +140,7 @@
 			if (result.error || !result.data) {
 				toast.error("Couldn't save changes", { description: errorMessage(result.error) });
 			} else {
-				relTypes = relTypes.map((et) => (et.id === id ? result.data! : et));
+				list.rows = relTypes.map((et) => (et.id === id ? result.data! : et));
 				editorOpen = false;
 				toast.success('Saved');
 			}
@@ -183,7 +163,7 @@
 					description: errorMessage(result.error)
 				});
 			} else {
-				relTypes = [result.data, ...relTypes];
+				list.rows = [result.data, ...relTypes];
 				editorOpen = false;
 				toast.success('Connection type created');
 			}
@@ -193,19 +173,19 @@
 
 	function handleDelete(et: EdgeTypeResponse) {
 		// Optimistically remove with undo window; restore if the server rejects (e.g. 409 in use)
-		relTypes = relTypes.filter((r) => r.id !== et.id);
+		list.rows = relTypes.filter((r) => r.id !== et.id);
 
 		let undone = false;
 		const timerId = setTimeout(async () => {
 			if (undone) return;
 			const result = await deleteEdgeType({ path: { edge_type_id: et.id } });
 			if (result.response?.status === 409) {
-				relTypes = [et, ...relTypes];
+				list.rows = [et, ...relTypes];
 				toast.error("Can't delete - connections still use this type", {
 					description: 'Remove those connections first, or keep this relationship type.'
 				});
 			} else if (result.error) {
-				relTypes = [et, ...relTypes];
+				list.rows = [et, ...relTypes];
 				toast.error("Couldn't delete relationship type", {
 					description: errorMessage(result.error)
 				});
@@ -218,7 +198,7 @@
 				onClick: () => {
 					undone = true;
 					clearTimeout(timerId);
-					relTypes = [et, ...relTypes];
+					list.rows = [et, ...relTypes];
 				}
 			},
 			duration: 5000
@@ -226,14 +206,14 @@
 	}
 
 	$effect(() => {
-		void fetchPage();
+		void list.load(null);
 	});
 
 	// Coming back online, or Retry in the banner, reloads a list that had failed.
 	$effect(() => {
 		void offlineController.retryCount;
 		untrack(() => {
-			if (loadFailed) void fetchPage();
+			if (loadFailed) void list.retry();
 		});
 	});
 </script>
@@ -260,7 +240,7 @@
 	{#if loading && relTypes.length === 0}
 		<ListRowSkeleton count={3} />
 	{:else if loadFailed}
-		<LoadFailed what="your connection types" onretry={() => void fetchPage()} />
+		<LoadFailed what="your connection types" onretry={() => void list.retry()} />
 	{:else}
 		{#if relTypes.length > 0}
 			<ul class="divide-y rounded-xl border bg-card">
@@ -334,8 +314,9 @@
 		failed={pageFailed}
 		rows={relTypes.length}
 		noun="relationship type"
-		onload={loadMore}
-		onretry={() => void fetchPage(relTypes.at(-1)?.id)}
+		total={list.total}
+		onload={() => void list.loadMore()}
+		onretry={() => void list.retry()}
 	/>
 </Page>
 
