@@ -2,11 +2,14 @@ name: PR labeller
 
 # Labels pull requests from the files they change and from the conventional-commit
 # prefix of the title, so generated release notes (.github/release.yml) can group them.
-# pull_request_target runs with write access, so this workflow never checks out or runs
-# the pull request's code: the labeller reads its config from the base branch and the
-# title is only read as data.
+# It runs on `pull_request`, not `pull_request_target`: GitHub blocks that event by default in
+# public repositories from 2 December 2026. A pull request from this repository gets a token
+# that can write labels, so the two labelling jobs run for it. One from a fork does not, so
+# they skip it and a maintainer adds the kind label by hand, as the last job's message says.
+# That job only reads labels, so it runs for every pull request and stays a required check.
+# The title is only ever read as data.
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
   workflow_dispatch:
 
@@ -22,7 +25,7 @@ permissions:
 jobs:
   paths:
     name: "Labels: from changed files"
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -37,7 +40,7 @@ jobs:
     # After the paths job, not beside it: actions/labeler reads the labels first and
     # then replaces them all, so labels added in between were removed again.
     needs: [paths]
-    if: ${{ !cancelled() && github.event_name == 'pull_request_target' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -86,7 +89,7 @@ jobs:
     # Runs after the labelling jobs, and again when someone adds or removes a label, so
     # a pull request that failed can be fixed by labelling it by hand.
     needs: [paths, title]
-    if: ${{ !cancelled() && github.event_name == 'pull_request_target' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

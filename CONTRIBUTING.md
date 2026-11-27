@@ -385,7 +385,7 @@ Or by hand: on `main`, run `git fetch --tags`, then `poe release-tag` to print t
 
 ## Labels and release notes
 
-Generated release notes group pull requests by label (`.github/release.yml`), so give pull requests a conventional-commit title such as `feat: ...`, `fix(auth): ...` or `docs: ...`; add `!` after the type (`feat!:`) for a breaking change. The `PR labeller` workflow then adds labels from the title prefix and from the files changed (`.github/labeller.yml`), and Renovate adds `dependencies`. Labels are only ever added, so correct a wrong one by hand. The `Labels: at least one` check fails a pull request that has no label for the kind of change (`area: ...` labels do not count); add one by hand and it reruns.
+Generated release notes group pull requests by label (`.github/release.yml`), so give pull requests a conventional-commit title such as `feat: ...`, `fix(auth): ...` or `docs: ...`; add `!` after the type (`feat!:`) for a breaking change. The `PR labeller` workflow then adds labels from the title prefix and from the files changed (`.github/labeller.yml`), and Renovate adds `dependencies`. Labels are only ever added, so correct a wrong one by hand. The workflow runs on `pull_request`, so it can only label pull requests from this repository: a pull request from a fork has no labels until a maintainer adds one. The `Labels: at least one` check fails a pull request that has no label for the kind of change (`area: ...` labels do not count); add one by hand and it reruns.
 
 | Label | Meaning | Release notes section |
 |---|---|---|
