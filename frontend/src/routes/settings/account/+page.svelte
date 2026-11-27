@@ -6,13 +6,7 @@
 	import { toast } from 'svelte-sonner';
 	import { auth } from '$lib/auth.svelte.js';
 	import { DISPLAY_NAME_MAX_LENGTH, displayNameProblem, PASSWORD_MIN_LENGTH } from '$lib/auth';
-	import {
-		deviceRow,
-		formatRelativeTime,
-		nameDevice,
-		type DeviceRevoke,
-		type DeviceRow
-	} from '$lib/devices';
+	import { deviceRow, formatRelativeTime, type DeviceRevoke, type DeviceRow } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
 	import { wide } from '$lib/viewport.svelte';
 	import {
@@ -20,9 +14,13 @@
 		renameOwnDevice,
 		revokeOwnDevice,
 		revokeOwnSession,
-		revokeOtherSessions
+		revokeOtherSessions,
+		type OwnDeviceResponse,
+		type OwnDeviceSort
 	} from '$lib/api/client';
-	import { PAGE_LIMIT, readPages } from '$lib/paging';
+	import { PagedList } from '$lib/paged-list.svelte';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
+	import PageNav from '$lib/components/page-nav.svelte';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import DeviceTitle from '$lib/components/device-title.svelte';
 	import AccountPicture from '$lib/components/account-picture.svelte';
@@ -55,9 +53,24 @@
 	let nameError = $state<string | null>(null);
 	let nameTouched = $state(false);
 
-	let devices = $state<DeviceRow[]>([]);
-	let sessionsLoading = $state(true);
-	let sessionsError = $state<string | null>(null);
+	// A person's devices are few, so they page ten at a time, with Previous and Next. The server
+	// sorts, so every page is in order, not only the one on screen.
+	const DEVICES_PER_PAGE = 10;
+	let sort = $state<TableSort<OwnDeviceSort> | null>(null);
+	const list = new PagedList<OwnDeviceResponse, TableSort<OwnDeviceSort> | null>(
+		({ after, params }) =>
+			listOwnDevices({ query: { after, limit: DEVICES_PER_PAGE, ...sortQuery(params) } }),
+		{ mode: 'page' }
+	);
+	const devices = $derived<DeviceRow[]>(list.rows.map(deviceRow));
+	const sessionsLoading = $derived(list.loading);
+	const sessionsError = $derived(
+		list.failed
+			? list.failure?.response
+				? networkAwareError(list.failure).title
+				: 'Could not load devices.'
+			: null
+	);
 	let sessionBusy = $state<string | null>(null);
 	let revokingOthers = $state(false);
 	let confirmRevokeOthers = $state(false);
@@ -108,39 +121,18 @@
 		confirm = '';
 		toast.success('Password changed');
 		if (wasForced) await goto(resolve('/'));
-		else void loadSessions();
-	}
-
-	async function loadSessions() {
-		sessionsLoading = true;
-		sessionsError = null;
-		try {
-			const read = await readPages((after) =>
-				listOwnDevices({ query: { after, limit: PAGE_LIMIT } })
-			);
-			if (!read.ok) {
-				sessionsError = networkAwareError(read.failure).title;
-			} else {
-				devices = read.rows.map(deviceRow);
-			}
-		} catch {
-			sessionsError = 'Could not load devices.';
-		}
-		sessionsLoading = false;
+		else void list.load(sort);
 	}
 
 	$effect(() => {
-		if (!forced) void loadSessions();
-		else sessionsLoading = false;
+		if (!forced) void list.load(sort);
 	});
 
-	const hasOtherDevices = $derived(devices.some((d) => !d.current));
-
-	function applyName(deviceId: string, name: string | null) {
-		devices = devices.map((d) =>
-			d.deviceId === deviceId ? { ...d, name, ...nameDevice(name, d.label) } : d
-		);
-	}
+	// The current device is always one of the rows, so another exists when there is more than one.
+	// Without a count from the server, the page shown is all there is to go on.
+	const hasOtherDevices = $derived(
+		list.total !== null ? list.total > 1 : devices.some((d) => !d.current)
+	);
 
 	async function saveName(deviceId: string, name: string | null): Promise<boolean> {
 		try {
@@ -149,7 +141,7 @@
 				toast.error(errorMessage(result.error));
 				return false;
 			}
-			applyName(deviceId, result.data.name ?? null);
+			void list.refresh();
 			toast.success(result.data.name ? 'Device named' : 'Device name cleared');
 			return true;
 		} catch {
@@ -170,7 +162,7 @@
 				toast.error(errorMessage(result.error));
 			} else {
 				toast.success('Device signed out');
-				await loadSessions();
+				await list.refresh();
 			}
 		} catch {
 			toast.error('Could not sign out device.');
@@ -189,7 +181,7 @@
 			} else {
 				toast.success('Other devices signed out');
 				confirmRevokeOthers = false;
-				await loadSessions();
+				await list.load(sort);
 			}
 		} catch {
 			toast.error('Could not sign out other devices.');
@@ -376,11 +368,11 @@
 					type="button"
 					variant="outline"
 					class="pointer-coarse:h-11"
-					onclick={() => void loadSessions()}
+					onclick={() => void list.retry()}
 				>
 					Retry
 				</Button>
-			{:else if sessionsLoading}
+			{:else if sessionsLoading && devices.length === 0}
 				<div class="space-y-3">
 					<Skeleton class="h-20 w-full rounded-xl" />
 					<Skeleton class="h-20 w-full rounded-xl" />
@@ -391,11 +383,13 @@
 				{#if wide.current}
 					<DataTable
 						label="Active devices"
+						{sort}
+						onsort={(key) => (sort = nextSort(sort, key as OwnDeviceSort))}
 						columns={[
-							{ label: 'Device' },
+							{ label: 'Device', sortKey: 'name' },
 							{ label: 'Address' },
-							{ label: 'First signed in' },
-							{ label: 'Last active' },
+							{ label: 'First signed in', sortKey: 'first_seen_at' },
+							{ label: 'Last active', sortKey: 'last_seen_at' },
 							{ label: 'Action', end: true }
 						]}
 					>
@@ -505,6 +499,7 @@
 						{/each}
 					</ul>
 				{/if}
+				<PageNav {list} noun="device" />
 			{/if}
 		</section>
 
