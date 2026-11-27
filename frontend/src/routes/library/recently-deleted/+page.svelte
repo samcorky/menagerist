@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Page from '$lib/components/page.svelte';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 	import { RotateCcw, Trash2 } from '@lucide/svelte';
@@ -10,7 +11,8 @@
 		purgeCollection,
 		purgeNode,
 		restoreCollection,
-		restoreNode
+		restoreNode,
+		type DeletedNodeSort
 	} from '$lib/api/client';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
@@ -69,6 +71,9 @@
 	let actionError = $state<{ id: string; message: string } | null>(null);
 	let purgeTarget = $state<{ tab: DeletedTab; row: Row } | null>(null);
 	let listEl = $state<HTMLElement>();
+	// Items and collections are sorted by the same two keys, so one sort serves both tabs.
+	// The server sorts, so both lists are read again from the first page when it changes.
+	let sort = $state<TableSort<DeletedNodeSort> | null>(null);
 
 	const pane = $derived(panes[tab]);
 	const canRestore = $derived(
@@ -79,7 +84,7 @@
 	);
 
 	async function fetchPage(which: DeletedTab, after: string | null) {
-		const query = { limit: DELETED_PAGE_SIZE, ...(after ? { after } : {}) };
+		const query = { limit: DELETED_PAGE_SIZE, ...(after ? { after } : {}), ...sortQuery(sort) };
 		if (which === 'items') {
 			const result = await listDeletedNodes({ query });
 			if (result.error || !result.data) return { error: networkAwareError(result).title };
@@ -107,8 +112,8 @@
 		if (more ? current.loadingMore : false) return;
 		if (more) current.loadingMore = true;
 		else {
+			// The rows stay, dimmed, until the first page comes back, so a new sort does not jump.
 			current.loading = true;
-			current.rows = [];
 		}
 		current.error = null;
 		try {
@@ -130,8 +135,15 @@
 	}
 
 	$effect(() => {
-		void load('items');
-		void load('collections');
+		void sort;
+		// Only the sort re-runs this; the loads read and write the panes themselves.
+		untrack(() => {
+			void load('items');
+			void load('collections');
+		});
+	});
+
+	$effect(() => {
 		void fetchAllNodeTypes().then((types) => {
 			if (types) typeLabels = Object.fromEntries(types.map((t) => [t.slug, t.label]));
 		});
@@ -285,9 +297,9 @@
 			label={tab === 'items' ? 'Deleted items' : 'Deleted collections'}
 			what={tab === 'items' ? 'the deleted items' : 'the deleted collections'}
 			columns={[
-				{ label: 'Name' },
+				{ label: 'Name', sortKey: 'name' },
 				...(tab === 'items' ? [{ label: 'Type' }] : []),
-				{ label: 'When' },
+				{ label: 'When', sortKey: 'deleted_at' },
 				...(canRestore || canPurge ? [{ label: 'Actions', end: true }] : [])
 			]}
 			rows={pane.rows}
@@ -296,6 +308,8 @@
 			failed={pane.error !== null}
 			onretry={() => void load(tab)}
 			empty={NOTHING_DELETED_MESSAGE}
+			{sort}
+			onsort={(key) => (sort = nextSort(sort, key as DeletedNodeSort))}
 		>
 			{#snippet row(row)}
 				<Table.Row>
