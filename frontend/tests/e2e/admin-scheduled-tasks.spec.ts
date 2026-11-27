@@ -112,6 +112,46 @@ test('a task that is only ever scheduled has no Run now', async ({ page }) => {
 	await expect(row.getByRole('button', { name: /Run .* now/ })).toHaveCount(0);
 });
 
+test('a column header sorts the tasks, and a task with nothing to compare stays last', async ({
+	page
+}) => {
+	await page.goto('/admin/scheduled-tasks');
+	const table = page.getByRole('table', { name: 'Scheduled tasks' });
+	const titles = async () =>
+		table
+			.getByRole('rowheader')
+			.evaluateAll((cells) =>
+				cells.map((cell) => (cell.querySelector('.font-medium')?.textContent ?? '').trim())
+			);
+	const task = table.getByRole('columnheader', { name: 'Task' });
+	await expect(task.getByRole('button')).toBeVisible();
+	// With no sort the server lists them by title, so that is the order to compare with.
+	const unsorted = await titles();
+	expect(unsorted.length).toBeGreaterThan(2);
+
+	await task.getByRole('button').click();
+	await expect(task).toHaveAttribute('aria-sort', 'ascending');
+	expect(await titles()).toEqual(unsorted);
+
+	await task.getByRole('button').click();
+	await expect(task).toHaveAttribute('aria-sort', 'descending');
+	await expect.poll(titles).toEqual([...unsorted].reverse());
+
+	// The third click goes back to the server's own order.
+	await task.getByRole('button').click();
+	await expect(task).toHaveAttribute('aria-sort', 'none');
+	await expect.poll(titles).toEqual(unsorted);
+
+	// A task that is never scheduled has no next run, so it comes last either way.
+	const next = table.getByRole('columnheader', { name: 'Next run' });
+	for (const order of ['ascending', 'descending']) {
+		await next.getByRole('button').click();
+		await expect(next).toHaveAttribute('aria-sort', order);
+		const last = table.getByRole('row').last();
+		await expect(last.getByText('Not scheduled', { exact: true })).toBeVisible();
+	}
+});
+
 test('the page keeps internal wording out of sight', async ({ page }) => {
 	await page.goto('/admin/scheduled-tasks');
 	await expect(page.getByRole('heading', { name: 'Scheduled tasks', exact: true })).toBeVisible();

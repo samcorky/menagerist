@@ -14,6 +14,7 @@
 		runJobNow,
 		updateInstanceSettings,
 		type JobResponse,
+		type JobSort,
 		type JobRunResponse,
 		type SettingResponse
 	} from '$lib/api/client';
@@ -37,6 +38,8 @@
 		startedByHand,
 		type RunStatus
 	} from '$lib/scheduled-tasks';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
+	import { PAGE_LIMIT, readPages } from '$lib/paging';
 	import {
 		coerce,
 		formProp,
@@ -93,6 +96,8 @@
 	let drafts = $state<Record<string, unknown>>({});
 	let draftErrors = $state<Record<string, string>>({});
 	let saving = $state<string | null>(null);
+	// The server sorts, so the tasks are read again in the new order.
+	let sort = $state<TableSort<JobSort> | null>(null);
 	const canRead = $derived(auth.can('scheduling:job:read'));
 	const canRun = $derived(auth.can('scheduling:job:run'));
 	const canEditSchedules = $derived(
@@ -180,15 +185,18 @@
 			error = null;
 		}
 		try {
-			const res = await listJobs();
-			if (res.error || !res.data) {
+			// Every task is wanted, for the scroll to one and the live progress, so every page is read.
+			const read = await readPages((after) =>
+				listJobs({ query: { after, limit: PAGE_LIMIT, ...sortQuery(sort) } })
+			);
+			if (!read.ok) {
 				// Stale content stays visible; the alert appears above it.
-				error = networkAwareError(res).title;
+				error = networkAwareError(read.failure).title;
 			} else {
 				const previous = jobs;
-				jobs = res.data;
+				jobs = read.rows;
 				error = null;
-				for (const job of res.data) {
+				for (const job of read.rows) {
 					const before = previous.find((j) => j.job_key === job.job_key)?.active_run;
 					const wasActive = before && isActive(before.status);
 					if (wasActive && before.id !== activeRun(job)?.id) {
@@ -242,13 +250,16 @@
 		return () => clearTimeout(timer);
 	});
 
+	// Reading again when the sort changes keeps the rows on screen, dimmed, until the new order
+	// arrives.
 	$effect(() => {
-		if (canRead) {
-			void untrack(() => loadJobs(true));
-			void untrack(() => loadSettings());
-		} else {
-			loading = false;
-		}
+		void sort;
+		if (canRead) void untrack(() => loadJobs(true));
+		else loading = false;
+	});
+
+	$effect(() => {
+		if (canRead) void untrack(() => loadSettings());
 	});
 
 	$effect(() => {
@@ -660,13 +671,15 @@
 				what="the scheduled tasks"
 				onretry={() => void loadJobs(true)}
 				columns={[
-					{ label: 'Task' },
+					{ label: 'Task', sortKey: 'title' },
 					{ label: 'Schedule' },
-					{ label: 'Next run' },
-					{ label: 'Last run' },
+					{ label: 'Next run', sortKey: 'next_run_at' },
+					{ label: 'Last run', sortKey: 'last_run' },
 					{ label: 'Actions', end: true }
 				]}
 				rows={jobs}
+				{sort}
+				onsort={(key) => (sort = nextSort(sort, key as JobSort))}
 				rowKey={(job) => job.job_key}
 				{loading}
 				empty="Nothing is set up to run in the background yet."

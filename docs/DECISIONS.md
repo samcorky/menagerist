@@ -2104,3 +2104,11 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Why view only.** A smart collection is a saved search with a saved sort. Someone who only wants the newest first for a minute should not rewrite a collection that other pages (Home, the item page) read in its own order. The same applies to a collection someone else can see, and it keeps the page's behaviour the same for manual and smart.
 - **Oldest first on a smart collection is an order, not the default.** It sends an empty sort, so a collection saved newest first can be looked at in creation order; "As saved" is the way back.
 - **Removing an item and undoing it** puts the row back in id order by hand. In any other order there is no place to put it, so the list is read again.
+
+## The scheduled tasks list pages, sorts and searches on the server (2026-11-27)
+
+**Decision:** `GET /scheduling/jobs` takes `after`, `limit`, `sort`, `order` and `q` like every other list, and sends `Link` and `Total-Count`. It sorts by `title`, `next_run_at` and `last_run`, with a task that has no next run or has never run last in either direction, and by title when no sort is given. `q` matches the title and the description, ignoring case and accents, and the global search's scheduled task source now asks for it instead of filtering in the bridge.
+
+- **Why a registry list is paged at all.** The route returns about twenty rows, and a browser-side sort would have done. But "every table sorts on the server" is the rule a page can rely on (`ListTable`, the sortable headers, the API lint), a second rule for the few small lists is one more thing to remember, and it gives the search `q` for free. The page reads every page, since it scrolls to a task and follows the progress of the active ones.
+- **In memory, not in a query.** The jobs come from the registry and each needs its schedule, next run and last run read, so the list is built whole and then ordered, searched and paged with `page_rows`, the way a person's own few rows are. A job has a key, not an id, so the cursor ties on a UUID derived from the key.
+- **The default order changes.** It was the order jobs were registered in; it is now by title, which does not move when a module adds a job.
