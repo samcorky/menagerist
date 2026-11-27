@@ -247,6 +247,34 @@ describe('loadSmartCollection', () => {
 		});
 	});
 
+	describe('with an order for this view', () => {
+		it('sends that order in place of the saved one, without changing the saved query', async () => {
+			searchNodes.mockResolvedValue(page());
+			const result = await loadSmartCollection(collection(), {
+				limit: 10,
+				sort: [{ by: 'name', dir: 'desc' }]
+			});
+			expect(searchNodes).toHaveBeenCalledWith({
+				body: { query: { ...query, sort: [{ by: 'name', dir: 'desc' }] }, limit: 10, cursor: null }
+			});
+			expect(result.query).toEqual(query);
+		});
+
+		it('sends no order at all for an empty list, which is creation order', async () => {
+			searchNodes.mockResolvedValue(page());
+			await loadSmartCollection(collection(), { limit: 10, sort: [] });
+			expect(searchNodes).toHaveBeenCalledWith({
+				body: { query: { ...query, sort: [] }, limit: 10, cursor: null }
+			});
+		});
+
+		it('keeps the saved order when it is not given one', async () => {
+			searchNodes.mockResolvedValue(page());
+			await loadSmartCollection(collection(), { limit: 10 });
+			expect(searchNodes).toHaveBeenCalledWith({ body: { query, limit: 10, cursor: null } });
+		});
+	});
+
 	describe('narrowed', () => {
 		const adhoc: Query = {
 			v: 1,

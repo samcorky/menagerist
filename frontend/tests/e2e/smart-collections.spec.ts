@@ -899,3 +899,39 @@ test.describe('New collection: kind choice', () => {
 		await shot(page, 'smart-phone-dark');
 	});
 });
+
+test('a smart collection can be viewed in another order, without changing what it saved', async ({
+	page,
+	request
+}) => {
+	const tool = await makeTool(request);
+	const names = await seedItems(request, tool);
+	const smart = await makeSmart(request, uniqueName('Ordered'), weightAtLeast(tool, 2));
+	const before = await definitionOf(request, smart.id);
+
+	await page.goto(`/collections/${smart.slug}`);
+	const order = async () =>
+		(await page.getByRole('link').filter({ hasText: names.suffix }).allInnerTexts()).map((text) =>
+			text.split('\n')[0].replace(names.suffix, '')
+		);
+	const sortBy = page.getByRole('combobox', { name: 'Sort by' });
+
+	// It saved no order, so it comes as it was made, and says it is as saved.
+	await expect(sortBy).toHaveValue('saved');
+	await expect.poll(order).toEqual(['Anvil', 'Bolt', 'Chisel']);
+
+	await sortBy.selectOption('name-desc');
+	await expect(page).toHaveURL(/sort=name-desc/);
+	await expect.poll(order).toEqual(['Chisel', 'Bolt', 'Anvil']);
+
+	// Only this view changed: the collection's own definition is as it was, and a reload keeps
+	// the order from the address.
+	expect(await definitionOf(request, smart.id)).toEqual(before);
+	await page.reload();
+	await expect(sortBy).toHaveValue('name-desc');
+	await expect.poll(order).toEqual(['Chisel', 'Bolt', 'Anvil']);
+
+	await sortBy.selectOption('saved');
+	await expect(page).not.toHaveURL(/sort=/);
+	await expect.poll(order).toEqual(['Anvil', 'Bolt', 'Chisel']);
+});

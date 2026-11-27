@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { emptyQuery } from '$lib/query/tree';
-import { CUSTOM_SORT, SORT_CHOICES, sortChoiceOf, withSortChoice } from '$lib/query/sort-choices';
+import {
+	CUSTOM_SORT,
+	SORT_CHOICES,
+	nodeSortParams,
+	sortChoiceByValue,
+	sortChoiceOf,
+	withSortChoice
+} from '$lib/query/sort-choices';
 
 describe('sortChoiceOf', () => {
 	it('knows each choice by the sort it writes', () => {
@@ -52,5 +59,41 @@ describe('withSortChoice', () => {
 		const query = emptyQuery();
 		expect(withSortChoice(query, CUSTOM_SORT)).toBe(query);
 		expect(withSortChoice(query, 'nope')).toBe(query);
+	});
+});
+
+describe('nodeSortParams', () => {
+	it('says nothing for no sort, so the route keeps its own order', () => {
+		expect(nodeSortParams([])).toEqual({});
+	});
+
+	it('names the keys the item list route takes, each with its direction', () => {
+		expect(nodeSortParams([{ by: 'created', dir: 'desc' }])).toEqual({
+			sort: ['created_at'],
+			order: ['desc']
+		});
+		expect(nodeSortParams([{ by: 'name' }, { by: 'updated', dir: 'desc' }])).toEqual({
+			sort: ['name', 'updated_at'],
+			order: ['asc', 'desc']
+		});
+	});
+
+	it('leaves out a field key, which only the search route sorts by', () => {
+		expect(nodeSortParams([{ by: 'field', key: 'year' }])).toEqual({});
+	});
+
+	it('turns every choice into parameters the route takes', () => {
+		for (const choice of SORT_CHOICES) {
+			const params = nodeSortParams(choice.sort);
+			expect(params.sort?.length ?? 0).toBe(choice.sort.length);
+		}
+	});
+});
+
+describe('sortChoiceByValue', () => {
+	it('finds a choice by the value in the address, and nothing for any other', () => {
+		expect(sortChoiceByValue('name-desc')?.sort).toEqual([{ by: 'name', dir: 'desc' }]);
+		expect(sortChoiceByValue('saved')).toBeUndefined();
+		expect(sortChoiceByValue(null)).toBeUndefined();
 	});
 });
