@@ -6,6 +6,7 @@
 	import { wide } from '$lib/viewport.svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
 	import ListFoot from '$lib/components/list-foot.svelte';
+	import { PagedList } from '$lib/paged-list.svelte';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
@@ -53,15 +54,18 @@
 
 	const PAGE_SIZE = 50;
 
-	let categories = $state<NodeTypeResponse[]>([]);
-	let loading = $state(false);
+	const list = new PagedList<NodeTypeResponse, null>(({ after }) =>
+		listNodeTypes({ query: { after, limit: PAGE_SIZE } })
+	);
+	const categories = $derived(list.rows);
+	const loading = $derived(list.loading);
+	const hasMore = $derived(list.hasMore);
+	const loadFailed = $derived(list.failed);
+	// A later page that would not load: the list says so and offers Try again (#588).
+	const pageFailed = $derived(list.nextFailed);
 	let exampleTypeIds = $state<ReadonlySet<string>>(new Set());
 	// Items per type slug; null until counted, so a failed count shows no number rather than a wrong one.
 	let itemCounts = $state<ReadonlyMap<string, number> | null>(null);
-	let hasMore = $state(true);
-	let loadFailed = $state(false);
-	// A later page that would not load: the list says so and offers Try again (#588).
-	let pageFailed = $state(false);
 
 	// One editor serves both creating (editingId null) and editing.
 	let editorOpen = $state(false);
@@ -91,25 +95,6 @@
 	// Read from the list so a type that has gone leaves the selection.
 	const selected = $derived(categories.filter((c) => selectedIds.has(c.id)));
 
-	async function fetchPage(after?: string) {
-		loading = true;
-		if (!after) loadFailed = false;
-		pageFailed = false;
-		const result = await listNodeTypes({ query: { after, limit: PAGE_SIZE } });
-		if (result.error || !result.data) {
-			// A later page keeps `hasMore`, so Try again in the list's foot can resume it.
-			if (after) pageFailed = true;
-			else {
-				loadFailed = true;
-				hasMore = false;
-			}
-		} else {
-			categories = after ? [...categories, ...result.data] : result.data;
-			hasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-		}
-		loading = false;
-	}
-
 	/** Save the types, with the lists they use, as one file someone else can import. */
 	async function exportTypes(types: NodeTypeResponse[], filename: string) {
 		if (exportingId) return;
@@ -137,11 +122,6 @@
 		selectedIds.clear();
 	}
 
-	function loadMore() {
-		if (!hasMore || loading) return;
-		void fetchPage(categories.at(-1)?.id);
-	}
-
 	function openCreate() {
 		editingId = null;
 		label = '';
@@ -160,7 +140,7 @@
 
 	// A promoted field is saved already: add it to the open, unsaved schema too, so Save keeps it.
 	function handlePromoted(updated: NodeTypeResponse, key: string) {
-		categories = categories.map((c) => (c.id === updated.id ? updated : c));
+		list.rows = categories.map((c) => (c.id === updated.id ? updated : c));
 		const property = (updated.attributes_schema as AttributesSchema | null)?.properties?.[key];
 		if (!property) return;
 		const current = schema ?? (updated.attributes_schema as AttributesSchema);
@@ -212,7 +192,7 @@
 	async function refreshTypes() {
 		const all = await fetchAllNodeTypes();
 		if (all) allTypes = all;
-		await fetchPage();
+		await list.load(null);
 	}
 
 	async function save(choice?: { onClash: 'merge'; onDetach: 'keep' | 'drop' }) {
@@ -235,7 +215,7 @@
 			if (result.error || !result.data) {
 				toast.error("Couldn't save changes", { description: errorMessage(result.error) });
 			} else {
-				categories = categories.map((c) => (c.id === id ? result.data! : c));
+				list.rows = categories.map((c) => (c.id === id ? result.data! : c));
 				editorOpen = false;
 				parentAsk = null;
 				toast.success('Item type updated');
@@ -256,7 +236,7 @@
 			if (result.error || !result.data) {
 				toast.error("Couldn't create item type", { description: errorMessage(result.error) });
 			} else {
-				categories = [result.data, ...categories];
+				list.rows = [result.data, ...categories];
 				editorOpen = false;
 				toast.success('Item type created');
 				if (parent) await refreshTypes();
@@ -337,14 +317,14 @@
 		}
 
 		// No items - optimistic removal with undo window
-		categories = categories.filter((c) => c.id !== cat.id);
+		list.rows = categories.filter((c) => c.id !== cat.id);
 
 		let undone = false;
 		const timerId = setTimeout(async () => {
 			if (undone) return;
 			const result = await deleteNodeType({ path: { node_type_id: cat.id } });
 			if (result.error) {
-				categories = [cat, ...categories];
+				list.rows = [cat, ...categories];
 				toast.error("Couldn't delete item type", { description: errorMessage(result.error) });
 			}
 		}, 5000);
@@ -355,7 +335,7 @@
 				onClick: () => {
 					undone = true;
 					clearTimeout(timerId);
-					categories = [cat, ...categories];
+					list.rows = [cat, ...categories];
 				}
 			},
 			duration: 5000
@@ -370,7 +350,7 @@
 		if (result.error) {
 			toast.error("Couldn't delete item type", { description: errorMessage(result.error) });
 		} else {
-			categories = categories.filter((c) => c.id !== cat.id);
+			list.rows = categories.filter((c) => c.id !== cat.id);
 			toast.success('Item type deleted');
 		}
 		deletingId = null;
@@ -378,7 +358,7 @@
 	}
 
 	$effect(() => {
-		void fetchPage();
+		void list.load(null);
 		void fetchAllNodeTypes().then((all) => {
 			if (all) allTypes = all;
 		});
@@ -390,7 +370,7 @@
 	$effect(() => {
 		void offlineController.retryCount;
 		untrack(() => {
-			if (loadFailed) void fetchPage();
+			if (loadFailed) void list.retry();
 		});
 	});
 </script>
@@ -421,7 +401,7 @@
 	{#if loading && categories.length === 0}
 		<ListRowSkeleton count={3} tile />
 	{:else if loadFailed}
-		<LoadFailed what="your item types" onretry={() => void fetchPage()} />
+		<LoadFailed what="your item types" onretry={() => void list.retry()} />
 	{:else}
 		{#if selected.length > 0}
 			<div
@@ -606,8 +586,9 @@
 		failed={pageFailed}
 		rows={categories.length}
 		noun="item type"
-		onload={loadMore}
-		onretry={() => void fetchPage(categories.at(-1)?.id)}
+		total={list.total}
+		onload={() => void list.loadMore()}
+		onretry={() => void list.retry()}
 	/>
 </Page>
 
