@@ -15,7 +15,8 @@
 		Library
 	} from '@lucide/svelte';
 	import ListRowSkeleton from '$lib/components/list-row-skeleton.svelte';
-	import ListFoot from '$lib/components/list-foot.svelte';
+	import PageNav from '$lib/components/page-nav.svelte';
+	import { PagedList } from '$lib/paged-list.svelte';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
@@ -53,123 +54,54 @@
 		type PresetBundle
 	} from '$lib/preset-packs';
 
-	const PAGE_SIZE = 50;
+	// Three lists share this screen, so each pages, ten at a time.
+	const PAGE_SIZE = 10;
 	const sectionFilenames: Record<PackSectionKind, string> = {
 		field: 'menagerist-fields.json',
 		choice_list: 'menagerist-lists.json',
 		field_set: 'menagerist-field-groups.json'
 	};
 
-	let fields = $state<PresetResponse[]>([]);
-	let fieldsLoading = $state(false);
-	let fieldsHasMore = $state(true);
-	// A later page that would not load: the list's foot says so and offers Try again (#588).
-	let fieldsPageFailed = $state(false);
-	let fieldsLoadFailed = $state(false);
-
-	let lists = $state<PresetResponse[]>([]);
-	let listsLoading = $state(false);
-	let listsHasMore = $state(true);
-	// A later page that would not load: the list's foot says so and offers Try again (#588).
-	let listsPageFailed = $state(false);
-	let listsLoadFailed = $state(false);
-
-	let fieldSets = $state<PresetResponse[]>([]);
-	let fieldSetsLoading = $state(false);
-	let fieldSetsHasMore = $state(true);
-	// A later page that would not load: the list's foot says so and offers Try again (#588).
-	let fieldSetsPageFailed = $state(false);
-	let fieldSetsLoadFailed = $state(false);
-
-	async function fetchFields(after?: string) {
-		fieldsLoading = true;
-		fieldsPageFailed = false;
-		if (!after) fieldsLoadFailed = false;
-		const result = await listPresets({ query: { kind: 'field', after, limit: PAGE_SIZE } });
-		if (result.error || !result.data) {
-			// A later page keeps hasMore, so Try again in the list's foot can resume it.
-			if (after) fieldsPageFailed = true;
-			else {
-				fieldsLoadFailed = true;
-				fieldsHasMore = false;
-			}
-		} else {
-			fields = after ? [...fields, ...result.data] : result.data;
-			fieldsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-		}
-		fieldsLoading = false;
-	}
-
-	async function fetchLists(after?: string) {
-		listsLoading = true;
-		listsPageFailed = false;
-		if (!after) listsLoadFailed = false;
-		const result = await listPresets({ query: { kind: 'choice_list', after, limit: PAGE_SIZE } });
-		if (result.error || !result.data) {
-			// A later page keeps hasMore, so Try again in the list's foot can resume it.
-			if (after) listsPageFailed = true;
-			else {
-				listsLoadFailed = true;
-				listsHasMore = false;
-			}
-		} else {
-			lists = after ? [...lists, ...result.data] : result.data;
-			listsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-		}
-		listsLoading = false;
-	}
-
-	async function fetchFieldSets(after?: string) {
-		fieldSetsLoading = true;
-		fieldSetsPageFailed = false;
-		if (!after) fieldSetsLoadFailed = false;
-		const result = await listPresets({ query: { kind: 'field_set', after, limit: PAGE_SIZE } });
-		if (result.error || !result.data) {
-			// A later page keeps hasMore, so Try again in the list's foot can resume it.
-			if (after) fieldSetsPageFailed = true;
-			else {
-				fieldSetsLoadFailed = true;
-				fieldSetsHasMore = false;
-			}
-		} else {
-			fieldSets = after ? [...fieldSets, ...result.data] : result.data;
-			fieldSetsHasMore = /rel="next"/.test(result.response?.headers.get('link') ?? '');
-		}
-		fieldSetsLoading = false;
-	}
-
-	function loadFieldsMore() {
-		if (!fieldsHasMore || fieldsLoading) return;
-		void fetchFields(fields.at(-1)?.id);
-	}
-
-	function loadListsMore() {
-		if (!listsHasMore || listsLoading) return;
-		void fetchLists(lists.at(-1)?.id);
-	}
+	// Newest first, so a copy made here is at the top of its first page.
+	const presetList = (kind: PackSectionKind) =>
+		new PagedList<PresetResponse, null>(
+			({ after }) =>
+				listPresets({
+					query: { kind, after, limit: PAGE_SIZE, sort: ['created_at'], order: ['desc'] }
+				}),
+			{ mode: 'page' }
+		);
+	const fieldsList = presetList('field');
+	const listsList = presetList('choice_list');
+	const fieldSetsList = presetList('field_set');
+	const fields = $derived(fieldsList.rows);
+	const lists = $derived(listsList.rows);
+	const fieldSets = $derived(fieldSetsList.rows);
+	const fieldsLoading = $derived(fieldsList.loading);
+	const listsLoading = $derived(listsList.loading);
+	const fieldSetsLoading = $derived(fieldSetsList.loading);
+	const fieldsLoadFailed = $derived(fieldsList.failed);
+	const listsLoadFailed = $derived(listsList.failed);
+	const fieldSetsLoadFailed = $derived(fieldSetsList.failed);
 
 	function handleDelete(preset: PresetResponse, collection: 'fields' | 'lists' | 'fieldSets') {
-		const setItems =
-			collection === 'fields'
-				? (v: PresetResponse[]) => (fields = v)
-				: collection === 'lists'
-					? (v: PresetResponse[]) => (lists = v)
-					: (v: PresetResponse[]) => (fieldSets = v);
-		const current = collection === 'fields' ? fields : collection === 'lists' ? lists : fieldSets;
+		const list =
+			collection === 'fields' ? fieldsList : collection === 'lists' ? listsList : fieldSetsList;
 
 		// No items ever depend on a preset the way categories depend on connections - always
 		// use the optimistic undo path.
-		setItems(current.filter((p) => p.id !== preset.id));
+		list.rows = list.rows.filter((p) => p.id !== preset.id);
 
 		let undone = false;
 		const timerId = setTimeout(async () => {
 			if (undone) return;
 			const result = await deletePreset({ path: { preset_id: preset.id } });
 			if (result.error) {
-				const restored =
-					collection === 'fields' ? fields : collection === 'lists' ? lists : fieldSets;
-				setItems([preset, ...restored]);
+				list.rows = [preset, ...list.rows];
 				toast.error("Couldn't delete", { description: errorMessage(result.error) });
+			} else {
+				// Read the page again, so it fills up and the counts are right.
+				void list.refresh();
 			}
 		}, 5000);
 
@@ -185,9 +117,7 @@
 					onClick: () => {
 						undone = true;
 						clearTimeout(timerId);
-						const restored =
-							collection === 'fields' ? fields : collection === 'lists' ? lists : fieldSets;
-						setItems([preset, ...restored]);
+						list.rows = [preset, ...list.rows];
 					}
 				},
 				duration: 5000
@@ -203,11 +133,6 @@
 	function fieldSetPropertyCount(preset: PresetResponse): number | undefined {
 		const properties = (preset.definition as { properties?: unknown }).properties;
 		return Array.isArray(properties) ? properties.length : undefined;
-	}
-
-	function loadFieldSetsMore() {
-		if (!fieldSetsHasMore || fieldSetsLoading) return;
-		void fetchFieldSets(fieldSets.at(-1)?.id);
 	}
 
 	let busy = $state(false);
@@ -230,13 +155,7 @@
 	let catalogueOpen = $state(false);
 
 	async function reloadAll() {
-		fields = [];
-		lists = [];
-		fieldSets = [];
-		fieldsHasMore = true;
-		listsHasMore = true;
-		fieldSetsHasMore = true;
-		await Promise.all([fetchFields(), fetchLists(), fetchFieldSets()]);
+		await Promise.all([fieldsList.load(null), listsList.load(null), fieldSetsList.load(null)]);
 	}
 
 	// The file chosen to import, and what importing it would do, until it is confirmed.
@@ -380,9 +299,10 @@
 				return;
 			}
 			const copy = result.data;
-			if (copy.kind === 'field') fields = [copy, ...fields];
-			else if (copy.kind === 'choice_list') lists = [copy, ...lists];
-			else if (copy.kind === 'field_set') fieldSets = [copy, ...fieldSets];
+			// Newest first, so the copy is at the top of the first page.
+			if (copy.kind === 'field') void fieldsList.load(null);
+			else if (copy.kind === 'choice_list') void listsList.load(null);
+			else if (copy.kind === 'field_set') void fieldSetsList.load(null);
 			toast.success('Copied');
 		} finally {
 			copying = false;
@@ -403,28 +323,28 @@
 	}
 
 	function handleListSaved(saved: PresetResponse) {
-		lists = lists.map((p) => (p.id === saved.id ? saved : p));
+		listsList.rows = listsList.rows.map((p) => (p.id === saved.id ? saved : p));
 	}
 
 	$effect(() => {
-		void fetchFields();
+		void fieldsList.load(null);
 	});
 
 	$effect(() => {
-		void fetchLists();
+		void listsList.load(null);
 	});
 
 	$effect(() => {
-		void fetchFieldSets();
+		void fieldSetsList.load(null);
 	});
 
 	// Coming back online, or Retry in the banner, reloads any section that had failed.
 	$effect(() => {
 		void offlineController.retryCount;
 		untrack(() => {
-			if (fieldsLoadFailed) void fetchFields();
-			if (listsLoadFailed) void fetchLists();
-			if (fieldSetsLoadFailed) void fetchFieldSets();
+			if (fieldsLoadFailed) void fieldsList.retry();
+			if (listsLoadFailed) void listsList.retry();
+			if (fieldSetsLoadFailed) void fieldSetsList.retry();
 		});
 	});
 </script>
@@ -616,7 +536,12 @@
 		</div>
 	</div>
 
-	<CollapsibleSection id="saved-fields-fields" title="Fields" count={fields.length} class="gap-3">
+	<CollapsibleSection
+		id="saved-fields-fields"
+		title="Fields"
+		count={fieldsList.count ?? undefined}
+		class="gap-3"
+	>
 		{#snippet actions()}
 			{@render sectionActions('Fields', 'field')}
 		{/snippet}
@@ -624,7 +549,7 @@
 		{#if fieldsLoading && fields.length === 0}
 			<ListRowSkeleton count={3} />
 		{:else if fieldsLoadFailed}
-			<LoadFailed what="your saved fields" onretry={() => void fetchFields()} />
+			<LoadFailed what="your saved fields" onretry={() => void fieldsList.retry()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each fields as preset (preset.id)}
@@ -640,18 +565,15 @@
 			{/if}
 		{/if}
 
-		<ListFoot
-			loading={fieldsLoading}
-			hasMore={fieldsHasMore}
-			failed={fieldsPageFailed}
-			rows={fields.length}
-			noun="saved field"
-			onload={loadFieldsMore}
-			onretry={() => void fetchFields(fields.at(-1)?.id)}
-		/>
+		<PageNav list={fieldsList} noun="saved field" />
 	</CollapsibleSection>
 
-	<CollapsibleSection id="saved-fields-lists" title="Lists" count={lists.length} class="gap-3">
+	<CollapsibleSection
+		id="saved-fields-lists"
+		title="Lists"
+		count={listsList.count ?? undefined}
+		class="gap-3"
+	>
 		{#snippet actions()}
 			{@render sectionActions('Lists', 'choice_list')}
 		{/snippet}
@@ -659,7 +581,7 @@
 		{#if listsLoading && lists.length === 0}
 			<ListRowSkeleton count={3} />
 		{:else if listsLoadFailed}
-			<LoadFailed what="your saved lists" onretry={() => void fetchLists()} />
+			<LoadFailed what="your saved lists" onretry={() => void listsList.retry()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each lists as preset (preset.id)}
@@ -685,21 +607,13 @@
 			{/if}
 		{/if}
 
-		<ListFoot
-			loading={listsLoading}
-			hasMore={listsHasMore}
-			failed={listsPageFailed}
-			rows={lists.length}
-			noun="saved list"
-			onload={loadListsMore}
-			onretry={() => void fetchLists(lists.at(-1)?.id)}
-		/>
+		<PageNav list={listsList} noun="saved list" />
 	</CollapsibleSection>
 
 	<CollapsibleSection
 		id="saved-fields-field-groups"
 		title="Field groups"
-		count={fieldSets.length}
+		count={fieldSetsList.count ?? undefined}
 		class="gap-3"
 	>
 		{#snippet actions()}
@@ -709,7 +623,7 @@
 		{#if fieldSetsLoading && fieldSets.length === 0}
 			<ListRowSkeleton count={3} />
 		{:else if fieldSetsLoadFailed}
-			<LoadFailed what="your saved field groups" onretry={() => void fetchFieldSets()} />
+			<LoadFailed what="your saved field groups" onretry={() => void fieldSetsList.retry()} />
 		{:else}
 			<ul class="divide-y rounded-xl border bg-card">
 				{#each fieldSets as preset (preset.id)}
@@ -735,15 +649,7 @@
 			{/if}
 		{/if}
 
-		<ListFoot
-			loading={fieldSetsLoading}
-			hasMore={fieldSetsHasMore}
-			failed={fieldSetsPageFailed}
-			rows={fieldSets.length}
-			noun="field group"
-			onload={loadFieldSetsMore}
-			onretry={() => void fetchFieldSets(fieldSets.at(-1)?.id)}
-		/>
+		<PageNav list={fieldSetsList} noun="field group" />
 	</CollapsibleSection>
 	{#if editingList}
 		{#key editSession}
