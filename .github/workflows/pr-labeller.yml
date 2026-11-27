@@ -14,7 +14,10 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # One run per pull request and event, so a newer push replaces a run still going for it. The
+  # event is in the key so that two different triggers never cancel each other (while this
+  # workflow changed event, the old and the new run on one pull request did).
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
