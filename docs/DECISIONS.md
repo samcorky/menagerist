@@ -2078,3 +2078,21 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **The default is not changed.** #592 suggests newest first as the default, since "by id" is not an order people recognise. That changes what everyone sees when they open Items, and moves the default list onto the search endpoint, so it is left for a decision of its own. The control makes the order visible and one choice away.
 - **The toolbar wraps on a phone.** The row of controls did not wrap, so the select was squeezed to two letters at 360 px; the row now wraps and the select keeps its size.
 - **Not done:** the same control on a collection's page and the Collections list, which #592 asks for once the Items one is settled.
+
+## A list keeps its rows while it reloads, and one table component owns every list state (2026-11-27)
+
+**Decision:** A table or list that is sorted, searched or filtered again keeps its rows on screen, dimmed, until the new first page arrives, instead of emptying and showing a skeleton. `PagedList.load` takes `keepRows`, `DataTable` takes `busy`, and `ListTable` (`components/list-table.svelte`) is the one component that decides what a list shows: a skeleton on the first load only (after 300ms), a failure with Try again, the empty message once a read has finished with nothing, and otherwise the rows, as a table from `md` up and as cards below. All eight tables that used `DataTable` for a list use it.
+
+- **Why.** Emptying on every reload collapsed the table and the page below it moved, and each page had its own branch tying the skeleton to `loading`, `loadingDisplay.show` or the row count, so the wrong one was easy to write. The rule is now in one function, `listTableState`, which is unit tested.
+- **Effects must not read what they set.** Pages call `load` from an `$effect`. The first version read the row count to decide whether to keep rows, so the effect depended on the rows it set, re-ran and never settled; the count is read untracked. Effects do not run under Vitest, so only an e2e spec catches this class of bug.
+- **The failure is the standard one.** Where a page showed its own alert with a Retry button, it now shows `LoadFailed`, which is offline-aware. Recently deleted lost the server's error text for the same reason.
+- **A card list sorts by a select.** The Collections list has "Sort by" with the Items page's names (`lib/list-sort-choices.ts`), kept in the address as `?sort=`. The route's own order is the first choice.
+- **Not done:** the Items list and a collection's items still keep their own paging state (they read the server's cursor, not the last row's id); the collection page has no sort control yet.
+
+## The main search asks the list routes for their matches (2026-11-27)
+
+**Decision:** The item type, saved field and account sources of `GET /search` pass the text to their list use case as `q` and read every match, instead of reading the whole list and filtering in the bridge. Items and collections already did. The search is no narrower than before for any of them.
+
+- **Every match, not the first few.** The search ranks hits itself and the best one may come last in id order, so a source still reads all the matches a page at a time (up to 10,000), now with the database doing the filtering.
+- **`q` is as wide as the search was.** Saved fields matched label and description in the bridge but `q` matched the label only, so the list's `q` now covers the description too (the same `contains_any` as item types), in SQL and in memory. Item types gain the description in the search, and accounts gain the role, because the lists' `q` already reads them.
+- **Not changed:** example packs, settings, preferences and scheduled tasks are not paged lists, so they keep their own matching.

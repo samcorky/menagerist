@@ -7,7 +7,7 @@ from app.modules.presets.adapters.persistence.models import PresetModel
 from app.modules.presets.domain.preset import Preset
 from app.platform.keyset import keyset_page, text_column, timestamp_column
 from app.platform.orm_mixins import claim_rows, owned_by
-from app.platform.text_search import contains_pattern, unaccent_ilike
+from app.platform.text_search import contains_any
 
 if TYPE_CHECKING:
     import builtins
@@ -108,11 +108,9 @@ class SqlAlchemyPresetRepository:
         )
         if kind is not None:
             stmt = stmt.where(PresetModel.kind == kind)
-        needle = (q or "").strip()
-        if needle:
-            stmt = stmt.where(
-                unaccent_ilike(PresetModel.label, contains_pattern(needle))
-            )
+        match = contains_any(q, PresetModel.label, PresetModel.description)
+        if match is not None:
+            stmt = stmt.where(match)
         return await keyset_page(
             self._session,
             stmt,
