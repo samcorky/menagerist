@@ -252,6 +252,8 @@ Load large collections incrementally. Returning from an item in the same tab/ses
 
 A list always says what it is doing at its foot, through the shared `list-foot` component: the next page loading, the end of the list with its count, or that a page failed with a way to try again. A list never simply stops without a word. The next page starts loading about a screen and a half ahead of the foot, so a steady scroller rarely waits for it, and the foot's state is announced in a polite live region without moving focus (§20a). The end message may carry one of the page's own flavour lines beside the count, in the spirit of §11's first-use lines; failures stay plain.
 
+A list scrolls only when it is the main thing on its page: the items, the collections, the item types. A table, a group of cards, or any screen that holds several lists, pages instead, with the shared foot (`page-nav`): where the page sits in the list ("11–20 of 23 tokens"), Previous and Next, and a plain retry for a page that would not load. Several lists that each scroll would each load pages as the person moves past something else, and a table has no end to scroll to. There is no jump to a page number or to the last page, because the API pages by cursor. A list that fits one page says how many rows it holds and shows no buttons.
+
 Do not share this state across tabs. Direct/deep links have no collection context to reconstruct: return to defaults. Surviving a hard reload is optional.
 
 ## 20. Accessibility

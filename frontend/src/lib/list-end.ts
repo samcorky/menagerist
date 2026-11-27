@@ -60,5 +60,23 @@ export function endMessage(
 	return `${pickEmptyLine(lines, key)} ${counted} in all.`;
 }
 
+/**
+ * Where a table's page sits in its list: "26–50 of 312 sessions", or "26–50 sessions" when
+ * the server sent no count. A list that fits one page says how many it holds, as the end of
+ * an infinite list does.
+ */
+export function pageRangeMessage(
+	from: number,
+	to: number,
+	total: number | null,
+	noun: string,
+	single: boolean
+): string {
+	if (single) return countedEnd(to, total, noun);
+	const range = `${from.toLocaleString('en-GB')}–${to.toLocaleString('en-GB')}`;
+	if (total === null) return `${range} ${noun}s`;
+	return `${range} of ${total.toLocaleString('en-GB')} ${total === 1 ? noun : `${noun}s`}`;
+}
+
 /** The plain line for a next page that would not load. Never a flavour line (design §11). */
 export const LOAD_MORE_FAILED = "We couldn't load any more.";
