@@ -129,3 +129,5 @@ async def test_deleted_rows_filter_by_name_or_type_with_q(
     found = await repo.list_deleted(scope=scope, page=PageRequest(limit=10), q="CAFE")
 
     assert {n.id for n in found.items} == {by_name.id, typed.id}
+    # The total follows the filter and the scope, not every deleted row.
+    assert found.total == 2

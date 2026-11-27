@@ -259,3 +259,19 @@ def test_a_cursor_from_one_key_does_not_resume_a_list_of_two() -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_the_type_lists_say_how_many_rows_match_on_every_page() -> None:
+    """Item types, subtypes and connection types send `Total-Count` that follows `q`."""
+    client = TestClient(_app())
+    _make_node_types(client)
+    _make_edge_types(client)
+    matching = sum("b" in slug.lower() for slug in SLUGS)
+
+    node_types = client.get("/api/v1/node-types", params={"limit": 2})
+    searched = client.get("/api/v1/node-types", params={"q": "b", "limit": 1})
+    edge_types = client.get("/api/v1/edge-types", params={"limit": 2})
+
+    assert node_types.headers["Total-Count"] == str(len(SLUGS))
+    assert searched.headers["Total-Count"] == str(matching)
+    assert edge_types.headers["Total-Count"] == str(len(SLUGS))

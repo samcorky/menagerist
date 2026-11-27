@@ -324,3 +324,29 @@ async def test_list_sorts_by_two_keys_each_in_its_own_direction(
         page = await repository.list(scope=scope, page=request(after=page.next))
 
     assert seen == expected
+
+
+async def test_list_counts_the_filtered_list_in_scope_on_every_page(
+    db_session: AsyncSession,
+) -> None:
+    """`total` counts the owner's matching rows on every page and follows `q`."""
+    repository = SqlAlchemyNodeTypeRepository(db_session)
+    owner, other = uuid.uuid7(), uuid.uuid7()
+    for slug in ("a", "b", "c", "d", "e"):
+        await repository.add(
+            NodeType.create(owner_id=owner, slug=slug, label=slug.upper())
+        )
+    await repository.add(NodeType.create(owner_id=other, slug="f", label="F"))
+    scope = ContentFilter.of(owner)
+
+    first = await repository.list(scope=scope, page=PageRequest(limit=2))
+    assert first.next is not None
+    second = await repository.list(
+        scope=scope, page=PageRequest(after=first.next, limit=2)
+    )
+    searched = await repository.list(scope=scope, page=PageRequest(limit=1), q="a")
+    nothing = await repository.list(scope=scope, page=PageRequest(limit=1), q="zebra")
+
+    assert (first.total, second.total) == (5, 5)
+    assert searched.total == 1
+    assert nothing.total == 0

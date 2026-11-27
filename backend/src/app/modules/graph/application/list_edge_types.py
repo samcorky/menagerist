@@ -61,6 +61,7 @@ class ListEdgeTypes(QueryHandler[GraphRepos, ListEdgeTypesQuery, Page[EdgeType]]
         return Page(
             items=[await self._resolved(edge_type) for edge_type in page.items],
             next=page.next,
+            total=page.total,
         )
 
     async def _resolved(self, edge_type: EdgeType) -> EdgeType:

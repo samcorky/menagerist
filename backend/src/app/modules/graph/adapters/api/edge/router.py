@@ -13,8 +13,8 @@ from app.entrypoints.api.shared.http.conditional_request import (
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
-    link_header_responses,
-    set_next_link,
+    paging_responses,
+    set_page_headers,
 )
 from app.entrypoints.api.shared.http.parameters import EdgeId, SearchPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -130,7 +130,7 @@ async def get_edge(
     "",
     response_model=list[EdgeResponse],
     operation_id="list_edges",
-    responses={**link_header_responses()},
+    responses={**paging_responses("Connections")},
 )
 async def list_edges(
     use_case: Annotated[ListEdges, Depends(get_list_edges_use_case)],
@@ -156,7 +156,7 @@ async def list_edges(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
+    set_page_headers(request, response, result)
     return [EdgeResponse.from_domain(edge) for edge in result.items]
 
 

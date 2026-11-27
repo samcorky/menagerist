@@ -12,8 +12,8 @@ from app.entrypoints.api.shared.http.conditional_request import (
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
-    link_header_responses,
-    set_next_link,
+    paging_responses,
+    set_page_headers,
 )
 from app.entrypoints.api.shared.http.parameters import PresetId, SearchPageParams
 from app.entrypoints.api.shared.http.problem_response import error_response
@@ -101,7 +101,7 @@ async def get_preset(
     "",
     response_model=list[PresetResponse],
     operation_id="list_presets",
-    responses={**link_header_responses()},
+    responses={**paging_responses("Saved fields")},
 )
 async def list_presets(
     use_case: Annotated[ListPresets, Depends(get_list_presets_use_case)],
@@ -126,7 +126,7 @@ async def list_presets(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
+    set_page_headers(request, response, result)
     return [PresetResponse.from_domain(p) for p in result.items]
 
 

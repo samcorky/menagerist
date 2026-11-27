@@ -67,4 +67,5 @@ class ListNodeTypes(QueryHandler[GraphRepos, ListNodeTypesQuery, Page[NodeType]]
                 for node_type in page.items
             ],
             next=page.next,
+            total=page.total,
         )

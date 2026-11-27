@@ -7847,6 +7847,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Total-Count": {
+                "description": "Connections in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -9324,6 +9330,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Total-Count": {
+                "description": "Item types in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             },
             "links": {
@@ -10389,6 +10401,12 @@
                 "description": "RFC 8288 next-page cursor. Absent on last page.",
                 "schema": {
                   "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Subtypes in total. Always exact.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             }
@@ -12236,6 +12254,12 @@
                 "description": "RFC 8288 next-page cursor. Absent on last page.",
                 "schema": {
                   "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Connection types in total. Always exact.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             },
@@ -17307,6 +17331,12 @@
                 "description": "RFC 8288 next-page cursor. Absent on last page.",
                 "schema": {
                   "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Saved fields in total. Always exact.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             },
@@ -25515,6 +25545,12 @@
                 "description": "RFC 8288 next-page cursor. Absent on last page.",
                 "schema": {
                   "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Collections in total. Always exact.",
+                "schema": {
+                  "type": "integer"
                 }
               }
             },

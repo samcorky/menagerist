@@ -47,7 +47,7 @@ A list returns a **bare JSON array**, and paging lives in headers, in the style 
 
 - Keyset pagination: `?after=<cursor>&limit=<n>`, never an offset. The cursor is opaque to clients: pass back the one the `Link` header carries and read nothing into it.
 - `Link: <url>; rel="next"` (RFC 8288) is present while there is another page and absent on the last. The next URL repeats the request's other parameters, so `sort`, `order` and `q` carry on to every page.
-- `Total-Count` is the number of items matching the filters, with `Total-Count-Capped: true` when a search stopped counting at its cap and the number is a lower bound.
+- `Total-Count` is the number of items matching the filters, with `Total-Count-Capped: true` when a search stopped counting at its cap and the number is a lower bound. It is the same on every page, so a client shows "11–20 of 23" from any of them. Every list sends it except where counting is not cheap or not defined: a search of items counts to a cap, a list of collections filtered by `item_id` is filtered after the rows are read, and the contents of an item are walked, not counted. The SQL lists count with one extra query, `with_total` on `keyset_page`, over the same rows without the cursor condition.
 
 ### Sort, order and search
 

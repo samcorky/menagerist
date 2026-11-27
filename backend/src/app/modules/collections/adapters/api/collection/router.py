@@ -15,8 +15,8 @@ from app.entrypoints.api.shared.http.conditional_request import (
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
-    link_header_responses,
-    set_next_link,
+    paging_responses,
+    set_page_headers,
 )
 from app.entrypoints.api.shared.http.parameters import (
     NewestFirstSearchPageParams,
@@ -203,7 +203,7 @@ async def create_collection(
     "",
     response_model=list[CollectionResponse],
     operation_id="list_collections",
-    responses={**link_header_responses()},
+    responses={**paging_responses("Collections")},
 )
 async def list_collections(
     use_case: Annotated[ListCollections, Depends(get_list_collections_use_case)],
@@ -245,7 +245,7 @@ async def list_collections(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
+    set_page_headers(request, response, result)
     return [CollectionResponse.from_domain(s) for s in result.items]
 
 
@@ -280,8 +280,7 @@ async def list_deleted_collections(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
-    response.headers["Total-Count"] = str(result.total)
+    set_page_headers(request, response, result)
     return [DeletedCollectionResponse.from_domain(c) for c in result.items]
 
 

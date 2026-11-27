@@ -120,6 +120,7 @@ class SqlAlchemyPresetRepository:
             columns=_SORT_COLUMNS,
             request=page,
             to_domain=_to_domain,
+            with_total=True,
         )
 
     async def list_deleted_before(

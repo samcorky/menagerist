@@ -12,8 +12,8 @@ from app.entrypoints.api.shared.http.conditional_request import (
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
-    link_header_responses,
-    set_next_link,
+    paging_responses,
+    set_page_headers,
 )
 from app.entrypoints.api.shared.http.parameters import (
     FieldKey,
@@ -162,7 +162,7 @@ async def get_node_type(
     "",
     response_model=list[NodeTypeResponse],
     operation_id="list_node_types",
-    responses={**link_header_responses()},
+    responses={**paging_responses("Item types")},
 )
 async def list_node_types(
     use_case: Annotated[ListNodeTypes, Depends(get_list_node_types_use_case)],
@@ -183,7 +183,7 @@ async def list_node_types(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
+    set_page_headers(request, response, result)
     return [NodeTypeResponse.from_domain(nt) for nt in result.items]
 
 
@@ -192,7 +192,7 @@ async def list_node_types(
     response_model=list[NodeTypeResponse],
     operation_id="list_subtypes",
     responses={
-        **link_header_responses(),
+        **paging_responses("Subtypes"),
         **error_response(
             NodeTypeNotFoundError,
             detail="NodeType 01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20 not found",
@@ -220,7 +220,7 @@ async def list_subtypes(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
+    set_page_headers(request, response, result)
     return [NodeTypeResponse.from_domain(nt) for nt in result.items]
 
 
