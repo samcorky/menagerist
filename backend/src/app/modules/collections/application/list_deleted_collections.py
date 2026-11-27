@@ -9,7 +9,7 @@ from app.modules.collections.domain.collection import Collection
 from app.modules.collections.ports.unit_of_work import CollectionsRepos
 from app.shared_kernel.access import Access, Content
 from app.shared_kernel.cqrs import QueryHandler
-from app.shared_kernel.paging import Cursor, SearchedPagedQuery, SortOrder
+from app.shared_kernel.paging import Page, SearchedPagedQuery, SortOrder
 
 if TYPE_CHECKING:
     from app.shared_kernel.actor import Actor
@@ -31,19 +31,8 @@ class ListDeletedCollectionsQuery(SearchedPagedQuery[DeletedCollectionSort]):
     order: SortOrder = SortOrder.DESC
 
 
-@dataclass(kw_only=True, frozen=True)
-class ListDeletedCollectionsResult:
-    """A page of deleted collections, the next cursor, and how many are deleted."""
-
-    items: list[Collection]
-    total: int
-    next: Cursor | None = None
-
-
 class ListDeletedCollections(
-    QueryHandler[
-        CollectionsRepos, ListDeletedCollectionsQuery, ListDeletedCollectionsResult
-    ]
+    QueryHandler[CollectionsRepos, ListDeletedCollectionsQuery, Page[Collection]]
 ):
     """List the caller's deleted collections, newest deleted first."""
 
@@ -51,7 +40,7 @@ class ListDeletedCollections(
 
     async def _handle(
         self, query: ListDeletedCollectionsQuery, actor: Actor
-    ) -> ListDeletedCollectionsResult:
+    ) -> Page[Collection]:
         """Return a page of deleted collections after `query.after`."""
         scope = self.scope(actor)
         page = await self._repos.collections.list_deleted(
@@ -59,8 +48,7 @@ class ListDeletedCollections(
             page=query.page_request(DeletedCollectionSort.DELETED_AT),
             q=query.q,
         )
-        total = await self._repos.collections.count_deleted(scope=scope)
-        logger.debug("deleted collections listed", count=len(page.items), total=total)
-        return ListDeletedCollectionsResult(
-            items=page.items, total=total, next=page.next
+        logger.debug(
+            "deleted collections listed", count=len(page.items), total=page.total
         )
+        return page

@@ -16,6 +16,7 @@ from app.entrypoints.api.shared.http.http_headers import (
     conditional_patch_responses,
     link_next_header,
     set_next_link,
+    set_page_headers,
 )
 from app.entrypoints.api.shared.http.parameters import (
     FieldKey,
@@ -398,8 +399,7 @@ async def list_deleted_nodes(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
-    response.headers["Total-Count"] = str(result.total)
+    set_page_headers(request, response, result)
     return [DeletedNodeResponse.from_domain(n) for n in result.items]
 
 

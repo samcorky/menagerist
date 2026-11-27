@@ -621,3 +621,4 @@ async def test_list_deleted_q_matches_the_name(db_session: AsyncSession) -> None
     )
 
     assert [c.id for c in found.items] == [gone.id]
+    assert found.total == 1

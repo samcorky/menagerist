@@ -52,10 +52,15 @@ class ListCollectionsQuery(SearchedPagedQuery[CollectionSort]):
 
 @dataclass(kw_only=True, frozen=True)
 class ListCollectionsResult:
-    """A page of collection summaries, and the cursor of the next page if any."""
+    """A page of collection summaries, and the cursor of the next page if any.
+
+    `total` is how many collections match, when the list could count them: not when it
+    was filtered to those holding an item, which happens after the rows are read.
+    """
 
     items: list[CollectionSummary]
     next: Cursor | None = None
+    total: int | None = None
 
 
 class ListCollections(
@@ -81,7 +86,7 @@ class ListCollections(
             await summarise(self._repos, self._items, c, scope) for c in page.items
         ]
         logger.debug("collections listed", count=len(summaries))
-        return ListCollectionsResult(items=summaries, next=page.next)
+        return ListCollectionsResult(items=summaries, next=page.next, total=page.total)
 
     async def _page(
         self, query: ListCollectionsQuery, scope: ContentFilter

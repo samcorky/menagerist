@@ -12,8 +12,8 @@ from app.entrypoints.api.shared.http.conditional_request import (
 from app.entrypoints.api.shared.http.http_headers import (
     conditional_get_responses,
     conditional_patch_responses,
-    link_header_responses,
-    set_next_link,
+    paging_responses,
+    set_page_headers,
 )
 from app.entrypoints.api.shared.http.parameters import (
     EdgeTypeId,
@@ -122,7 +122,7 @@ async def get_edge_type(
     "",
     response_model=list[EdgeTypeResponse],
     operation_id="list_edge_types",
-    responses={**link_header_responses()},
+    responses={**paging_responses("Connection types")},
 )
 async def list_edge_types(
     use_case: Annotated[ListEdgeTypes, Depends(get_list_edge_types_use_case)],
@@ -143,7 +143,7 @@ async def list_edge_types(
         ),
         actor,
     )
-    set_next_link(request, response, result.next)
+    set_page_headers(request, response, result)
     return [EdgeTypeResponse.from_domain(et) for et in result.items]
 
 

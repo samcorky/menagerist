@@ -290,3 +290,19 @@ def test_list_a_cursor_from_another_sort_is_a_400() -> None:
 
     assert response.status_code == 400
     assert client.get("/api/v1/presets", params={"after": "nope"}).status_code == 400
+
+
+def test_list_says_how_many_presets_match_on_every_page() -> None:
+    """`Total-Count` counts the filtered list, whatever page or size is asked for."""
+    client = TestClient(_app_with_in_memory_presets())
+    for label in ("Café", "Cafeteria", "Tea"):
+        _create(client, label)
+    _create(client, "Grades", kind="choice_list")
+
+    everything = client.get("/api/v1/presets", params={"limit": 2})
+    searched = client.get("/api/v1/presets", params={"q": "cafe", "limit": 1})
+    one_kind = client.get("/api/v1/presets", params={"kind": "field"})
+
+    assert everything.headers["Total-Count"] == "4"
+    assert searched.headers["Total-Count"] == "2"
+    assert one_kind.headers["Total-Count"] == "3"

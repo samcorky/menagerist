@@ -183,6 +183,7 @@ class SqlAlchemyCollectionRepository:
             columns=_SORT_COLUMNS,
             request=page,
             to_domain=_to_domain,
+            with_total=True,
         )
 
     @staticmethod
@@ -219,6 +220,7 @@ class SqlAlchemyCollectionRepository:
             columns=_DELETED_SORT_COLUMNS,
             request=page,
             to_domain=_to_domain,
+            with_total=True,
         )
 
     async def count_deleted(self, *, scope: ContentFilter) -> int:

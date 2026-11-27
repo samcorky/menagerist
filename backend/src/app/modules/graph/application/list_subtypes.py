@@ -66,4 +66,5 @@ class ListSubtypes(QueryHandler[GraphRepos, ListSubtypesQuery, Page[NodeType]]):
                 for subtype in page.items
             ],
             next=page.next,
+            total=page.total,
         )

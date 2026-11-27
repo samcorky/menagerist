@@ -1,5 +1,5 @@
 from email.utils import formatdate, parsedate_to_datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from .problem_response import (
     PRECONDITION_FAILED_DETAIL,
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from starlette.requests import Request
     from starlette.responses import Response
 
-    from app.shared_kernel.paging import Cursor, Page
+    from app.shared_kernel.paging import Cursor
 
 
 def http_date(dt: datetime) -> str:
@@ -89,7 +89,21 @@ def conditional_patch_responses() -> dict[int | str, dict[str, Any]]:
     }
 
 
-def set_page_headers(request: Request, response: Response, page: Page[Any]) -> None:
+class PagedResult(Protocol):
+    """What the paging headers read: a `Page`, or a result shaped like one."""
+
+    @property
+    def next(self) -> Cursor | None:
+        """The cursor of the next page, or None on the last."""
+        ...
+
+    @property
+    def total(self) -> int | None:
+        """How many rows match, or None when the list did not count them."""
+        ...
+
+
+def set_page_headers(request: Request, response: Response, page: PagedResult) -> None:
     """Set `Link` to the next page, and `Total-Count` when the page knows the total."""
     set_next_link(request, response, page.next)
     if page.total is not None:
@@ -112,20 +126,6 @@ def paging_responses(what: str) -> dict[int | str, dict[str, Any]]:
                     "description": f"{what} in total. Always exact.",
                     "schema": {"type": "integer"},
                 },
-            }
-        }
-    }
-
-
-def link_header_responses() -> dict[int | str, dict[str, Any]]:
-    """OpenAPI docs for the RFC 8288 Link header on list endpoints."""
-    return {
-        200: {
-            "headers": {
-                "Link": {
-                    "description": "RFC 8288 next-page cursor. Absent on last page.",
-                    "schema": {"type": "string"},
-                }
             }
         }
     }

@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import SQLColumnExpression, and_, func, or_
+from sqlalchemy import SQLColumnExpression, and_, func, or_, select
 
 from app.shared_kernel.paging import (
     Cursor,
@@ -110,18 +110,28 @@ async def keyset_page[Row, T](
     columns: Mapping[str, SortColumn],
     request: PageRequest,
     to_domain: Callable[[Row], T],
+    with_total: bool = False,
 ) -> Page[T]:
     """Run `stmt` as one page of `request`: ordered, resumed after the cursor, limited.
 
     `stmt` selects the rows of one model, with the actor's scope and the route's
     filters applied and no ordering of its own. The keyset condition is added to it,
-    so paging can never reach a row the scope left out.
+    so paging can never reach a row the scope left out. With `with_total` the page
+    carries `total`, the rows `stmt` matches, at the price of one count query.
 
     Raises:
         InvalidCursorError: The cursor does not match the request, or its values are
             not of the kind the sort key compares with.
     """
     request.check()
+    # Counted over the same rows, before the keyset condition narrows them to this page.
+    total = (
+        await session.scalar(
+            select(func.count()).select_from(stmt.order_by(None).subquery())
+        )
+        if with_total
+        else None
+    )
     sorted_by = [columns[key] for key in request.keys]
     orders = request.orders
 
@@ -146,11 +156,12 @@ async def keyset_page[Row, T](
     kept = rows[: request.size]
     items = [to_domain(row[0]) for row in kept]
     if not kept or len(rows) <= request.size:
-        return Page(items=items)
+        return Page(items=items, total=total)
     last = kept[-1]
     return Page(
         items=items,
         next=request.next_after(
             last[-1], tuple(_cursor_value(value) for value in last[1:-1])
         ),
+        total=total,
     )

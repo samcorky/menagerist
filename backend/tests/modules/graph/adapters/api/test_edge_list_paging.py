@@ -150,3 +150,17 @@ def test_connections_search_the_type() -> None:
     assert len(whole) == 3
     assert {e["type"] for e in one_item} == {"likes"}
     assert len(one_item) == 2
+
+
+def test_connections_say_how_many_match_for_the_whole_list_and_for_one_item() -> None:
+    """`Total-Count` counts every connection, or only the ones touching `node_id`."""
+    client = TestClient(_app())
+    hub = _node(client, "hub")
+    _edges(client, hub)
+    _edges(client)
+
+    whole = client.get(BASE, params={"limit": 2})
+    one_item = client.get(BASE, params={"node_id": hub, "limit": 1})
+
+    assert whole.headers["Total-Count"] == str(2 * len(TYPES))
+    assert one_item.headers["Total-Count"] == str(len(TYPES))

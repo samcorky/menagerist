@@ -174,6 +174,7 @@ class SqlAlchemyEdgeRepository:
             columns=_SORT_COLUMNS,
             request=page,
             to_domain=_to_domain,
+            with_total=True,
         )
 
     async def has_edges_of_type(self, type_slug: str, *, scope: ContentFilter) -> bool:

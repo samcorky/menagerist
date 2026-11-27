@@ -2039,3 +2039,13 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Previous needs no server support.** The list keeps the cursor each page was read with, so Previous reads that page again. A page that changed meanwhile shows its new rows. There is no jump to a page number or the last page, for the reason the API has no offsets (see the list convention decision).
 - **After a change the list reads the page again.** `refresh()` keeps the rows shown until the new ones arrive, and falls back to the page before when the page has emptied. Creating a row calls `load()`, which goes to the first page, where the newest comes first.
 - **Reading everything stays.** `readPages` is for the pickers and loaders that need every row; a list a person looks at uses `PagedList`.
+
+## The SQL-paged library lists send `Total-Count` too (2026-11-27)
+
+**Decision:** Saved fields, item types and their subtypes, connection types, connections, collections and the two recently deleted lists send `Total-Count`, the number of rows that match the filters, on every page. `keyset_page` takes `with_total` and counts the same rows without the cursor condition. Part of #611, so a table can say "11–20 of 23" and a heading can show a real count.
+
+- **The convention already said so.** `API_STYLE.md` has `Total-Count` as the number of items matching the filters, and tables page with "next" and show it. The lists that page in memory sent it (their `Page` carries the total), the SQL ones did not, so the app could not show a range for them.
+- **One extra query, scoped like the page.** The count runs over the statement the repository hands the helper: the owner's scope and the route's filters, before the cursor condition, so every page of a list reports the same number and `q` narrows it. It is opt-in, not the default, because a count has a price on a large table.
+- **Not for the items list.** Items count to a cap (1,000 for a text search) and say so in `Total-Count-Capped`, which is its own decision above, and the contents of an item are walked in memory. A list of collections filtered by `item_id` is filtered after the rows are read, so it has no total.
+- **The deleted lists count inside the page.** They counted all deleted rows in a second query that ignored `q`, so after `q` was added `Total-Count` no longer followed the filter. They now return the `Page` with its own total, and the result types that only carried the count are gone.
+- **Not breaking:** a new response header on six more routes, documented in the schema.

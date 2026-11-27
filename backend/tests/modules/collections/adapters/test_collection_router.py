@@ -877,3 +877,20 @@ def test_list_walks_every_sort_key_to_the_end_in_order(
 def test_the_sort_keys_a_route_declares_are_fields_of_the_collection() -> None:
     """The enum's keys are names in the response, so a client sorts by what it sees."""
     assert {key.value for key in CollectionSort} <= set(CollectionResponse.model_fields)
+
+
+def test_list_says_how_many_collections_match_on_every_page(api: Api) -> None:
+    """`Total-Count` is the filtered list, not the page; absent with an item filter."""
+    for name in ("Tapes", "Tabs", "Vinyl"):
+        api.create(name)
+    holding = api.create("Holding")
+    item = api.live_item()
+    api.client.put(f"{BASE}/{holding['id']}/items", json={"item_ids": [item]})
+
+    everything = api.client.get(BASE, params={"limit": 2})
+    searched = api.client.get(BASE, params={"q": "ta", "limit": 1})
+    holding_item = api.client.get(BASE, params={"item_id": item})
+
+    assert everything.headers["Total-Count"] == "4"
+    assert searched.headers["Total-Count"] == "2"
+    assert "Total-Count" not in holding_item.headers
