@@ -11,21 +11,18 @@
 	} from '$lib/api/client';
 	import { PagedList } from '$lib/paged-list.svelte';
 	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
-	import PageNav from '$lib/components/page-nav.svelte';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { formatDateTime } from '$lib/format-date';
-	import { wide } from '$lib/viewport.svelte';
 	import {
 		NO_EXPORTS_MESSAGE,
 		describeExportExpiry,
 		formatExportSize
 	} from '$lib/personal-exports';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
+	import ListTable from '$lib/components/list-table.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 
@@ -40,13 +37,6 @@
 	);
 	const exports = $derived(list.rows);
 	const loading = $derived(list.loading);
-	const loadError = $derived(
-		list.failed
-			? list.failure?.response
-				? networkAwareError(list.failure).title
-				: 'Could not load exports.'
-			: null
-	);
 	let creating = $state(false);
 	let createError = $state<string | null>(null);
 	let deleteTarget = $state<UserExportResponse | null>(null);
@@ -144,108 +134,91 @@
 		</Alert.Root>
 	{/if}
 
-	{#if loadError}
-		<Alert.Root variant="destructive">
-			<Alert.Description>{loadError}</Alert.Description>
-		</Alert.Root>
-		<Button
-			type="button"
-			variant="outline"
-			class="pointer-coarse:h-11"
-			onclick={() => void list.retry()}
-		>
-			Retry
-		</Button>
-	{:else if loading && exports.length === 0}
-		<Skeleton class="h-20 w-full rounded-xl" />
-	{:else if exports.length === 0}
-		<p class="text-sm text-muted-foreground">{NO_EXPORTS_MESSAGE}</p>
-	{:else}
-		{#if wide.current}
-			<DataTable
-				label="Exports"
-				{sort}
-				busy={loading}
-				onsort={(key) => (sort = nextSort(sort, key as UserExportSort))}
-				columns={[
-					{ label: 'Created', sortKey: 'created_at' },
-					{ label: 'Size', sortKey: 'size' },
-					{ label: 'Expires', sortKey: 'expires_at' },
-					{ label: 'Actions', end: true }
-				]}
-			>
-				{#each exports as item (item.id)}
-					{@const created = formatDateTime(item.created_at)}
-					<Table.Row>
-						<Table.Cell class="font-medium" title={created.utc}>{created.local}</Table.Cell>
-						<Table.Cell class="text-muted-foreground">{formatExportSize(item.size)}</Table.Cell>
-						<Table.Cell class="text-muted-foreground">
+	<ListTable
+		label="Exports"
+		what="your exports"
+		columns={[
+			{ label: 'Created', sortKey: 'created_at' },
+			{ label: 'Size', sortKey: 'size' },
+			{ label: 'Expires', sortKey: 'expires_at' },
+			{ label: 'Actions', end: true }
+		]}
+		rows={exports}
+		rowKey={(item) => item.id}
+		{loading}
+		failed={list.failed}
+		onretry={() => void list.retry()}
+		empty={NO_EXPORTS_MESSAGE}
+		{sort}
+		onsort={(key) => (sort = nextSort(sort, key as UserExportSort))}
+		{list}
+		noun="export"
+		skeletons={1}
+	>
+		{#snippet row(item)}
+			{@const created = formatDateTime(item.created_at)}
+			<Table.Row>
+				<Table.Cell class="font-medium" title={created.utc}>{created.local}</Table.Cell>
+				<Table.Cell class="text-muted-foreground">{formatExportSize(item.size)}</Table.Cell>
+				<Table.Cell class="text-muted-foreground">
+					{describeExportExpiry(item.expires_at, now)}
+				</Table.Cell>
+				<Table.Cell>
+					<div class="flex justify-end gap-2">
+						<Button href={downloadUrl(item.id)} download variant="outline" class="h-9">
+							<Download class="size-4" aria-hidden="true" />
+							Download
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							class="h-9"
+							onclick={() => (deleteTarget = item)}
+						>
+							<Trash2 class="size-4" aria-hidden="true" />
+							Delete
+						</Button>
+					</div>
+				</Table.Cell>
+			</Table.Row>
+		{/snippet}
+		{#snippet card(item)}
+			{@const created = formatDateTime(item.created_at)}
+			<Card.Root>
+				<Card.Content
+					class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+				>
+					<div class="space-y-1">
+						<p class="font-medium" title={created.utc}>{created.local}</p>
+						<p class="text-xs text-muted-foreground">
+							{formatExportSize(item.size)} &middot;
 							{describeExportExpiry(item.expires_at, now)}
-						</Table.Cell>
-						<Table.Cell>
-							<div class="flex justify-end gap-2">
-								<Button href={downloadUrl(item.id)} download variant="outline" class="h-9">
-									<Download class="size-4" aria-hidden="true" />
-									Download
-								</Button>
-								<Button
-									type="button"
-									variant="outline"
-									class="h-9"
-									onclick={() => (deleteTarget = item)}
-								>
-									<Trash2 class="size-4" aria-hidden="true" />
-									Delete
-								</Button>
-							</div>
-						</Table.Cell>
-					</Table.Row>
-				{/each}
-			</DataTable>
-		{:else}
-			<ul class="space-y-3" aria-label="Exports">
-				{#each exports as item (item.id)}
-					{@const created = formatDateTime(item.created_at)}
-					<li>
-						<Card.Root>
-							<Card.Content
-								class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
-							>
-								<div class="space-y-1">
-									<p class="font-medium" title={created.utc}>{created.local}</p>
-									<p class="text-xs text-muted-foreground">
-										{formatExportSize(item.size)} &middot;
-										{describeExportExpiry(item.expires_at, now)}
-									</p>
-								</div>
-								<div class="flex shrink-0 gap-2">
-									<Button
-										href={downloadUrl(item.id)}
-										download
-										variant="outline"
-										class="flex-1 sm:flex-none pointer-coarse:h-11"
-									>
-										<Download class="size-4" aria-hidden="true" />
-										Download
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										class="flex-1 sm:flex-none pointer-coarse:h-11"
-										onclick={() => (deleteTarget = item)}
-									>
-										<Trash2 class="size-4" aria-hidden="true" />
-										Delete
-									</Button>
-								</div>
-							</Card.Content>
-						</Card.Root>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-		<PageNav {list} noun="export" />
-	{/if}
+						</p>
+					</div>
+					<div class="flex shrink-0 gap-2">
+						<Button
+							href={downloadUrl(item.id)}
+							download
+							variant="outline"
+							class="flex-1 sm:flex-none pointer-coarse:h-11"
+						>
+							<Download class="size-4" aria-hidden="true" />
+							Download
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							class="flex-1 sm:flex-none pointer-coarse:h-11"
+							onclick={() => (deleteTarget = item)}
+						>
+							<Trash2 class="size-4" aria-hidden="true" />
+							Delete
+						</Button>
+					</div>
+				</Card.Content>
+			</Card.Root>
+		{/snippet}
+	</ListTable>
 </section>
 
 <ConfirmDialog
