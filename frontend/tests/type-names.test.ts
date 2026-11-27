@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupByFamily, inFamilyOrder, matchTypes, typeNames } from '$lib/type-names';
+import { groupByFamily, inFamilyOrder, typeNames, withFamilies } from '$lib/type-names';
 
 const names = typeNames([
 	{ slug: 'memorabilia', label: 'Memorabilia', parent: null },
@@ -112,9 +112,9 @@ describe('typeNames', () => {
 	});
 });
 
-describe('matchTypes', () => {
+describe('withFamilies', () => {
 	const t = (slug: string, label: string, parent?: string) => ({ slug, label, parent });
-	const types = [
+	const all = [
 		t('film', 'Film'),
 		t('memorabilia', 'Memorabilia'),
 		t('poster', 'Poster', 'memorabilia'),
@@ -123,46 +123,47 @@ describe('matchTypes', () => {
 		t('vinyl', 'Vinyl', 'music'),
 		t('lost', 'Lost', 'gone')
 	];
-	const slugs = (query: string) => matchTypes(types, query).map((x) => x.slug);
+	const pick = (...slugs: string[]) => all.filter((x) => slugs.includes(x.slug));
+	const slugs = (matches: ReturnType<typeof pick>) =>
+		inFamilyOrder(withFamilies(matches, all)).map((x) => x.slug);
 
-	it('keeps every type for a blank search', () => {
-		expect(slugs('')).toEqual(types.map((x) => x.slug));
-		expect(slugs('   ')).toEqual(types.map((x) => x.slug));
+	it('shows a match that has no family as it is', () => {
+		expect(slugs(pick('film'))).toEqual(['film']);
 	});
 
-	it('finds a type by its label or its slug, ignoring case', () => {
-		expect(slugs('FILM')).toEqual(['film']);
-		expect(slugs('ticket-stub')).toEqual(['memorabilia', 'ticket-stub']);
+	it('brings the subtypes of a parent that matched', () => {
+		expect(slugs(pick('memorabilia'))).toEqual(['memorabilia', 'poster', 'ticket-stub']);
 	});
 
-	it('brings the subtypes of a parent that matches', () => {
-		expect(slugs('memorabilia')).toEqual(['memorabilia', 'poster', 'ticket-stub']);
+	it('brings the parent of a subtype that matched, and only that subtype', () => {
+		expect(slugs(pick('poster'))).toEqual(['memorabilia', 'poster']);
+		expect(slugs(pick('vinyl'))).toEqual(['music', 'vinyl']);
 	});
 
-	it('brings the parent of a subtype that matches, and only that subtype', () => {
-		expect(slugs('poster')).toEqual(['memorabilia', 'poster']);
-		expect(slugs('vinyl')).toEqual(['music', 'vinyl']);
+	it('lists a family once when both the parent and a subtype matched', () => {
+		expect(slugs(pick('memorabilia', 'poster'))).toEqual(['memorabilia', 'poster', 'ticket-stub']);
 	});
 
-	it('lists a family once when both parent and subtype match', () => {
-		// "o" is in Memorabilia and in Poster, and in Lost, which has no family.
-		expect(slugs('o')).toEqual(['memorabilia', 'poster', 'ticket-stub', 'lost']);
+	it('finds the family on pages the list has not loaded, since it reads the complete set', () => {
+		// The server's matches hold only the subtype; its parent and the other subtype are elsewhere.
+		const shown = withFamilies(pick('ticket-stub'), all);
+		expect(shown.map((x) => x.slug)).toEqual(['ticket-stub', 'memorabilia']);
 	});
 
-	it('keeps the order it was given', () => {
-		expect(matchTypes([...types].reverse(), 'memorabilia').map((x) => x.slug)).toEqual([
-			'ticket-stub',
-			'poster',
-			'memorabilia'
-		]);
+	it('keeps the matches first, in the order the server gave them', () => {
+		const shown = withFamilies(pick('music', 'film'), all);
+		expect(shown.map((x) => x.slug)).toEqual(['film', 'music', 'vinyl']);
 	});
 
-	it('leaves out a subtype whose parent is gone unless it matches itself', () => {
-		expect(slugs('lost')).toEqual(['lost']);
-		expect(slugs('gone')).toEqual([]);
+	it('leaves out a subtype whose parent is gone unless it matched itself', () => {
+		expect(slugs(pick('lost'))).toEqual(['lost']);
 	});
 
-	it('finds nothing for a search nothing matches', () => {
-		expect(slugs('zzz')).toEqual([]);
+	it('shows the matches as they are while the complete set has not loaded', () => {
+		expect(withFamilies(pick('poster'), []).map((x) => x.slug)).toEqual(['poster']);
+	});
+
+	it('shows nothing for no matches', () => {
+		expect(withFamilies([], all)).toEqual([]);
 	});
 });
