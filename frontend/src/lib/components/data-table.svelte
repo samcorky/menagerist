@@ -19,6 +19,7 @@
 		columns,
 		sort = null,
 		onsort,
+		busy = false,
 		children
 	}: {
 		/** Accessible name of the table. */
@@ -28,6 +29,8 @@
 		sort?: TableSort | null;
 		/** A click on a sortable header, with its key. The owner of the rows does the sorting. */
 		onsort?: (key: string) => void;
+		/** The rows are being read again: they stay, dimmed, so the table does not jump. */
+		busy?: boolean;
 		/** The `<Table.Row>`s of the body. */
 		children: Snippet;
 	} = $props();
@@ -77,7 +80,10 @@
 				{/each}
 			</Table.Row>
 		</Table.Header>
-		<Table.Body>
+		<Table.Body
+			aria-busy={busy}
+			class={busy ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+		>
 			{@render children()}
 		</Table.Body>
 	</Table.Root>

@@ -300,9 +300,9 @@
 			}
 			const copy = result.data;
 			// Newest first, so the copy is at the top of the first page.
-			if (copy.kind === 'field') void fieldsList.load(null);
-			else if (copy.kind === 'choice_list') void listsList.load(null);
-			else if (copy.kind === 'field_set') void fieldSetsList.load(null);
+			if (copy.kind === 'field') void fieldsList.load(null, { keepRows: true });
+			else if (copy.kind === 'choice_list') void listsList.load(null, { keepRows: true });
+			else if (copy.kind === 'field_set') void fieldSetsList.load(null, { keepRows: true });
 			toast.success('Copied');
 		} finally {
 			copying = false;
@@ -327,15 +327,15 @@
 	}
 
 	$effect(() => {
-		void fieldsList.load(null);
+		void fieldsList.load(null, { keepRows: true });
 	});
 
 	$effect(() => {
-		void listsList.load(null);
+		void listsList.load(null, { keepRows: true });
 	});
 
 	$effect(() => {
-		void fieldSetsList.load(null);
+		void fieldSetsList.load(null, { keepRows: true });
 	});
 
 	// Coming back online, or Retry in the banner, reloads any section that had failed.

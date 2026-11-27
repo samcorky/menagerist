@@ -206,7 +206,7 @@
 	}
 
 	$effect(() => {
-		void list.load(null);
+		void list.load(null, { keepRows: true });
 	});
 
 	// Coming back online, or Retry in the banner, reloads a list that had failed.

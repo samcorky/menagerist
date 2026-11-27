@@ -162,7 +162,7 @@
 
 	// A new search starts the list again from its first page.
 	$effect(() => {
-		void list.load({ q });
+		void list.load({ q }, { keepRows: true });
 	});
 
 	// Coming back online, or Retry in the banner, reloads a list that had failed.

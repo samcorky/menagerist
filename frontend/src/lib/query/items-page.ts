@@ -1,5 +1,6 @@
 import { listNodes, type NodeResponse } from '$lib/api/client';
 import { networkAwareError } from '$lib/api/errors';
+import { nextCursor } from '$lib/paging';
 import { decodeQuery, encodeQuery } from './codec';
 import { fitsLimits } from './limits';
 import { runSearch, SearchError, type SearchWarning } from './search';
@@ -110,7 +111,7 @@ export type ItemsPage =
 			status: 'ok';
 			items: NodeResponse[];
 			hasMore: boolean;
-			/** Search cursor for the next page; null on the list path. */
+			/** The server's cursor for the next page, from the `Link` header or the search; null at the end. */
 			cursor: string | null;
 			/** On the list path only set for a text search (possibly capped). */
 			total: number | null;
@@ -123,14 +124,13 @@ export type ItemsPage =
 	| { status: 'failed'; title: string; description?: string };
 
 /**
- * Load one page of items. Without filter conditions this is the existing `GET /node` call
- * (paged by `after`); otherwise the page's type and search box are folded into the filter
- * and sent to `POST /node/search` (paged by cursor).
+ * Load one page of items. Without filter conditions this is the existing `GET /node` call;
+ * otherwise the page's type and search box are folded into the filter and sent to
+ * `POST /node/search`. Either way the next page is read with the cursor the server gave.
  */
 export async function loadItemsPage(args: {
 	filter: Query;
 	basics: PageBasics;
-	after?: string;
 	cursor?: string | null;
 	limit?: number;
 }): Promise<ItemsPage> {
@@ -138,16 +138,17 @@ export async function loadItemsPage(args: {
 	const { type, q } = args.basics;
 	if (!usesSearch(args.filter)) {
 		const result = await listNodes({
-			query: { after: args.after, limit, type: type ?? undefined, q: q || undefined }
+			query: { after: args.cursor ?? undefined, limit, type: type ?? undefined, q: q || undefined }
 		});
 		if (result.error || !result.data) return { status: 'failed', ...networkAwareError(result) };
 		// Only a text search reports a count here; the plain list stays quiet.
 		const counted = q ? readListCount(result.response?.headers) : { total: null, capped: false };
+		const next = nextCursor(result.response?.headers.get('link'));
 		return {
 			status: 'ok',
 			items: result.data,
-			hasMore: /rel="next"/.test(result.response?.headers.get('link') ?? ''),
-			cursor: null,
+			hasMore: next !== null,
+			cursor: next,
 			total: counted.total,
 			totalCapped: counted.capped,
 			warnings: [],

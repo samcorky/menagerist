@@ -55,7 +55,7 @@
 	let now = $state(new Date());
 
 	$effect(() => {
-		void list.load(sort);
+		void list.load(sort, { keepRows: true });
 	});
 
 	// The expiry text counts from when the page was read.
@@ -75,7 +75,7 @@
 			} else {
 				toast.success('Export created');
 				// The newest is first.
-				await list.load(sort);
+				await list.load(sort, { keepRows: true });
 			}
 		} catch {
 			createError = 'Could not create the export. Try again.';
@@ -165,6 +165,7 @@
 			<DataTable
 				label="Exports"
 				{sort}
+				busy={loading}
 				onsort={(key) => (sort = nextSort(sort, key as UserExportSort))}
 				columns={[
 					{ label: 'Created', sortKey: 'created_at' },
