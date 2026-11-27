@@ -32,12 +32,9 @@
 	import { networkAwareError, uploadErrorMessage } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import { formatDateTime } from '$lib/format-date';
-	import { delayedLoading } from '$lib/delayed-loading.svelte.js';
-	import { wide } from '$lib/viewport.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
+	import ListTable from '$lib/components/list-table.svelte';
 	import FileDrop from '$lib/components/file-drop.svelte';
-	import LoadFailed from '$lib/components/load-failed.svelte';
 	import { offlineController } from '$lib/offline.svelte.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -45,7 +42,6 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 
 	const canRead = $derived(auth.can('backup:archive:read'));
@@ -68,8 +64,6 @@
 	let reports = $state<Record<string, VerificationResponse>>({});
 	let rowErrors = $state<Record<string, string>>({});
 	let createButton = $state<HTMLButtonElement | null>(null);
-	const loadingDisplay = delayedLoading();
-	$effect(() => loadingDisplay.set(loading));
 	$effect(() => {
 		void sort;
 		if (canRead) untrack(() => void load());
@@ -317,111 +311,91 @@
 				<RefreshCw class="size-4" aria-hidden="true" />Refresh
 			</Button>
 		</div>
-		{#if loadFailed && !loading && backups.length === 0}<LoadFailed
-				what="the backups"
-				onretry={() => void load()}
-			/>{/if}
-		{#if loadingDisplay.show && backups.length === 0}
-			<div role="status" aria-label="Loading backups" class="space-y-3">
-				<Skeleton class="h-40 w-full" /><Skeleton class="h-40 w-full" />
-			</div>
-		{:else if !loading && !loadFailed && backups.length === 0}
-			<p class="rounded-xl border p-6 text-muted-foreground">
-				No backups yet. Create a backup to keep a copy of this Menagerist.
-			</p>
-		{/if}
-		{#if backups.length > 0}
-			{#if wide.current}
-				<div aria-busy={loading}>
-					<DataTable
-						label="Backups"
-						{sort}
-						busy={loading}
-						onsort={(key) => (sort = nextSort(sort, key as BackupSort))}
-						columns={[
-							{ label: 'Backup', sortKey: 'label' },
-							{ label: 'Created', sortKey: 'created_at' },
-							{ label: 'Size', sortKey: 'size' },
-							{ label: 'Versions' },
-							{ label: 'Actions', end: true }
-						]}
-					>
-						{#each backups as backup (backup.id)}
-							<Table.Row>
-								<Table.Cell class="max-w-xs">
-									<div class="flex flex-wrap items-center gap-2">
-										<span class="font-medium break-words">{backup.label}</span>
-										{@render verifyBadge(backup)}
-									</div>
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground">
-									<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}>
-										{formatDateTime(backup.created_at).local}
-									</time>
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground">{size(backup.size)}</Table.Cell>
-								<Table.Cell class="max-w-48 text-xs text-muted-foreground">
-									<div class="break-all">App {backup.app_version}</div>
-									<div class="break-all">Database {backup.alembic_revision}</div>
-								</Table.Cell>
-								<Table.Cell>
-									<div class="flex flex-wrap justify-end gap-2">
-										{@render backupActions(backup, true)}
-									</div>
-								</Table.Cell>
-							</Table.Row>
-							{#if rowErrors[backup.id] || reports[backup.id]?.findings.length}
-								<Table.Row class="hover:bg-transparent">
-									<Table.Cell colspan={5} class="pt-0">
-										{@render verifyDetails(backup)}
-									</Table.Cell>
-								</Table.Row>
-							{/if}
-						{/each}
-					</DataTable>
-				</div>
-			{:else}
-				<ul aria-label="Backups" class="space-y-4" aria-busy={loading}>
-					{#each backups as backup (backup.id)}
-						<li>
-							<Card.Root>
-								<Card.Header>
-									<div class="flex flex-wrap items-center gap-2">
-										<Card.Title class="min-w-0 break-words">{backup.label}</Card.Title>
-										{@render verifyBadge(backup)}
-									</div>
-									<Card.Description>
-										<time
-											datetime={backup.created_at}
-											title={formatDateTime(backup.created_at).utc}
-										>
-											{formatDateTime(backup.created_at).local}
-										</time>
-										- {size(backup.size)}
-									</Card.Description>
-								</Card.Header>
-								<Card.Content class="space-y-4">
-									<dl class="grid gap-2 text-sm sm:grid-cols-2">
-										<div>
-											<dt class="text-muted-foreground">App version</dt>
-											<dd class="break-all">{backup.app_version}</dd>
-										</div>
-										<div>
-											<dt class="text-muted-foreground">Database version</dt>
-											<dd class="break-all">{backup.alembic_revision}</dd>
-										</div>
-									</dl>
-									<div class="flex flex-wrap gap-2">
-										{@render backupActions(backup, false)}
-									</div>
-									{@render verifyDetails(backup)}
-								</Card.Content>
-							</Card.Root>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		{/if}
+		<ListTable
+			label="Backups"
+			what="the backups"
+			columns={[
+				{ label: 'Backup', sortKey: 'label' },
+				{ label: 'Created', sortKey: 'created_at' },
+				{ label: 'Size', sortKey: 'size' },
+				{ label: 'Versions' },
+				{ label: 'Actions', end: true }
+			]}
+			rows={backups}
+			rowKey={(backup) => backup.id}
+			{loading}
+			failed={loadFailed && !loading && backups.length === 0}
+			onretry={() => void load()}
+			empty="No backups yet. Create a backup to keep a copy of this Menagerist."
+			{sort}
+			onsort={(key) => (sort = nextSort(sort, key as BackupSort))}
+			skeletonClass="h-40"
+		>
+			{#snippet row(backup)}
+				<Table.Row>
+					<Table.Cell class="max-w-xs">
+						<div class="flex flex-wrap items-center gap-2">
+							<span class="font-medium break-words">{backup.label}</span>
+							{@render verifyBadge(backup)}
+						</div>
+					</Table.Cell>
+					<Table.Cell class="text-muted-foreground">
+						<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}>
+							{formatDateTime(backup.created_at).local}
+						</time>
+					</Table.Cell>
+					<Table.Cell class="text-muted-foreground">{size(backup.size)}</Table.Cell>
+					<Table.Cell class="max-w-48 text-xs text-muted-foreground">
+						<div class="break-all">App {backup.app_version}</div>
+						<div class="break-all">Database {backup.alembic_revision}</div>
+					</Table.Cell>
+					<Table.Cell>
+						<div class="flex flex-wrap justify-end gap-2">
+							{@render backupActions(backup, true)}
+						</div>
+					</Table.Cell>
+				</Table.Row>
+				{#if rowErrors[backup.id] || reports[backup.id]?.findings.length}
+					<Table.Row class="hover:bg-transparent">
+						<Table.Cell colspan={5} class="pt-0">
+							{@render verifyDetails(backup)}
+						</Table.Cell>
+					</Table.Row>
+				{/if}
+			{/snippet}
+			{#snippet card(backup)}
+				<Card.Root>
+					<Card.Header>
+						<div class="flex flex-wrap items-center gap-2">
+							<Card.Title class="min-w-0 break-words">{backup.label}</Card.Title>
+							{@render verifyBadge(backup)}
+						</div>
+						<Card.Description>
+							<time datetime={backup.created_at} title={formatDateTime(backup.created_at).utc}>
+								{formatDateTime(backup.created_at).local}
+							</time>
+							- {size(backup.size)}
+						</Card.Description>
+					</Card.Header>
+					<Card.Content class="space-y-4">
+						<dl class="grid gap-2 text-sm sm:grid-cols-2">
+							<div>
+								<dt class="text-muted-foreground">App version</dt>
+								<dd class="break-all">{backup.app_version}</dd>
+							</div>
+							<div>
+								<dt class="text-muted-foreground">Database version</dt>
+								<dd class="break-all">{backup.alembic_revision}</dd>
+							</div>
+						</dl>
+						<div class="flex flex-wrap gap-2">
+							{@render backupActions(backup, false)}
+						</div>
+						{@render verifyDetails(backup)}
+					</Card.Content>
+				</Card.Root>
+			{/snippet}
+		</ListTable>
 	{/if}
 </Page>
 
