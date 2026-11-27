@@ -254,6 +254,45 @@ describe('PagedList, with a cursor and a total in the result', () => {
 	});
 });
 
+describe('PagedList.clear', () => {
+	it('empties the list at once and drops a read that is still in flight', async () => {
+		let release: () => void = () => {};
+		const list = new PagedList<Row, null>(async ({ after }) => {
+			if (after === undefined && list.rows.length > 0) {
+				await new Promise<void>((resolve) => (release = resolve));
+			}
+			return { data: rows(0, 2), cursor: 'c2', total: 9 };
+		});
+		await list.load(null);
+		expect([list.rows.length, list.hasMore, list.total]).toEqual([2, true, 9]);
+
+		const slow = list.load(null, { keepRows: true });
+		list.clear();
+		expect([list.rows.length, list.hasMore, list.total, list.loading]).toEqual([
+			0,
+			false,
+			null,
+			false
+		]);
+
+		release();
+		await slow;
+		// The answer to the read it dropped does not come back.
+		expect([list.rows.length, list.hasMore, list.total]).toEqual([0, false, null]);
+	});
+
+	it('forgets a failure, so a list that shows something else starts clean', async () => {
+		const list = new PagedList<Row, null>(async () => failure());
+		await list.load(null);
+		expect(list.failed).toBe(true);
+
+		list.clear();
+		expect([list.failed, list.nextFailed, list.failure]).toEqual([false, false, null]);
+		await list.retry();
+		expect(list.failed).toBe(false);
+	});
+});
+
 describe('PagedList, in pages', () => {
 	const paged = (count: number, size: number) => {
 		const served = route(count, size);

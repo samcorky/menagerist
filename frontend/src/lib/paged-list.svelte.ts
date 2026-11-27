@@ -110,6 +110,29 @@ export class PagedList<T, P> {
 		return this.#read(0, undefined, 0);
 	}
 
+	/**
+	 * Forget the rows, the count and any failure, and drop a read still in flight, for a list
+	 * that now shows something else (another collection): its old rows must not stay on screen
+	 * while the new ones are found. Unlike `load` it reads nothing.
+	 */
+	clear(): void {
+		this.#seq++;
+		this.#restart = false;
+		this.#cursor = null;
+		this.#cursors = [undefined];
+		this.#starts = [0];
+		this.#failedRead = null;
+		this.rows = [];
+		this.hasMore = false;
+		this.total = null;
+		this.pageIndex = 0;
+		this.loading = false;
+		this.loadingMore = false;
+		this.failed = false;
+		this.nextFailed = false;
+		this.failure = null;
+	}
+
 	/** `append`: read the next page onto the rows, if there is one and nothing is loading. */
 	loadMore(): Promise<void> {
 		if (this.mode !== 'append') return Promise.resolve();
