@@ -8,7 +8,6 @@
 	import { DISPLAY_NAME_MAX_LENGTH, displayNameProblem, PASSWORD_MIN_LENGTH } from '$lib/auth';
 	import { deviceRow, formatRelativeTime, type DeviceRevoke, type DeviceRow } from '$lib/devices';
 	import { formatIsoDate } from '$lib/format-date';
-	import { wide } from '$lib/viewport.svelte';
 	import {
 		listOwnDevices,
 		renameOwnDevice,
@@ -20,15 +19,14 @@
 	} from '$lib/api/client';
 	import { PagedList } from '$lib/paged-list.svelte';
 	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
-	import PageNav from '$lib/components/page-nav.svelte';
-	import { errorMessage, networkAwareError } from '$lib/api/errors';
+	import { errorMessage } from '$lib/api/errors';
 	import DeviceTitle from '$lib/components/device-title.svelte';
 	import AccountPicture from '$lib/components/account-picture.svelte';
 	import ApiTokensCard from '$lib/components/api-tokens-card.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import HiddenUsername from '$lib/components/hidden-username.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
+	import ListTable from '$lib/components/list-table.svelte';
 	import PersonalExportsCard from '$lib/components/personal-exports-card.svelte';
 	import DeviceIcon from '$lib/components/device-icon.svelte';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -37,7 +35,6 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 
@@ -64,13 +61,6 @@
 	);
 	const devices = $derived<DeviceRow[]>(list.rows.map(deviceRow));
 	const sessionsLoading = $derived(list.loading);
-	const sessionsError = $derived(
-		list.failed
-			? list.failure?.response
-				? networkAwareError(list.failure).title
-				: 'Could not load devices.'
-			: null
-	);
 	let sessionBusy = $state<string | null>(null);
 	let revokingOthers = $state(false);
 	let confirmRevokeOthers = $state(false);
@@ -360,45 +350,83 @@
 				{/if}
 			</div>
 
-			{#if sessionsError}
-				<Alert.Root variant="destructive">
-					<Alert.Description>{sessionsError}</Alert.Description>
-				</Alert.Root>
-				<Button
-					type="button"
-					variant="outline"
-					class="pointer-coarse:h-11"
-					onclick={() => void list.retry()}
-				>
-					Retry
-				</Button>
-			{:else if sessionsLoading && devices.length === 0}
-				<div class="space-y-3">
-					<Skeleton class="h-20 w-full rounded-xl" />
-					<Skeleton class="h-20 w-full rounded-xl" />
-				</div>
-			{:else if devices.length === 0}
-				<p class="text-sm text-muted-foreground">No active devices.</p>
-			{:else}
-				{#if wide.current}
-					<DataTable
-						label="Active devices"
-						{sort}
-						busy={sessionsLoading}
-						onsort={(key) => (sort = nextSort(sort, key as OwnDeviceSort))}
-						columns={[
-							{ label: 'Device', sortKey: 'name' },
-							{ label: 'Address' },
-							{ label: 'First signed in', sortKey: 'first_seen_at' },
-							{ label: 'Last active', sortKey: 'last_seen_at' },
-							{ label: 'Action', end: true }
-						]}
-					>
-						{#each devices as device (device.key)}
-							<Table.Row>
-								<Table.Cell>
-									<div class="flex items-center gap-2">
-										<DeviceIcon kind={device.kind} class="size-4 shrink-0 text-muted-foreground" />
+			<ListTable
+				label="Active devices"
+				what="your devices"
+				columns={[
+					{ label: 'Device', sortKey: 'name' },
+					{ label: 'Address' },
+					{ label: 'First signed in', sortKey: 'first_seen_at' },
+					{ label: 'Last active', sortKey: 'last_seen_at' },
+					{ label: 'Action', end: true }
+				]}
+				rows={devices}
+				rowKey={(device) => device.key}
+				loading={sessionsLoading}
+				failed={list.failed}
+				onretry={() => void list.retry()}
+				empty="No active devices."
+				{sort}
+				onsort={(key) => (sort = nextSort(sort, key as OwnDeviceSort))}
+				{list}
+				noun="device"
+			>
+				{#snippet row(device)}
+					<Table.Row>
+						<Table.Cell>
+							<div class="flex items-center gap-2">
+								<DeviceIcon kind={device.kind} class="size-4 shrink-0 text-muted-foreground" />
+								<DeviceTitle
+									title={device.title}
+									subtitle={device.subtitle}
+									name={device.name}
+									label={device.label}
+									userAgent={device.userAgent}
+									onsave={device.deviceId ? (name) => saveName(device.deviceId!, name) : undefined}
+								/>
+								{#if device.current}
+									<Badge variant="secondary">This device</Badge>
+								{/if}
+							</div>
+						</Table.Cell>
+						<Table.Cell class="text-muted-foreground">{device.address ?? '—'}</Table.Cell>
+						<Table.Cell class="text-muted-foreground">
+							{formatIsoDate(device.firstSeen.slice(0, 10), 'short')}
+						</Table.Cell>
+						<Table.Cell class="text-muted-foreground">
+							{formatRelativeTime(device.lastSeen)}
+						</Table.Cell>
+						<Table.Cell class="text-right">
+							{#if !device.current}
+								<Button
+									type="button"
+									variant="outline"
+									class="h-9 px-3"
+									disabled={sessionBusy === device.key}
+									onclick={() => handleRevoke(device.key, device.revoke)}
+								>
+									{#if sessionBusy === device.key}
+										<Spinner class="size-4" />
+									{/if}
+									Sign out
+								</Button>
+							{/if}
+						</Table.Cell>
+					</Table.Row>
+				{/snippet}
+				{#snippet card(device)}
+					<Card.Root>
+						<Card.Content
+							class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+						>
+							<div class="flex items-start gap-3">
+								<div
+									class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+								>
+									<DeviceIcon kind={device.kind} class="size-5" />
+								</div>
+								<div class="space-y-1">
+									<div class="flex flex-wrap items-center gap-2">
 										<DeviceTitle
 											title={device.title}
 											subtitle={device.subtitle}
@@ -413,95 +441,34 @@
 											<Badge variant="secondary">This device</Badge>
 										{/if}
 									</div>
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground">{device.address ?? '—'}</Table.Cell>
-								<Table.Cell class="text-muted-foreground">
-									{formatIsoDate(device.firstSeen.slice(0, 10), 'short')}
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground">
-									{formatRelativeTime(device.lastSeen)}
-								</Table.Cell>
-								<Table.Cell class="text-right">
-									{#if !device.current}
-										<Button
-											type="button"
-											variant="outline"
-											class="h-9 px-3"
-											disabled={sessionBusy === device.key}
-											onclick={() => handleRevoke(device.key, device.revoke)}
-										>
-											{#if sessionBusy === device.key}
-												<Spinner class="size-4" />
-											{/if}
-											Sign out
-										</Button>
-									{/if}
-								</Table.Cell>
-							</Table.Row>
-						{/each}
-					</DataTable>
-				{:else}
-					<ul class="space-y-3" aria-label="Active devices">
-						{#each devices as device (device.key)}
-							<li>
-								<Card.Root>
-									<Card.Content
-										class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
-									>
-										<div class="flex items-start gap-3">
-											<div
-												class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-											>
-												<DeviceIcon kind={device.kind} class="size-5" />
-											</div>
-											<div class="space-y-1">
-												<div class="flex flex-wrap items-center gap-2">
-													<DeviceTitle
-														title={device.title}
-														subtitle={device.subtitle}
-														name={device.name}
-														label={device.label}
-														userAgent={device.userAgent}
-														onsave={device.deviceId
-															? (name) => saveName(device.deviceId!, name)
-															: undefined}
-													/>
-													{#if device.current}
-														<Badge variant="secondary">This device</Badge>
-													{/if}
-												</div>
-												<p class="text-xs text-muted-foreground">
-													{#if device.address}
-														{device.address} &middot;
-													{/if}
-													First signed in {formatIsoDate(device.firstSeen.slice(0, 10), 'short')} &middot;
-													Last active {formatRelativeTime(device.lastSeen)}
-												</p>
-											</div>
-										</div>
-
-										{#if !device.current}
-											<Button
-												type="button"
-												variant="outline"
-												class="shrink-0 pointer-coarse:h-11"
-												disabled={sessionBusy === device.key}
-												onclick={() => handleRevoke(device.key, device.revoke)}
-											>
-												{#if sessionBusy === device.key}
-													<Spinner class="size-4" />
-												{/if}
-												Sign out
-											</Button>
+									<p class="text-xs text-muted-foreground">
+										{#if device.address}
+											{device.address} &middot;
 										{/if}
-									</Card.Content>
-								</Card.Root>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-				<PageNav {list} noun="device" />
-			{/if}
+										First signed in {formatIsoDate(device.firstSeen.slice(0, 10), 'short')} &middot; Last
+										active {formatRelativeTime(device.lastSeen)}
+									</p>
+								</div>
+							</div>
+
+							{#if !device.current}
+								<Button
+									type="button"
+									variant="outline"
+									class="shrink-0 pointer-coarse:h-11"
+									disabled={sessionBusy === device.key}
+									onclick={() => handleRevoke(device.key, device.revoke)}
+								>
+									{#if sessionBusy === device.key}
+										<Spinner class="size-4" />
+									{/if}
+									Sign out
+								</Button>
+							{/if}
+						</Card.Content>
+					</Card.Root>
+				{/snippet}
+			</ListTable>
 		</section>
 
 		<ApiTokensCard />

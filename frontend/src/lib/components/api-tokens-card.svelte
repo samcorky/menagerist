@@ -10,10 +10,8 @@
 		type ApiTokenResponse,
 		type ApiTokenSort
 	} from '$lib/api/client';
-	import PageNav from '$lib/components/page-nav.svelte';
 	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
 	import { PagedList } from '$lib/paged-list.svelte';
-	import { networkAwareError } from '$lib/api/errors';
 	import {
 		AREAS,
 		DEFAULT_EXPIRY_DAYS,
@@ -30,12 +28,11 @@
 		type AreaAccess,
 		type TokenPreset
 	} from '$lib/api-tokens';
-	import { wide } from '$lib/viewport.svelte';
 	import { auth } from '$lib/auth.svelte.js';
 	import { copyText } from '$lib/clipboard';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
 	import HiddenUsername from '$lib/components/hidden-username.svelte';
-	import DataTable from '$lib/components/data-table.svelte';
+	import ListTable from '$lib/components/list-table.svelte';
 	import PasswordInput from '$lib/components/password-input.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
@@ -46,7 +43,6 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
@@ -61,13 +57,6 @@
 	);
 	const tokens = $derived(list.rows);
 	const tokensLoading = $derived(list.loading);
-	const tokensError = $derived(
-		list.failed
-			? list.failure?.response
-				? networkAwareError(list.failure).title
-				: 'Could not load tokens.'
-			: null
-	);
 	let now = $state(new Date());
 	// The expiry text counts from when the page was read.
 	$effect(() => {
@@ -319,147 +308,128 @@
 		to find out how to use one.
 	</p>
 
-	{#if tokensError}
-		<Alert.Root variant="destructive">
-			<Alert.Description>{tokensError}</Alert.Description>
-		</Alert.Root>
-		<Button
-			type="button"
-			variant="outline"
-			class="pointer-coarse:h-11"
-			onclick={() => void list.retry()}
-		>
-			Retry
-		</Button>
-	{:else if tokensLoading && tokens.length === 0}
-		<div class="space-y-3">
-			<Skeleton class="h-20 w-full rounded-xl" />
-		</div>
-	{:else if tokens.length === 0}
-		<p class="text-sm text-muted-foreground">You have not created any tokens.</p>
-	{:else}
-		{#if wide.current}
-			<DataTable
-				label="Personal access tokens"
-				{sort}
-				busy={tokensLoading}
-				onsort={(key) => (sort = nextSort(sort, key as ApiTokenSort))}
-				columns={[
-					{ label: 'Token', sortKey: 'name' },
-					{ label: 'Access' },
-					{ label: 'Expires', sortKey: 'expires_at' },
-					{ label: 'Last used', sortKey: 'last_used_at' },
-					{ label: 'Actions', end: true }
-				]}
-			>
-				{#each tokens as token (token.id)}
-					<Table.Row>
-						<Table.Cell class="max-w-48 font-medium break-words">
-							<div class="flex items-center gap-2">
-								<KeyRound class="size-4 shrink-0 text-muted-foreground" />
-								{token.name}
+	<ListTable
+		label="Personal access tokens"
+		what="your tokens"
+		columns={[
+			{ label: 'Token', sortKey: 'name' },
+			{ label: 'Access' },
+			{ label: 'Expires', sortKey: 'expires_at' },
+			{ label: 'Last used', sortKey: 'last_used_at' },
+			{ label: 'Actions', end: true }
+		]}
+		rows={tokens}
+		rowKey={(token) => token.id}
+		loading={tokensLoading}
+		failed={list.failed}
+		onretry={() => void list.retry()}
+		empty="You have not created any tokens."
+		{sort}
+		onsort={(key) => (sort = nextSort(sort, key as ApiTokenSort))}
+		{list}
+		noun="token"
+		skeletons={1}
+	>
+		{#snippet row(token)}
+			<Table.Row>
+				<Table.Cell class="max-w-48 font-medium break-words">
+					<div class="flex items-center gap-2">
+						<KeyRound class="size-4 shrink-0 text-muted-foreground" />
+						{token.name}
+					</div>
+				</Table.Cell>
+				<Table.Cell class="text-muted-foreground">{describeGrants(token.grants)}</Table.Cell>
+				<Table.Cell>
+					{#if expiresSoon(token.expires_at, now)}
+						<Badge variant="outline" class="gap-1 font-semibold">
+							<Clock class="size-3" />
+							{describeExpiry(token.expires_at, now)}
+						</Badge>
+					{:else}
+						<span class="text-muted-foreground">{describeExpiry(token.expires_at, now)}</span>
+					{/if}
+				</Table.Cell>
+				<Table.Cell class="text-muted-foreground">
+					{describeLastUsed(token.last_used_at, now)}
+				</Table.Cell>
+				<Table.Cell>
+					<div class="flex justify-end gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							class="h-9"
+							aria-label={`Regenerate ${token.name}`}
+							onclick={() => openRotate(token)}
+						>
+							Regenerate
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							class="h-9"
+							aria-label={`Revoke ${token.name}`}
+							onclick={() => (revokeTarget = token)}
+						>
+							Revoke
+						</Button>
+					</div>
+				</Table.Cell>
+			</Table.Row>
+		{/snippet}
+		{#snippet card(token)}
+			<Card.Root>
+				<Card.Content
+					class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
+				>
+					<div class="flex items-start gap-3">
+						<div
+							class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+						>
+							<KeyRound class="size-5" />
+						</div>
+						<div class="min-w-0 space-y-1">
+							<p class="font-medium break-words">{token.name}</p>
+							<p class="text-sm text-muted-foreground">{describeGrants(token.grants)}</p>
+							<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+								{#if expiresSoon(token.expires_at, now)}
+									<Badge variant="outline" class="gap-1 font-semibold">
+										<Clock class="size-3" />
+										{describeExpiry(token.expires_at, now)}
+									</Badge>
+									<span class="text-muted-foreground">
+										{describeLastUsed(token.last_used_at, now)}
+									</span>
+								{:else}
+									<span class="text-muted-foreground">{metaParts(token).join(' · ')}</span>
+								{/if}
 							</div>
-						</Table.Cell>
-						<Table.Cell class="text-muted-foreground">{describeGrants(token.grants)}</Table.Cell>
-						<Table.Cell>
-							{#if expiresSoon(token.expires_at, now)}
-								<Badge variant="outline" class="gap-1 font-semibold">
-									<Clock class="size-3" />
-									{describeExpiry(token.expires_at, now)}
-								</Badge>
-							{:else}
-								<span class="text-muted-foreground">{describeExpiry(token.expires_at, now)}</span>
-							{/if}
-						</Table.Cell>
-						<Table.Cell class="text-muted-foreground">
-							{describeLastUsed(token.last_used_at, now)}
-						</Table.Cell>
-						<Table.Cell>
-							<div class="flex justify-end gap-2">
-								<Button
-									type="button"
-									variant="outline"
-									class="h-9"
-									aria-label={`Regenerate ${token.name}`}
-									onclick={() => openRotate(token)}
-								>
-									Regenerate
-								</Button>
-								<Button
-									type="button"
-									variant="outline"
-									class="h-9"
-									aria-label={`Revoke ${token.name}`}
-									onclick={() => (revokeTarget = token)}
-								>
-									Revoke
-								</Button>
-							</div>
-						</Table.Cell>
-					</Table.Row>
-				{/each}
-			</DataTable>
-		{:else}
-			<ul class="space-y-3" aria-label="Personal access tokens">
-				{#each tokens as token (token.id)}
-					<li>
-						<Card.Root>
-							<Card.Content
-								class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between"
-							>
-								<div class="flex items-start gap-3">
-									<div
-										class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-									>
-										<KeyRound class="size-5" />
-									</div>
-									<div class="min-w-0 space-y-1">
-										<p class="font-medium break-words">{token.name}</p>
-										<p class="text-sm text-muted-foreground">{describeGrants(token.grants)}</p>
-										<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-											{#if expiresSoon(token.expires_at, now)}
-												<Badge variant="outline" class="gap-1 font-semibold">
-													<Clock class="size-3" />
-													{describeExpiry(token.expires_at, now)}
-												</Badge>
-												<span class="text-muted-foreground">
-													{describeLastUsed(token.last_used_at, now)}
-												</span>
-											{:else}
-												<span class="text-muted-foreground">{metaParts(token).join(' · ')}</span>
-											{/if}
-										</div>
-									</div>
-								</div>
+						</div>
+					</div>
 
-								<div class="flex shrink-0 gap-2">
-									<Button
-										type="button"
-										variant="outline"
-										class="pointer-coarse:h-11"
-										aria-label={`Regenerate ${token.name}`}
-										onclick={() => openRotate(token)}
-									>
-										Regenerate
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										class="pointer-coarse:h-11"
-										aria-label={`Revoke ${token.name}`}
-										onclick={() => (revokeTarget = token)}
-									>
-										Revoke
-									</Button>
-								</div>
-							</Card.Content>
-						</Card.Root>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-		<PageNav {list} noun="token" />
-	{/if}
+					<div class="flex shrink-0 gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							class="pointer-coarse:h-11"
+							aria-label={`Regenerate ${token.name}`}
+							onclick={() => openRotate(token)}
+						>
+							Regenerate
+						</Button>
+						<Button
+							type="button"
+							variant="outline"
+							class="pointer-coarse:h-11"
+							aria-label={`Revoke ${token.name}`}
+							onclick={() => (revokeTarget = token)}
+						>
+							Revoke
+						</Button>
+					</div>
+				</Card.Content>
+			</Card.Root>
+		{/snippet}
+	</ListTable>
 </section>
 
 <ResponsiveDialog.Root
