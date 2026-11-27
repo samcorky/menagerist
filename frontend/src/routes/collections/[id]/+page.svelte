@@ -64,7 +64,8 @@
 		readFilter,
 		withFilter
 	} from '$lib/query/items-page';
-	import { nextCursor } from '$lib/paging';
+	import type { PageResult } from '$lib/paging';
+	import { PagedList, type PageRequest } from '$lib/paged-list.svelte';
 	import {
 		SAVED_SORT,
 		SORT_CHOICES,
@@ -87,7 +88,7 @@
 	import { SearchError, type SearchWarning } from '$lib/query/search';
 	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
 	import { pickEmptyLine } from '$lib/empty-lines';
-	import type { Path, Query } from '$lib/query/types';
+	import type { Path, Query, SortKey } from '$lib/query/types';
 	import { mapWarnings, pathKey, splitDetail } from '$lib/query/warnings';
 	import {
 		SmartCollectionError,
@@ -165,6 +166,20 @@
 	const emptyLine = $derived(pickEmptyLine(EMPTY_LINES, page.url.pathname));
 
 	const PAGE_SIZE = 50;
+
+	// What the items are read for: the collection (the smart one, to run its search), the box and
+	// the type select, the order for this view and, for a smart collection, the saved search and
+	// the page's own narrowing.
+	type CollectionRead = {
+		id: string;
+		smart: CollectionResponse | null;
+		search: string;
+		type: string;
+		sort: SortKey[] | undefined;
+		adhoc: Query;
+		basics: { q: string; type: string | null };
+		storedQuery: Query | null;
+	};
 	const SMART_EXPLANATION = 'Items are added automatically by the conditions.';
 	const EDIT_CONDITIONS_DESCRIPTION =
 		'Change the saved conditions, then choose Save. Cancel discards your changes.';
@@ -177,22 +192,25 @@
 	// Why "Show on Home" can't be used now (offline, or Home is full), or null.
 	const homeBlocked = $derived(collection ? homeToggleBlocked(collection.id) : null);
 	const canonicalId = $derived(collection?.id ?? '');
-	// The first page of results has arrived; the exact count waits for it
-	let firstPageLoaded = $state(false);
 	let headerLoading = $state(true);
 	let notFound = $state(false);
 	let loadFailed = $state(false);
 
-	let items = $state<NodeResponse[]>([]);
 	let itemTypes = $state<NodeTypeResponse[]>([]);
-	let loading = $state(false);
-	let hasMore = $state(false);
-	// The server's cursor for the next page of a manual collection, from the `Link` header.
-	let pageCursor = $state<string | null>(null);
-	// A later page that would not load: the list's foot says so and offers Try again (#588).
-	let pageFailed = $state(false);
-	let itemsFailed = $state(false);
 	let fetchSeq = 0;
+	// Both kinds of collection read a page at a time through the server's cursor: a manual one
+	// from the item list route, a smart one from the search (`readItems`).
+	const list = new PagedList<NodeResponse, CollectionRead>(readItems);
+	const items = $derived(list.rows);
+	const loading = $derived(list.loading);
+	const hasMore = $derived(list.hasMore);
+	// The first page of results has arrived; the exact count waits for it.
+	const firstPageLoaded = $derived(!list.loading || list.loadingMore);
+	// A later page that would not load: the list's foot says so and offers Try again (#588).
+	const pageFailed = $derived(list.nextFailed);
+	const itemsFailed = $derived(list.failed);
+	// Nothing is being read until the collection is known, which is not yet.
+	list.clear();
 	let collectionSeq = 0;
 	let searchInput = $state('');
 	let q = $state('');
@@ -240,7 +258,6 @@
 		connections.ensureFor(storedQuery);
 		connections.ensureFor(adhoc);
 	});
-	let smartCursor = $state<string | null>(null);
 	let smartWarnings = $state<SearchWarning[]>([]);
 	let typesLoaded = $state(false);
 	let itemFields = $state<ItemField[] | null>(null);
@@ -476,7 +493,6 @@
 		const value = searchInput;
 		const timer = setTimeout(() => {
 			if (value === q) return;
-			hasMore = false;
 			q = value;
 		}, 300);
 		return () => clearTimeout(timer);
@@ -487,13 +503,11 @@
 		const fallback = smart ? SAVED_SORT : SORT_CHOICES[0].value;
 		if (value === fallback) params.delete('sort');
 		else params.set('sort', value);
-		hasMore = false;
 		navigateWith(params, true);
 	}
 
 	function selectType(slug: string) {
 		if (slug === selectedType) return;
-		hasMore = false;
 		selectedType = slug;
 	}
 
@@ -578,7 +592,6 @@
 			if (urlQ !== appliedQ) {
 				appliedQ = urlQ;
 				if (urlQ !== q) {
-					hasMore = false;
 					q = urlQ;
 				}
 				searchInput = urlQ;
@@ -586,7 +599,6 @@
 			if (urlType !== appliedType) {
 				appliedType = urlType;
 				if (urlType !== selectedType) {
-					hasMore = false;
 					selectedType = urlType;
 				}
 			}
@@ -655,8 +667,7 @@
 	}
 
 	function clearManualNarrowing() {
-		items = [];
-		hasMore = false;
+		list.clear();
 		searchInput = '';
 		q = '';
 		selectedType = '';
@@ -698,45 +709,6 @@
 		updateOpen = open;
 	}
 
-	async function fetchPage(id: string, search: string, type: string, after?: string) {
-		const seq = ++fetchSeq;
-		loading = true;
-		pageFailed = false;
-		if (!after) {
-			itemsFailed = false;
-			firstPageLoaded = false;
-			pageCursor = null;
-		}
-		const result = await listNodes({
-			query: {
-				after,
-				limit: PAGE_SIZE,
-				q: search || undefined,
-				type: type || undefined,
-				collection: id,
-				...nodeSortParams(sortChoice?.sort ?? [])
-			}
-		});
-		if (seq !== fetchSeq) return;
-		if (result.response?.status === 404) {
-			notFound = true;
-			hasMore = false;
-		} else if (result.error || !result.data) {
-			// A later page keeps `hasMore`, so Try again in the list's foot can resume it.
-			if (after) pageFailed = true;
-			else {
-				itemsFailed = true;
-				hasMore = false;
-			}
-		} else {
-			items = after ? [...items, ...result.data] : result.data;
-			pageCursor = nextCursor(result.response?.headers.get('link'));
-			hasMore = pageCursor !== null;
-		}
-		if (!after) firstPageLoaded = true;
-		loading = false;
-	}
-
 	$effect(() => {
 		const id = collectionId;
 		if (!id) return;
@@ -746,8 +718,7 @@
 		untrack(() => {
 			selection.exit();
 			collection = null;
-			items = [];
-			hasMore = false;
+			list.clear();
 			q = '';
 			searchInput = '';
 			selectedType = '';
@@ -757,9 +728,21 @@
 		void loadCollection(id);
 	});
 
-	function retryItems() {
-		if (smart) void fetchSmart();
-		else void fetchPage(canonicalId, q, selectedType);
+	// What the list is read for: the collection, the box and the type select, the order for this
+	// view and, for a smart collection, its saved search with the page's own narrowing.
+	const readParams = (): CollectionRead => ({
+		id: canonicalId,
+		smart: collection && smart ? collection : null,
+		search: q,
+		type: selectedType,
+		sort: sortChoice?.sort,
+		adhoc,
+		basics,
+		storedQuery
+	});
+
+	function reloadItems() {
+		void list.load(readParams(), { keepRows: true });
 	}
 
 	// Coming back online, or Retry in the banner, reloads a collection that had failed.
@@ -767,82 +750,81 @@
 		void offlineController.retryCount;
 		untrack(() => {
 			if (loadFailed && collectionId) void loadCollection(collectionId);
-			else if (itemsFailed) void retryItems();
+			else if (itemsFailed) void list.retry();
 		});
 	});
 
-	async function fetchSmart(more = false) {
-		const current = collection;
-		if (!current) return;
+	async function readItems({
+		after,
+		params
+	}: PageRequest<CollectionRead>): Promise<PageResult<NodeResponse>> {
 		const seq = ++fetchSeq;
-		loading = true;
-		pageFailed = false;
-		if (!more) {
-			itemsFailed = false;
-			firstPageLoaded = false;
-			tooLarge = false;
-		}
-		try {
-			const result = await loadSmartCollection(current, {
-				cursor: more ? smartCursor : null,
-				limit: PAGE_SIZE,
-				narrow: { adhoc, basics },
-				sort: sortChoice?.sort
+		// A newer read has started: the list drops this one, and so must what it would set here.
+		const current = () => seq === fetchSeq;
+		const more = after !== undefined;
+		if (!params.smart) {
+			const result = await listNodes({
+				query: {
+					after,
+					limit: PAGE_SIZE,
+					q: params.search || undefined,
+					type: params.type || undefined,
+					collection: params.id,
+					...nodeSortParams(params.sort ?? [])
+				}
 			});
-			if (seq !== fetchSeq) return;
-			items = more ? [...items, ...result.items] : result.items;
-			smartCursor = result.nextCursor;
-			hasMore = result.nextCursor !== null;
-			smartWarnings = result.warnings;
-			searchWarnings = result.searchWarnings;
-			tooLarge = result.tooLarge;
-			adhocError = null;
-			narrowedTotal = { total: result.total, capped: result.totalCapped };
+			if (result.response?.status === 404) {
+				if (current()) notFound = true;
+				return { data: [], cursor: null };
+			}
+			return result;
+		}
+		if (!more) tooLarge = false;
+		try {
+			const result = await loadSmartCollection(params.smart, {
+				cursor: after ?? null,
+				limit: PAGE_SIZE,
+				narrow: { adhoc: params.adhoc, basics: params.basics },
+				sort: params.sort
+			});
+			if (current()) {
+				smartWarnings = result.warnings;
+				searchWarnings = result.searchWarnings;
+				tooLarge = result.tooLarge;
+				adhocError = null;
+				narrowedTotal = { total: result.total, capped: result.totalCapped };
+			}
+			return { data: result.items, cursor: result.nextCursor, total: result.total };
 		} catch (e) {
-			if (seq !== fetchSeq) return;
 			if (
 				e instanceof SearchError &&
 				e.detail !== null &&
 				(e.status === 400 || e.status === 422) &&
-				storedQuery
+				params.storedQuery
 			) {
-				const { target, message } = splitDetail(e.detail);
-				const at =
-					target && 'where' in target
-						? locateInCombined(target.where, storedQuery, adhoc, basics)
-						: null;
-				adhocError = { message, path: at?.part === 'adhoc' ? at.path : null };
-				items = [];
-				hasMore = false;
-				hasMore = false;
-			} else if (more) {
-				// Retryable: the rows already loaded stay, and the foot offers Try again (#588).
-				pageFailed = true;
-			} else {
-				itemsFailed = true;
-				hasMore = false;
+				if (current()) {
+					const { target, message } = splitDetail(e.detail);
+					const at =
+						target && 'where' in target
+							? locateInCombined(target.where, params.storedQuery, params.adhoc, params.basics)
+							: null;
+					adhocError = { message, path: at?.part === 'adhoc' ? at.path : null };
+				}
+				return { data: [], cursor: null, total: null };
 			}
+			// A page that would not load is the list's failure: the first page, or a later one the
+			// foot offers Try again for (#588).
+			return { error: e };
 		}
-		if (!more) firstPageLoaded = true;
-		loading = false;
 	}
 
 	$effect(() => {
 		const id = canonicalId;
-		const search = q;
-		const type = selectedType;
 		const kind = collectionKind;
-		// Refetch when the filters, or the saved conditions, change
-		void [adhocKey, storedKey, sortChoice?.value];
+		// Refetch when the search, the type, the filters, the order or the saved conditions change
+		void [q, selectedType, adhocKey, storedKey, sortChoice?.value];
 		if (!id || !kind) return;
-		untrack(() => {
-			if (kind === 'dynamic') {
-				smartCursor = null;
-				void fetchSmart();
-			} else {
-				void fetchPage(id, search, type);
-			}
-		});
+		untrack(() => reloadItems());
 	});
 
 	$effect(() => {
@@ -872,7 +854,7 @@
 			const updated = await updateDefinition(id, next);
 			if (id !== collection?.id) return false;
 			collection = updated;
-			items = [];
+			list.clear();
 			toast.success('Conditions saved');
 			return true;
 		} catch (e) {
@@ -908,16 +890,6 @@
 		wasConditionsOpen = open;
 	});
 
-	function nextPage() {
-		if (smart) void fetchSmart(true);
-		else void fetchPage(canonicalId, q, selectedType, pageCursor ?? undefined);
-	}
-
-	function loadMore() {
-		if (!hasMore || loading) return;
-		nextPage();
-	}
-
 	function openAdd(event: MouseEvent) {
 		addTrigger = event.currentTarget as HTMLElement;
 		addOpen = true;
@@ -935,14 +907,13 @@
 
 	function refreshAfterChange() {
 		void loadCollection(canonicalId, true);
-		void fetchPage(canonicalId, q, selectedType);
+		reloadItems();
 		void loadTypeCounts(canonicalId);
 	}
 
 	async function reloadList() {
-		items = [];
-		hasMore = false;
-		retryItems();
+		list.clear();
+		reloadItems();
 		void loadCollection(canonicalId, true);
 		void loadTypeCounts(canonicalId);
 	}
@@ -987,7 +958,7 @@
 			return;
 		}
 		if (id !== collection?.id) return;
-		items = items.filter((i) => i.id !== item.id);
+		list.rows = list.rows.filter((i) => i.id !== item.id);
 		void loadCollection(id, true);
 		void loadTypeCounts(id);
 		void tick().then(() => {
@@ -1023,7 +994,7 @@
 		void loadCollection(id, true);
 		// Another order has no place to put it back by hand: read the list again.
 		if (!inCreationOrder) {
-			void fetchPage(id, q, selectedType);
+			reloadItems();
 			return;
 		}
 		// Restore in id order, unless it belongs on a page that has not loaded yet
@@ -1035,7 +1006,7 @@
 			!beyondLoaded &&
 			!items.some((i) => i.id === item.id)
 		) {
-			items = [...items, item].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+			list.rows = [...list.rows, item].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
 		}
 	}
 
@@ -1544,7 +1515,7 @@
 		{/if}
 
 		{#if itemsFailed}
-			<LoadFailed what="the items in this collection" onretry={retryItems} />
+			<LoadFailed what="the items in this collection" onretry={() => void list.retry()} />
 		{:else if items.length > 0 && shownItems.length === 0 && !loading && !hasMore}
 			<div class="flex flex-col items-center gap-3 py-12 text-center">
 				<EyeOff class="size-10 text-muted-foreground/50" />
@@ -1621,8 +1592,8 @@
 			rows={shownItems.length}
 			total={countableTotal}
 			noun="item"
-			onload={loadMore}
-			onretry={nextPage}
+			onload={() => void list.loadMore()}
+			onretry={() => void list.retry()}
 		/>
 	{/if}
 </Page>
