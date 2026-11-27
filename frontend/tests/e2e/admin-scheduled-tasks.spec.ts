@@ -142,13 +142,14 @@ test('a column header sorts the tasks, and a task with nothing to compare stays 
 	await expect(task).toHaveAttribute('aria-sort', 'none');
 	await expect.poll(titles).toEqual(unsorted);
 
-	// A task that is never scheduled has no next run, so it comes last either way.
+	// A task with no next run (one you start by hand, or that is not scheduled) comes last
+	// either way, so the last row has no time to show.
 	const next = table.getByRole('columnheader', { name: 'Next run' });
 	for (const order of ['ascending', 'descending']) {
 		await next.getByRole('button').click();
 		await expect(next).toHaveAttribute('aria-sort', order);
 		const last = table.getByRole('row').last();
-		await expect(last.getByText('Not scheduled', { exact: true })).toBeVisible();
+		await expect(last.getByText(/Runs when you start it|Not scheduled/)).toBeVisible();
 	}
 });
 
