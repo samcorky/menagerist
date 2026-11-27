@@ -28,9 +28,11 @@
 		updateUser,
 		type AdminSessionResponse,
 		type Role,
-		type UserResponse
+		type UserResponse,
+		type UserSort
 	} from '$lib/api/client';
 	import { PAGE_LIMIT, readPages } from '$lib/paging';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { auth } from '$lib/auth.svelte.js';
 	import {
@@ -64,6 +66,8 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 
 	let users = $state<UserResponse[]>([]);
+	// The server sorts, so the list is read again in the new order.
+	let sort = $state<TableSort<UserSort> | null>(null);
 	let loading = $state(true);
 	let loadFailed = $state(false);
 	let rowBusy = $state<string | null>(null);
@@ -105,7 +109,9 @@
 		loading = true;
 		loadFailed = false;
 		try {
-			const read = await readPages((after) => listUsers({ query: { after, limit: PAGE_LIMIT } }));
+			const read = await readPages((after) =>
+				listUsers({ query: { after, limit: PAGE_LIMIT, ...sortQuery(sort) } })
+			);
 			if (!read.ok) {
 				loadFailed = true;
 			} else {
@@ -118,6 +124,7 @@
 	}
 
 	$effect(() => {
+		void sort;
 		if (canList) void load();
 		else loading = false;
 	});
@@ -719,11 +726,13 @@
 			{#if wide.current}
 				<DataTable
 					label="Users"
+					{sort}
+					onsort={(key) => (sort = nextSort(sort, key as UserSort))}
 					columns={[
-						{ label: 'Person' },
-						{ label: 'Role' },
+						{ label: 'Person', sortKey: 'display_name' },
+						{ label: 'Role', sortKey: 'role' },
 						{ label: 'Status' },
-						{ label: 'Last sign-in' },
+						{ label: 'Last sign-in', sortKey: 'last_login_at' },
 						{ label: 'Actions', end: true }
 					]}
 				>

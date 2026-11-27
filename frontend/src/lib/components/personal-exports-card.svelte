@@ -6,9 +6,12 @@
 		deleteUserExport,
 		exportUserData,
 		listUserExports,
-		type UserExportResponse
+		type UserExportResponse,
+		type UserExportSort
 	} from '$lib/api/client';
-	import { PAGE_LIMIT, readPages } from '$lib/paging';
+	import { PagedList } from '$lib/paged-list.svelte';
+	import { nextSort, sortQuery, type TableSort } from '$lib/table-sort';
+	import PageNav from '$lib/components/page-nav.svelte';
 	import { errorMessage, networkAwareError } from '$lib/api/errors';
 	import { formatDateTime } from '$lib/format-date';
 	import { wide } from '$lib/viewport.svelte';
@@ -26,9 +29,24 @@
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 
-	let exports = $state<UserExportResponse[]>([]);
-	let loading = $state(true);
-	let loadError = $state<string | null>(null);
+	// A person's exports are few, so they page ten at a time, with Previous and Next.
+	const EXPORTS_PER_PAGE = 10;
+	// The server sorts, so every page is in order, not only the one on screen.
+	let sort = $state<TableSort<UserExportSort> | null>(null);
+	const list = new PagedList<UserExportResponse, TableSort<UserExportSort> | null>(
+		({ after, params }) =>
+			listUserExports({ query: { after, limit: EXPORTS_PER_PAGE, ...sortQuery(params) } }),
+		{ mode: 'page' }
+	);
+	const exports = $derived(list.rows);
+	const loading = $derived(list.loading);
+	const loadError = $derived(
+		list.failed
+			? list.failure?.response
+				? networkAwareError(list.failure).title
+				: 'Could not load exports.'
+			: null
+	);
 	let creating = $state(false);
 	let createError = $state<string | null>(null);
 	let deleteTarget = $state<UserExportResponse | null>(null);
@@ -36,24 +54,14 @@
 	let deleteError = $state<string | null>(null);
 	let now = $state(new Date());
 
-	async function load() {
-		loading = true;
-		loadError = null;
-		try {
-			const read = await readPages((after) =>
-				listUserExports({ query: { after, limit: PAGE_LIMIT } })
-			);
-			if (!read.ok) loadError = networkAwareError(read.failure).title;
-			else exports = read.rows;
-		} catch {
-			loadError = 'Could not load exports.';
-		}
-		now = new Date();
-		loading = false;
-	}
-
 	$effect(() => {
-		void load();
+		void list.load(sort);
+	});
+
+	// The expiry text counts from when the page was read.
+	$effect(() => {
+		void list.rows;
+		now = new Date();
 	});
 
 	async function handleCreate() {
@@ -66,7 +74,8 @@
 				createError = networkAwareError(result).title;
 			} else {
 				toast.success('Export created');
-				await load();
+				// The newest is first.
+				await list.load(sort);
 			}
 		} catch {
 			createError = 'Could not create the export. Try again.';
@@ -88,7 +97,7 @@
 				toast.success('Export deleted');
 			}
 			deleteTarget = null;
-			await load();
+			await list.refresh();
 		} catch {
 			deleteError = 'Could not delete the export. Try again.';
 			toast.error(deleteError);
@@ -139,7 +148,12 @@
 		<Alert.Root variant="destructive">
 			<Alert.Description>{loadError}</Alert.Description>
 		</Alert.Root>
-		<Button type="button" variant="outline" class="pointer-coarse:h-11" onclick={() => void load()}>
+		<Button
+			type="button"
+			variant="outline"
+			class="pointer-coarse:h-11"
+			onclick={() => void list.retry()}
+		>
 			Retry
 		</Button>
 	{:else if loading && exports.length === 0}
@@ -150,10 +164,12 @@
 		{#if wide.current}
 			<DataTable
 				label="Exports"
+				{sort}
+				onsort={(key) => (sort = nextSort(sort, key as UserExportSort))}
 				columns={[
-					{ label: 'Created' },
-					{ label: 'Size' },
-					{ label: 'Expires' },
+					{ label: 'Created', sortKey: 'created_at' },
+					{ label: 'Size', sortKey: 'size' },
+					{ label: 'Expires', sortKey: 'expires_at' },
 					{ label: 'Actions', end: true }
 				]}
 			>
@@ -227,6 +243,7 @@
 				{/each}
 			</ul>
 		{/if}
+		<PageNav {list} noun="export" />
 	{/if}
 </section>
 
