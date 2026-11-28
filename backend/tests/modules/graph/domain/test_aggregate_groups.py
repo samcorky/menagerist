@@ -64,6 +64,11 @@ def test_a_type_or_tag_grouping_needs_nothing_else() -> None:
         {"by": "tag", "limit": 0},
         {"by": "tag", "limit": 101},
         {"by": "tag", "limit": True},
+        {"by": "related"},
+        {"by": "related", "relationship": "made-by", "direction": "up"},
+        {"by": "related", "relationship": "made-by", "key": "x", "type": "film"},
+        {"by": "tag", "relationship": "made-by"},
+        {"by": "tag", "direction": "out"},
     ],
 )
 def test_refuses_a_malformed_grouping(raw: object) -> None:
@@ -118,3 +123,27 @@ def test_splits_the_groups_the_limit_leaves_out() -> None:
 
     assert _keys(shown) == ["a", "b", "c"]
     assert _keys(hidden) == [None]
+
+
+def test_parses_a_related_grouping() -> None:
+    """A related grouping names a relationship, and reads either end by default."""
+    named = parse_group_by({"by": "related", "relationship": "made-by"})
+    out = parse_group_by(
+        {"by": "related", "relationship": "made-by", "direction": "out"}
+    )
+
+    assert named == GroupBy(by="related", relationship="made-by", direction="any")
+    assert out.direction == "out"
+
+
+def test_orders_by_label_before_key() -> None:
+    """A group of related items is sorted by the item's name, not its id."""
+    groups = [
+        GroupValue(key="2", label="Acme", count=1, values=()),
+        GroupValue(key="1", label="Zeta", count=1, values=()),
+        GroupValue(key=None, count=1, values=()),
+    ]
+
+    ordered, _ = arrange_groups(groups, GroupBy(by="related", relationship="r"))
+
+    assert [g.label for g in ordered] == ["Acme", "Zeta", None]

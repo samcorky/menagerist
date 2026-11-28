@@ -643,21 +643,37 @@ class NodeGroupByRequest(RequestModel):
                 {"by": "type"},
                 {"by": "tag", "order": "count", "limit": 10},
                 {"by": "field", "type": "film", "key": "format"},
+                {"by": "related", "relationship": "made-by", "direction": "out"},
             ]
         }
     )
 
-    by: Literal["field", "type", "tag"] = Field(
+    by: Literal["field", "related", "tag", "type"] = Field(
         description=(
             "`field` for a text, choice, multiple-choice or yes/no field (named with "
-            + "`type` and `key`, or `origin`), `type` for the item type, `tag` for "
-            + "the tags."
+            + "`type` and `key`, or `origin`), `related` for the item at the other "
+            + "end of a `relationship`, `type` for the item type, `tag` for the tags."
         )
     )
     type: str | None = Field(None, description="With `by` of field: the item type.")
     key: str | None = Field(None, description="With `by` of field: the field's key.")
     origin: str | None = Field(
         None, description="With `by` of field: the saved field, instead of `type`."
+    )
+    relationship: str | None = Field(
+        None,
+        description=(
+            "With `by` of related: the slug of the relationship. An item connected "
+            + "to two items is in both groups; one with no connection is unset."
+        ),
+    )
+    direction: Literal["out", "in", "any"] | None = Field(
+        None,
+        description=(
+            "With `by` of related: `out` groups by the items this one points to, `in` "
+            + "by the items pointing to it, `any` (the default) by either. A "
+            + "relationship with no direction is read from either end."
+        ),
     )
     order: Literal["key", "count", "measure"] = Field(
         "key",
@@ -839,11 +855,14 @@ class NodeAggregateGroupResponse(BaseModel):
     key: str | None = Field(
         None,
         description=(
-            "The tag, field value or item type slug; null for the items with none "
+            "The tag, field value, item type slug or related item's id; null for "
+            + "the items with none "
             + "(`label` is `Unset`)."
         ),
     )
-    label: str = Field(description="What to show for the group.")
+    label: str = Field(
+        description="What to show for the group: the related item's name for one."
+    )
     count: int = Field(description="How many items are in the group.")
     measures: list[NodeMeasureValueResponse] = Field(
         description="One entry per measure asked, in the same order."

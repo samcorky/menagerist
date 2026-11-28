@@ -89,12 +89,13 @@ IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}
 
 ### Groups
 
-`group_by` splits the items before measuring, so the same measures are answered within each group: `by` is `field` (a text, choice, multiple-choice or yes/no field, named as a measure's is), `type` (the item type) or `tag`. The response then has `groups`, one `{key, label, count, measures}` for each, and `other` when the limit cut some off; without `group_by` both are `null`.
+`group_by` splits the items before measuring, so the same measures are answered within each group: `by` is `field` (a text, choice, multiple-choice or yes/no field, named as a measure's is), `related` (the item at the other end of a connection), `type` (the item type) or `tag`. The response then has `groups`, one `{key, label, count, measures}` for each, and `other` when the limit cut some off; without `group_by` both are `null`.
 
 - **Order and limit.** Groups sort by `order`: `key` (the default, ascending), `count` or one `measure` by its index (high to low unless `descending` says otherwise). Ordering by a money measure is a 400, as money is never converted into one number. `limit` is 1 to 100, and 100 when left out. Groups with nothing to sort by, and the unset group when sorting by key, come last.
 - **`other` is the groups left out**, with how many there were (`groups`), the items in any of them (`count`, each counted once) and the measures taken over those items. A response that shows every group has no `other`.
 - **Items with no value are in an unset group:** `key` is `null` and `label` is `Unset`. So are items of a type that does not have the field, and a value of the wrong shape.
-- **An item can be in several groups.** A multiple-choice field and the tags put an item in every group it belongs to, so group counts and totals can add up to more than `items`, and a measure over `groups` is not a measure over the whole. `other` is the one place an item is counted once.
+- **Related items.** `by: related` takes the `relationship` slug and a `direction` (`out`: the items this one points to, `in`: the items pointing to it, `any`, the default, either), read as a `connection` condition reads them: live connections to live items in your scope, and a relationship with no direction is read from either end. A group's `key` is the related item's id and its `label` its name, sorted by name when ordering by key. An item with no such connection is in the unset group, and a relationship that no longer exists gives no groups and a warning at `group_by`.
+- **An item can be in several groups.** A multiple-choice field, the tags and an item's connections put an item in every group it belongs to, so group counts and totals can add up to more than `items`, and a measure over `groups` is not a measure over the whole. `other` is the one place an item is counted once.
 - **Money stays per currency** inside each group, and a group where no item has an amount has no currencies.
 - **A grouping field that no longer exists** gives no groups and a warning at `group_by`; a field of any other kind (number, money, date), or a saved field of mixed kinds, is a 400 there.
 

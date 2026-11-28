@@ -6,7 +6,7 @@ leave an item out of a measure when its field is empty or of another shape.
 """
 
 from collections import defaultdict
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -22,7 +22,11 @@ from app.modules.graph.domain.aggregate import (
 )
 
 if TYPE_CHECKING:
+    from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
+
+# A node's live connections, each with the item at the far end.
+type Neighbours = Callable[[Node], Sequence[tuple[Edge, Node]]]
 
 _NUMERIC = frozenset({"number", "duration", "rating"})
 
@@ -110,33 +114,53 @@ def measure_values(
     return answers
 
 
-def group_keys(node: Node, group: ResolvedGroup) -> list[str | None]:
-    """The keys of the groups a node is in; `[None]` (unset) for none."""
+def group_members(
+    node: Node, group: ResolvedGroup, neighbours: Neighbours | None = None
+) -> list[tuple[str | None, str | None]]:
+    """The (key, label) of each group a node is in; one unset group for none."""
+    unset: list[tuple[str | None, str | None]] = [(None, None)]
+    if group.group.by == "related":
+        chosen = group.group
+        found: dict[str, str] = {}
+        for edge, far in neighbours(node) if neighbours is not None else ():
+            near = edge.source_id if chosen.direction == "out" else edge.target_id
+            directed = chosen.direction != "any" and group.directional
+            if edge.type == chosen.relationship and (not directed or near == node.id):
+                found.setdefault(str(far.id), far.name)
+        return list(found.items()) or unset
     if group.group.by == "type":
-        return [node.type]
+        return [(node.type, None)]
     if group.group.by == "tag":
-        return list(dict.fromkeys(node.tags)) or [None]
+        return [(tag, None) for tag in dict.fromkeys(node.tags)] or unset
     source = next((s for s in group.sources if node.type in s.types), None)
     raw = node.attributes.get(source.key) if source is not None else None
     if group.kind == "multichoice":
         held = [v for v in raw if isinstance(v, str)] if isinstance(raw, list) else []
-        return list(dict.fromkeys(held)) or [None]
+        return [(v, None) for v in dict.fromkeys(held)] or unset
     if group.kind == "boolean":
-        return [str(raw).lower() if isinstance(raw, bool) else None]
-    return [raw if isinstance(raw, str) else None]
+        return [(str(raw).lower() if isinstance(raw, bool) else None, None)]
+    return [(raw if isinstance(raw, str) else None, None)]
 
 
 def group_values(
-    nodes: Iterable[Node], group: ResolvedGroup, measures: Sequence[ResolvedMeasure]
+    nodes: Iterable[Node],
+    group: ResolvedGroup,
+    measures: Sequence[ResolvedMeasure],
+    neighbours: Neighbours | None = None,
 ) -> list[GroupValue]:
     """Each group's size and one value per measure, over the nodes in it."""
     members: dict[str | None, list[Node]] = defaultdict(list)
+    labels: dict[str | None, str | None] = {}
     for node in nodes:
-        for key in group_keys(node, group):
+        for key, label in group_members(node, group, neighbours):
             members[key].append(node)
+            labels[key] = label
     return [
         GroupValue(
-            key=key, count=len(found), values=tuple(measure_values(found, measures))
+            key=key,
+            label=labels[key],
+            count=len(found),
+            values=tuple(measure_values(found, measures)),
         )
         for key, found in members.items()
     ]
@@ -147,12 +171,13 @@ def outside_group_values(
     group: ResolvedGroup,
     measures: Sequence[ResolvedMeasure],
     shown: Collection[str | None],
+    neighbours: Neighbours | None = None,
 ) -> GroupValue:
     """The nodes in a group that is not shown, each counted once."""
     found = [
         node
         for node in nodes
-        if any(key not in shown for key in group_keys(node, group))
+        if any(key not in shown for key, _ in group_members(node, group, neighbours))
     ]
     return GroupValue(
         key=None, count=len(found), values=tuple(measure_values(found, measures))

@@ -23,6 +23,7 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
     InMemoryNodeTypeRepository,
 )
 from app.modules.graph.adapters.persistence.unit_of_work import (
+    build_in_memory_graph_repos,
     create_in_memory_graph_uow,
 )
 from app.modules.graph.ports.unit_of_work import GraphRepos
@@ -928,3 +929,47 @@ def test_aggregate_nodes_refuses_a_grouping_that_cannot_work() -> None:
     assert refused.status_code == 400
     assert "group_by" in refused.json()["detail"]
     assert malformed.status_code == 422
+
+
+def test_aggregate_nodes_groups_by_a_related_item() -> None:
+    """`by: related` groups under the item's name; no connection is unset."""
+    app = create_app()
+    repos = build_in_memory_graph_repos()
+    app.dependency_overrides[get_graph_uow] = lambda: create_in_memory_graph_uow(repos)
+    app.dependency_overrides[get_graph_repos] = lambda: repos
+    client = TestClient(app)
+    client.post("/api/v1/edge-types", json={"slug": "made-by", "label": "Made by"})
+    film = client.post("/api/v1/nodes", json={"name": "Alien", "type": "film"}).json()
+    other = client.post("/api/v1/nodes", json={"name": "Dune", "type": "film"}).json()
+    maker = client.post("/api/v1/nodes", json={"name": "Fox", "type": "studio"}).json()
+    client.post(
+        "/api/v1/edges",
+        json={"source_id": film["id"], "target_id": maker["id"], "type": "made-by"},
+    )
+
+    response = client.post(
+        "/api/v1/nodes/aggregate",
+        json={
+            "measures": [{"fn": "count"}],
+            "group_by": {
+                "by": "related",
+                "relationship": "made-by",
+                "direction": "out",
+            },
+        },
+    )
+    missing = client.post(
+        "/api/v1/nodes/aggregate",
+        json={
+            "measures": [{"fn": "count"}],
+            "group_by": {"by": "related", "direction": "out"},
+        },
+    )
+
+    assert response.status_code == 200
+    assert [(g["key"], g["label"], g["count"]) for g in response.json()["groups"]] == [
+        (maker["id"], "Fox", 1),
+        (None, "Unset", 2),
+    ]
+    assert other["id"] != film["id"]
+    assert missing.status_code == 400
