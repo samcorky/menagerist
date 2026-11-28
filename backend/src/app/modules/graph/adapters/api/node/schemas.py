@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.modules.graph.application.aggregate_nodes import AggregateNodesResult
     from app.modules.graph.application.search_node_counts import SearchCount
     from app.modules.graph.application.search_nodes import SearchNodesResult
+    from app.modules.graph.domain.aggregate import MeasureValue
     from app.modules.graph.domain.node import Node
 
 # Written out, not an alias, so the schema lists the functions inline.
@@ -633,6 +634,51 @@ class NodeMeasureRequest(RequestModel):
     )
 
 
+class NodeGroupByRequest(RequestModel):
+    """How to split the matching items into groups."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"by": "type"},
+                {"by": "tag", "order": "count", "limit": 10},
+                {"by": "field", "type": "film", "key": "format"},
+            ]
+        }
+    )
+
+    by: Literal["field", "type", "tag"] = Field(
+        description=(
+            "`field` for a text, choice, multiple-choice or yes/no field (named with "
+            + "`type` and `key`, or `origin`), `type` for the item type, `tag` for "
+            + "the tags."
+        )
+    )
+    type: str | None = Field(None, description="With `by` of field: the item type.")
+    key: str | None = Field(None, description="With `by` of field: the field's key.")
+    origin: str | None = Field(
+        None, description="With `by` of field: the saved field, instead of `type`."
+    )
+    order: Literal["key", "count", "measure"] = Field(
+        "key",
+        description=(
+            "Sort the groups by their key, their number of items, or the value of "
+            + "the measure at index `measure`. Groups with nothing to sort by, and "
+            + "the unset group when sorting by key, come last."
+        ),
+    )
+    measure: int | None = Field(
+        None,
+        ge=0,
+        description="With `order` of measure: the index of a measure, not money.",
+    )
+    descending: bool | None = Field(
+        None,
+        description="High to low. Defaults to true for `count` and `measure`.",
+    )
+    limit: int = Field(100, ge=1, le=100, description="Most groups to list, 1 to 100.")
+
+
 class NodeAggregateRequest(RequestModel):
     """Request body for aggregating fields of the items a condition tree matches."""
 
@@ -666,6 +712,14 @@ class NodeAggregateRequest(RequestModel):
     )
     measures: list[NodeMeasureRequest] = Field(
         min_length=1, max_length=10, description="1 to 10 measures, answered in order."
+    )
+    group_by: NodeGroupByRequest | None = Field(
+        None,
+        description=(
+            "Also give every measure within each group. An item in several groups "
+            + "(a tag, a multiple-choice value) counts in each, so the groups can "
+            + "add up to more than `items`."
+        ),
     )
 
 
@@ -730,6 +784,99 @@ class NodeMeasureResponse(BaseModel):
     )
 
 
+class NodeMeasureValueResponse(BaseModel):
+    """What one measure came to within a group, in the order the measures were asked."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"value": 3.75, "currencies": []},
+                {"value": None, "currencies": [{"currency": "GBP", "value": 96.5}]},
+            ]
+        }
+    )
+
+    value: float | int | str | None = Field(
+        None, description="As `value` of the measure. Null for money."
+    )
+    currencies: list[NodeCurrencyValueResponse] = Field(
+        description="As `currencies` of the measure."
+    )
+
+    @classmethod
+    def from_domain(cls, value: MeasureValue) -> NodeMeasureValueResponse:
+        """Build one from a measure's value."""
+        return cls(
+            value=value.value,
+            currencies=[
+                NodeCurrencyValueResponse(currency=c.currency, value=c.value)
+                for c in value.currencies
+            ],
+        )
+
+
+class NodeAggregateGroupResponse(BaseModel):
+    """One group of the matching items."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "key": "dvd",
+                    "label": "dvd",
+                    "count": 12,
+                    "measures": [
+                        {
+                            "value": None,
+                            "currencies": [{"currency": "GBP", "value": 96.5}],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    key: str | None = Field(
+        None,
+        description=(
+            "The tag, field value or item type slug; null for the items with none "
+            + "(`label` is `Unset`)."
+        ),
+    )
+    label: str = Field(description="What to show for the group.")
+    count: int = Field(description="How many items are in the group.")
+    measures: list[NodeMeasureValueResponse] = Field(
+        description="One entry per measure asked, in the same order."
+    )
+
+
+class NodeAggregateOtherResponse(BaseModel):
+    """The items in the groups the `limit` left out."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "groups": 4,
+                    "count": 9,
+                    "measures": [
+                        {
+                            "value": None,
+                            "currencies": [{"currency": "GBP", "value": 31}],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    groups: int = Field(description="How many groups were left out.")
+    count: int = Field(description="Items in any of them, each counted once.")
+    measures: list[NodeMeasureValueResponse] = Field(
+        description="One entry per measure asked, over those items."
+    )
+
+
 class NodeAggregateResponse(BaseModel):
     """The aggregates of the items a query matches."""
 
@@ -759,7 +906,18 @@ class NodeAggregateResponse(BaseModel):
         description="One entry per measure asked, in the same order."
     )
     warnings: list[QueryWarningResponse] = Field(
-        description="Parts of the query, or measures, that no longer apply."
+        description="Parts of the query, measures or grouping that no longer apply."
+    )
+    groups: list[NodeAggregateGroupResponse] | None = Field(
+        None,
+        description=(
+            "With `group_by`, up to `limit` groups, each with its own count and "
+            + "measures. Null without it."
+        ),
+    )
+    other: NodeAggregateOtherResponse | None = Field(
+        None,
+        description="Present when the `limit` left groups out, covering their items.",
     )
 
     @classmethod
@@ -787,6 +945,28 @@ class NodeAggregateResponse(BaseModel):
                 QueryWarningResponse(path=w.path, message=w.message)
                 for w in result.warnings
             ],
+            groups=None
+            if result.groups is None
+            else [
+                NodeAggregateGroupResponse(
+                    key=g.key,
+                    label=g.label,
+                    count=g.count,
+                    measures=[
+                        NodeMeasureValueResponse.from_domain(v) for v in g.values
+                    ],
+                )
+                for g in result.groups
+            ],
+            other=None
+            if result.other is None
+            else NodeAggregateOtherResponse(
+                groups=result.other.groups,
+                count=result.other.count,
+                measures=[
+                    NodeMeasureValueResponse.from_domain(v) for v in result.other.values
+                ],
+            ),
         )
 
 

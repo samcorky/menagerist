@@ -2146,4 +2146,14 @@ Totals on a collection page, a dashboard panel and a grouped total all need the 
 - **Money is added up per currency and never converted.** A money measure answers with one value for each currency found. The conversion rate is not ours to guess, and a single mixed total would be wrong whenever two currencies are present.
 - **Exact sums.** SQL adds JSON numbers as `numeric` and rounds to six places, and the in-memory evaluator uses `Decimal`, so the two agree (a parity test runs both) and money does not drift.
 - **The use case resolves, the repository evaluates.** `AggregateNodes` parses the query and measures, finds each measure's fields in the item types (a type's field is read from its subtypes too) and passes `ResolvedMeasure`s to `NodeRepository.aggregate`, one `SELECT` per measure.
-- **Not yet:** grouping (#135) and the totals on the collection page and Home (#136).
+- **Grouping:** see the entry below. **Not yet:** grouping by a related item (#135) and the totals on the collection page and Home (#136).
+
+## Aggregate groups split the rows in the database, order and cut them in the use case (2026-11-28)
+
+`group_by` on `POST /nodes/aggregate` (#135) splits the matching items by a field, the item type or a tag.
+
+- **One row for each item and key.** Each grouping becomes a JSON array of the keys an item is in (`[null]` for none), expanded with `jsonb_array_elements_text` in a lateral `SELECT DISTINCT`, so an item that holds the same choice twice is in that group once. A measure is then its ordinary `SELECT` grouped by that key (and by currency for money), and the group's size is the same query with a count of items. The in-memory evaluator buckets the nodes by the same keys and reuses its own measure code, so the parity tests in `test_node_aggregate_groups.py` cover both.
+- **Every group comes back, the use case orders and cuts.** `NodeRepository.aggregate_groups` returns all groups unordered, and `arrange_groups` (domain) sorts them and splits off those past the limit, so the ordering rules (unset last, empty values last, ties by key) are written once and tested without a database. Ordering in SQL would need a `LIMIT` per measure and a second pass for the remainder. The cost is that a field with many distinct values is read in full; a group is a key, a count and a few numbers, so it stays small.
+- **`other` counts items once.** `aggregate_outside_groups` selects the items that are in any group not shown (an `IN` over their ids) and measures them as a whole, since a total of group totals would count an item in two hidden groups twice and cannot add averages or distinct counts at all.
+- **Only kinds with a stable text key.** Text, choice, multiple-choice and yes/no fields can group; numbers, money and dates would need bucketing rules (ranges, a currency, a month) that are a product decision. A money measure cannot order the groups, as it has no single number.
+- **Related-item grouping is a separate change**, as the plan on #122 says: it needs a join through edges and an edge type.

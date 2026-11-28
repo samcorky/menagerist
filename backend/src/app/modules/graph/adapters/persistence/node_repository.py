@@ -27,7 +27,11 @@ from sqlalchemy.dialects.postgresql import (
 )
 
 from app.modules.graph.adapters.persistence.aggregate_sql import (
+    ITEMS,
+    group_values as group_values_of,
+    outside as aggregate_outside,
     read as read_aggregate,
+    read_groups as read_aggregate_groups,
     statement as aggregate_statement,
 )
 from app.modules.graph.adapters.persistence.models import NodeFavouriteModel, NodeModel
@@ -49,6 +53,7 @@ from app.modules.graph.adapters.persistence.search_sql import (
 from app.modules.graph.application.field_kinds import KIND_OPERATORS
 from app.modules.graph.application.schema_meta import NAMESPACE
 from app.modules.graph.domain import reach as reach_rules
+from app.modules.graph.domain.aggregate import GroupValue
 from app.modules.graph.domain.node import Node
 from app.modules.graph.domain.query import (
     ConnectionCondition,
@@ -74,7 +79,11 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.sql import Executable
 
-    from app.modules.graph.domain.aggregate import MeasureValue, ResolvedMeasure
+    from app.modules.graph.domain.aggregate import (
+        MeasureValue,
+        ResolvedGroup,
+        ResolvedMeasure,
+    )
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
     from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
@@ -547,6 +556,59 @@ class SqlAlchemyNodeRepository:
             rows = (await self._run(stmt, resolved)).all()
             answers.append(read_aggregate(measure, rows))
         return answers
+
+    async def aggregate_groups(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        group: ResolvedGroup,
+        measures: Sequence[ResolvedMeasure],
+    ) -> builtins.list[GroupValue]:
+        """Evaluate the measures in each group of the live nodes in `scope`."""
+        logger.debug("aggregating nodes by group", measures=len(measures))
+        where = compile_where(resolved, QueryEnv(scope=scope, external=self._external))
+        await _jit_off_for_text(self._session, has_text=_has_text(resolved))
+        answers: builtins.list[dict[str | None, MeasureValue]] = []
+        sizes: builtins.list[Any] = []
+        for measure in (ITEMS, *measures):
+            stmt = aggregate_statement(measure, group).where(_in_scope(scope))
+            if where is not None:
+                stmt = stmt.where(where)
+            rows = (await self._run(stmt, resolved)).all()
+            if measure is ITEMS:
+                sizes = [tuple(row) for row in rows]
+            else:
+                answers.append(read_aggregate_groups(measure, rows))
+        return group_values_of(sizes, answers)
+
+    async def aggregate_outside_groups(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        group: ResolvedGroup,
+        measures: Sequence[ResolvedMeasure],
+        shown: collections.abc.Collection[str | None],
+    ) -> GroupValue:
+        """Evaluate the measures over the nodes in a group that is not `shown`."""
+        where = compile_where(resolved, QueryEnv(scope=scope, external=self._external))
+        await _jit_off_for_text(self._session, has_text=_has_text(resolved))
+        hidden = aggregate_outside(group, shown).where(_in_scope(scope))
+        values: builtins.list[MeasureValue] = []
+        size = 0
+        for measure in (ITEMS, *measures):
+            stmt = aggregate_statement(measure).where(
+                _in_scope(scope), NodeModel.id.in_(hidden)
+            )
+            if where is not None:
+                stmt = stmt.where(where)
+            rows = (await self._run(stmt, resolved)).all()
+            if measure is ITEMS:
+                size = int(rows[0][0])
+            else:
+                values.append(read_aggregate(measure, rows))
+        return GroupValue(key=None, count=size, values=tuple(values))
 
     async def count_by_type(
         self,

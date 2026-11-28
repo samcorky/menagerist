@@ -7,7 +7,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from datetime import datetime
 
-    from app.modules.graph.domain.aggregate import MeasureValue, ResolvedMeasure
+    from app.modules.graph.domain.aggregate import (
+        GroupValue,
+        MeasureValue,
+        ResolvedGroup,
+        ResolvedMeasure,
+    )
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import (
         Cursor,
@@ -164,6 +169,39 @@ class NodeRepository(Protocol):
         items that have a value. With no value to read the answer is `None` (a count
         is 0), and a money measure has no currencies. A money measure gives one value
         per currency, sorted by currency code, and never mixes them.
+        """
+        ...
+
+    async def aggregate_groups(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        group: ResolvedGroup,
+        measures: Sequence[ResolvedMeasure],
+    ) -> builtins.list[GroupValue]:
+        """Evaluate the measures in each group of the live nodes that match the query.
+
+        Every group is returned, in no particular order, each with its item count and
+        one value per measure as `aggregate` gives it. A node with no value for the
+        grouping is in the group whose key is `None`; a node in several groups (a
+        tag, a multiple-choice value) is counted in each.
+        """
+        ...
+
+    async def aggregate_outside_groups(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        group: ResolvedGroup,
+        measures: Sequence[ResolvedMeasure],
+        shown: collections.abc.Collection[str | None],
+    ) -> GroupValue:
+        """Evaluate the measures over the matching nodes in a group not in `shown`.
+
+        A node counts once, however many hidden groups it is in. The result's key is
+        `None`.
         """
         ...
 

@@ -19,6 +19,8 @@ from app.modules.graph.adapters.persistence.in_memory_node_type_repository impor
 from app.modules.graph.application.aggregate_nodes import (
     AggregateNodes,
     AggregateNodesQuery,
+    AggregateNodesResult,
+    AggregateOther,
 )
 from app.modules.graph.domain.aggregate import CurrencyValue, MeasureValue
 from app.modules.graph.domain.node import Node
@@ -52,6 +54,10 @@ FILMS: dict[str, Any] = {
     "v": 1,
     "where": {"op": "and", "children": [{"kind": "type", "in": ["film"]}]},
 }
+
+
+# Tags on three films: A has x and y, B has x, C has z.
+TAGS: dict[str, list[str]] = {"A": ["x", "y"], "B": ["x"], "C": ["z"]}
 
 
 def _gbp(value: float) -> dict[str, Any]:
@@ -90,7 +96,11 @@ async def _world() -> AggregateNodes:
     for name, type_slug, attributes in items:
         await repos.nodes.add(
             Node.create(
-                owner_id=ALICE.id, name=name, type=type_slug, attributes=attributes
+                owner_id=ALICE.id,
+                name=name,
+                type=type_slug,
+                attributes=attributes,
+                tags=TAGS.get(name, []),
             )
         )
     await repos.nodes.add(
@@ -339,4 +349,202 @@ async def test_a_bad_query_is_refused_like_a_search_refuses_it() -> None:
     with pytest.raises(InvalidQueryError):
         await use_case.handle(
             AggregateNodesQuery(query={"v": 9}, measures=[{"fn": "count"}]), ALICE
+        )
+
+
+async def _grouped(
+    group_by: dict[str, Any],
+    measures: list[dict[str, Any]] | None = None,
+    use_case: AggregateNodes | None = None,
+) -> AggregateNodesResult:
+    use_case = use_case or await _world()
+    return await use_case.handle(
+        AggregateNodesQuery(measures=measures or [{"fn": "count"}], group_by=group_by),
+        ALICE,
+    )
+
+
+async def test_without_group_by_there_are_no_groups() -> None:
+    """The answer is the same shape as before when no grouping is asked for."""
+    result = await _grouped({"by": "type"})
+    plain = await (await _world()).handle(
+        AggregateNodesQuery(measures=[{"fn": "count"}]), ALICE
+    )
+
+    assert plain.groups is None
+    assert plain.other is None
+    assert result.items == plain.items
+
+
+async def test_groups_by_type_with_each_types_label() -> None:
+    """Items split by type, in key order, Bob's film left out."""
+    result = await _grouped({"by": "type"})
+
+    assert result.groups is not None
+    assert [(g.key, g.label, g.count) for g in result.groups] == [
+        ("book", "Book", 1),
+        ("documentary", "Documentary", 1),
+        ("film", "Film", 4),
+    ]
+    assert result.other is None
+
+
+async def test_groups_hold_money_per_currency() -> None:
+    """Each group's money is totalled in its own currencies, never converted."""
+    result = await _grouped(
+        {"by": "type"}, [{"fn": "sum", "type": "film", "key": "price"}]
+    )
+
+    assert result.groups is not None
+    by_key = {g.key: g.values[0] for g in result.groups}
+    assert by_key["film"] == _money(("GBP", 30.5), ("USD", 5))
+    assert by_key["documentary"] == _money(("GBP", 1.25))
+    assert by_key["book"] == MeasureValue()
+
+
+async def test_groups_by_a_field_with_the_rest_unset() -> None:
+    """Items without a value, or of a type without the field, are in the unset group."""
+    result = await _grouped({"by": "field", "type": "film", "key": "owned"})
+
+    assert result.groups is not None
+    assert [(g.key, g.label, g.count) for g in result.groups] == [
+        ("true", "true", 1),
+        (None, "Unset", 5),
+    ]
+
+
+async def test_an_item_with_two_tags_is_in_both_groups() -> None:
+    """Group sizes can add up to more than the items matched."""
+    result = await _grouped({"by": "tag"})
+
+    assert result.groups is not None
+    assert [(g.key, g.count) for g in result.groups] == [
+        ("x", 2),
+        ("y", 1),
+        ("z", 1),
+        (None, 3),
+    ]
+    assert sum(g.count for g in result.groups) > result.items
+
+
+async def test_the_limit_leaves_the_rest_in_other() -> None:
+    """The biggest groups are shown; `other` has the rest, each item once."""
+    result = await _grouped(
+        {"by": "tag", "order": "count", "limit": 1},
+        [{"fn": "sum", "type": "film", "key": "price"}],
+    )
+
+    assert result.groups is not None
+    assert [(g.key, g.label, g.count) for g in result.groups] == [(None, "Unset", 3)]
+    assert result.other == AggregateOther(
+        groups=3, count=3, values=[_money(("GBP", 30.5), ("USD", 5))]
+    )
+
+
+async def test_can_order_by_a_measure() -> None:
+    """Groups run high to low by the chosen measure."""
+    result = await _grouped(
+        {"by": "type", "order": "measure", "measure": 1},
+        [{"fn": "count"}, {"fn": "avg", "type": "film", "key": "rating"}],
+    )
+
+    assert result.groups is not None
+    # Film averages 3, the documentary 4, and a book has no rating.
+    assert [g.key for g in result.groups] == ["documentary", "film", "book"]
+
+
+async def test_a_missing_measure_is_empty_in_every_group() -> None:
+    """A measure whose field is gone has an empty value in each group."""
+    result = await _grouped(
+        {"by": "type"}, [{"fn": "count"}, {"fn": "sum", "type": "film", "key": "gone"}]
+    )
+
+    assert result.groups is not None
+    assert all(g.values[1] == MeasureValue() for g in result.groups)
+    assert [g.values[0] for g in result.groups] == [
+        MeasureValue(value=1),
+        MeasureValue(value=1),
+        MeasureValue(value=4),
+    ]
+
+
+async def test_a_grouping_field_that_is_gone_warns_and_has_no_groups() -> None:
+    """A field removed from its type warns at `group_by` instead of failing."""
+    result = await _grouped({"by": "field", "type": "film", "key": "gone"})
+
+    assert result.groups == []
+    assert [(w.path, w.message) for w in result.warnings] == [
+        ("group_by", "That field no longer exists.")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("group_by", "match"),
+    [
+        ({"by": "field", "type": "film", "key": "price"}, "money field"),
+        ({"by": "field", "type": "film", "key": "rating"}, "rating field"),
+        ({"by": "field", "origin": "p1"}, "different kinds|money field"),
+        ({"by": "type", "order": "measure", "measure": 3}, "no measure 3"),
+        ({"by": "type", "order": "measure", "measure": 1}, "money"),
+        ({"by": "nonsense"}, "`by`"),
+    ],
+)
+async def test_refuses_a_grouping_that_cannot_work(
+    group_by: dict[str, Any], match: str
+) -> None:
+    """A field that cannot name a group, a bad order or a bad shape is a 400."""
+    use_case = await _world()
+
+    with pytest.raises(InvalidQueryError, match=match):
+        await use_case.handle(
+            AggregateNodesQuery(
+                measures=[
+                    {"fn": "count"},
+                    {"fn": "sum", "type": "film", "key": "price"},
+                ],
+                group_by=group_by,
+            ),
+            ALICE,
+        )
+
+
+async def test_a_grouping_only_covers_the_actors_items() -> None:
+    """Bob's one film is in none of Alice's groups."""
+    use_case = await _world()
+
+    result = await use_case.handle(
+        AggregateNodesQuery(measures=[{"fn": "count"}], group_by={"by": "type"}),
+        BOB,
+    )
+
+    assert result.groups is not None
+    assert [(g.key, g.count) for g in result.groups] == [("film", 1)]
+
+
+async def test_refuses_to_group_by_a_saved_field_of_mixed_kinds() -> None:
+    """The groups of one saved field must all be named the same way."""
+    use_case = await _world()
+    await use_case._repos.node_types.add(
+        NodeType.create(
+            owner_id=ALICE.id,
+            slug="game",
+            label="Game",
+            attributes_schema={
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "x-menagerist": {"origin": {"preset": "p1"}},
+                    }
+                },
+            },
+        )
+    )
+
+    with pytest.raises(InvalidQueryError, match="different kinds"):
+        await use_case.handle(
+            AggregateNodesQuery(
+                measures=[{"fn": "count"}], group_by={"by": "field", "origin": "p1"}
+            ),
+            ALICE,
         )

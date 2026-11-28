@@ -87,6 +87,17 @@ IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}
 - **Exact and rounded.** Sums and averages are taken as exact decimals in the database and given to six places, so adding 0.1 and 0.2 gives 0.3. The totals are not capped; the route shares the search's rate limit and condition limits.
 - **Only your items, and only your item types.** The scope is its own `WHERE` term, as in a search.
 
+### Groups
+
+`group_by` splits the items before measuring, so the same measures are answered within each group: `by` is `field` (a text, choice, multiple-choice or yes/no field, named as a measure's is), `type` (the item type) or `tag`. The response then has `groups`, one `{key, label, count, measures}` for each, and `other` when the limit cut some off; without `group_by` both are `null`.
+
+- **Order and limit.** Groups sort by `order`: `key` (the default, ascending), `count` or one `measure` by its index (high to low unless `descending` says otherwise). Ordering by a money measure is a 400, as money is never converted into one number. `limit` is 1 to 100, and 100 when left out. Groups with nothing to sort by, and the unset group when sorting by key, come last.
+- **`other` is the groups left out**, with how many there were (`groups`), the items in any of them (`count`, each counted once) and the measures taken over those items. A response that shows every group has no `other`.
+- **Items with no value are in an unset group:** `key` is `null` and `label` is `Unset`. So are items of a type that does not have the field, and a value of the wrong shape.
+- **An item can be in several groups.** A multiple-choice field and the tags put an item in every group it belongs to, so group counts and totals can add up to more than `items`, and a measure over `groups` is not a measure over the whole. `other` is the one place an item is counted once.
+- **Money stays per currency** inside each group, and a group where no item has an amount has no currencies.
+- **A grouping field that no longer exists** gives no groups and a warning at `group_by`; a field of any other kind (number, money, date), or a saved field of mixed kinds, is a 400 there.
+
 ## Conditional requests
 
 `GET` responses carry a weak `ETag` (see [Weak ETags](DECISIONS.md#weak-etags-to-survive-a-compressing-proxy-open-question-76)), `If-None-Match` returns 304, and `PATCH` honours `If-Match` and answers 412 with a problem body and the current `ETag`. A route takes `ConditionalGetDep` or `ConditionalPatchDep`, which declare `If-None-Match` or `If-Match` as parameters so they appear in `openapi.json` and the generated client. The date forms, `If-Modified-Since` and `If-Unmodified-Since`, are honoured but not declared, so the contract steers clients to ETags as IBM recommends.
