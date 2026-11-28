@@ -2096,3 +2096,11 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Every match, not the first few.** The search ranks hits itself and the best one may come last in id order, so a source still reads all the matches a page at a time (up to 10,000), now with the database doing the filtering.
 - **`q` is as wide as the search was.** Saved fields matched label and description in the bridge but `q` matched the label only, so the list's `q` now covers the description too (the same `contains_any` as item types), in SQL and in memory. Item types gain the description in the search, and accounts gain the role, because the lists' `q` already reads them.
 - **Not changed:** example packs, settings, preferences and scheduled tasks are not paged lists, so they keep their own matching.
+
+## A collection's page sorts its items for the view only (2026-11-27)
+
+**Decision:** The collection page has a "Sort by" select with the Items page's five orders, kept in the address as `?sort=`. On a manual collection it sorts the items through the item list route. On a smart collection it replaces the saved order in the search it sends, and "As saved" (the default, no `?sort=`) keeps the collection's own. The choice is never written to the collection: saving a different order would be a change to the collection's definition, made through Edit conditions, not by looking at it.
+
+- **Why view only.** A smart collection is a saved search with a saved sort. Someone who only wants the newest first for a minute should not rewrite a collection that other pages (Home, the item page) read in its own order. The same applies to a collection someone else can see, and it keeps the page's behaviour the same for manual and smart.
+- **Oldest first on a smart collection is an order, not the default.** It sends an empty sort, so a collection saved newest first can be looked at in creation order; "As saved" is the way back.
+- **Removing an item and undoing it** puts the row back in id order by hand. In any other order there is no place to put it, so the list is read again.

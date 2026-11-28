@@ -66,6 +66,12 @@
 	} from '$lib/query/items-page';
 	import { nextCursor } from '$lib/paging';
 	import {
+		SAVED_SORT,
+		SORT_CHOICES,
+		nodeSortParams,
+		sortChoiceByValue
+	} from '$lib/query/sort-choices';
+	import {
 		NARROW_TOO_LARGE_MESSAGE,
 		linkedBlockReason,
 		linkedNarrow,
@@ -221,6 +227,12 @@
 	// Smart collections: the kind decides how results load, so nothing loads until it is known.
 	const collectionKind = $derived(collection ? collection.kind : null);
 	const smart = $derived(collection ? isSmart(collection) : false);
+	// The order for this view only (`?sort=`). A manual collection's route sorts it; a smart one is
+	// searched in that order in place of the one it saved. It is never saved with the collection.
+	const sortChoice = $derived(sortChoiceByValue(page.url.searchParams.get('sort')));
+	const sortValue = $derived(sortChoice?.value ?? (smart ? SAVED_SORT : SORT_CHOICES[0].value));
+	// No choice, or oldest first, is the plain list, in creation order.
+	const inCreationOrder = $derived(!sortChoice || sortChoice.sort.length === 0);
 	const storedQuery = $derived(collection && smart ? parseQuery(collection.definition) : null);
 	const unreadable = $derived(smart && storedQuery === null);
 	// Read the relationships and linked item names the saved and extra conditions name.
@@ -470,6 +482,15 @@
 		return () => clearTimeout(timer);
 	});
 
+	function setSort(value: string) {
+		const params = new SvelteURLSearchParams(page.url.searchParams);
+		const fallback = smart ? SAVED_SORT : SORT_CHOICES[0].value;
+		if (value === fallback) params.delete('sort');
+		else params.set('sort', value);
+		hasMore = false;
+		navigateWith(params, true);
+	}
+
 	function selectType(slug: string) {
 		if (slug === selectedType) return;
 		hasMore = false;
@@ -692,7 +713,8 @@
 				limit: PAGE_SIZE,
 				q: search || undefined,
 				type: type || undefined,
-				collection: id
+				collection: id,
+				...nodeSortParams(sortChoice?.sort ?? [])
 			}
 		});
 		if (seq !== fetchSeq) return;
@@ -764,7 +786,8 @@
 			const result = await loadSmartCollection(current, {
 				cursor: more ? smartCursor : null,
 				limit: PAGE_SIZE,
-				narrow: { adhoc, basics }
+				narrow: { adhoc, basics },
+				sort: sortChoice?.sort
 			});
 			if (seq !== fetchSeq) return;
 			items = more ? [...items, ...result.items] : result.items;
@@ -810,7 +833,7 @@
 		const type = selectedType;
 		const kind = collectionKind;
 		// Refetch when the filters, or the saved conditions, change
-		void [adhocKey, storedKey];
+		void [adhocKey, storedKey, sortChoice?.value];
 		if (!id || !kind) return;
 		untrack(() => {
 			if (kind === 'dynamic') {
@@ -998,6 +1021,11 @@
 		}
 		if (id !== collection?.id) return;
 		void loadCollection(id, true);
+		// Another order has no place to put it back by hand: read the list again.
+		if (!inCreationOrder) {
+			void fetchPage(id, q, selectedType);
+			return;
+		}
 		// Restore in id order, unless it belongs on a page that has not loaded yet
 		const last = items.at(-1);
 		const beyondLoaded = hasMore && last !== undefined && item.id > last.id;
@@ -1239,7 +1267,7 @@
 					class="flex h-9 min-w-0 flex-1 basis-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none sm:max-w-sm sm:basis-auto md:text-sm"
 				/>
 			{/if}
-			<div class="ml-auto flex items-center gap-2">
+			<div class="ml-auto flex flex-wrap items-center justify-end gap-2">
 				{#if smart && !unreadable}
 					<Button
 						variant="outline"
@@ -1257,6 +1285,22 @@
 							</Badge>
 						{/if}
 					</Button>
+				{/if}
+				{#if !unreadable}
+					<NativeSelect.Root
+						size="sm"
+						class="shrink-0 max-sm:[&_select[data-size]]:h-11"
+						aria-label="Sort by"
+						value={sortValue}
+						onchange={(e) => setSort(e.currentTarget.value)}
+					>
+						{#if smart}
+							<NativeSelect.Option value={SAVED_SORT}>As saved</NativeSelect.Option>
+						{/if}
+						{#each SORT_CHOICES as choice (choice.value)}
+							<NativeSelect.Option value={choice.value}>{choice.label}</NativeSelect.Option>
+						{/each}
+					</NativeSelect.Root>
 				{/if}
 				{#if showTypeFilter && !unreadable}
 					<NativeSelect.Root
