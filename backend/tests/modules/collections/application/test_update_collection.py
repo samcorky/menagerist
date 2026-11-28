@@ -179,3 +179,40 @@ async def test_update_definition_on_manual_collection_is_a_conflict(
     assert shelf.kind is CollectionKind.MANUAL
     assert shelf.definition is None
     assert world.uow.committed is False
+
+
+async def test_update_sets_resets_and_leaves_the_summary(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """A summary is set, an empty one is kept, and reset goes back to automatic."""
+    shelf = make_collection()
+    await world.collections.add(shelf)
+    use_case = UpdateCollection(world.uow, InMemoryAccessGuard(), world.checker)
+    totals = [{"fn": "sum", "type": "film", "key": "price"}]
+
+    async def update(**changes: object) -> Collection:
+        return await use_case.handle(
+            UpdateCollectionCommand(collection_id=shelf.id, **changes),  # type: ignore[arg-type]
+            SYSTEM_ACTOR,
+        )
+
+    assert (await update(summary=totals)).summary == totals
+    assert (await update(name="Renamed")).summary == totals
+    assert (await update(summary=[])).summary == []
+    assert (await update(reset_summary=True)).summary is None
+
+
+async def test_update_refuses_a_summary_with_reset_summary(
+    world: World, make_collection: MakeCollection
+) -> None:
+    """The two ways of changing the summary cannot be combined."""
+    shelf = make_collection()
+    await world.collections.add(shelf)
+
+    with pytest.raises(InvalidCollectionError):
+        await UpdateCollection(world.uow, InMemoryAccessGuard(), world.checker).handle(
+            UpdateCollectionCommand(
+                collection_id=shelf.id, summary=[], reset_summary=True
+            ),
+            SYSTEM_ACTOR,
+        )

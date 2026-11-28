@@ -39,7 +39,9 @@ class UpdateCollectionCommand:
     """Request to update a collection's name, description, slug or definition.
 
     `slug` sets the slug; `regenerate_slug` rebuilds it from the (new) name. The
-    two are exclusive. The kind is immutable.
+    two are exclusive. The kind is immutable. `summary` sets the totals shown on the
+    collection (an empty list shows none) and `reset_summary` goes back to the
+    automatic ones; the two are exclusive.
     """
 
     collection_id: uuid.UUID
@@ -48,6 +50,8 @@ class UpdateCollectionCommand:
     definition: dict[str, Any] | None = None
     slug: str | None = None
     regenerate_slug: bool = False
+    summary: list[dict[str, Any]] | None = None
+    reset_summary: bool = False
 
 
 class UpdateCollection(
@@ -110,6 +114,7 @@ class UpdateCollection(
                 collection.description = command.description.strip() or None
             if command.definition is not None:
                 collection.replace_definition(command.definition)
+            self._apply_summary(collection, command)
             await self._apply_slug(
                 repos.collections, collection, command, wanted, scope
             )
@@ -118,6 +123,15 @@ class UpdateCollection(
             await self._uow.commit()
         logger.info("collection updated", collection_id=command.collection_id)
         return collection
+
+    @staticmethod
+    def _apply_summary(
+        collection: Collection, command: UpdateCollectionCommand
+    ) -> None:
+        if command.summary is not None and command.reset_summary:
+            raise InvalidCollectionError("Give either a summary or reset_summary.")
+        if command.summary is not None or command.reset_summary:
+            collection.replace_summary(command.summary)
 
     @staticmethod
     async def _apply_slug(
