@@ -457,6 +457,7 @@ QUERY_PARAMS: dict[str, Callable[[Seed], str]] = {
     "collection": lambda s: s.collection,
     "node_id": lambda s: s.item,
     "item_id": lambda s: s.item,
+    "id": lambda s: s.item,
     "after": lambda s: s.item,
     # Every list that sorts can sort by when it was created.
     "sort": lambda _: "created_at",

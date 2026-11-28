@@ -144,6 +144,47 @@ async def test_list_nodes_collection_restricts_to_members() -> None:
     assert result.total == 3
 
 
+async def test_list_nodes_by_ids_returns_only_those_items() -> None:
+    """Asking for ids lists those items, with a total of those that exist."""
+    nodes, _, _, on_shelf = await _shelf_setup()
+    use_case = ListNodes(_make_repos(nodes), InMemoryAccessGuard())
+    asked = frozenset({on_shelf[0].id, on_shelf[2].id, uuid.uuid4()})
+
+    result = await use_case.handle(ListNodesQuery(ids=asked), SYSTEM_ACTOR)
+
+    assert {n.name for n in result.items} == {"Alien", "Ridley Scott"}
+    assert result.total == 2
+
+
+async def test_list_nodes_by_no_ids_lists_nothing() -> None:
+    """An empty set of ids is not "no filter": it matches nothing."""
+    nodes, _, _, _ = await _shelf_setup()
+    use_case = ListNodes(_make_repos(nodes), InMemoryAccessGuard())
+
+    result = await use_case.handle(ListNodesQuery(ids=frozenset()), SYSTEM_ACTOR)
+
+    assert result.items == []
+    assert result.total == 0
+
+
+async def test_list_nodes_ids_narrow_a_collection() -> None:
+    """With a collection, only the asked-for ids that are on it are listed."""
+    nodes, members, collection_id, on_shelf = await _shelf_setup()
+    off_shelf = Node.create(owner_id=uuid.UUID(int=1), name="Elsewhere", type="film")
+    await nodes.add(off_shelf)
+    use_case = ListNodes(_make_repos(nodes), InMemoryAccessGuard(), members)
+
+    result = await use_case.handle(
+        ListNodesQuery(
+            collection=collection_id, ids=frozenset({on_shelf[1].id, off_shelf.id})
+        ),
+        SYSTEM_ACTOR,
+    )
+
+    assert [n.name for n in result.items] == ["Aliens"]
+    assert result.total == 1
+
+
 async def test_list_nodes_collection_combines_with_other_filters() -> None:
     """The collection restriction combines with q, type and favourite."""
     nodes, members, collection_id, _ = await _shelf_setup()

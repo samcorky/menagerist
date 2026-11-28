@@ -27,7 +27,7 @@
 	import AttributesEditor from '$lib/components/attributes-editor.svelte';
 	import type { AttributesSchema, JsonSchemaProperty } from '$lib/schema-types';
 	import { effectiveSchema, fetchAllNodeTypes } from '$lib/node-types';
-	import { fetchItems } from '$lib/fetch-items';
+	import { fetchItemsById } from '$lib/fetch-items';
 	import { archivedKeys, mergeAttributeSchemas, readSchemaMeta } from '$lib/schema-meta';
 	import { normalise, isSectionItem } from '$lib/layout';
 	import { coreForProp } from '$lib/field-types';
@@ -241,14 +241,12 @@
 		loading = true;
 		notFound = false;
 		loadFailed = false;
-		const [nodeResult, edgesResult, nodesResult, edgeTypesResult, nodeTypesResult] =
-			await Promise.all([
-				getNode({ path: { node_id: nodeId } }),
-				listEdges({ query: { node_id: nodeId, limit: 100 } }),
-				fetchItems(),
-				listEdgeTypes({ query: { limit: 100 } }),
-				fetchAllNodeTypes()
-			]);
+		const [nodeResult, edgesResult, edgeTypesResult, nodeTypesResult] = await Promise.all([
+			getNode({ path: { node_id: nodeId } }),
+			listEdges({ query: { node_id: nodeId, limit: 100 } }),
+			listEdgeTypes({ query: { limit: 100 } }),
+			fetchAllNodeTypes()
+		]);
 
 		if (nodeResult.response?.status === 404 || nodeResult.response?.status === 422) {
 			notFound = true;
@@ -267,7 +265,10 @@
 		description = node.description ?? '';
 		tags = node.tags;
 		edges = edgesResult.data ?? [];
-		otherNodes = nodesResult.filter((candidate) => candidate.id !== nodeId);
+		// Only the items on the other end of a connection are read, to name them.
+		otherNodes = (await fetchItemsById(edges.map(otherNodeId))).filter(
+			(candidate) => candidate.id !== nodeId
+		);
 		edgeTypes = edgeTypesResult.data ?? [];
 		nodeTypes = nodeTypesResult ?? [];
 		// nodeSchema is a $derived and hasn't reacted to the nodeTypes assignment above
@@ -591,6 +592,9 @@
 		} else {
 			const { created, skipped } = result.data;
 			edges = [...edges, ...created];
+			// The new connections' other ends were picked from a search, so they are known already.
+			const named = new Set(otherNodes.map((candidate) => candidate.id));
+			otherNodes = [...otherNodes, ...selectedTargets.filter((t) => !named.has(t.id))];
 			const itemWord = created.length === 1 ? 'item' : 'items';
 			const message =
 				skipped.length === 0
