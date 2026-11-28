@@ -3,7 +3,11 @@ from datetime import UTC, datetime
 from functools import partial
 from typing import TYPE_CHECKING, cast
 
-from app.modules.graph.adapters.persistence.aggregate_eval import measure_values
+from app.modules.graph.adapters.persistence.aggregate_eval import (
+    group_values,
+    measure_values,
+    outside_group_values,
+)
 from app.modules.graph.adapters.persistence.query_env import QueryEnv
 from app.modules.graph.adapters.persistence.query_eval import (
     is_after,
@@ -28,7 +32,12 @@ if TYPE_CHECKING:
     from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
         EdgeStore,
     )
-    from app.modules.graph.domain.aggregate import MeasureValue, ResolvedMeasure
+    from app.modules.graph.domain.aggregate import (
+        GroupValue,
+        MeasureValue,
+        ResolvedGroup,
+        ResolvedMeasure,
+    )
     from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
@@ -394,6 +403,31 @@ class InMemoryNodeRepository:
         """Evaluate each measure over the live nodes in `scope` that match."""
         hits = self._matching(scope, resolved)
         return measure_values((hit.node for hit in hits), measures)
+
+    async def aggregate_groups(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        group: ResolvedGroup,
+        measures: Sequence[ResolvedMeasure],
+    ) -> builtins.list[GroupValue]:
+        """Evaluate the measures in each group of the live nodes in `scope`."""
+        hits = self._matching(scope, resolved)
+        return group_values((hit.node for hit in hits), group, measures)
+
+    async def aggregate_outside_groups(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        group: ResolvedGroup,
+        measures: Sequence[ResolvedMeasure],
+        shown: collections.abc.Collection[str | None],
+    ) -> GroupValue:
+        """Evaluate the measures over the nodes in a group that is not `shown`."""
+        hits = self._matching(scope, resolved)
+        return outside_group_values((hit.node for hit in hits), group, measures, shown)
 
     async def random(
         self,

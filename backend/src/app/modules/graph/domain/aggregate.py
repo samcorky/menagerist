@@ -16,12 +16,20 @@ MAX_MEASURES: Final = 10
 # Totals and averages are given to this many decimal places, in SQL and in memory.
 PLACES: Final = 6
 MAX_KEY_LENGTH: Final = 200
+# Most groups an aggregate lists; the rest are counted in one `other` row.
+MAX_GROUPS: Final = 100
 
+type GroupAxis = Literal["field", "type", "tag"]
+type GroupOrder = Literal["key", "count", "measure"]
 type AggregateFn = Literal["count", "sum", "avg", "min", "max", "distinct"]
 
 FUNCTIONS: Final[frozenset[str]] = frozenset(
     {"count", "sum", "avg", "min", "max", "distinct"}
 )
+
+# The kinds of field whose values name a group. A multiple-choice value is in one
+# group for each choice it holds.
+GROUPABLE_KINDS: Final = frozenset({"choice", "multichoice", "boolean", "text"})
 
 # Money is added up per currency, never converted.
 MONEY: Final = "money"
@@ -125,6 +133,26 @@ def _text(raw: Mapping[str, Any], name: str, path: str) -> str | None:
     return value
 
 
+def _field_ref(
+    raw: Mapping[str, Any], path: str
+) -> tuple[str | None, str | None, str | None]:
+    """The `type`, `key` and `origin` of a field a measure or a grouping names."""
+    type_slug = _text(raw, "type", path)
+    key = _text(raw, "key", path)
+    origin = _text(raw, "origin", path)
+    if origin is not None and (type_slug is not None or key is not None):
+        raise InvalidQueryError(
+            "Name a saved field with `origin`, or a type's field with `type` and"
+            + " `key`, not both.",
+            path=path,
+        )
+    if origin is None and (type_slug is None) != (key is None):
+        raise InvalidQueryError(
+            "A type's field needs both `type` and `key`.", path=path
+        )
+    return type_slug, key, origin
+
+
 def parse_measure(raw: object, path: str) -> Measure:
     """Parse one measure.
 
@@ -142,19 +170,7 @@ def parse_measure(raw: object, path: str) -> Measure:
         raise InvalidQueryError(
             f"`fn` is one of {', '.join(sorted(FUNCTIONS))}.", path=path
         )
-    type_slug = _text(raw, "type", path)
-    key = _text(raw, "key", path)
-    origin = _text(raw, "origin", path)
-    if origin is not None and (type_slug is not None or key is not None):
-        raise InvalidQueryError(
-            "Name a saved field with `origin`, or a type's field with `type` and"
-            + " `key`, not both.",
-            path=path,
-        )
-    if origin is None and (type_slug is None) != (key is None):
-        raise InvalidQueryError(
-            "A type's field needs both `type` and `key`.", path=path
-        )
+    type_slug, key, origin = _field_ref(raw, path)
     if fn != "count" and origin is None and key is None:
         raise InvalidQueryError(f"`{fn}` needs a field to read.", path=path)
     return Measure(fn=cast("AggregateFn", fn), type=type_slug, key=key, origin=origin)
@@ -174,3 +190,148 @@ def parse_measures(raw: Sequence[object]) -> tuple[Measure, ...]:
 def tidy(value: Any) -> float:  # noqa: ANN401
     """A total or an average (a `Decimal`) as the number a response carries."""
     return float(round(value, PLACES))
+
+
+@dataclass(frozen=True, kw_only=True)
+class GroupBy:
+    """What to split the matching items by: a field, the item type or a tag.
+
+    A field is named as a measure's is (`type` and `key`, or `origin`). `order`
+    sorts the groups by their key, their item count or one measure's value (the
+    index in `measure`); `descending` defaults to ascending for a key and
+    descending for the others.
+    """
+
+    by: GroupAxis
+    type: str | None = None
+    key: str | None = None
+    origin: str | None = None
+    order: GroupOrder = "key"
+    measure: int | None = None
+    descending: bool | None = None
+    limit: int = MAX_GROUPS
+
+    @property
+    def is_descending(self) -> bool:
+        """Whether the groups run from high to low."""
+        if self.descending is not None:
+            return self.descending
+        return self.order != "key"
+
+
+@dataclass(frozen=True, kw_only=True)
+class ResolvedGroup:
+    """A grouping checked against the item types, ready for a repository.
+
+    `sources` is empty unless grouping by a field. `kind` is the one kind every
+    source holds.
+    """
+
+    group: GroupBy
+    kind: str | None
+    sources: tuple[MeasureSource, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
+class GroupValue:
+    """One group: its key (None for items with no value), size and measure values.
+
+    An item in several groups (a tag, a multiple-choice value) counts in each.
+    """
+
+    key: str | None
+    count: int
+    values: tuple[MeasureValue, ...]
+
+
+def _group_order(raw: Mapping[str, Any], path: str) -> tuple[GroupOrder, int | None]:
+    """The `order` of a grouping and, for an order by a measure, its index."""
+    order = raw.get("order", "key")
+    if order not in {"key", "count", "measure"}:
+        raise InvalidQueryError("`order` is one of count, key, measure.", path=path)
+    measure = raw.get("measure")
+    if order == "measure":
+        if not isinstance(measure, int) or isinstance(measure, bool) or measure < 0:
+            raise InvalidQueryError(
+                "Ordering by a measure needs its index in `measure`.", path=path
+            )
+    elif measure is not None:
+        raise InvalidQueryError("`measure` goes with `order` of measure.", path=path)
+    return cast("GroupOrder", order), measure
+
+
+def parse_group_by(raw: object) -> GroupBy:
+    """Parse a request's grouping.
+
+    Raises:
+        InvalidQueryError: With the path of anything that is not a grouping.
+    """
+    path = "group_by"
+    if not isinstance(raw, Mapping):
+        raise InvalidQueryError("`group_by` is an object.", path=path)
+    unknown = set(raw) - {
+        "by", "type", "key", "origin", "order", "measure", "descending", "limit"
+    }  # fmt: skip
+    if unknown:
+        raise InvalidQueryError(
+            f"Unknown grouping property: {sorted(unknown)[0]}.", path=path
+        )
+    by = raw.get("by")
+    if by not in {"field", "type", "tag"}:
+        raise InvalidQueryError("`by` is one of field, tag, type.", path=path)
+    type_slug, key, origin = _field_ref(raw, path)
+    has_field = key is not None or origin is not None
+    if by == "field" and not has_field:
+        raise InvalidQueryError("Grouping by a field needs one.", path=path)
+    if by != "field" and has_field:
+        raise InvalidQueryError(f"Grouping by {by} takes no field to read.", path=path)
+    order, measure = _group_order(raw, path)
+    descending = raw.get("descending")
+    if descending is not None and not isinstance(descending, bool):
+        raise InvalidQueryError("`descending` is true or false.", path=path)
+    limit = raw.get("limit", MAX_GROUPS)
+    if (
+        not isinstance(limit, int)
+        or isinstance(limit, bool)
+        or not 1 <= limit <= MAX_GROUPS
+    ):
+        raise InvalidQueryError(
+            f"`limit` is a whole number from 1 to {MAX_GROUPS}.", path=path
+        )
+    return GroupBy(
+        by=cast("GroupAxis", by),
+        type=type_slug,
+        key=key,
+        origin=origin,
+        order=order,
+        measure=measure,
+        descending=descending,
+        limit=limit,
+    )
+
+
+def _sort_value(group: GroupValue, by: GroupBy) -> float | int | str | None:
+    if by.order == "count":
+        return group.count
+    if by.order == "measure":
+        return group.values[by.measure or 0].value
+    return group.key
+
+
+def arrange_groups(
+    groups: Sequence[GroupValue], by: GroupBy
+) -> tuple[list[GroupValue], list[GroupValue]]:
+    """Sort the groups as asked and split them into those shown and the rest.
+
+    Ties, and groups with nothing to sort by (the unset group when sorting by
+    key, an empty measure), come last, in key order with the unset group at the end.
+    """
+    by_key = sorted(groups, key=lambda g: (g.key is None, g.key or ""))
+    keyed = [(g, _sort_value(g, by)) for g in by_key]
+    with_value = sorted(
+        ((g, v) for g, v in keyed if v is not None),
+        key=lambda pair: pair[1],
+        reverse=by.is_descending,
+    )
+    ordered = [g for g, _ in with_value] + [g for g, v in keyed if v is None]
+    return ordered[: by.limit], ordered[by.limit :]

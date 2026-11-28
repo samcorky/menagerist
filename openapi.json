@@ -3434,7 +3434,7 @@
           "Nodes"
         ],
         "summary": "Aggregate Nodes",
-        "description": "Total, average, count or compare fields of the items a query matches.\n\n`query` is a condition tree like the `query` of `POST /nodes/search`, parsed and\nresolved the same way, so the items aggregated are exactly the ones a search for\nit lists (leave it out for every item). Each of 1 to 10 `measures` is a function\nover a field: one item type's (`type` and `key`), or every type field copied\nfrom a saved field (`origin`). Items with no value for a field are left out of\nthat measure, so an average is over the items that have one.\n\nMoney is aggregated per currency and never converted: a money measure has no\n`value`, and `currencies` has one entry for each currency found. A field that no\nlonger exists gives no value and a warning at the measure's path; a function\nthat cannot read the field's kind is a 400.\n\n**Requires permission:** `graph:item:read`",
+        "description": "Total, average, count or compare fields of the items a query matches.\n\n`query` is a condition tree like the `query` of `POST /nodes/search`, parsed and\nresolved the same way, so the items aggregated are exactly the ones a search for\nit lists (leave it out for every item). Each of 1 to 10 `measures` is a function\nover a field: one item type's (`type` and `key`), or every type field copied\nfrom a saved field (`origin`). Items with no value for a field are left out of\nthat measure, so an average is over the items that have one.\n\nMoney is aggregated per currency and never converted: a money measure has no\n`value`, and `currencies` has one entry for each currency found. A field that no\nlonger exists gives no value and a warning at the measure's path; a function\nthat cannot read the field's kind is a 400.\n\n`group_by` splits the items by a text, choice, multiple-choice or yes/no field,\nby item type, or by tag, and answers every measure within each group, up to\n`limit` groups (at most 100) sorted by key, count or one measure. Items with no\nvalue are in an unset group (key null). An item with several values, such as\ntwo tags, is in every one of its groups, so group counts and totals can add up\nto more than the whole; `other` covers the items in the groups left out, each\ncounted once. Money stays per currency inside each group.\n\n**Requires permission:** `graph:item:read`",
         "operationId": "aggregate_nodes",
         "security": [
           {
@@ -40951,6 +40951,111 @@
         "title": "NameLookup",
         "description": "What happens to an item found by name when the person has none called that."
       },
+      "NodeAggregateGroupResponse": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key",
+            "description": "The tag, field value or item type slug; null for the items with none (`label` is `Unset`)."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "What to show for the group."
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "How many items are in the group."
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/NodeMeasureValueResponse"
+            },
+            "type": "array",
+            "title": "Measures",
+            "description": "One entry per measure asked, in the same order."
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "count",
+          "measures"
+        ],
+        "title": "NodeAggregateGroupResponse",
+        "description": "One group of the matching items.",
+        "examples": [
+          {
+            "count": 12,
+            "key": "dvd",
+            "label": "dvd",
+            "measures": [
+              {
+                "currencies": [
+                  {
+                    "currency": "GBP",
+                    "value": 96.5
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "NodeAggregateOtherResponse": {
+        "properties": {
+          "groups": {
+            "type": "integer",
+            "title": "Groups",
+            "description": "How many groups were left out."
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Items in any of them, each counted once."
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/NodeMeasureValueResponse"
+            },
+            "type": "array",
+            "title": "Measures",
+            "description": "One entry per measure asked, over those items."
+          }
+        },
+        "type": "object",
+        "required": [
+          "groups",
+          "count",
+          "measures"
+        ],
+        "title": "NodeAggregateOtherResponse",
+        "description": "The items in the groups the `limit` left out.",
+        "examples": [
+          {
+            "count": 9,
+            "groups": 4,
+            "measures": [
+              {
+                "currencies": [
+                  {
+                    "currency": "GBP",
+                    "value": 31
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
       "NodeAggregateRequest": {
         "properties": {
           "query": {
@@ -40968,6 +41073,17 @@
             "minItems": 1,
             "title": "Measures",
             "description": "1 to 10 measures, answered in order."
+          },
+          "group_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeGroupByRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Also give every measure within each group. An item in several groups (a tag, a multiple-choice value) counts in each, so the groups can add up to more than `items`."
           }
         },
         "additionalProperties": false,
@@ -41032,7 +41148,33 @@
             },
             "type": "array",
             "title": "Warnings",
-            "description": "Parts of the query, or measures, that no longer apply."
+            "description": "Parts of the query, measures or grouping that no longer apply."
+          },
+          "groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NodeAggregateGroupResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groups",
+            "description": "With `group_by`, up to `limit` groups, each with its own count and measures. Null without it."
+          },
+          "other": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeAggregateOtherResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present when the `limit` left groups out, covering their items."
           }
         },
         "type": "object",
@@ -41146,6 +41288,122 @@
           {
             "currency": "GBP",
             "value": 1204.5
+          }
+        ]
+      },
+      "NodeGroupByRequest": {
+        "properties": {
+          "by": {
+            "type": "string",
+            "enum": [
+              "field",
+              "type",
+              "tag"
+            ],
+            "title": "By",
+            "description": "`field` for a text, choice, multiple-choice or yes/no field (named with `type` and `key`, or `origin`), `type` for the item type, `tag` for the tags."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type",
+            "description": "With `by` of field: the item type."
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key",
+            "description": "With `by` of field: the field's key."
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin",
+            "description": "With `by` of field: the saved field, instead of `type`."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "key",
+              "count",
+              "measure"
+            ],
+            "title": "Order",
+            "description": "Sort the groups by their key, their number of items, or the value of the measure at index `measure`. Groups with nothing to sort by, and the unset group when sorting by key, come last.",
+            "default": "key"
+          },
+          "measure": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measure",
+            "description": "With `order` of measure: the index of a measure, not money."
+          },
+          "descending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descending",
+            "description": "High to low. Defaults to true for `count` and `measure`."
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Most groups to list, 1 to 100.",
+            "default": 100
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "by"
+        ],
+        "title": "NodeGroupByRequest",
+        "description": "How to split the matching items into groups.",
+        "examples": [
+          {
+            "by": "type"
+          },
+          {
+            "by": "tag",
+            "limit": 10,
+            "order": "count"
+          },
+          {
+            "by": "field",
+            "key": "format",
+            "type": "film"
           }
         ]
       },
@@ -41330,6 +41588,56 @@
             "key": "rating",
             "type": "film",
             "value": 3.75
+          }
+        ]
+      },
+      "NodeMeasureValueResponse": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "As `value` of the measure. Null for money."
+          },
+          "currencies": {
+            "items": {
+              "$ref": "#/components/schemas/NodeCurrencyValueResponse"
+            },
+            "type": "array",
+            "title": "Currencies",
+            "description": "As `currencies` of the measure."
+          }
+        },
+        "type": "object",
+        "required": [
+          "currencies"
+        ],
+        "title": "NodeMeasureValueResponse",
+        "description": "What one measure came to within a group, in the order the measures were asked.",
+        "examples": [
+          {
+            "currencies": [],
+            "value": 3.75
+          },
+          {
+            "currencies": [
+              {
+                "currency": "GBP",
+                "value": 96.5
+              }
+            ]
           }
         ]
       },

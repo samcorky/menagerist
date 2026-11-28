@@ -857,3 +857,74 @@ def test_aggregate_nodes_refuses_what_cannot_be_aggregated(
     response = client.post("/api/v1/nodes/aggregate", json={"measures": measures})
 
     assert response.status_code in {400, 422}
+
+
+def test_aggregate_nodes_groups_and_cuts_with_other() -> None:
+    """`group_by` lists the groups with their measures, and `other` holds the rest."""
+    client = _aggregate_app_with_films()
+    client.post("/api/v1/nodes", json={"name": "Untyped", "type": None})
+    films = client.get("/api/v1/nodes?type=film").json()
+    client.post(
+        "/api/v1/nodes/tags",
+        json={"ids": [films[0]["id"], films[1]["id"]], "add": ["seen"]},
+    )
+
+    grouped = client.post(
+        "/api/v1/nodes/aggregate",
+        json={
+            "measures": [{"fn": "sum", "type": "film", "key": "price"}],
+            "group_by": {"by": "tag"},
+        },
+    )
+    cut = client.post(
+        "/api/v1/nodes/aggregate",
+        json={
+            "measures": [{"fn": "count"}],
+            "group_by": {"by": "type", "order": "count", "limit": 1},
+        },
+    )
+
+    assert grouped.status_code == 200
+    tags = grouped.json()["groups"]
+    assert [(g["key"], g["label"], g["count"]) for g in tags] == [
+        ("seen", "seen", 2),
+        (None, "Unset", 2),
+    ]
+    assert tags[0]["measures"][0]["currencies"] == [{"currency": "GBP", "value": 15.5}]
+    assert cut.json()["groups"][0]["key"] == "film"
+    assert cut.json()["other"] == {
+        "groups": 1,
+        "count": 1,
+        "measures": [{"value": 1, "currencies": []}],
+    }
+
+
+def test_aggregate_nodes_without_group_by_has_no_groups() -> None:
+    """The answer has `groups` and `other` as null unless grouping is asked for."""
+    client = _aggregate_app_with_films()
+
+    body = client.post(
+        "/api/v1/nodes/aggregate", json={"measures": [{"fn": "count"}]}
+    ).json()
+
+    assert body["groups"] is None
+    assert body["other"] is None
+
+
+def test_aggregate_nodes_refuses_a_grouping_that_cannot_work() -> None:
+    """Grouping by a money field is a 400 naming `group_by`; a bad shape is a 422."""
+    client = _aggregate_app_with_films()
+    money = {"by": "field", "type": "film", "key": "price"}
+
+    refused = client.post(
+        "/api/v1/nodes/aggregate",
+        json={"measures": [{"fn": "count"}], "group_by": money},
+    )
+    malformed = client.post(
+        "/api/v1/nodes/aggregate",
+        json={"measures": [{"fn": "count"}], "group_by": {"by": "tag", "limit": 500}},
+    )
+
+    assert refused.status_code == 400
+    assert "group_by" in refused.json()["detail"]
+    assert malformed.status_code == 422

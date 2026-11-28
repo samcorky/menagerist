@@ -349,6 +349,14 @@ async def aggregate_nodes(
     `value`, and `currencies` has one entry for each currency found. A field that no
     longer exists gives no value and a warning at the measure's path; a function
     that cannot read the field's kind is a 400.
+
+    `group_by` splits the items by a text, choice, multiple-choice or yes/no field,
+    by item type, or by tag, and answers every measure within each group, up to
+    `limit` groups (at most 100) sorted by key, count or one measure. Items with no
+    value are in an unset group (key null). An item with several values, such as
+    two tags, is in every one of its groups, so group counts and totals can add up
+    to more than the whole; `other` covers the items in the groups left out, each
+    counted once. Money stays per currency inside each group.
     """
     result = await use_case.handle(
         AggregateNodesQuery(
@@ -356,6 +364,11 @@ async def aggregate_nodes(
             measures=[
                 measure.model_dump(exclude_none=True) for measure in body.measures
             ],
+            group_by=(
+                None
+                if body.group_by is None
+                else body.group_by.model_dump(exclude_none=True)
+            ),
         ),
         actor,
     )

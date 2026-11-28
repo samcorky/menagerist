@@ -6,7 +6,7 @@ leave an item out of a measure when its field is empty or of another shape.
 """
 
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -14,7 +14,9 @@ from app.modules.graph.adapters.persistence.query_eval import _number
 from app.modules.graph.domain.aggregate import (
     MONEY,
     CurrencyValue,
+    GroupValue,
     MeasureValue,
+    ResolvedGroup,
     ResolvedMeasure,
     tidy,
 )
@@ -106,3 +108,52 @@ def measure_values(
             )
         )
     return answers
+
+
+def group_keys(node: Node, group: ResolvedGroup) -> list[str | None]:
+    """The keys of the groups a node is in; `[None]` (unset) for none."""
+    if group.group.by == "type":
+        return [node.type]
+    if group.group.by == "tag":
+        return list(dict.fromkeys(node.tags)) or [None]
+    source = next((s for s in group.sources if node.type in s.types), None)
+    raw = node.attributes.get(source.key) if source is not None else None
+    if group.kind == "multichoice":
+        held = [v for v in raw if isinstance(v, str)] if isinstance(raw, list) else []
+        return list(dict.fromkeys(held)) or [None]
+    if group.kind == "boolean":
+        return [str(raw).lower() if isinstance(raw, bool) else None]
+    return [raw if isinstance(raw, str) else None]
+
+
+def group_values(
+    nodes: Iterable[Node], group: ResolvedGroup, measures: Sequence[ResolvedMeasure]
+) -> list[GroupValue]:
+    """Each group's size and one value per measure, over the nodes in it."""
+    members: dict[str | None, list[Node]] = defaultdict(list)
+    for node in nodes:
+        for key in group_keys(node, group):
+            members[key].append(node)
+    return [
+        GroupValue(
+            key=key, count=len(found), values=tuple(measure_values(found, measures))
+        )
+        for key, found in members.items()
+    ]
+
+
+def outside_group_values(
+    nodes: Iterable[Node],
+    group: ResolvedGroup,
+    measures: Sequence[ResolvedMeasure],
+    shown: Collection[str | None],
+) -> GroupValue:
+    """The nodes in a group that is not shown, each counted once."""
+    found = [
+        node
+        for node in nodes
+        if any(key not in shown for key in group_keys(node, group))
+    ]
+    return GroupValue(
+        key=None, count=len(found), values=tuple(measure_values(found, measures))
+    )
