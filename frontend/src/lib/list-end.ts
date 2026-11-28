@@ -29,6 +29,22 @@ export function loadAheadMargin(viewportHeight: number): string {
 	return `${Math.round(height * LOAD_AHEAD_SCREENS)}px`;
 }
 
+/**
+ * The nearest ancestor that scrolls, or null when the page itself does.
+ *
+ * An observer rooted at the viewport ignores its margin for a target inside a scrolling
+ * container: the container clips the target first, so the page would load only when the
+ * foot is already on screen. The app's pages scroll inside one (`#main-scroll`), so the
+ * observer needs it as its root for the margin to count.
+ */
+export function scrollParent(node: HTMLElement): HTMLElement | null {
+	for (let up = node.parentElement; up; up = up.parentElement) {
+		const { overflowY } = getComputedStyle(up);
+		if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') return up;
+	}
+	return null;
+}
+
 /** Decides what the foot of a list should show. */
 export function listEndState(paging: {
 	loading: boolean;

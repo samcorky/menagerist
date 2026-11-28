@@ -2135,3 +2135,10 @@ The item page read up to 500 items on every load only to name the item on the ot
 
 - **`GET /nodes` takes a repeated `id`.** Up to 100 ids, each once; it lists those items among the ones you can see, so an id that is not one is left out, and `Total-Count` counts what was found. It narrows a manual collection's items too, and is refused for a smart collection, which already chooses its items by its search. It is additive, so not a breaking change.
 - **The page reads the other ends of its connections.** `fetchItemsById` asks for the distinct ids, 100 to a request, and keeps what it got when a request fails, so names still show. Connections made on the page add their targets, which the search already returned.
+
+## The list foot observes from the scrolling container (2026-11-28)
+
+Infinite lists loaded their next page only when the foot was almost on screen, whatever margin they were given (#588, #841). Pages scroll inside `#main-scroll`, and an `IntersectionObserver` rooted at the viewport ignores its `rootMargin` for a target inside a scrolling container, because the container clips the target first.
+
+- **`ListFoot` roots its observer at the nearest scrolling ancestor** (`scrollParent` in `lib/list-end.ts`), so the two and a half screens of margin count.
+- **It looks again when a page arrives.** An observer reports a change, not a state, so a foot still inside the margin after a page (a tall window, a short page) would have stopped there. The action re-observes when loading ends, and the list keeps filling until the foot is out of the margin or the list ends.

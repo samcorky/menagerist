@@ -2,7 +2,13 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { RefreshCw } from '@lucide/svelte';
-	import { endMessage, listEndState, loadAheadMargin, LOAD_MORE_FAILED } from '$lib/list-end';
+	import {
+		endMessage,
+		listEndState,
+		loadAheadMargin,
+		LOAD_MORE_FAILED,
+		scrollParent
+	} from '$lib/list-end';
 
 	/**
 	 * The foot of an infinite list (#588): the sentinel that loads the next page, the
@@ -52,17 +58,20 @@
 		state === 'loading' ? 'Loading more…' : state === 'end' ? ending : ''
 	);
 
-	function sentinel(node: HTMLElement) {
+	// `busy` is only there so the action hears when a page has arrived (see `update`).
+	function sentinel(node: HTMLElement, busy: boolean) {
 		let observer: IntersectionObserver | undefined;
+		void busy;
 
 		// The margin follows the viewport, so a tall window loads further ahead than a phone.
+		// The scrolling container is the root, or the margin would not reach past its edge.
 		function observe() {
 			observer?.disconnect();
 			observer = new IntersectionObserver(
 				(entries) => {
 					if (entries[0].isIntersecting) onload();
 				},
-				{ rootMargin: loadAheadMargin(window.innerHeight) }
+				{ root: scrollParent(node), rootMargin: loadAheadMargin(window.innerHeight) }
 			);
 			observer.observe(node);
 		}
@@ -70,6 +79,11 @@
 		observe();
 		window.addEventListener('resize', observe);
 		return {
+			// A page arrived and the foot may still be inside the margin (a tall window, or a
+			// short page): an observer only reports a change, so look again and keep filling.
+			update(next: boolean) {
+				if (!next) observe();
+			},
 			destroy() {
 				window.removeEventListener('resize', observe);
 				observer?.disconnect();
@@ -81,7 +95,12 @@
 <div data-slot="list-foot" class="flex flex-col items-center gap-3 py-4">
 	{#if hasMore && !failed}
 		<!-- Only the sentinel is hidden from the reader; the live region below speaks for it. -->
-		<div use:sentinel aria-hidden="true" class="flex justify-center">
+		<div
+			use:sentinel={loading}
+			data-testid="list-foot-sentinel"
+			aria-hidden="true"
+			class="flex justify-center"
+		>
 			{#if state === 'loading'}
 				<Spinner class="size-5 text-muted-foreground" aria-label={null} />
 			{/if}
