@@ -1902,6 +1902,8 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **Collections:** each pack has a smart collection filtered by the parent type, which finds every subtype's items (search by parent, above), so the grouping shows straight after installing.
 - **Slugs** start with the pack id like any pack's, so the parents are `music-formats-media`, `film-formats-media` and `currency-money`. The packs sit with the base packs in the index, ahead of the add-ons.
 - **A parent type may have no items of its own** when its subtypes do; the shipped-pack test counts a parent as used then. Its other test checks a subtype's values against the parent's fields as well as its own.
+- **The foot observes from the scrolling container.** Pages scroll inside `#main-scroll`, and an `IntersectionObserver` rooted at the viewport ignores its `rootMargin` for a target inside a scrolling container, because the container clips it first. So the margin never applied: the list loaded only once its foot was nearly on screen. `ListFoot` roots its observer at the nearest scrolling ancestor (`scrollParent` in `lib/list-end.ts`).
+- **It looks again when a page arrives.** An observer reports a change, not a state, so a foot still inside the margin after a page (a tall window, a short page) would have stopped there. The action re-observes when loading ends, and the list keeps filling until the foot is out of the margin or the list ends.
 - **Not done:** a pack cannot name a parent in a pack it requires, so no add-on can make a subtype of a base pack's type (a games Expansion, say). The older packs that gained subtypes are in the next entry.
 
 ## The Parts, Comic con and Movies packs use parent types where a "kind" field stood in for them (2026-11-25)
