@@ -75,7 +75,7 @@ services:
 
   traefik:
     profiles: [traefik]
-    image: traefik:v3.7.19
+    image: traefik:v3.8.0
     depends_on:
       app:
         condition: service_healthy
