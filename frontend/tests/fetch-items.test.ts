@@ -2,41 +2,37 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { listNodes } = vi.hoisted(() => ({ listNodes: vi.fn() }));
 vi.mock('$lib/api/client', () => ({ listNodes }));
-import { fetchItems } from '../src/lib/fetch-items';
+import { fetchItemsById } from '../src/lib/fetch-items';
 import { PAGE_LIMIT } from '../src/lib/paging';
 
-const rows = (from: number, count: number) =>
-	Array.from({ length: count }, (_, i) => ({ id: `n${from + i}` }));
-const page = (data: unknown[], next?: string) => ({
-	data,
-	response: new Response(null, {
-		headers: next ? { link: `</api/v1/nodes?limit=100&after=${next}>; rel="next"` } : {}
-	})
-});
+const ids = (count: number) => Array.from({ length: count }, (_, i) => `n${i}`);
+const found = (rows: string[]) => ({ data: rows.map((id) => ({ id })) });
 
 beforeEach(() => listNodes.mockReset());
 
-describe('fetchItems', () => {
-	it('reads items a page at a time, following the cursor', async () => {
-		listNodes
-			.mockResolvedValueOnce(page(rows(0, 100), 'c1'))
-			.mockResolvedValueOnce(page(rows(100, 40)));
-		expect(await fetchItems()).toHaveLength(140);
-		expect(listNodes).toHaveBeenNthCalledWith(1, {
-			query: { after: undefined, limit: PAGE_LIMIT }
-		});
-		expect(listNodes).toHaveBeenNthCalledWith(2, { query: { after: 'c1', limit: PAGE_LIMIT } });
+describe('fetchItemsById', () => {
+	it('reads the items in one request, once for each id', async () => {
+		listNodes.mockResolvedValue(found(['a', 'b']));
+		expect(await fetchItemsById(['a', 'b', 'a'])).toEqual([{ id: 'a' }, { id: 'b' }]);
+		expect(listNodes).toHaveBeenCalledTimes(1);
+		expect(listNodes).toHaveBeenCalledWith({ query: { id: ['a', 'b'], limit: PAGE_LIMIT } });
 	});
 
-	it('reads no more than it was asked for', async () => {
-		listNodes.mockResolvedValue(page(rows(0, 100), 'more'));
-		expect(await fetchItems(250)).toHaveLength(250);
+	it('reads nothing for no ids', async () => {
+		expect(await fetchItemsById([])).toEqual([]);
+		expect(listNodes).not.toHaveBeenCalled();
 	});
 
-	it('keeps what it loaded when a later page fails', async () => {
+	it('splits more ids than a request takes', async () => {
+		listNodes.mockResolvedValueOnce(found(ids(PAGE_LIMIT))).mockResolvedValueOnce(found(ids(5)));
+		expect(await fetchItemsById(ids(PAGE_LIMIT + 5))).toHaveLength(PAGE_LIMIT + 5);
+		expect(listNodes).toHaveBeenCalledTimes(2);
+	});
+
+	it('keeps what it read when one request fails', async () => {
 		listNodes
-			.mockResolvedValueOnce(page(rows(0, 100), 'c1'))
+			.mockResolvedValueOnce(found(ids(PAGE_LIMIT)))
 			.mockResolvedValueOnce({ error: { detail: 'boom' }, data: undefined });
-		expect(await fetchItems()).toHaveLength(100);
+		expect(await fetchItemsById(ids(PAGE_LIMIT + 5))).toHaveLength(PAGE_LIMIT);
 	});
 });

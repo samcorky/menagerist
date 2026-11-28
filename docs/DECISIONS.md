@@ -2128,3 +2128,10 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **`clear()` for another collection.** Opening a different collection must not leave the old one's items on screen while the new ones are found, and a read still in flight for the old one must not land. `PagedList.clear()` empties the list, forgets any failure and drops a read in flight, without reading anything; `load` with `keepRows` is for the same collection read again.
 - **What the reader sets.** A smart collection's warnings, its "too large" flag, the capped count and the filter error are set by the reader, and only for the newest read. A manual collection's 404 sets `notFound` there too.
 - **Same behaviour.** Removing an item and undoing it still edit the rows by hand, in creation order only (any other order reads the list again); a reload keeps the old rows, dimmed, until the new first page arrives; a failed later page keeps its rows with Try again.
+
+## The item page names its connections by id, not from the first 500 items (2026-11-28)
+
+The item page read up to 500 items on every load only to name the item on the other end of each connection (#792). A connection to an item past the first 500 showed "View item" with no name or summary, and was never checked against the connection type's limits.
+
+- **`GET /nodes` takes a repeated `id`.** Up to 100 ids, each once; it lists those items among the ones you can see, so an id that is not one is left out, and `Total-Count` counts what was found. It narrows a manual collection's items too, and is refused for a smart collection, which already chooses its items by its search. It is additive, so not a breaking change.
+- **The page reads the other ends of its connections.** `fetchItemsById` asks for the distinct ids, 100 to a request, and keeps what it got when a request fails, so names still show. Connections made on the page add their targets, which the search already returned.

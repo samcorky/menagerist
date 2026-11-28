@@ -632,6 +632,34 @@ def test_list_nodes_collection_restricts_and_combines_with_filters_and_paging() 
     assert searched.headers["Total-Count"] == "0"
 
 
+def test_list_nodes_by_id_lists_only_those_and_leaves_out_unknown_ids() -> None:
+    """Repeating ?id= lists those items, with a matching Total-Count."""
+    client = TestClient(_app_with_in_memory_graph())
+    ids = [
+        client.post("/api/v1/nodes", json={"name": f"Film {i}", "type": "film"}).json()[
+            "id"
+        ]
+        for i in range(3)
+    ]
+
+    response = client.get(
+        f"/api/v1/nodes?id={ids[0]}&id={ids[2]}&id={uuid.uuid4()}&limit=100"
+    )
+
+    assert response.status_code == 200
+    assert {row["id"] for row in response.json()} == {ids[0], ids[2]}
+    assert response.headers["Total-Count"] == "2"
+
+
+def test_list_nodes_by_id_takes_at_most_a_hundred() -> None:
+    """More ids than a page holds is a 422, not a long query."""
+    client = TestClient(_app_with_in_memory_graph())
+    query = "&".join(f"id={uuid.uuid4()}" for _ in range(101))
+
+    assert client.get(f"/api/v1/nodes?{query}").status_code == 422
+    assert client.get(f"/api/v1/nodes?{query[: query.rfind('&')]}").status_code == 200
+
+
 def test_list_nodes_unknown_collection_returns_404() -> None:
     """?collection= for an unknown collection is a 404 problem response."""
     app = _app_with_in_memory_graph()

@@ -30,6 +30,7 @@ from app.modules.graph.domain.query import (
 from app.modules.graph.ports.collection_members import (
     CollectionMembers,
     CollectionSource,
+    ManualSource,
     SmartSource,
 )
 from app.modules.graph.ports.item_covers import ItemCovers  # noqa: TC001
@@ -48,7 +49,7 @@ from app.shared_kernel.paging import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Collection, Mapping
 
     from app.shared_kernel.access_guard import AccessGuard
     from app.shared_kernel.actor import Actor
@@ -81,6 +82,8 @@ class ListNodesQuery(SearchedPagedQuery[NodeSort]):
     type: str | None = None
     favourite: bool | None = None
     collection: uuid.UUID | None = None
+    # Only these items: for naming the ends of an item's connections in one read.
+    ids: frozenset[uuid.UUID] | None = None
 
 
 @dataclass(frozen=True)
@@ -162,6 +165,18 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             raise CollectionNotFoundError(msg)
         return source
 
+    @staticmethod
+    def _member_ids(
+        source: ManualSource | None, query: ListNodesQuery
+    ) -> Collection[uuid.UUID] | None:
+        """The ids a list may hold: its collection's, those asked for, or both."""
+        held = None if source is None else source.ids
+        if held is None:
+            return query.ids
+        if query.ids is None:
+            return held
+        return held & query.ids
+
     async def _smart_query(
         self,
         query: ListNodesQuery,
@@ -235,6 +250,9 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         """
         request = self._page_request(query)
         request.check()
+        if query.ids is not None:
+            msg = "A smart collection cannot be listed by id."
+            raise ValidationError(msg)
         sort = self._smart_sort(query)
         after = self._smart_cursor(query)
         combined = await self._smart_query(query, definition, scope)
@@ -284,7 +302,7 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
             q=query.q,
             favourite=query.favourite,
             attribute_search_exclusions=exclusions,
-            ids=None if source is None else source.ids,
+            ids=self._member_ids(source, query),
         )
 
     async def count_types(
@@ -358,7 +376,7 @@ class ListNodes(QueryHandler[GraphRepos, ListNodesQuery, ListNodesResult]):
         exclusions = (
             await self._search_exclusions(scope) if query.q is not None else None
         )
-        ids = None if source is None else source.ids
+        ids = self._member_ids(source, query)
         page = await self._repos.nodes.page(
             scope=scope,
             page=self._page_request(query),
