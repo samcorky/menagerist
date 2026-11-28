@@ -33,15 +33,22 @@ PAGE_CURSOR_DESCRIPTION = (
 )
 PAGE_LIMIT_DESCRIPTION = "Most rows to return on this page."
 
+# The request the sort description gives as its example, read back by a test.
+PAGE_SORT_EXAMPLE = "sort=name&sort=created_at&order=asc&order=desc"
+
 PAGE_SORT_DESCRIPTION = (
     "What to order the rows by. Repeat it for a second and third key, which break"
     + " ties in the first. Leave it out to order by id, which is creation order."
-    + " Ties keep a fixed order."
+    + " Ties keep a fixed order. Write the parameter once for each key, in the address:"
+    + " `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest"
+    + " created first. The list picker in this page sends keys in the list's own"
+    + " order, not the order you chose, so build a request of several keys by hand."
 )
 PAGE_ORDER_DESCRIPTION = (
     "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction,"
     + " in the same order; a key with none is `asc`. With no `sort` it applies to id,"
-    + " so `desc` alone lists the newest first."
+    + " so `desc` alone lists the newest first. Directions pair with keys by"
+    + " position, so a picker that cannot keep the order of values cannot pair them."
 )
 PAGE_NEWEST_FIRST_ORDER_DESCRIPTION = (
     "`desc` (the default) lists the newest first; `asc` the oldest. Repeat it to give"

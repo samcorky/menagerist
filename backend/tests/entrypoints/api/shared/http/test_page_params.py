@@ -6,7 +6,9 @@ from fastapi import FastAPI, Query
 from fastapi.testclient import TestClient
 
 # FastAPI reads the route's annotations at runtime, so these cannot be type-only.
-from app.entrypoints.api.shared.http.parameters import (  # noqa: TC001
+from app.entrypoints.api.shared.http.parameters import (
+    PAGE_SORT_DESCRIPTION,
+    PAGE_SORT_EXAMPLE,
     NewestFirstPageParams,
     PageParams,
     SearchPageParams,
@@ -172,3 +174,15 @@ def test_a_searchable_list_also_takes_q() -> None:
         p["name"] for p in _app().openapi()["paths"]["/searchable"]["get"]["parameters"]
     }
     assert names == {"after", "limit", "sort", "order", "q"}
+
+
+def test_the_sort_description_example_is_the_request_it_claims() -> None:
+    """The example in the docs orders by name, then newest created first."""
+    assert f"?{PAGE_SORT_EXAMPLE}`" in PAGE_SORT_DESCRIPTION
+
+    response = TestClient(_app()).get(f"/rows?{PAGE_SORT_EXAMPLE}")
+
+    assert response.status_code == 200
+    assert response.json()["sort"] == "name"
+    assert response.json()["order"] == "asc"
+    assert response.json()["then_by"] == [["created_at", "desc"]]
