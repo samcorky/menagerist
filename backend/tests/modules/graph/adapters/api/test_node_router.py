@@ -1,6 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
+import pytest
 from starlette.testclient import TestClient
 
 from app.entrypoints.api import create_app
@@ -746,3 +747,113 @@ def test_update_node_rejects_a_blank_type() -> None:
 
     assert response.status_code == 400
     assert client.get(f"/api/v1/nodes/{node['id']}").json()["type"] == "film"
+
+
+def _aggregate_app_with_films() -> TestClient:
+    client = TestClient(_app_with_in_memory_graph())
+    schema = {
+        "type": "object",
+        "properties": {
+            "rating": {"type": "number", "x-menagerist": {"kind": "rating"}},
+            "price": {"type": "object", "x-menagerist": {"kind": "money"}},
+            "seen": {"type": "string", "format": "date"},
+        },
+    }
+    client.post(
+        "/api/v1/node-types",
+        json={"slug": "film", "label": "Film", "attributes_schema": schema},
+    )
+    for name, rating, amount, currency in [
+        ("Alien", 5, 10, "GBP"),
+        ("Aliens", 4, 5.5, "GBP"),
+        ("Alien 3", 2, 3, "USD"),
+    ]:
+        client.post(
+            "/api/v1/nodes",
+            json={
+                "name": name,
+                "type": "film",
+                "attributes": {
+                    "rating": rating,
+                    "price": {"value": amount, "currency": currency},
+                },
+            },
+        )
+    return client
+
+
+def test_aggregate_nodes_totals_per_currency_and_averages() -> None:
+    """POST /nodes/aggregate answers each measure in order, money per currency."""
+    client = _aggregate_app_with_films()
+
+    response = client.post(
+        "/api/v1/nodes/aggregate",
+        json={
+            "measures": [
+                {"fn": "count"},
+                {"fn": "avg", "type": "film", "key": "rating"},
+                {"fn": "sum", "type": "film", "key": "price"},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"] == 3
+    assert [m["value"] for m in body["measures"]] == [3, pytest.approx(3.666667), None]
+    assert body["measures"][2]["currencies"] == [
+        {"currency": "GBP", "value": 15.5},
+        {"currency": "USD", "value": 3},
+    ]
+    assert body["warnings"] == []
+
+
+def test_aggregate_nodes_narrows_with_a_query() -> None:
+    """The same condition tree as a search chooses the items."""
+    client = _aggregate_app_with_films()
+    query = {
+        "v": 1,
+        "where": {
+            "op": "and",
+            "children": [
+                {
+                    "kind": "field",
+                    "type": "film",
+                    "key": "rating",
+                    "op": ">=",
+                    "value": 4,
+                }
+            ],
+        },
+    }
+
+    response = client.post(
+        "/api/v1/nodes/aggregate",
+        json={
+            "query": query,
+            "measures": [{"fn": "sum", "type": "film", "key": "rating"}],
+        },
+    )
+
+    assert response.json()["items"] == 2
+    assert response.json()["measures"][0]["value"] == 9
+
+
+@pytest.mark.parametrize(
+    "measures",
+    [
+        [{"fn": "sum", "type": "film", "key": "seen"}],
+        [{"fn": "avg"}],
+        [{"fn": "median", "type": "film", "key": "rating"}],
+        [],
+    ],
+)
+def test_aggregate_nodes_refuses_what_cannot_be_aggregated(
+    measures: list[dict[str, object]],
+) -> None:
+    """A function the field's kind cannot answer, or a malformed measure, is refused."""
+    client = _aggregate_app_with_films()
+
+    response = client.post("/api/v1/nodes/aggregate", json={"measures": measures})
+
+    assert response.status_code in {400, 422}

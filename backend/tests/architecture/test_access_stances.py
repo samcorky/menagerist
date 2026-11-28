@@ -183,6 +183,7 @@ EXPECTED_CONTENT: frozenset[str] = frozenset(
         "graph.ListNodes",
         "graph.PromoteExtraSchemaField",
         "graph.PurgeDeletedNode",
+        "graph.AggregateNodes",
         "graph.SearchNodeCounts",
         "graph.SearchNodes",
         "graph.RestoreNode",

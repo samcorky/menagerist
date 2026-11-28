@@ -34,6 +34,7 @@ from app.entrypoints.api.shared.http.rate_limit import (
 )
 from app.entrypoints.api.shared.permission_aware_route import PermissionAwareRoute
 from app.modules.graph.adapters.api.dependencies import (
+    get_aggregate_nodes_use_case,
     get_count_node_types_use_case,
     get_count_nodes_use_case,
     get_create_node_use_case,
@@ -61,6 +62,8 @@ from app.modules.graph.adapters.api.node.schemas import (
     DeleteNodesRequest,
     DuplicateNodeRequest,
     ItemFieldResponse,
+    NodeAggregateRequest,
+    NodeAggregateResponse,
     NodeContentsEntryResponse,
     NodeCountResponse,
     NodeResponse,
@@ -76,6 +79,10 @@ from app.modules.graph.adapters.api.node.schemas import (
     UpdateNodeRequest,
 )
 from app.modules.graph.adapters.api.node_type.schemas import NodeTypeResponse
+from app.modules.graph.application.aggregate_nodes import (
+    AggregateNodes,
+    AggregateNodesQuery,
+)
 from app.modules.graph.application.count_node_types import (
     CountNodeTypes,
     CountNodeTypesQuery,
@@ -309,6 +316,50 @@ async def count_node_searches(
     """
     result = await use_case.handle(SearchNodeCountsQuery(queries=body.queries), actor)
     return NodeSearchCountsResponse.from_result(result)
+
+
+@router.post(
+    "/aggregate",
+    response_model=NodeAggregateResponse,
+    operation_id="aggregate_nodes",
+    dependencies=[Depends(rate_limited(RateLimitBucket.SEARCH))],
+    responses={
+        **RATE_LIMITED_RESPONSE,
+        **error_response(
+            InvalidQueryError,
+            detail="measures[0]: `sum` cannot read a date field.",
+        ),
+    },
+)
+async def aggregate_nodes(
+    body: NodeAggregateRequest,
+    use_case: Annotated[AggregateNodes, Depends(get_aggregate_nodes_use_case)],
+    actor: Annotated[Actor, Depends(get_current_actor)],
+) -> NodeAggregateResponse:
+    """Total, average, count or compare fields of the items a query matches.
+
+    `query` is a condition tree like the `query` of `POST /nodes/search`, parsed and
+    resolved the same way, so the items aggregated are exactly the ones a search for
+    it lists (leave it out for every item). Each of 1 to 10 `measures` is a function
+    over a field: one item type's (`type` and `key`), or every type field copied
+    from a saved field (`origin`). Items with no value for a field are left out of
+    that measure, so an average is over the items that have one.
+
+    Money is aggregated per currency and never converted: a money measure has no
+    `value`, and `currencies` has one entry for each currency found. A field that no
+    longer exists gives no value and a warning at the measure's path; a function
+    that cannot read the field's kind is a 400.
+    """
+    result = await use_case.handle(
+        AggregateNodesQuery(
+            query=body.query,
+            measures=[
+                measure.model_dump(exclude_none=True) for measure in body.measures
+            ],
+        ),
+        actor,
+    )
+    return NodeAggregateResponse.from_result(body.measures, result)
 
 
 @router.get(

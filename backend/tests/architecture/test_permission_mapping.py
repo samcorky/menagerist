@@ -94,6 +94,7 @@ EXPECTED_PERMISSIONS: dict[str, str] = {
     "graph.PurgeDeletedNode": "graph:item:purge",
     "graph.PurgeEdgeTypeAttribute": "graph:edge_type:purge_attribute",
     "graph.PurgeNodeTypeAttribute": "graph:node_type:purge_attribute",
+    "graph.AggregateNodes": "graph:item:read",
     "graph.SearchNodeCounts": "graph:item:read",
     "graph.SearchNodes": "graph:item:read",
     "graph.RestoreNode": "graph:item:write",

@@ -28,6 +28,7 @@ from app.entrypoints.api.shared.bridges.item_dependents import (
 )
 from app.entrypoints.api.shared.clock import Today, get_today
 from app.modules.graph.adapters.persistence.unit_of_work import create_graph_uow
+from app.modules.graph.application.aggregate_nodes import AggregateNodes
 from app.modules.graph.application.count_edge_type_attribute_usage import (
     CountEdgeTypeAttributeUsage,
 )
@@ -195,6 +196,14 @@ def get_search_node_counts_use_case(
     today: Annotated[Today, Depends(get_today)],
 ) -> SearchNodeCounts:
     return SearchNodeCounts(repos, guard, today=today)
+
+
+def get_aggregate_nodes_use_case(
+    repos: Annotated[GraphRepos, Depends(get_graph_repos)],
+    guard: Annotated[AccessGuard, Depends(get_access_guard)],
+    today: Annotated[Today, Depends(get_today)],
+) -> AggregateNodes:
+    return AggregateNodes(repos, guard, today=today)
 
 
 def get_count_node_types_use_case(

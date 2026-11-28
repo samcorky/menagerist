@@ -26,6 +26,10 @@ from sqlalchemy.dialects.postgresql import (
     insert,
 )
 
+from app.modules.graph.adapters.persistence.aggregate_sql import (
+    read as read_aggregate,
+    statement as aggregate_statement,
+)
 from app.modules.graph.adapters.persistence.models import NodeFavouriteModel, NodeModel
 from app.modules.graph.adapters.persistence.query_env import QueryEnv
 from app.modules.graph.adapters.persistence.query_sql import (
@@ -70,6 +74,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.sql import Executable
 
+    from app.modules.graph.domain.aggregate import MeasureValue, ResolvedMeasure
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
     from app.modules.graph.domain.reach import ReachDirection
     from app.modules.graph.ports.external_conditions import ExternalConditions
@@ -522,6 +527,26 @@ class SqlAlchemyNodeRepository:
         if len(found) > reach_rules.MAX_REACHED:
             raise reach_rules.ReachTooLargeError
         return found
+
+    async def aggregate(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        measures: Sequence[ResolvedMeasure],
+    ) -> builtins.list[MeasureValue]:
+        """Evaluate each measure over the live nodes in `scope` that match."""
+        logger.debug("aggregating nodes", measures=len(measures))
+        where = compile_where(resolved, QueryEnv(scope=scope, external=self._external))
+        await _jit_off_for_text(self._session, has_text=_has_text(resolved))
+        answers: builtins.list[MeasureValue] = []
+        for measure in measures:
+            stmt = aggregate_statement(measure).where(_in_scope(scope))
+            if where is not None:
+                stmt = stmt.where(where)
+            rows = (await self._run(stmt, resolved)).all()
+            answers.append(read_aggregate(measure, rows))
+        return answers
 
     async def count_by_type(
         self,
