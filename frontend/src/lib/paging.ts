@@ -18,6 +18,13 @@ export interface PageResult<T> {
 	data?: T[];
 	error?: unknown;
 	response?: Response;
+	/**
+	 * The cursor of the next page, for a route that gives it in its body and not in a `Link`
+	 * header; `null` is the last page. Left out, the `Link` header is read.
+	 */
+	cursor?: string | null;
+	/** The count of every row, for a route that gives it in its body; left out, `Total-Count`. */
+	total?: number | null;
 }
 
 /** Every row, or the page that failed and the rows read before it. */

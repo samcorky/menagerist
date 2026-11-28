@@ -51,8 +51,11 @@
 		TOO_MANY_MESSAGE,
 		usesSearch,
 		withFilter,
-		FILTER_PARAM
+		FILTER_PARAM,
+		type PageBasics
 	} from '$lib/query/items-page';
+	import { PagedList, type PageRequest } from '$lib/paged-list.svelte';
+	import type { PageResult } from '$lib/paging';
 	import { createCountTracker } from '$lib/query/search-count';
 	import { combineWithSaved, narrowFilterCount, saveBlockReason } from '$lib/query/narrow';
 	import { countConditions, emptyQuery, removeAt } from '$lib/query/tree';
@@ -113,30 +116,34 @@
 		'The last of them. Live long and catalogue.'
 	];
 
+	// What the list is read for: the filter, and the page's own type and search box.
+	type ItemsRead = { filter: Query; basics: PageBasics };
+
 	// Persisted outside component so scroll position survives navigation
 	let savedScrollTop = 0;
 
-	let items = $state<NodeResponse[]>([]);
 	// Starts from the list the session already holds, so cards draw with their type's icon at once.
 	let allCategories = $state<NodeTypeResponse[]>(cachedItemTypes() ?? []);
-	let loading = $state(false);
-	// The read in flight is a further page, not a new search, sort or filter.
-	let loadingMore = $state(false);
-	let hasMore = $state(true);
 	let selectedType = $state<string | null>(null);
 	let fetchSeq = 0;
 	const counts = createCountTracker();
-	// Search paging: the next cursor, and the count the server reported.
-	let cursor = $state<string | null>(null);
-	let total = $state<number | null>(null);
 	let totalCapped = $state(false);
 	let marks = $state<WarningMarks>({ conditions: new Set(), messages: new Map(), sort: false });
 	let filterError = $state<BuilderError | null>(null);
 	let tooMany = $state(false);
+	// The list reads a page at a time through the server's cursor, from the plain list or, with a
+	// filter or a sort, from the search (`readItems`). It owns the rows and the paging state.
+	const list = new PagedList<NodeResponse, ItemsRead>(readItems);
+	const items = $derived(list.rows);
+	const loading = $derived(list.loading);
+	// The read in flight is a further page, not a new search, sort or filter.
+	const loadingMore = $derived(list.loadingMore);
+	const hasMore = $derived(list.hasMore);
+	const total = $derived(list.total);
 	// The first page could not be fetched: shown as a failure with Retry, never as an empty list.
-	let loadFailed = $state(false);
+	const loadFailed = $derived(list.failed);
 	// A later page that would not load: the list's foot says so and offers Try again (#588).
-	let pageFailed = $state(false);
+	const pageFailed = $derived(list.nextFailed);
 	let filtersOpen = $state(false);
 	let filtersFocus = $state<Path | null>(null);
 	let saveOpen = $state(false);
@@ -172,10 +179,11 @@
 		selection.toggle(id);
 	}
 
+	// What the list is asked for: the filter, and the page's own type and search box.
+	const readParams = (): ItemsRead => ({ filter, basics: { type: selectedType, q } });
+
 	async function reloadList() {
-		hasMore = true;
-		cursor = null;
-		await fetchPage();
+		await list.load(readParams(), { keepRows: true });
 	}
 	const exampleFilters = Object.keys(EXAMPLE_FILTER_LABELS) as ExampleFilter[];
 
@@ -326,7 +334,6 @@
 		const urlQ = normaliseQuery(page.url.searchParams.get('q'));
 		if (!urlQ) return;
 		if (urlQ !== untrack(() => q)) {
-			hasMore = true;
 			q = urlQ;
 		}
 		searchInput = urlQ;
@@ -347,7 +354,6 @@
 		const typeParam = page.url.searchParams.get('type');
 		untrack(() => {
 			if (typeParam === selectedType) return;
-			hasMore = true;
 			selectedType = typeParam;
 		});
 	});
@@ -356,66 +362,61 @@
 		const value = searchInput;
 		const timer = setTimeout(() => {
 			if (value === q) return;
-			hasMore = true;
 			q = value;
 		}, 300);
 		return () => clearTimeout(timer);
 	});
 
-	async function fetchPage(more = false) {
+	async function readItems({
+		after,
+		params
+	}: PageRequest<ItemsRead>): Promise<PageResult<NodeResponse>> {
 		const seq = ++fetchSeq;
-		if (!more) {
-			counts.cancel();
-			loadFailed = false;
-		}
-		pageFailed = false;
-		loading = true;
-		loadingMore = more;
-		const basics = { type: selectedType, q };
+		const more = after !== undefined;
+		if (!more) counts.cancel();
 		const result = await loadItemsPage({
-			filter,
-			basics,
-			cursor: more ? cursor : null
+			filter: params.filter,
+			basics: params.basics,
+			cursor: after ?? null
 		});
-		if (seq !== fetchSeq) return;
+		// A newer read has started: the list drops this one, and so must what it would set here.
+		const current = seq === fetchSeq;
 		if (result.status === 'ok') {
-			items = more ? [...items, ...result.items] : result.items;
-			hasMore = result.hasMore;
-			cursor = result.cursor;
-			// A further list page repeats the capped figure; keep the exact one already shown.
-			if (!more || searching) {
-				total = result.total;
-				totalCapped = result.totalCapped;
+			const plainList = !usesSearch(params.filter);
+			if (current) {
+				// A further list page repeats the capped figure; keep the exact one already shown.
+				if (!more || !plainList) totalCapped = result.totalCapped;
+				if (!more && plainList && result.totalCapped) {
+					void counts.run(params.basics, (exact) => {
+						list.total = exact;
+						totalCapped = false;
+					});
+				}
+				marks = mapWarnings(result.warnings, result.prefix);
+				filterError = null;
+				tooMany = false;
 			}
-			if (!more && !searching && result.totalCapped) {
-				void counts.run(basics, (exact) => {
-					total = exact;
-					totalCapped = false;
-				});
-			}
-			marks = mapWarnings(result.warnings, result.prefix);
-			filterError = null;
-			tooMany = false;
-		} else if (result.status === 'failed' && more) {
-			// Only a next page that would not load is retryable: it keeps `hasMore` and the rows
-			// already on screen, and the list's foot offers Try again (#588).
-			pageFailed = true;
-		} else {
-			hasMore = false;
-			if (!more) items = [];
+			return {
+				data: result.items,
+				cursor: result.cursor,
+				total: !more || !plainList ? result.total : list.total
+			};
+		}
+		// A page that would not load is the list's failure: the first page, or a later one the
+		// foot offers Try again for (#588).
+		if (result.status === 'failed') return { error: result };
+		if (current) {
 			tooMany = result.status === 'too-many';
 			if (result.status === 'rejected') {
 				const { target, message } = splitDetail(result.detail);
 				const path =
 					target && 'where' in target
-						? toFilterPath(target.where, combinePrefix(filter, basics))
+						? toFilterPath(target.where, combinePrefix(params.filter, params.basics))
 						: null;
 				filterError = { message, path };
 			} else filterError = null;
-			if (result.status === 'failed') loadFailed = true;
 		}
-		loading = false;
-		loadingMore = false;
+		return { data: [], cursor: null, total: null };
 	}
 
 	// Quiet on failure: only the collection picker says so.
@@ -455,7 +456,6 @@
 
 	function selectType(type: string | null) {
 		if (selectedType === type) return;
-		hasMore = true;
 		selectedType = type;
 		const params = new SvelteURLSearchParams(page.url.searchParams);
 		if (type) params.set('type', type);
@@ -466,11 +466,6 @@
 			keepFocus: true,
 			noScroll: true
 		});
-	}
-
-	function loadMore() {
-		if (!hasMore || loading) return;
-		void fetchPage(true);
 	}
 
 	function focusRef(node: HTMLInputElement) {
@@ -484,21 +479,13 @@
 
 	$effect(() => {
 		if (captureController.nodeCreationCount === 0) return;
-		untrack(() => {
-			hasMore = true;
-			cursor = null;
-			void fetchPage();
-		});
+		untrack(() => void list.load(readParams(), { keepRows: true }));
 	});
 
 	// Reload from the start whenever the type, the search box or the filter changes.
 	$effect(() => {
 		void [selectedType, q, filterKey];
-		untrack(() => {
-			hasMore = true;
-			cursor = null;
-			void fetchPage();
-		});
+		untrack(() => void list.load(readParams(), { keepRows: true }));
 	});
 
 	$effect(() => {
@@ -509,7 +496,7 @@
 	$effect(() => {
 		void offlineController.retryCount;
 		untrack(() => {
-			if (loadFailed) void fetchPage();
+			if (loadFailed) void list.retry();
 		});
 	});
 
@@ -822,7 +809,7 @@
 			</Button>
 		</div>
 	{:else if loadFailed}
-		<LoadFailed what="your items" onretry={() => void fetchPage()} />
+		<LoadFailed what="your items" onretry={() => void list.retry()} />
 	{:else if items.length === 0 && !loading && !filterError && !tooMany}
 		<div class="flex flex-col items-center gap-3 py-12 text-center">
 			{#if searching && conditionCount > 0}
@@ -881,8 +868,8 @@
 		noun="item"
 		lines={END_LINES}
 		lineKey={page.url.pathname}
-		onload={loadMore}
-		onretry={() => void fetchPage(true)}
+		onload={() => void list.loadMore()}
+		onretry={() => void list.retry()}
 	/>
 </Page>
 

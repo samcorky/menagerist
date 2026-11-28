@@ -17,12 +17,32 @@ export type ListEndState = 'idle' | 'loading' | 'end' | 'failed';
  *
  * The old 200px rarely hid the request: a page of rows is taller than that, so
  * a steady scroller reached the spinner before the rows arrived. A viewport and
- * a half buys roughly a screen of reading while the page is in flight, without
- * fetching pages nobody scrolls to.
+ * a half was better, but a quick scroll or a slow connection still caught up with
+ * it. Two and a half buys a couple of screens of reading while the page is in
+ * flight, and is still no further than the next page, so the first scroll does not
+ * fetch pages nobody reads.
  */
+export const LOAD_AHEAD_SCREENS = 2.5;
+
 export function loadAheadMargin(viewportHeight: number): string {
 	const height = Number.isFinite(viewportHeight) && viewportHeight > 0 ? viewportHeight : 800;
-	return `${Math.round(height * 1.5)}px`;
+	return `${Math.round(height * LOAD_AHEAD_SCREENS)}px`;
+}
+
+/**
+ * The nearest ancestor that scrolls, or null when the page itself does.
+ *
+ * An observer rooted at the viewport ignores its margin for a target inside a scrolling
+ * container: the container clips the target first, so the page would load only when the
+ * foot is already on screen. The app's pages scroll inside one (`#main-scroll`), so the
+ * observer needs it as its root for the margin to count.
+ */
+export function scrollParent(node: HTMLElement): HTMLElement | null {
+	for (let up = node.parentElement; up; up = up.parentElement) {
+		const { overflowY } = getComputedStyle(up);
+		if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') return up;
+	}
+	return null;
 }
 
 /** Decides what the foot of a list should show. */
