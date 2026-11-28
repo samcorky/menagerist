@@ -115,6 +115,10 @@
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
 	let trigger: HTMLElement | null = null;
+	// Where focus goes back to if the button that opened the dialog has since gone: the header's
+	// is shown while the list loads and removed when it turns out empty (the empty state has its own).
+	let headerNewButton = $state<HTMLElement | null>(null);
+	let emptyNewButton = $state<HTMLElement | null>(null);
 
 	// 'manual' is a list the person fills; 'smart' saves a search (fixed once created).
 	let kind = $state<'manual' | 'smart'>('manual');
@@ -248,7 +252,9 @@
 		dialogOpen = open;
 		if (!open) {
 			resetDialog();
-			void tick().then(() => trigger?.focus());
+			void tick().then(() =>
+				(trigger?.isConnected ? trigger : (emptyNewButton ?? headerNewButton))?.focus()
+			);
 		}
 	}
 
@@ -301,7 +307,12 @@
 			<p class="mt-1 text-muted-foreground">Group your items into named collections.</p>
 		</div>
 		{#if showControls}
-			<IconButton label="New collection" variant="default" onclick={openDialog}>
+			<IconButton
+				bind:ref={headerNewButton}
+				label="New collection"
+				variant="default"
+				onclick={openDialog}
+			>
 				<Plus />
 			</IconButton>
 		{/if}
@@ -399,7 +410,7 @@
 			<p class="max-w-sm text-sm text-muted-foreground">
 				A collection groups items together. Make one for your vinyl, your Funkos, or films to watch.
 			</p>
-			<Button onclick={openDialog}>
+			<Button bind:ref={emptyNewButton} onclick={openDialog}>
 				<Plus class="size-4" />
 				New collection
 			</Button>
