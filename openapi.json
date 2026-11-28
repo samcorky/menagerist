@@ -40963,12 +40963,12 @@
               }
             ],
             "title": "Key",
-            "description": "The tag, field value or item type slug; null for the items with none (`label` is `Unset`)."
+            "description": "The tag, field value, item type slug or related item's id; null for the items with none (`label` is `Unset`)."
           },
           "label": {
             "type": "string",
             "title": "Label",
-            "description": "What to show for the group."
+            "description": "What to show for the group: the related item's name for one."
           },
           "count": {
             "type": "integer",
@@ -41297,11 +41297,12 @@
             "type": "string",
             "enum": [
               "field",
-              "type",
-              "tag"
+              "related",
+              "tag",
+              "type"
             ],
             "title": "By",
-            "description": "`field` for a text, choice, multiple-choice or yes/no field (named with `type` and `key`, or `origin`), `type` for the item type, `tag` for the tags."
+            "description": "`field` for a text, choice, multiple-choice or yes/no field (named with `type` and `key`, or `origin`), `related` for the item at the other end of a `relationship`, `type` for the item type, `tag` for the tags."
           },
           "type": {
             "anyOf": [
@@ -41338,6 +41339,35 @@
             ],
             "title": "Origin",
             "description": "With `by` of field: the saved field, instead of `type`."
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship",
+            "description": "With `by` of related: the slug of the relationship. An item connected to two items is in both groups; one with no connection is unset."
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "out",
+                  "in",
+                  "any"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction",
+            "description": "With `by` of related: `out` groups by the items this one points to, `in` by the items pointing to it, `any` (the default) by either. A relationship with no direction is read from either end."
           },
           "order": {
             "type": "string",
@@ -41404,6 +41434,11 @@
             "by": "field",
             "key": "format",
             "type": "film"
+          },
+          {
+            "by": "related",
+            "direction": "out",
+            "relationship": "made-by"
           }
         ]
       },

@@ -19,7 +19,8 @@ MAX_KEY_LENGTH: Final = 200
 # Most groups an aggregate lists; the rest are counted in one `other` row.
 MAX_GROUPS: Final = 100
 
-type GroupAxis = Literal["field", "type", "tag"]
+type GroupAxis = Literal["field", "type", "tag", "related"]
+type Direction = Literal["out", "in", "any"]
 type GroupOrder = Literal["key", "count", "measure"]
 type AggregateFn = Literal["count", "sum", "avg", "min", "max", "distinct"]
 
@@ -194,9 +195,11 @@ def tidy(value: Any) -> float:  # noqa: ANN401
 
 @dataclass(frozen=True, kw_only=True)
 class GroupBy:
-    """What to split the matching items by: a field, the item type or a tag.
+    """What to split the matching items by: a field, the item type, a tag or an item.
 
-    A field is named as a measure's is (`type` and `key`, or `origin`). `order`
+    A field is named as a measure's is (`type` and `key`, or `origin`). `related`
+    groups by the item at the other end of a named `relationship`, read in
+    `direction` as a connection condition reads it. `order`
     sorts the groups by their key, their item count or one measure's value (the
     index in `measure`); `descending` defaults to ascending for a key and
     descending for the others.
@@ -206,6 +209,8 @@ class GroupBy:
     type: str | None = None
     key: str | None = None
     origin: str | None = None
+    relationship: str | None = None
+    direction: Direction = "any"
     order: GroupOrder = "key"
     measure: int | None = None
     descending: bool | None = None
@@ -224,24 +229,28 @@ class ResolvedGroup:
     """A grouping checked against the item types, ready for a repository.
 
     `sources` is empty unless grouping by a field. `kind` is the one kind every
-    source holds.
+    source holds. `directional` is whether a related grouping's relationship has a
+    direction; one that has none is read from either end.
     """
 
     group: GroupBy
     kind: str | None
     sources: tuple[MeasureSource, ...]
+    directional: bool = True
 
 
 @dataclass(frozen=True, kw_only=True)
 class GroupValue:
     """One group: its key (None for items with no value), size and measure values.
 
-    An item in several groups (a tag, a multiple-choice value) counts in each.
+    An item in several groups (a tag, a multiple-choice value, a related item)
+    counts in each. A group of related items has the item's name as `label`.
     """
 
     key: str | None
     count: int
     values: tuple[MeasureValue, ...]
+    label: str | None = None
 
 
 def _group_order(raw: Mapping[str, Any], path: str) -> tuple[GroupOrder, int | None]:
@@ -260,6 +269,27 @@ def _group_order(raw: Mapping[str, Any], path: str) -> tuple[GroupOrder, int | N
     return cast("GroupOrder", order), measure
 
 
+def _relation(
+    raw: Mapping[str, Any], by: object, path: str
+) -> tuple[str | None, Direction]:
+    """The `relationship` and `direction` of a related grouping."""
+    relationship = _text(raw, "relationship", path)
+    direction = raw.get("direction")
+    if by != "related":
+        if relationship is not None or direction is not None:
+            raise InvalidQueryError(
+                "`relationship` and `direction` go with `by` of related.", path=path
+            )
+        return None, "any"
+    if relationship is None:
+        raise InvalidQueryError(
+            "Grouping by related items needs a `relationship`.", path=path
+        )
+    if direction is not None and direction not in {"out", "in", "any"}:
+        raise InvalidQueryError("`direction` is out, in or any.", path=path)
+    return relationship, cast("Direction", direction or "any")
+
+
 def parse_group_by(raw: object) -> GroupBy:
     """Parse a request's grouping.
 
@@ -270,21 +300,23 @@ def parse_group_by(raw: object) -> GroupBy:
     if not isinstance(raw, Mapping):
         raise InvalidQueryError("`group_by` is an object.", path=path)
     unknown = set(raw) - {
-        "by", "type", "key", "origin", "order", "measure", "descending", "limit"
+        "by", "type", "key", "origin", "relationship", "direction",
+        "order", "measure", "descending", "limit",
     }  # fmt: skip
     if unknown:
         raise InvalidQueryError(
             f"Unknown grouping property: {sorted(unknown)[0]}.", path=path
         )
     by = raw.get("by")
-    if by not in {"field", "type", "tag"}:
-        raise InvalidQueryError("`by` is one of field, tag, type.", path=path)
+    if by not in {"field", "type", "tag", "related"}:
+        raise InvalidQueryError("`by` is one of field, related, tag, type.", path=path)
     type_slug, key, origin = _field_ref(raw, path)
     has_field = key is not None or origin is not None
     if by == "field" and not has_field:
         raise InvalidQueryError("Grouping by a field needs one.", path=path)
     if by != "field" and has_field:
         raise InvalidQueryError(f"Grouping by {by} takes no field to read.", path=path)
+    relationship, direction = _relation(raw, by, path)
     order, measure = _group_order(raw, path)
     descending = raw.get("descending")
     if descending is not None and not isinstance(descending, bool):
@@ -303,6 +335,8 @@ def parse_group_by(raw: object) -> GroupBy:
         type=type_slug,
         key=key,
         origin=origin,
+        relationship=relationship,
+        direction=direction,
         order=order,
         measure=measure,
         descending=descending,
@@ -315,7 +349,7 @@ def _sort_value(group: GroupValue, by: GroupBy) -> float | int | str | None:
         return group.count
     if by.order == "measure":
         return group.values[by.measure or 0].value
-    return group.key
+    return group.label or group.key
 
 
 def arrange_groups(
@@ -326,7 +360,9 @@ def arrange_groups(
     Ties, and groups with nothing to sort by (the unset group when sorting by
     key, an empty measure), come last, in key order with the unset group at the end.
     """
-    by_key = sorted(groups, key=lambda g: (g.key is None, g.key or ""))
+    by_key = sorted(
+        groups, key=lambda g: (g.key is None, g.label or g.key or "", g.key or "")
+    )
     keyed = [(g, _sort_value(g, by)) for g in by_key]
     with_value = sorted(
         ((g, v) for g, v in keyed if v is not None),

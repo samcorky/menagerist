@@ -13,7 +13,10 @@ import structlog
 from app.modules.graph.application.field_scope_expansion import fields_reached
 from app.modules.graph.application.permissions import GraphPermission
 from app.modules.graph.application.prepare_query import prepare_query, utc_today
-from app.modules.graph.application.type_catalogue import load_node_types
+from app.modules.graph.application.type_catalogue import (
+    load_edge_types,
+    load_node_types,
+)
 from app.modules.graph.application.type_families import type_views
 from app.modules.graph.domain.aggregate import (
     GROUPABLE_KINDS,
@@ -44,6 +47,14 @@ logger = structlog.get_logger()
 
 # What a request without a query asks about: every item.
 EVERYTHING: Mapping[str, Any] = {"v": 1}
+
+# What a grouping that matches nothing any more says it lost.
+_GONE = {
+    "field": "That field no longer exists.",
+    "related": "That relationship no longer exists.",
+    "type": "That field no longer exists.",
+    "tag": "That field no longer exists.",
+}
 
 # The label of the group of items that have no value to group by.
 UNSET_LABEL = "Unset"
@@ -147,11 +158,17 @@ class AggregateNodes(
         group = None
         if grouping is not None:
             _check_order(grouping, ready)
-            group = _resolve_group(grouping, schemas, families)
+            directional = (
+                {
+                    str(t.slug): t.directional
+                    for t in await load_edge_types(self._repos, scope)
+                }
+                if grouping.by == "related"
+                else {}
+            )
+            group = _resolve_group(grouping, schemas, families, directional)
             if group is None:
-                warnings.append(
-                    QueryWarning("group_by", "That field no longer exists.")
-                )
+                warnings.append(QueryWarning("group_by", _GONE[grouping.by]))
         counted = await self._repos.nodes.search_count(scope=scope, resolved=resolved)
         answers = iter(
             await self._repos.nodes.aggregate(
@@ -272,13 +289,24 @@ def _resolve_group(
     grouping: GroupBy,
     schemas: Mapping[str, Mapping[str, Any]],
     families: Mapping[str, tuple[str, ...]],
+    directional: Mapping[str, bool],
 ) -> ResolvedGroup | None:
     """Check the grouping against the item types; None when its field is gone.
+
+    A related grouping is checked against the live relationships instead, with
+    whether each has a direction.
 
     Raises:
         InvalidQueryError: If the field is of a kind that cannot name a group, or
             the fields a saved field reaches are of different kinds.
     """
+    if grouping.by == "related":
+        slug = grouping.relationship or ""
+        if slug not in directional:
+            return None
+        return ResolvedGroup(
+            group=grouping, kind=None, sources=(), directional=directional[slug]
+        )
     if grouping.by != "field":
         return ResolvedGroup(group=grouping, kind=None, sources=())
     named = Measure(
@@ -305,6 +333,7 @@ def _aligned(group: GroupValue, ready: Sequence[ResolvedMeasure | None]) -> Grou
     answers = iter(group.values)
     return GroupValue(
         key=group.key,
+        label=group.label,
         count=group.count,
         values=tuple(MeasureValue() if m is None else next(answers) for m in ready),
     )
@@ -318,7 +347,7 @@ def _group(
     elif grouping.by == "type":
         label = type_labels.get(group.key, group.key)
     else:
-        label = group.key
+        label = group.label or group.key
     return AggregateGroup(
         key=group.key, label=label, count=group.count, values=list(group.values)
     )

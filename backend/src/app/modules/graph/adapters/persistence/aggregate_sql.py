@@ -14,6 +14,7 @@ from sqlalchemy import (
     Boolean,
     Numeric,
     Select,
+    String,
     and_,
     case,
     cast,
@@ -26,11 +27,12 @@ from sqlalchemy import (
     or_,
     select,
     true,
+    type_coerce,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.modules.graph.adapters.persistence.models import NodeModel
+from app.modules.graph.adapters.persistence.models import EdgeModel, NodeModel
 from app.modules.graph.adapters.persistence.query_sql import (
     _C,
     _FLOAT_MAX,
@@ -49,9 +51,12 @@ from app.modules.graph.domain.aggregate import (
     ResolvedMeasure,
     tidy,
 )
+from app.platform.orm_mixins import owned_by
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Sequence
+
+    from app.shared_kernel.content_filter import ContentFilter
 
 type _Expr = ColumnElement[Any]
 
@@ -150,35 +155,85 @@ def _group_keys(group: ResolvedGroup) -> _Expr:
     return case(*reads, else_=_UNSET)
 
 
-def _group_rows(group: ResolvedGroup) -> Any:  # noqa: ANN401
+def _related_rows(group: ResolvedGroup, scope: ContentFilter) -> Any:  # noqa: ANN401
+    """A lateral select of the distinct live items connected to the outer item.
+
+    Read the way a `connection` condition reads it: a live edge of the named
+    relationship at the end `direction` asks for (either end for `any`, or for a
+    relationship with no direction), to a live item in `scope`.
+    """
+    chosen = group.group
+    far = NodeModel.__table__.alias()
+    out_ok: _Expr = EdgeModel.source_id == NodeModel.id
+    in_ok: _Expr = EdgeModel.target_id == NodeModel.id
+    far_id: _Expr = case((out_ok, EdgeModel.target_id), else_=EdgeModel.source_id)
+    near: _Expr = or_(out_ok, in_ok)
+    if group.directional and chosen.direction == "out":
+        near, far_id = out_ok, type_coerce(EdgeModel.target_id, far_id.type)
+    elif group.directional and chosen.direction == "in":
+        near, far_id = in_ok, type_coerce(EdgeModel.source_id, far_id.type)
+    return (
+        select(cast(far.c.id, String).label("gkey"), far.c.name.label("glabel"))
+        .select_from(EdgeModel)
+        .join(far, far.c.id == far_id)
+        .where(
+            near,
+            EdgeModel.type == chosen.relationship,
+            EdgeModel.deleted_at.is_(None),
+            owned_by(EdgeModel, scope.user_id),
+            far.c.deleted_at.is_(None),
+            true() if scope.user_id is None else far.c.owner_id == scope.user_id,
+        )
+        .distinct()
+        .lateral("g")
+    )
+
+
+def _group_rows(group: ResolvedGroup, scope: ContentFilter | None) -> Any:  # noqa: ANN401
     """A lateral join: one row per distinct key of each item, with the key as `gkey`."""
+    if group.group.by == "related":
+        assert scope is not None
+        return _related_rows(group, scope)
     key = func.jsonb_array_elements_text(_group_keys(group)).column_valued("gkey")
     return select(key).distinct().lateral("g")
 
 
 def statement(
-    measure: ResolvedMeasure, group: ResolvedGroup | None = None
+    measure: ResolvedMeasure,
+    group: ResolvedGroup | None = None,
+    *,
+    scope: ContentFilter | None = None,
 ) -> Select[Any]:
     """The `SELECT` for one measure, to which the caller adds scope and filter.
 
     A money measure also selects its currency and groups by it, so currencies are
     never mixed. With a `group`, each row leads with the key of a group and an item
-    is counted in every group it is in.
+    is counted in every group it is in; the count of items also gives the group's
+    label (the name of a related item), and `scope` is needed for a related group.
     """
     lead: list[_Expr] = []
     rows = None
     if group is not None:
-        rows = _group_rows(group)
+        rows = _group_rows(group, scope)
         lead = [rows.c.gkey]
 
     def build(*columns: _Expr) -> Select[Any]:
         stmt = select(*lead, *columns).select_from(NodeModel)
         if rows is None:
             return stmt
-        return stmt.join(rows, true()).group_by(*lead)
+        # A related item may not exist: the item is then in the unset group.
+        joined = stmt.outerjoin if group and group.group.by == "related" else stmt.join
+        return joined(rows, true()).group_by(*lead)
 
     if not measure.sources:
-        return build(func.count())
+        if rows is None:
+            return build(func.count())
+        label = (
+            func.min(rows.c.glabel)
+            if group and group.group.by == "related"
+            else sql_null()
+        )
+        return build(label, func.count())
     value = _by_type(measure, _value(measure.kind or ""))
     if not measure.per_currency:
         return build(_function(measure, value))
@@ -191,15 +246,20 @@ def statement(
     )
 
 
-def outside(group: ResolvedGroup, shown: Collection[str | None]) -> Select[Any]:
+def outside(
+    group: ResolvedGroup, shown: Collection[str | None], scope: ContentFilter
+) -> Select[Any]:
     """The ids of the items in a group that is not among the `shown` keys."""
-    rows = _group_rows(group)
+    rows = _group_rows(group, scope)
     named = [key for key in shown if key is not None]
     hidden = or_(
         and_(rows.c.gkey.is_(None), true() if None not in shown else false()),
         and_(rows.c.gkey.is_not(None), rows.c.gkey.not_in(named)),
     )
-    return select(NodeModel.id).select_from(NodeModel).join(rows, true()).where(hidden)
+    stmt = select(NodeModel.id).select_from(NodeModel)
+    if group.group.by == "related":
+        return stmt.outerjoin(rows, true()).where(hidden)
+    return stmt.join(rows, true()).where(hidden)
 
 
 def _answer(measure: ResolvedMeasure, raw: object) -> float | int | str | None:
@@ -231,7 +291,8 @@ def read_groups(
 ) -> dict[str | None, MeasureValue]:
     """The measure's value in each group from the rows its grouped statement gave."""
     if not measure.per_currency:
-        return {row[0]: MeasureValue(value=_answer(measure, row[1])) for row in rows}
+        # A count of items also selects the group's label, before the count.
+        return {row[0]: MeasureValue(value=_answer(measure, row[-1])) for row in rows}
     found: dict[str | None, list[CurrencyValue]] = {}
     for key, currency, raw in rows:
         found.setdefault(key, []).append(
@@ -249,8 +310,9 @@ def group_values(
     return [
         GroupValue(
             key=key,
+            label=label,
             count=size,
             values=tuple(a.get(key, MeasureValue()) for a in answers),
         )
-        for key, size in counts
+        for key, label, size in counts
     ]

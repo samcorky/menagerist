@@ -99,6 +99,11 @@ class InMemoryNodeRepository:
                 pairs.append((edge, far))
         return pairs
 
+    def _neighbours(
+        self, scope: ContentFilter
+    ) -> collections.abc.Callable[[Node], builtins.list[tuple[Edge, Node]]]:
+        return lambda node: self.connected(node.id, scope)
+
     def reached(
         self,
         node_id: uuid.UUID,
@@ -414,7 +419,9 @@ class InMemoryNodeRepository:
     ) -> builtins.list[GroupValue]:
         """Evaluate the measures in each group of the live nodes in `scope`."""
         hits = self._matching(scope, resolved)
-        return group_values((hit.node for hit in hits), group, measures)
+        return group_values(
+            (hit.node for hit in hits), group, measures, self._neighbours(scope)
+        )
 
     async def aggregate_outside_groups(
         self,
@@ -427,7 +434,9 @@ class InMemoryNodeRepository:
     ) -> GroupValue:
         """Evaluate the measures over the nodes in a group that is not `shown`."""
         hits = self._matching(scope, resolved)
-        return outside_group_values((hit.node for hit in hits), group, measures, shown)
+        return outside_group_values(
+            (hit.node for hit in hits), group, measures, shown, self._neighbours(scope)
+        )
 
     async def random(
         self,

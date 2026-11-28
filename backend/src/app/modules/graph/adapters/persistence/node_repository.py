@@ -572,7 +572,9 @@ class SqlAlchemyNodeRepository:
         answers: builtins.list[dict[str | None, MeasureValue]] = []
         sizes: builtins.list[Any] = []
         for measure in (ITEMS, *measures):
-            stmt = aggregate_statement(measure, group).where(_in_scope(scope))
+            stmt = aggregate_statement(measure, group, scope=scope).where(
+                _in_scope(scope)
+            )
             if where is not None:
                 stmt = stmt.where(where)
             rows = (await self._run(stmt, resolved)).all()
@@ -594,7 +596,7 @@ class SqlAlchemyNodeRepository:
         """Evaluate the measures over the nodes in a group that is not `shown`."""
         where = compile_where(resolved, QueryEnv(scope=scope, external=self._external))
         await _jit_off_for_text(self._session, has_text=_has_text(resolved))
-        hidden = aggregate_outside(group, shown).where(_in_scope(scope))
+        hidden = aggregate_outside(group, shown, scope).where(_in_scope(scope))
         values: builtins.list[MeasureValue] = []
         size = 0
         for measure in (ITEMS, *measures):
