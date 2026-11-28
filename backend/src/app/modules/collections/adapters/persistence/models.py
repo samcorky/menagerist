@@ -35,6 +35,8 @@ class CollectionModel(IdentifiableMixin, SoftDeletableMixin, Base):
     visibility: Mapped[str]
     # Null for manual collections; opaque to this module.
     definition: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # The totals shown on the collection; null means automatic.
+    summary: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
 
 
 class CollectionMemberModel(Base):

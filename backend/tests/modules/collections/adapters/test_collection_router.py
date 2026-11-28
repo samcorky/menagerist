@@ -92,6 +92,7 @@ def test_create_returns_201_with_derived_slug_and_exact_body(api: Api) -> None:
         "kind",
         "visibility",
         "definition",
+        "summary",
         "item_count",
         "item_count_capped",
         "warnings",
@@ -105,6 +106,7 @@ def test_create_returns_201_with_derived_slug_and_exact_body(api: Api) -> None:
     assert body["visibility"] == "private"
     assert body["item_count"] == 0
     assert body["definition"] is None
+    assert body["summary"] is None
     assert body["item_count_capped"] is False
     assert body["warnings"] == []
     assert api.client.get(f"{BASE}/{body['id']}").json() == body
@@ -894,3 +896,24 @@ def test_list_says_how_many_collections_match_on_every_page(api: Api) -> None:
     assert everything.headers["Total-Count"] == "4"
     assert searched.headers["Total-Count"] == "2"
     assert "Total-Count" not in holding_item.headers
+
+
+def test_patch_sets_resets_and_validates_the_summary(api: Api) -> None:
+    """`summary` is null until set, kept by other edits, and can be reset."""
+    created = api.create("Shelf")
+    totals = [{"fn": "sum", "type": "film", "key": "price"}]
+
+    assert created["summary"] is None
+    chosen = api.client.patch(f"{BASE}/{created['id']}", json={"summary": totals})
+    renamed = api.client.patch(f"{BASE}/{created['id']}", json={"name": "Other"})
+    reset = api.client.patch(f"{BASE}/{created['id']}", json={"reset_summary": True})
+    both = api.client.patch(
+        f"{BASE}/{created['id']}", json={"summary": [], "reset_summary": True}
+    )
+    bad = api.client.patch(f"{BASE}/{created['id']}", json={"summary": [{"x": 1}]})
+
+    assert chosen.json()["summary"] == totals
+    assert renamed.json()["summary"] == totals
+    assert reset.json()["summary"] is None
+    assert both.status_code == 400
+    assert bad.status_code == 400

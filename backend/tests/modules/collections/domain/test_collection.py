@@ -1,6 +1,7 @@
 import dataclasses
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -190,3 +191,45 @@ def test_rename_slug_changes_slug_and_touches() -> None:
     assert c.slug.value == "new-link"
     assert c.name == "My vinyl"
     assert c.updated_at > datetime(2000, 1, 1, tzinfo=UTC)
+
+
+def test_a_new_collection_has_the_automatic_summary() -> None:
+    """No summary means the totals are chosen automatically."""
+    assert _make().summary is None
+
+
+def test_replace_summary_sets_it_and_none_goes_back_to_automatic() -> None:
+    """A list is the person's own choice, even an empty one; None resets it."""
+    shelf = _make()
+    before = shelf.updated_at
+
+    shelf.replace_summary([{"fn": "sum", "type": "film", "key": "price"}])
+    assert shelf.summary == [{"fn": "sum", "type": "film", "key": "price"}]
+    assert shelf.updated_at >= before
+
+    shelf.replace_summary([])
+    assert shelf.summary == []
+
+    shelf.replace_summary(None)
+    assert shelf.summary is None
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        [{"fn": "count"}] * 11,
+        ["sum"],
+        [{"type": "film"}],
+        [{"fn": "count", "colour": "red"}],
+        [{"fn": 3}],
+        [{"fn": ""}],
+        [{"fn": "x" * 201}],
+        [{"fn": "a\x00b"}],
+    ],
+)
+def test_replace_summary_refuses_what_is_not_a_short_list_of_totals(
+    summary: list[Any],
+) -> None:
+    """A summary is up to ten flat objects of short text."""
+    with pytest.raises(InvalidCollectionError):
+        _make().replace_summary(summary)

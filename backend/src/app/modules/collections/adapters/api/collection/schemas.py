@@ -114,6 +114,21 @@ class UpdateCollectionRequest(RequestModel):
     definition: dict[str, Any] | None = Field(
         default=None, description="Replaces a smart collection's search query."
     )
+    summary: list[dict[str, Any]] | None = Field(
+        default=None,
+        max_length=10,
+        description=(
+            "Replaces the totals shown on the collection: up to 10 measures, each "
+            + "`{fn, type, key}` or `{fn, origin}` as for `POST /nodes/aggregate`. "
+            + "An empty list shows none. Cannot be combined with `reset_summary`."
+        ),
+    )
+    reset_summary: bool = Field(
+        default=False,
+        description=(
+            "Go back to the automatic totals. Cannot be combined with `summary`."
+        ),
+    )
     slug: str | None = Field(
         default=None,
         max_length=MAX_SLUG_LENGTH,
@@ -139,6 +154,8 @@ class UpdateCollectionRequest(RequestModel):
             definition=self.definition,
             slug=self.slug,
             regenerate_slug=self.regenerate_slug,
+            summary=self.summary,
+            reset_summary=self.reset_summary,
         )
 
 
@@ -220,6 +237,13 @@ class CollectionResponse(BaseModel):
     definition: dict[str, Any] | None = Field(
         default=None, description="A smart collection's search query; null if manual."
     )
+    summary: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            "The totals the person chose to show, as measures for "
+            + "`POST /nodes/aggregate`; null means the automatic ones."
+        ),
+    )
     item_count: int = Field(
         description="Live items on it; for a smart collection, capped at 1000."
     )
@@ -263,6 +287,7 @@ class CollectionResponse(BaseModel):
             kind=collection.kind,
             visibility=str(collection.visibility),
             definition=definition,
+            summary=collection.summary,
             item_count=summary.item_count,
             item_count_capped=summary.item_count_capped,
             warnings=warnings,

@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Final
 
 from app.modules.collections.domain.errors import (
     CollectionKindError,
@@ -47,6 +47,9 @@ class Collection(Identifiable, SoftDeletable):
     owner_id: uuid.UUID
     visibility: Visibility = Visibility.PRIVATE
     definition: dict[str, Any] | None = None
+    # The totals shown on the collection: null means "automatic", a list is the
+    # person's own choice (possibly none). Opaque to this module beyond its shape.
+    summary: list[dict[str, Any]] | None = None
 
     @classmethod
     def create(
@@ -113,6 +116,17 @@ class Collection(Identifiable, SoftDeletable):
         self.definition = definition
         self.touch()
 
+    def replace_summary(self, summary: list[dict[str, Any]] | None) -> None:
+        """Set the totals shown on the collection; None goes back to automatic.
+
+        Raises:
+            InvalidCollectionError: If it is not a short list of small objects.
+        """
+        if summary is not None:
+            _check_summary(summary)
+        self.summary = summary
+        self.touch()
+
     def ensure_manual_membership(self) -> None:
         """Guard a change to the collection's items.
 
@@ -132,3 +146,37 @@ class Membership:
     collection_id: uuid.UUID
     item_id: uuid.UUID
     added_at: datetime
+
+
+MAX_SUMMARY_ENTRIES: Final = 10
+_SUMMARY_KEYS: Final = frozenset({"fn", "type", "key", "origin"})
+_MAX_SUMMARY_TEXT: Final = 200
+
+
+def _check_summary(summary: list[dict[str, Any]]) -> None:
+    """Refuse a summary that is not up to ten flat objects of short text.
+
+    Whether each entry names a real field and a function it can read is for the
+    aggregate that runs it to say, since fields can change after it is saved.
+    """
+    if len(summary) > MAX_SUMMARY_ENTRIES:
+        raise InvalidCollectionError(
+            f"A summary has up to {MAX_SUMMARY_ENTRIES} totals."
+        )
+    for entry in summary:
+        if not isinstance(entry, dict) or "fn" not in entry:
+            raise InvalidCollectionError("Each total is an object with an `fn`.")
+        if set(entry) - _SUMMARY_KEYS:
+            raise InvalidCollectionError(
+                "A total has only `fn`, `type`, `key` and `origin`."
+            )
+        for value in entry.values():
+            if (
+                not isinstance(value, str)
+                or not value
+                or len(value) > _MAX_SUMMARY_TEXT
+                or "\x00" in value
+            ):
+                raise InvalidCollectionError(
+                    "Each part of a total is short, non-empty text."
+                )

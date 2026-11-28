@@ -622,3 +622,27 @@ async def test_list_deleted_q_matches_the_name(db_session: AsyncSession) -> None
 
     assert [c.id for c in found.items] == [gone.id]
     assert found.total == 1
+
+
+async def test_summary_round_trips_and_null_means_automatic(
+    db_session: AsyncSession,
+) -> None:
+    """A chosen summary (even an empty one) is kept; a new collection has none."""
+    repo = SqlAlchemyCollectionRepository(db_session)
+    automatic = Collection.create(name="Auto", slug=Slug("auto"), owner_id=_OWNER)
+    chosen = Collection.create(name="Chosen", slug=Slug("chosen"), owner_id=_OWNER)
+    empty = Collection.create(name="Empty", slug=Slug("empty"), owner_id=_OWNER)
+    chosen.replace_summary([{"fn": "avg", "origin": "p1"}])
+    empty.replace_summary([])
+    for collection in (automatic, chosen, empty):
+        await repo.add(collection)
+    db_session.expire_all()
+
+    scope = ContentFilter.everyone()
+    stored = [await repo.get(c.id, scope=scope) for c in (automatic, chosen, empty)]
+
+    assert [c.summary for c in stored if c is not None] == [
+        None,
+        [{"fn": "avg", "origin": "p1"}],
+        [],
+    ]

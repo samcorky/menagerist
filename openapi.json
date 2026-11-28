@@ -37295,6 +37295,22 @@
             "title": "Definition",
             "description": "A smart collection's search query; null if manual."
           },
+          "summary": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "The totals the person chose to show, as measures for `POST /nodes/aggregate`; null means the automatic ones."
+          },
           "item_count": {
             "type": "integer",
             "title": "Item Count",
@@ -44858,6 +44874,29 @@
             ],
             "title": "Definition",
             "description": "Replaces a smart collection's search query."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "Replaces the totals shown on the collection: up to 10 measures, each `{fn, type, key}` or `{fn, origin}` as for `POST /nodes/aggregate`. An empty list shows none. Cannot be combined with `reset_summary`."
+          },
+          "reset_summary": {
+            "type": "boolean",
+            "title": "Reset Summary",
+            "description": "Go back to the automatic totals. Cannot be combined with `summary`.",
+            "default": false
           },
           "slug": {
             "anyOf": [
