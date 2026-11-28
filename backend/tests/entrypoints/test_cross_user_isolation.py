@@ -501,6 +501,12 @@ BODIES: dict[str, Callable[[Seed], dict[str, Any]]] = {
             }
         }
     },
+    "NodeAggregateRequest": lambda s: {
+        "json": {
+            "query": {"v": 1},
+            "measures": [{"fn": "count"}, {"fn": "sum", "type": "film", "key": "x"}],
+        }
+    },
     "NodeSearchCountsRequest": lambda s: {
         "json": {
             "queries": {
@@ -564,6 +570,18 @@ def _unknown_items(response: Response) -> str | None:
     return f"expected 400 Unknown or deleted items, got {response.status_code}"
 
 
+def _aggregates_nothing(response: Response) -> str | None:
+    """B's aggregate covers none of A's items: it echoes the measures, sums nothing."""
+    if response.status_code != 200:
+        return f"expected 200, got {response.status_code}"
+    body = response.json()
+    nothing = all(
+        m["value"] in (0, None) and not m["currencies"] for m in body["measures"]
+    )
+    return None if body["items"] == 0 and nothing else f"read A's items: {body}"
+
+
+SPECIAL[("POST", "/api/v1/nodes/aggregate")] = _aggregates_nothing
 SPECIAL[("POST", "/api/v1/nodes/delete")] = _unknown_items
 SPECIAL[("POST", "/api/v1/nodes/tags")] = _unknown_items
 

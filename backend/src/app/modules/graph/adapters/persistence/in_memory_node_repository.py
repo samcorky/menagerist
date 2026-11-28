@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from functools import partial
 from typing import TYPE_CHECKING, cast
 
+from app.modules.graph.adapters.persistence.aggregate_eval import measure_values
 from app.modules.graph.adapters.persistence.query_env import QueryEnv
 from app.modules.graph.adapters.persistence.query_eval import (
     is_after,
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from app.modules.graph.adapters.persistence.in_memory_edge_repository import (
         EdgeStore,
     )
+    from app.modules.graph.domain.aggregate import MeasureValue, ResolvedMeasure
     from app.modules.graph.domain.edge import Edge
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import Cursor, ResolvedQuery
@@ -381,6 +383,17 @@ class InMemoryNodeRepository:
             hits = [h for h in hits if h.node.id in ids]
         count = len(hits)
         return count if limit is None else min(count, limit)
+
+    async def aggregate(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        measures: Sequence[ResolvedMeasure],
+    ) -> builtins.list[MeasureValue]:
+        """Evaluate each measure over the live nodes in `scope` that match."""
+        hits = self._matching(scope, resolved)
+        return measure_values((hit.node for hit in hits), measures)
 
     async def random(
         self,

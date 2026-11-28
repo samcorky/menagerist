@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from datetime import datetime
 
+    from app.modules.graph.domain.aggregate import MeasureValue, ResolvedMeasure
     from app.modules.graph.domain.node import Node
     from app.modules.graph.domain.query import (
         Cursor,
@@ -146,6 +147,23 @@ class NodeRepository(Protocol):
 
         With `limit`, the result never exceeds it and the database stops
         counting once it has found that many. With `ids`, only those nodes count.
+        """
+        ...
+
+    async def aggregate(
+        self,
+        *,
+        scope: ContentFilter,
+        resolved: ResolvedQuery,
+        measures: Sequence[ResolvedMeasure],
+    ) -> builtins.list[MeasureValue]:
+        """Evaluate each measure over the live nodes in `scope` that match the query.
+
+        One value per measure, in order. An item whose field is empty, or not of the
+        kind the measure reads, is left out of that measure, so `avg` is over the
+        items that have a value. With no value to read the answer is `None` (a count
+        is 0), and a money measure has no currencies. A money measure gives one value
+        per currency, sorted by currency code, and never mixes them.
         """
         ...
 

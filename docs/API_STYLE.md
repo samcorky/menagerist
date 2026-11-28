@@ -76,6 +76,17 @@ A list route that pages declares all four of `after`, `limit`, `sort` and `order
 
 IBM's handbook prefers an envelope (`{"nodes": [...], "limit": ..., "next": ...}`). We keep arrays because the headers carry everything the envelope would and the generated client stays simple. `ibm-no-array-responses` and `ibm-collection-array-property` follow from this and are off. Changing it later would be a breaking change to every list endpoint.
 
+## Aggregates
+
+`POST /nodes/aggregate` totals, averages, counts or compares fields over the items a condition tree matches. It is a `POST` because the tree is a body, as for `POST /nodes/search`, and it changes nothing. The `query` is parsed and resolved by the search's own code, so the items aggregated are exactly the ones a search for it lists, and a smart collection or a collection's items are just a query. Each of 1 to 10 `measures` is a function (`count`, `sum`, `avg`, `min`, `max`, `distinct`) over one item type's field (`type` and `key`) or every type field copied from a saved field (`origin`); `count` with no field counts the items.
+
+- **Kinds:** `sum` and `avg` read numbers, durations, ratings and money; `min` and `max` also dates; `distinct` also text, choice and yes/no values; `count` counts the items that have a value. A function the field's kind cannot answer is a 400 at the measure's path, as is a saved field whose copies are of different kinds.
+- **Money is never converted.** A money measure has no `value`: `currencies` has one entry for each currency found, sorted by code. A count of items with an amount is one number.
+- **Missing values are left out**, so an average is over the items that have one. A field of the wrong shape (text where a number goes) counts as missing. With nothing to read the answer is `null`, and a count is 0.
+- **A field that no longer exists** gives no value and a warning at the measure's path, as a stale condition does in a search.
+- **Exact and rounded.** Sums and averages are taken as exact decimals in the database and given to six places, so adding 0.1 and 0.2 gives 0.3. The totals are not capped; the route shares the search's rate limit and condition limits.
+- **Only your items, and only your item types.** The scope is its own `WHERE` term, as in a search.
+
 ## Conditional requests
 
 `GET` responses carry a weak `ETag` (see [Weak ETags](DECISIONS.md#weak-etags-to-survive-a-compressing-proxy-open-question-76)), `If-None-Match` returns 304, and `PATCH` honours `If-Match` and answers 412 with a problem body and the current `ETag`. A route takes `ConditionalGetDep` or `ConditionalPatchDep`, which declare `If-None-Match` or `If-Match` as parameters so they appear in `openapi.json` and the generated client. The date forms, `If-Modified-Since` and `If-Unmodified-Since`, are honoured but not declared, so the contract steers clients to ETags as IBM recommends.

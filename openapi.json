@@ -3427,6 +3427,255 @@
         "x-required-permission": "graph:item:read"
       }
     },
+    "/api/v1/nodes/aggregate": {
+      "post": {
+        "tags": [
+          "v1",
+          "Nodes"
+        ],
+        "summary": "Aggregate Nodes",
+        "description": "Total, average, count or compare fields of the items a query matches.\n\n`query` is a condition tree like the `query` of `POST /nodes/search`, parsed and\nresolved the same way, so the items aggregated are exactly the ones a search for\nit lists (leave it out for every item). Each of 1 to 10 `measures` is a function\nover a field: one item type's (`type` and `key`), or every type field copied\nfrom a saved field (`origin`). Items with no value for a field are left out of\nthat measure, so an average is over the items that have one.\n\nMoney is aggregated per currency and never converted: a money measure has no\n`value`, and `currencies` has one entry for each currency found. A field that no\nlonger exists gives no value and a warning at the measure's path; a function\nthat cannot read the field's kind is a 400.\n\n**Requires permission:** `graph:item:read`",
+        "operationId": "aggregate_nodes",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Time-Zone",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`).",
+              "title": "Time-Zone"
+            },
+            "description": "An IANA time zone, such as `Europe/London`, for relative dates like 'the last 30 days'. Missing or unknown means the server's zone (`MENAGERIST_TIME_ZONE`)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeAggregateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeAggregateResponse"
+                },
+                "example": {
+                  "items": 232,
+                  "measures": [
+                    {
+                      "currencies": [],
+                      "fn": "avg",
+                      "key": "rating",
+                      "type": "film",
+                      "value": 3.75
+                    }
+                  ],
+                  "warnings": []
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Returned when a query is malformed or does not fit the item types.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "InvalidQueryError",
+                  "status": 400,
+                  "detail": "measures[0]: `sum` cannot read a date field.",
+                  "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session is no longer valid. A bearer token that is unknown, expired, revoked or whose owner is disabled is refused with problem type `invalid_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "not_signed_in": {
+                    "summary": "Not signed in",
+                    "value": {
+                      "type": "unauthenticated",
+                      "title": "SessionRequiredError",
+                      "status": 401,
+                      "detail": "Sign in to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                    }
+                  },
+                  "setup_required": {
+                    "summary": "No account exists yet",
+                    "value": {
+                      "type": "setup_required",
+                      "title": "SetupRequiredError",
+                      "status": 401,
+                      "detail": "Create the first account to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Bearer token not valid",
+                    "value": {
+                      "type": "invalid_token",
+                      "title": "InvalidApiTokenError",
+                      "status": 401,
+                      "detail": "The access token is not valid.",
+                      "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not permitted: the account or token lacks the permission, or the password must be changed first (`password_expired`). A cookie-authenticated request that did not come from this site's own pages is refused with `csrf_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "permission_refused": {
+                    "summary": "Permission refused",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "ForbiddenError",
+                      "status": 403,
+                      "detail": "You do not have permission to do that.",
+                      "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                    }
+                  },
+                  "csrf_failed": {
+                    "summary": "Request not from this site",
+                    "value": {
+                      "type": "csrf_failed",
+                      "title": "CsrfError",
+                      "status": 403,
+                      "detail": "This request was not sent from this site's own pages.",
+                      "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                    }
+                  },
+                  "password_expired": {
+                    "summary": "Password must be changed",
+                    "value": {
+                      "type": "password_expired",
+                      "title": "PasswordExpiredError",
+                      "status": 403,
+                      "detail": "Change your password to continue.",
+                      "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests recently; wait for `Retry-After` seconds.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "RateLimitedError",
+                  "status": 429,
+                  "detail": "Too many requests. Try again later.",
+                  "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                },
+                "examples": {
+                  "internal_error": {
+                    "summary": "Server error",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Internal Server Error",
+                      "status": 500,
+                      "detail": "An unexpected error occurred.",
+                      "instance": "https://menagerist.example/api/v1/nodes/aggregate"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-required-permission": "graph:item:read"
+      }
+    },
     "/api/v1/nodes/fields": {
       "get": {
         "tags": [
@@ -40702,6 +40951,114 @@
         "title": "NameLookup",
         "description": "What happens to an item found by name when the person has none called that."
       },
+      "NodeAggregateRequest": {
+        "properties": {
+          "query": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Query",
+            "description": "The condition tree to aggregate over, as for `POST /nodes/search`: `v` and an optional `where` group. Leave it out for every item."
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/NodeMeasureRequest"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Measures",
+            "description": "1 to 10 measures, answered in order."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "measures"
+        ],
+        "title": "NodeAggregateRequest",
+        "description": "Request body for aggregating fields of the items a condition tree matches.",
+        "examples": [
+          {
+            "measures": [
+              {
+                "fn": "sum",
+                "key": "price",
+                "type": "film"
+              },
+              {
+                "fn": "avg",
+                "key": "rating",
+                "type": "film"
+              },
+              {
+                "fn": "count"
+              }
+            ],
+            "query": {
+              "v": 1,
+              "where": {
+                "children": [
+                  {
+                    "in": [
+                      "film"
+                    ],
+                    "kind": "type"
+                  }
+                ],
+                "op": "and"
+              }
+            }
+          }
+        ]
+      },
+      "NodeAggregateResponse": {
+        "properties": {
+          "items": {
+            "type": "integer",
+            "title": "Items",
+            "description": "How many items the query matches, exactly."
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/NodeMeasureResponse"
+            },
+            "type": "array",
+            "title": "Measures",
+            "description": "One entry per measure asked, in the same order."
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/QueryWarningResponse"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Parts of the query, or measures, that no longer apply."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "measures",
+          "warnings"
+        ],
+        "title": "NodeAggregateResponse",
+        "description": "The aggregates of the items a query matches.",
+        "examples": [
+          {
+            "items": 232,
+            "measures": [
+              {
+                "currencies": [],
+                "fn": "avg",
+                "key": "rating",
+                "type": "film",
+                "value": 3.75
+              }
+            ],
+            "warnings": []
+          }
+        ]
+      },
       "NodeContentsEntryResponse": {
         "properties": {
           "item": {
@@ -40762,6 +41119,217 @@
         "examples": [
           {
             "count": 1234
+          }
+        ]
+      },
+      "NodeCurrencyValueResponse": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "The currency code the amounts are in."
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "The aggregate of the amounts in this currency."
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "value"
+        ],
+        "title": "NodeCurrencyValueResponse",
+        "description": "An aggregate of the amounts in one currency.",
+        "examples": [
+          {
+            "currency": "GBP",
+            "value": 1204.5
+          }
+        ]
+      },
+      "NodeMeasureRequest": {
+        "properties": {
+          "fn": {
+            "type": "string",
+            "enum": [
+              "count",
+              "sum",
+              "avg",
+              "min",
+              "max",
+              "distinct"
+            ],
+            "title": "Fn",
+            "description": "`count`, `sum`, `avg`, `min`, `max` or `distinct`. `sum` and `avg` read numbers, durations, ratings and money; `min` and `max` also dates; `distinct` and `count` any of those and text, choice and yes/no values. `count` with no field counts the items."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type",
+            "description": "Slug of the item type whose field is read, with `key`."
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key",
+            "description": "The field's key on that item type."
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin",
+            "description": "Id of a saved field, to read every item type field copied from it instead of naming `type` and `key`."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fn"
+        ],
+        "title": "NodeMeasureRequest",
+        "description": "One function over one field of the items a query matches.",
+        "examples": [
+          {
+            "fn": "sum",
+            "key": "price",
+            "type": "film"
+          },
+          {
+            "fn": "avg",
+            "origin": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20"
+          },
+          {
+            "fn": "count"
+          }
+        ]
+      },
+      "NodeMeasureResponse": {
+        "properties": {
+          "fn": {
+            "type": "string",
+            "enum": [
+              "count",
+              "sum",
+              "avg",
+              "min",
+              "max",
+              "distinct"
+            ],
+            "title": "Fn",
+            "description": "The function, as asked."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type",
+            "description": "The item type, as asked."
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key",
+            "description": "The field's key, as asked."
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin",
+            "description": "The saved field, as asked."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "The answer: a number, or a date as text for `min` and `max` of a date field. Null when no item had a value to read, when the field no longer exists (see `warnings`), and for money, which is in `currencies`."
+          },
+          "currencies": {
+            "items": {
+              "$ref": "#/components/schemas/NodeCurrencyValueResponse"
+            },
+            "type": "array",
+            "title": "Currencies",
+            "description": "For money, one value per currency, sorted by currency code. Money is never converted, so the currencies are never added together. Empty for anything else, and for money when no item had an amount."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fn",
+          "currencies"
+        ],
+        "title": "NodeMeasureResponse",
+        "description": "What one measure came to.",
+        "examples": [
+          {
+            "currencies": [
+              {
+                "currency": "GBP",
+                "value": 1204.5
+              },
+              {
+                "currency": "USD",
+                "value": 80
+              }
+            ],
+            "fn": "sum",
+            "key": "price",
+            "type": "film"
+          },
+          {
+            "currencies": [],
+            "fn": "avg",
+            "key": "rating",
+            "type": "film",
+            "value": 3.75
           }
         ]
       },

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -17,9 +17,13 @@ from app.modules.graph.domain.query import ItemFieldUse, TypeCount  # noqa: TC00
 from app.platform.request_model import RequestModel
 
 if TYPE_CHECKING:
+    from app.modules.graph.application.aggregate_nodes import AggregateNodesResult
     from app.modules.graph.application.search_node_counts import SearchCount
     from app.modules.graph.application.search_nodes import SearchNodesResult
     from app.modules.graph.domain.node import Node
+
+# Written out, not an alias, so the schema lists the functions inline.
+_Function = Literal["count", "sum", "avg", "min", "max", "distinct"]
 
 _NODE_EXAMPLE: dict[str, Any] = {
     "id": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e10",
@@ -592,6 +596,197 @@ class NodeSearchCountsResponse(BaseModel):
                 )
                 for name, count in result.items()
             }
+        )
+
+
+class NodeMeasureRequest(RequestModel):
+    """One function over one field of the items a query matches."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"fn": "sum", "type": "film", "key": "price"},
+                {"fn": "avg", "origin": "01978c3e-2b8b-7c3a-9c2e-3a2f6b9d4e20"},
+                {"fn": "count"},
+            ]
+        }
+    )
+
+    fn: _Function = Field(
+        description=(
+            "`count`, `sum`, `avg`, `min`, `max` or `distinct`. `sum` and `avg` read "
+            + "numbers, durations, ratings and money; `min` and `max` also dates; "
+            + "`distinct` and `count` any of those and text, choice and yes/no "
+            + "values. `count` with no field counts the items."
+        )
+    )
+    type: str | None = Field(
+        None, description="Slug of the item type whose field is read, with `key`."
+    )
+    key: str | None = Field(None, description="The field's key on that item type.")
+    origin: str | None = Field(
+        None,
+        description=(
+            "Id of a saved field, to read every item type field copied from it "
+            + "instead of naming `type` and `key`."
+        ),
+    )
+
+
+class NodeAggregateRequest(RequestModel):
+    """Request body for aggregating fields of the items a condition tree matches."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "query": {
+                        "v": 1,
+                        "where": {
+                            "op": "and",
+                            "children": [{"kind": "type", "in": ["film"]}],
+                        },
+                    },
+                    "measures": [
+                        {"fn": "sum", "type": "film", "key": "price"},
+                        {"fn": "avg", "type": "film", "key": "rating"},
+                        {"fn": "count"},
+                    ],
+                }
+            ]
+        }
+    )
+
+    query: dict[str, Any] = Field(
+        default_factory=lambda: {"v": 1},
+        description=(
+            "The condition tree to aggregate over, as for `POST /nodes/search`: "
+            + "`v` and an optional `where` group. Leave it out for every item."
+        ),
+    )
+    measures: list[NodeMeasureRequest] = Field(
+        min_length=1, max_length=10, description="1 to 10 measures, answered in order."
+    )
+
+
+class NodeCurrencyValueResponse(BaseModel):
+    """An aggregate of the amounts in one currency."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"currency": "GBP", "value": 1204.5}]}
+    )
+
+    currency: str = Field(description="The currency code the amounts are in.")
+    value: float = Field(description="The aggregate of the amounts in this currency.")
+
+
+class NodeMeasureResponse(BaseModel):
+    """What one measure came to."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "fn": "sum",
+                    "type": "film",
+                    "key": "price",
+                    "origin": None,
+                    "value": None,
+                    "currencies": [
+                        {"currency": "GBP", "value": 1204.5},
+                        {"currency": "USD", "value": 80},
+                    ],
+                },
+                {
+                    "fn": "avg",
+                    "type": "film",
+                    "key": "rating",
+                    "origin": None,
+                    "value": 3.75,
+                    "currencies": [],
+                },
+            ]
+        }
+    )
+
+    fn: _Function = Field(description="The function, as asked.")
+    type: str | None = Field(None, description="The item type, as asked.")
+    key: str | None = Field(None, description="The field's key, as asked.")
+    origin: str | None = Field(None, description="The saved field, as asked.")
+    value: float | int | str | None = Field(
+        None,
+        description=(
+            "The answer: a number, or a date as text for `min` and `max` of a date "
+            + "field. Null when no item had a value to read, when the field no longer "
+            + "exists (see `warnings`), and for money, which is in `currencies`."
+        ),
+    )
+    currencies: list[NodeCurrencyValueResponse] = Field(
+        description=(
+            "For money, one value per currency, sorted by currency code. Money is "
+            + "never converted, so the currencies are never added together. Empty "
+            + "for anything else, and for money when no item had an amount."
+        )
+    )
+
+
+class NodeAggregateResponse(BaseModel):
+    """The aggregates of the items a query matches."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "items": 232,
+                    "measures": [
+                        {
+                            "fn": "avg",
+                            "type": "film",
+                            "key": "rating",
+                            "origin": None,
+                            "value": 3.75,
+                            "currencies": [],
+                        }
+                    ],
+                    "warnings": [],
+                }
+            ]
+        }
+    )
+
+    items: int = Field(description="How many items the query matches, exactly.")
+    measures: list[NodeMeasureResponse] = Field(
+        description="One entry per measure asked, in the same order."
+    )
+    warnings: list[QueryWarningResponse] = Field(
+        description="Parts of the query, or measures, that no longer apply."
+    )
+
+    @classmethod
+    def from_result(
+        cls, asked: list[NodeMeasureRequest], result: AggregateNodesResult
+    ) -> NodeAggregateResponse:
+        """Build a response from what an `AggregateNodes` returned."""
+        return cls(
+            items=result.items,
+            measures=[
+                NodeMeasureResponse(
+                    fn=measure.fn,
+                    type=measure.type,
+                    key=measure.key,
+                    origin=measure.origin,
+                    value=value.value,
+                    currencies=[
+                        NodeCurrencyValueResponse(currency=c.currency, value=c.value)
+                        for c in value.currencies
+                    ],
+                )
+                for measure, value in zip(asked, result.values, strict=True)
+            ],
+            warnings=[
+                QueryWarningResponse(path=w.path, message=w.message)
+                for w in result.warnings
+            ],
         )
 
 

@@ -71,6 +71,16 @@ def _targets(
                 yield slug, key, kind
 
 
+def fields_reached(
+    schemas: _Schemas, *, key: str | None = None, origin: str | None = None
+) -> Iterator[tuple[str, str, str]]:
+    """Yield (type, key, kind) for each live type field with `key`, or from `origin`.
+
+    The fields a condition or a measure that names a key, or a saved field, reaches.
+    """
+    yield from _targets(schemas, FieldCondition(key=key or "", op="=", origin=origin))
+
+
 def _expand(
     condition: FieldCondition, schemas: _Schemas, path: str
 ) -> Group | Condition:

@@ -2137,3 +2137,13 @@ The item page read up to 500 items on every load only to name the item on the ot
 
 - **`GET /nodes` takes a repeated `id`.** Up to 100 ids, each once; it lists those items among the ones you can see, so an id that is not one is left out, and `Total-Count` counts what was found. It narrows a manual collection's items too, and is refused for a smart collection, which already chooses its items by its search. It is additive, so not a breaking change.
 - **The page reads the other ends of its connections.** `fetchItemsById` asks for the distinct ids, 100 to a request, and keeps what it got when a request fails, so names still show. Connections made on the page add their targets, which the search already returned.
+
+## Aggregates are one endpoint over the search's condition tree (2026-11-28)
+
+Totals on a collection page, a dashboard panel and a grouped total all need the same thing: a number taken over the items a query matches (#134, #135, #136). So there is one endpoint, `POST /nodes/aggregate`, and no collection-specific one: a collection's items are already a query, manual (a collection condition) or smart (its saved tree).
+
+- **Measures name a field, not an expression.** A measure is a function over one item type's field (`type` and `key`) or every type field copied from a saved field (`origin`), so "my Value saved field across every type" is one measure. A `computed` source can join them when computed fields land without changing the endpoint. Fields of one item (`field_kind` on an item's own overlay) are left out for now: they have no schema to check a function against.
+- **Money is added up per currency and never converted.** A money measure answers with one value for each currency found. The conversion rate is not ours to guess, and a single mixed total would be wrong whenever two currencies are present.
+- **Exact sums.** SQL adds JSON numbers as `numeric` and rounds to six places, and the in-memory evaluator uses `Decimal`, so the two agree (a parity test runs both) and money does not drift.
+- **The use case resolves, the repository evaluates.** `AggregateNodes` parses the query and measures, finds each measure's fields in the item types (a type's field is read from its subtypes too) and passes `ResolvedMeasure`s to `NodeRepository.aggregate`, one `SELECT` per measure.
+- **Not yet:** grouping (#135) and the totals on the collection page and Home (#136).
