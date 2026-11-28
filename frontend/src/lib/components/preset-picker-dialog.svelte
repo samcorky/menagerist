@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { listPresets } from '$lib/api/client';
 	import { errorMessage } from '$lib/api/errors';
 	import * as ResponsiveDialog from '$lib/components/ui/responsive-dialog/index.js';
@@ -26,7 +27,10 @@
 	let loading = $state(false);
 	let loadError = $state<string | null>(null);
 	let search = $state('');
+	// What the server was last asked for: the box, once typing has paused.
+	let appliedSearch = $state('');
 	let catalogueOpen = $state(false);
+	let seq = 0;
 
 	const catalogueSections = $derived<EntrySection[]>(
 		kind === 'choice_list' ? ['choice_list'] : kind === 'field_set' ? ['field_group'] : ['field']
@@ -47,10 +51,14 @@
 				: 'Search saved fields'
 	);
 
-	async function load() {
+	// The server matches the text (label and description, ignoring case and accents), so a
+	// saved field past the first hundred is found too. The rows stay while it is asked.
+	async function load(text = appliedSearch) {
+		const mine = ++seq;
 		loading = true;
 		loadError = null;
-		const result = await listPresets({ query: { kind, limit: 100 } });
+		const result = await listPresets({ query: { kind, limit: 100, q: text || undefined } });
+		if (mine !== seq) return;
 		loading = false;
 		if (result.error || !result.data) {
 			loadError = errorMessage(result.error);
@@ -59,18 +67,28 @@
 		presets = result.data as unknown as Preset[];
 	}
 
+	const searching = $derived(appliedSearch !== '');
+	// With nothing saved there is nothing to search; a search that finds nothing keeps its box.
+	const canSearch = $derived(searching || presets.length > 0);
+
 	$effect(() => {
 		if (open) {
-			search = '';
-			void load();
+			untrack(() => {
+				search = '';
+				appliedSearch = '';
+			});
 		}
 	});
 
-	const filtered = $derived(
-		search.trim() === ''
-			? presets
-			: presets.filter((p) => p.label.toLowerCase().includes(search.trim().toLowerCase()))
-	);
+	$effect(() => {
+		const text = search.trim();
+		const timer = setTimeout(() => (appliedSearch = text), 250);
+		return () => clearTimeout(timer);
+	});
+
+	$effect(() => {
+		if (open) void load(appliedSearch);
+	});
 
 	function pick(preset: Preset) {
 		onPick(preset);
@@ -86,16 +104,16 @@
 					bind:value={search}
 					placeholder="Search…"
 					aria-label={searchLabel}
-					disabled={loading || presets.length === 0}
+					disabled={!canSearch}
 					class="min-w-48 flex-1"
 				/>
-				{#if presets.length > 0}
+				{#if canSearch}
 					<Button type="button" variant="ghost" size="sm" onclick={() => (catalogueOpen = true)}>
 						Install from catalogue
 					</Button>
 				{/if}
 			</div>
-			{#if loading}
+			{#if loading && presets.length === 0}
 				<p class="py-6 text-center text-sm text-muted-foreground">Loading…</p>
 			{:else if loadError}
 				<div class="flex flex-col items-center gap-2 py-6 text-center">
@@ -104,11 +122,11 @@
 						Retry
 					</Button>
 				</div>
-			{:else if filtered.length === 0}
+			{:else if presets.length === 0}
 				<p class="py-6 text-center text-sm text-muted-foreground">
-					{presets.length === 0 ? emptyLabel : 'No matches'}
+					{searching ? 'No matches' : emptyLabel}
 				</p>
-				{#if presets.length === 0}
+				{#if !searching}
 					<div class="flex justify-center">
 						<Button type="button" size="sm" onclick={() => (catalogueOpen = true)}>
 							Install from catalogue
@@ -116,8 +134,13 @@
 					</div>
 				{/if}
 			{:else}
-				<ul class="max-h-80 space-y-1 overflow-y-auto">
-					{#each filtered as preset (preset.id)}
+				<ul
+					class="max-h-80 space-y-1 overflow-y-auto transition-opacity {loading
+						? 'opacity-60'
+						: ''}"
+					aria-busy={loading}
+				>
+					{#each presets as preset (preset.id)}
 						<li class="flex items-center gap-2 rounded-md border border-input p-2">
 							<div class="min-w-0 flex-1">
 								<p class="truncate text-sm font-medium">{preset.label}</p>
