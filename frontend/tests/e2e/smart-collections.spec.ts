@@ -271,7 +271,9 @@ test('Edit conditions: Cancel keeps the definition, Save changes the results', a
 	await expect(page.getByText('1 item', { exact: true })).toBeVisible();
 	expect(await definitionOf(request, smart.id)).not.toEqual(before);
 
-	// A rename straight after a definition save must not be refused as a stale write.
+	// A rename straight after a definition save must not be refused as a stale write. The toast
+	// sits over the Edit button until it goes, and a pointer hovering it keeps it up.
+	await expect(page.getByText('Conditions saved')).toBeHidden();
 	await page.getByRole('button', { name: 'Edit', exact: true }).click();
 	const edit = page.getByRole('dialog', { name: 'Edit collection' });
 	const renamed = uniqueName('Renamed');

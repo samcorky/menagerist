@@ -2122,3 +2122,11 @@ The import page uploads the file once, as it is chosen, and follows the import's
 - **What stays on the page.** The warning marks, the filter error, the "too many conditions" notice, the capped-count flag and the exact-count tracker that upgrades "1,000+" are set by the reader, and only for the newest read, so a slow answer to an old search cannot change them.
 - **Why two and a half.** At one and a half a quick scroll or a slow connection still caught the spinner. More than about three screens would load a second page on the first scroll that nobody reads.
 - **Not done:** a collection's items still keep their own paging state, because a collection page has a manual path (the item list route) and a smart path (the search) and the saved-order rules of #835.
+
+## A collection's items read through PagedList, with one reader for both kinds (2026-11-27)
+
+**Decision:** The collection page keeps no paging state of its own. A `PagedList` owns the rows, the cursor, whether there is more, and the first-page and later-page failures, and one reader (`readItems`) runs the item list route for a manual collection and the search for a smart one, with the order for the view (`?sort=`), the box, the type and the page's own narrowing as its parameters. That was the last page paging by hand, so the guard test's list of them is empty.
+
+- **`clear()` for another collection.** Opening a different collection must not leave the old one's items on screen while the new ones are found, and a read still in flight for the old one must not land. `PagedList.clear()` empties the list, forgets any failure and drops a read in flight, without reading anything; `load` with `keepRows` is for the same collection read again.
+- **What the reader sets.** A smart collection's warnings, its "too large" flag, the capped count and the filter error are set by the reader, and only for the newest read. A manual collection's 404 sets `notFound` there too.
+- **Same behaviour.** Removing an item and undoing it still edit the rows by hand, in creation order only (any other order reads the list again); a reload keeps the old rows, dimmed, until the new first page arrives; a failed later page keeps its rows with Try again.

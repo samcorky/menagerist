@@ -12,11 +12,10 @@ const sources = import.meta.glob(
 const PAGING = '../src/lib/paging.ts';
 
 /**
- * Pages that keep their own paging state instead of a `PagedList`, until they move onto it
- * with their sort controls (#592, #610). They read the server's cursor with `nextCursor`, as
- * everything else does. Take a path off this list when it moves; never add one.
+ * Pages that keep their own paging state instead of a `PagedList`. None today: the last two, the
+ * Items list and a collection's items, moved onto it (#611). Never add one.
  */
-const BY_HAND = new Set(['../src/routes/collections/[id]/+page.svelte']);
+const BY_HAND = new Set<string>();
 
 /** Pages a cursor by the id of the last row on purpose: an item's contents come in (depth, id) order. */
 const POSITIONAL = new Set(['../src/lib/components/item-contents.svelte']);
