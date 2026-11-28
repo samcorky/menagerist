@@ -370,11 +370,17 @@ class ScheduledTaskSource:
         self, query: str, limit: int, actor: Actor, *, collection: str | None = None
     ) -> list[SearchHit]:
         """Return scheduled tasks matching `query`."""
-        statuses = await self._use_case.handle(
-            ListJobsQuery(
-                now=datetime.now(UTC), timezone=get_server_settings().time_zone.key
-            ),
-            actor,
+        statuses = await _every_match(
+            lambda after: self._use_case.handle(
+                ListJobsQuery(
+                    after=after,
+                    limit=_MATCH_PAGE,
+                    q=query,
+                    now=datetime.now(UTC),
+                    timezone=get_server_settings().time_zone.key,
+                ),
+                actor,
+            )
         )
         return [
             SearchHit(
@@ -384,7 +390,6 @@ class ScheduledTaskSource:
                 description=status.definition.description,
             )
             for status in statuses
-            if _mentions(query, status.definition.title, status.definition.description)
         ]
 
 

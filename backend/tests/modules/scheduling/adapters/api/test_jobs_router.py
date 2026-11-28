@@ -12,6 +12,7 @@ from app.modules.scheduling.adapters.api.dependencies import (
     get_list_jobs_use_case,
     get_run_job_now_use_case,
 )
+from app.modules.scheduling.adapters.api.schemas import JobResponse
 from app.modules.scheduling.adapters.persistence.in_memory_job_run_reader import (
     InMemoryJobRunReader,
 )
@@ -28,7 +29,7 @@ from app.modules.scheduling.adapters.platform.in_memory_schedule_source import (
     InMemoryScheduleSource,
 )
 from app.modules.scheduling.application.get_job_history import GetJobHistory
-from app.modules.scheduling.application.list_jobs import ListJobs
+from app.modules.scheduling.application.list_jobs import JobSort, ListJobs
 from app.modules.scheduling.application.run_job_now import RunJobNow
 from app.modules.scheduling.domain.job_run import JobRun, RunStatus
 from app.modules.scheduling.domain.registry import JobRegistry
@@ -40,7 +41,7 @@ type AsUser = Callable[..., None]
 
 
 def build(
-    as_user: AsUser, role: str = "admin"
+    as_user: AsUser, role: str = "admin", *, manual_title: str = ""
 ) -> tuple[TestClient, InMemorySchedulingStore]:
     """The app signed in with the given role, over an in-memory scheduler."""
     registry = JobRegistry(
@@ -52,7 +53,10 @@ def build(
                 description="Saves a full copy.",
             ),
             JobDefinition(
-                job_key="manual.only", run_now_allowed=False, confirm_required=True
+                job_key="manual.only",
+                run_now_allowed=False,
+                confirm_required=True,
+                title=manual_title,
             ),
         ]
     )
@@ -90,6 +94,60 @@ def test_it_lists_every_job_with_its_schedule(as_user: AsUser) -> None:
     assert jobs["manual.only"]["schedule"] is None
     assert jobs["manual.only"]["next_run_at"] is None
     assert jobs["manual.only"]["run_now_allowed"] is False
+
+
+def test_the_sort_keys_the_route_declares_are_fields_of_the_response() -> None:
+    """The enum's keys are names in the response, so a client sorts by what it sees."""
+    assert {key.value for key in JobSort} <= set(JobResponse.model_fields)
+
+
+def test_it_lists_jobs_by_title_and_sorts_on_the_server(as_user: AsUser) -> None:
+    """Title order by default; a job with no next run sorts last whichever way."""
+    client, _ = build(as_user, manual_title="Only by hand")
+
+    def keys(**params: str) -> list[str]:
+        return [job["job_key"] for job in client.get(BASE, params=params).json()]
+
+    assert keys() == ["backup.create", "manual.only"]
+    assert keys(sort="title", order="desc") == ["manual.only", "backup.create"]
+    assert keys(sort="next_run_at") == ["backup.create", "manual.only"]
+    assert keys(sort="next_run_at", order="desc") == ["backup.create", "manual.only"]
+
+
+def test_it_searches_title_and_description_ignoring_case_and_accents(
+    as_user: AsUser,
+) -> None:
+    """`q` keeps the jobs whose title or description contains it."""
+    client, _ = build(as_user, manual_title="Only by hand")
+
+    def keys(q: str) -> list[str]:
+        return [job["job_key"] for job in client.get(BASE, params={"q": q}).json()]
+
+    assert keys("BACK UP") == ["backup.create"]
+    assert keys("full copy") == ["backup.create"]
+    assert keys("by hand") == ["manual.only"]
+    assert keys("zzz") == []
+
+
+def test_it_pages_with_a_link_and_counts_the_matches(as_user: AsUser) -> None:
+    """The first page names the next in `Link`, and `Total-Count` is every match."""
+    client, _ = build(as_user, manual_title="Only by hand")
+
+    first = client.get(BASE, params={"limit": 1})
+
+    assert first.status_code == 200
+    assert first.headers["total-count"] == "2"
+    assert 'rel="next"' in first.headers["link"]
+    assert [job["job_key"] for job in first.json()] == ["backup.create"]
+
+
+def test_it_refuses_a_sort_key_it_does_not_offer(as_user: AsUser) -> None:
+    """An unknown key is a 422 that names the parameter."""
+    client, _ = build(as_user)
+
+    response = client.get(BASE, params={"sort": "schedule"})
+
+    assert response.status_code == 422
 
 
 def test_it_shows_work_in_progress(as_user: AsUser) -> None:

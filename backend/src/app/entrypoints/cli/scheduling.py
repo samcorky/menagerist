@@ -60,6 +60,7 @@ from app.platform.config.scheduler import get_scheduler_settings
 from app.platform.config.server import get_server_settings
 from app.platform.database import get_engine, get_session_factory
 from app.shared_kernel.actor import SYSTEM_ACTOR
+from app.shared_kernel.paging import MAX_PAGE_ROWS
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -324,12 +325,16 @@ async def list_registered_jobs(
             source,
             CronScheduleEvaluator(),
         )
-        return await query.handle(
+        # Every registered job: the registry is far smaller than a page's most.
+        page = await query.handle(
             ListJobsQuery(
-                now=datetime.now(UTC), timezone=get_server_settings().time_zone.key
+                limit=MAX_PAGE_ROWS,
+                now=datetime.now(UTC),
+                timezone=get_server_settings().time_zone.key,
             ),
             SYSTEM_ACTOR,
         )
+        return page.items
 
 
 async def run_registered_job(

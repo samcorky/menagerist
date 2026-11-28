@@ -18447,18 +18447,107 @@
           "Scheduling"
         ],
         "summary": "List Jobs",
-        "description": "List every scheduled job with its schedule, next run and current work.\n\n**Requires permission:** `scheduling:job:read`",
+        "description": "List scheduled jobs with their schedule, next run and current work.\n\nOrdered by title unless sorted. `q` keeps the jobs whose title or description\ncontains it. A job with no next run, or that has never run, sorts last.\n\n**Requires permission:** `scheduling:job:read`",
         "operationId": "list_jobs",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`.",
+              "title": "After"
+            },
+            "description": "Where the previous page ended. Leave it out for the first page; the `Link` header of each page carries the next one. Pass it back unchanged, with the same `sort` and `order`."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Most rows to return on this page.",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Most rows to return on this page."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/JobSort"
+              },
+              "maxItems": 3,
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "title": "Sort"
+            },
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SortOrder"
+              },
+              "maxItems": 3,
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "title": "Order"
+            },
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep the rows whose text contains this, ignoring case and accents.",
+              "title": "Q"
+            },
+            "description": "Keep the rows whose text contains this, ignoring case and accents."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/JobResponse"
                   },
-                  "type": "array",
                   "title": "Response List Jobs",
                   "description": "Each entry is a `JobResponse`."
                 },
@@ -18494,6 +18583,20 @@
                     "title": "Back up everything"
                   }
                 ]
+              }
+            },
+            "headers": {
+              "Link": {
+                "description": "RFC 8288 next-page cursor. Absent on last page.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Total-Count": {
+                "description": "Scheduled tasks in total. Always exact.",
+                "schema": {
+                  "type": "integer"
+                }
               }
             }
           },
@@ -18546,6 +18649,32 @@
               }
             }
           },
+          "422": {
+            "description": "A field is missing or has the wrong type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                },
+                "example": {
+                  "type": "about:blank",
+                  "title": "Unprocessable Content",
+                  "status": 422,
+                  "detail": [
+                    {
+                      "type": "missing",
+                      "loc": [
+                        "body",
+                        "name"
+                      ],
+                      "msg": "Field required"
+                    }
+                  ],
+                  "instance": "https://menagerist.example/api/v1/scheduling/jobs"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected server error, or a step that gave way part-way. The detail is generic; the cause is only logged.",
             "content": {
@@ -18569,11 +18698,6 @@
             }
           }
         },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
         "x-required-permission": "scheduling:job:read"
       }
     },
@@ -40103,6 +40227,16 @@
         ],
         "title": "JobRunSort",
         "description": "What a job's runs can be sorted by: fields of the response."
+      },
+      "JobSort": {
+        "type": "string",
+        "enum": [
+          "title",
+          "next_run_at",
+          "last_run"
+        ],
+        "title": "JobSort",
+        "description": "What the jobs can be sorted by: fields of the response."
       },
       "KeptEntityResponse": {
         "properties": {
