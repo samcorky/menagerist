@@ -300,10 +300,10 @@
                 "$ref": "#/components/schemas/BackupSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -1486,10 +1486,10 @@
                 "$ref": "#/components/schemas/UserExportSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -2532,10 +2532,10 @@
                 "$ref": "#/components/schemas/NodeSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -2547,10 +2547,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "id",
@@ -3909,10 +3909,10 @@
                 "$ref": "#/components/schemas/DeletedNodeSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -7779,10 +7779,10 @@
                 "$ref": "#/components/schemas/EdgeSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -7794,10 +7794,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -9280,10 +9280,10 @@
                 "$ref": "#/components/schemas/NodeTypeSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -9295,10 +9295,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -10352,10 +10352,10 @@
                 "$ref": "#/components/schemas/NodeTypeSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -10367,10 +10367,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -12195,10 +12195,10 @@
                 "$ref": "#/components/schemas/EdgeTypeSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -12210,10 +12210,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -17252,10 +17252,10 @@
                 "$ref": "#/components/schemas/PresetSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -17267,10 +17267,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -18521,10 +18521,10 @@
                 "$ref": "#/components/schemas/JobSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -18536,10 +18536,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -18793,10 +18793,10 @@
                 "$ref": "#/components/schemas/JobRunSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -23633,10 +23633,10 @@
                 "$ref": "#/components/schemas/ItemImportSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -25562,10 +25562,10 @@
                 "$ref": "#/components/schemas/CollectionSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -25577,10 +25577,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -25933,10 +25933,10 @@
                 "$ref": "#/components/schemas/DeletedCollectionSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -29009,10 +29009,10 @@
                 "$ref": "#/components/schemas/OwnDeviceSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -29973,10 +29973,10 @@
                 "$ref": "#/components/schemas/OwnSessionSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -30645,10 +30645,10 @@
                 "$ref": "#/components/schemas/UserSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -30660,10 +30660,10 @@
                 "$ref": "#/components/schemas/SortOrder"
               },
               "maxItems": 3,
-              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first.",
+              "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them.",
               "title": "Order"
             },
-            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
+            "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first. Directions pair with keys by position, so a picker that cannot keep the order of values cannot pair them."
           },
           {
             "name": "q",
@@ -32476,10 +32476,10 @@
                 "$ref": "#/components/schemas/SessionSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
@@ -33165,10 +33165,10 @@
                 "$ref": "#/components/schemas/ApiTokenSort"
               },
               "maxItems": 3,
-              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order.",
+              "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand.",
               "title": "Sort"
             },
-            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order."
+            "description": "What to order the rows by. Repeat it for a second and third key, which break ties in the first. Leave it out to order by id, which is creation order. Ties keep a fixed order. Write the parameter once for each key, in the address: `?sort=name&sort=created_at&order=asc&order=desc` orders by name, then newest created first. The list picker in this page sends keys in the list's own order, not the order you chose, so build a request of several keys by hand."
           },
           {
             "name": "order",
