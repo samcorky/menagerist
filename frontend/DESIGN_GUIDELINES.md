@@ -87,6 +87,14 @@ An item type may choose up to **three highlighted fields**, excluding long text.
 - Use labels such as “Signed”, “Format: Blu-ray” and “From the 1990s”.
 - Zero results explain the filter effect and offer to clear the relevant filters.
 
+### 7a-i. Totals
+
+A collection with items shows a quiet row of totals under its count: label above, value below, never a card or a chart. With nothing chosen it picks automatically (up to three money fields added up, up to two number fields averaged); an empty collection, or one with nothing to total, shows none.
+
+- Money is never converted: each currency is its own value, side by side ("£15.50 · US$3.00").
+- A control beside the row edits them. Editing shows a remove button on each total, **Add a total** (a field, then Total, Average, Lowest or Highest; dates take Earliest or Latest) and **Use automatic totals**. Removing from the automatic totals turns them into the person's own list, even an empty one.
+- Totals describe the whole collection, not the narrowed view.
+
 ### 7b. Image Handling
 
 - Keep one aspect ratio within each collection grid. Default to **2:3**; category types may specify another ratio (for example 16:9 or 1:1).

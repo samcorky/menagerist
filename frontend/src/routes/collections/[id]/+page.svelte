@@ -112,6 +112,7 @@
 	} from '$lib/collections';
 	import AddItemsDialog from '$lib/components/add-items-dialog.svelte';
 	import CollectionCount from '$lib/components/collection-count.svelte';
+	import CollectionTotals from '$lib/components/collection-totals.svelte';
 	import BackButton from '$lib/components/back-button.svelte';
 	import CollectionSlugField from '$lib/components/collection-slug-field.svelte';
 	import ConfirmDialog from '$lib/components/confirm-dialog.svelte';
@@ -1164,6 +1165,12 @@
 						</p>
 					{/if}
 					<CollectionCount {collection} ready={firstPageLoaded} />
+					<CollectionTotals
+						{collection}
+						{catalogue}
+						typeSlugs={typeCounts.flatMap((t) => (t.type === null ? [] : [t.type]))}
+						onchange={(updated) => (collection = updated)}
+					/>
 				</div>
 				<div class="flex flex-wrap items-center gap-2">
 					{#if smart}
