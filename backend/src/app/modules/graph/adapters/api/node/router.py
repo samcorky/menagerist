@@ -195,6 +195,9 @@ _DELETED_HEADERS: dict[int | str, dict[str, Any]] = {
     }
 }
 
+# The most ids one list read takes: a page, so that all of them can come back at once.
+MAX_IDS = 100
+
 _Q_DESCRIPTION = "Search text, matched case-insensitively."
 _Q_DESCRIPTION += " Looks in the name, the description and every text or number"
 _Q_DESCRIPTION += " value in the item's details. Field names, yes/no values, ratings,"
@@ -673,6 +676,18 @@ async def list_nodes(
     response: Response,
     filters: NodeFiltersDep,
     page: Annotated[PageParams[NodeSort], Query()],
+    ids: Annotated[
+        list[uuid.UUID] | None,
+        Query(
+            alias="id",
+            max_length=MAX_IDS,
+            description=(
+                "Keep only the items with these ids, given once for each. Up to "
+                + f"{MAX_IDS}. An id that is not an item you can see is left out. "
+                + "Not allowed with a smart collection."
+            ),
+        ),
+    ] = None,
 ) -> list[NodeResponse]:
     """List items, by id unless sorted.
 
@@ -690,6 +705,7 @@ async def list_nodes(
             q=filters.q,
             favourite=filters.favourite,
             collection=filters.collection,
+            ids=None if ids is None else frozenset(ids),
         ),
         actor,
     )

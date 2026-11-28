@@ -2553,6 +2553,29 @@
             "description": "`asc` (the default) or `desc`. Repeat it to give each `sort` its own direction, in the same order; a key with none is `asc`. With no `sort` it applies to id, so `desc` alone lists the newest first."
           },
           {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep only the items with these ids, given once for each. Up to 100. An id that is not an item you can see is left out. Not allowed with a smart collection.",
+              "title": "Id"
+            },
+            "description": "Keep only the items with these ids, given once for each. Up to 100. An id that is not an item you can see is left out. Not allowed with a smart collection."
+          },
+          {
             "name": "type",
             "in": "query",
             "required": false,

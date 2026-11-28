@@ -360,6 +360,17 @@ async def test_a_smart_collection_walks_every_sort_to_the_end(
         assert names == expected
 
 
+async def test_a_smart_collection_cannot_be_listed_by_id(world: World) -> None:
+    """A list of ids and a smart collection are two ways to choose, so it is refused."""
+    item = await world.item("Alien", rating=5)
+    collection = world.smart(_query(_rating("=", 5)))
+
+    with pytest.raises(ValidationError, match="by id"):
+        await world.use_case.handle(
+            ListNodesQuery(collection=collection, ids=frozenset({item.id})), AS_ALICE
+        )
+
+
 async def test_a_smart_collection_cannot_sort_by_type(world: World) -> None:
     """The search engine has no type ordering, so the list says so."""
     await world.item("Alien", rating=5)
