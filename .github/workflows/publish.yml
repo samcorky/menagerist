@@ -80,7 +80,7 @@ jobs:
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Check the CalVer setup
-        uses: samcorky/calver-scm@b2300af12d503400dd448a5a0d4bd2b50bca35b3 # v1.13.0
+        uses: samcorky/calver-scm@f84a4429ae0403948c94ed54e52a055ca5f17125 # v1.13.2
         with:
           command: doctor
           root: backend
